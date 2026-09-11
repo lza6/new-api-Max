@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
 const redisRateLimitNamespace = "rateLimit:v2"
@@ -174,6 +175,20 @@ func GlobalAPIRateLimit() func(c *gin.Context) {
 func CriticalRateLimit() func(c *gin.Context) {
 	if common.CriticalRateLimitEnable {
 		return rateLimitFactory(common.CriticalRateLimitNum, common.CriticalRateLimitDuration, "CT")
+	}
+	return defNext
+}
+
+// LoginRateLimit 登录接口专属限流（后台可开关，默认关闭；与全局
+// CriticalRateLimit 解耦——登录族端点不再被全局敏感端点限流连带）。
+// 开启后按 login_rate_limit.num / login_rate_limit.duration 以客户端 IP 限流。
+func LoginRateLimit() func(c *gin.Context) {
+	if operation_setting.IsLoginRateLimitEnabled() {
+		return rateLimitFactory(
+			operation_setting.GetLoginRateLimitNum(),
+			operation_setting.GetLoginRateLimitDuration(),
+			"LG",
+		)
 	}
 	return defNext
 }
