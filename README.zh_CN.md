@@ -2,9 +2,9 @@
 
 ![new-api](/web/public/logo.png)
 
-# New API
+# New API（Max 专属版）
 
-🍥 **新一代大模型网关与AI资产管理系统**
+🍥 **新一代大模型网关与 AI 资产管理系统**
 
 <p align="center">
   简体中文 |
@@ -48,6 +48,16 @@
 > - 使用者必须合法取得上游 API Key、账号、模型服务或接口权限，并遵守上游服务条款及适用法律法规。
 > - 使用者应确保其使用方式符合上游服务条款及适用法律法规。
 > - 面向公众提供生成式人工智能服务时，使用者应遵守[《生成式人工智能服务管理暂行办法》](http://www.cac.gov.cn/2023-07/13/c_1690898327029107.htm)等监管要求，自行完成所在司法辖区要求的备案、许可、内容安全、实名、日志留存、税务和上游授权等合规义务。
+
+---
+
+## 💰 充值模式
+
+本站采用 **额度卡（兑换码）模式**：所有额度通过兑换码充值，可在「钱包 → 兑换码」处输入兑换码获取额度。
+
+- **充值开关（热更新）**：系统管理 → 计费与支付 → 充值与兑换开关，可随时启用/停用「在线充值」与「兑换码」两个独立开关，保存后立即生效，无需重启。
+- **管理员批量导入**：系统管理 → 兑换码 → 新建兑换码，可批量生成（单次 ≤ 100 个）并导出文件；导入的兑换码为 32 位 UUID，兑换后自动标记已用并计入用户额度。
+- **购卡地址**：可在「运营设置 → 通用设置 → 充值链接（TopUpLink）」配置购买额度卡的链接（如 https://catfk.com/shop/YECI5WZ7 ），钱包的兑换码区域会显示「点此获取」跳转按钮。
 
 ---
 
@@ -115,14 +125,14 @@ docker-compose up -d
 
 ```bash
 # 拉取最新镜像
-docker pull calciumion/new-api:latest
+docker pull ghcr.io/lza6/new-api-max:latest
 
 # 使用 SQLite（默认）
 docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  ghcr.io/lza6/new-api-max:latest
 
 # 使用 MySQL
 docker run --name new-api -d --restart always \
@@ -130,7 +140,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  ghcr.io/lza6/new-api-max:latest
 ```
 
 > **💡 提示：** `-v ./data:/data` 会将数据保存在当前目录的 `data` 文件夹中，你也可以改为绝对路径如 `-v /your/custom/path:/data`
@@ -284,7 +294,7 @@ docker run --name new-api -d --restart always \
 ## 🚢 部署
 
 > [!TIP]
-> **最新版 Docker 镜像：** `calciumion/new-api:latest`
+> **最新版 Docker 镜像：** `ghcr.io/lza6/new-api-max:latest`
 
 ### 📋 部署要求
 
@@ -359,7 +369,7 @@ docker run --name new-api -d --restart always \
   -p 3000:3000 \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  ghcr.io/lza6/new-api-max:latest
 ```
 
 **使用 MySQL：**
@@ -369,7 +379,7 @@ docker run --name new-api -d --restart always \
   -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
   -e TZ=Asia/Shanghai \
   -v ./data:/data \
-  calciumion/new-api:latest
+  ghcr.io/lza6/new-api-max:latest
 ```
 
 > **💡 路径说明：**
