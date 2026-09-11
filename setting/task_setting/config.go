@@ -45,9 +45,10 @@ func GetTaskSetting() *TaskSetting {
 }
 
 // GetUnconfirmedWindowMinutes 返回 unconfirmed 兜底查询窗口（分钟）。
-// 未通过数据库配置时使用默认 30 分钟。
+// 未通过数据库配置时使用默认 30 分钟；显式配置 0 或负数表示禁用超窗退款
+// （unconfirmed 任务保持挂起，仅在有 remote_task_id_hint 时继续轮询解析）。
 func GetUnconfirmedWindowMinutes() int {
-	if s := GetTaskSetting(); s != nil && s.UnconfirmedWindowMinutes > 0 {
+	if s := GetTaskSetting(); s != nil {
 		return s.UnconfirmedWindowMinutes
 	}
 	return DefaultUnconfirmedWindowMinutes

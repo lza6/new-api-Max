@@ -356,6 +356,10 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	if resp.StatusCode != http.StatusOK {
 		responseBody, _ := io.ReadAll(resp.Body)
 		unconfirmedInfo := service.ClassifySubmitFailure(resp.StatusCode, responseBody, nil)
+		// 非 2xx 响应体里若仍带 task_id（远端实际已受理），尽力提取供轮询兜底直查。
+		if unconfirmedInfo.Unconfirmed && unconfirmedInfo.RemoteTaskIDHint == "" {
+			unconfirmedInfo.RemoteTaskIDHint = service.ExtractRemoteTaskIDHint(responseBody)
+		}
 		service.MarkUnconfirmedOnContext(c, unconfirmedInfo)
 		return nil, service.TaskErrorWrapper(fmt.Errorf("%s", string(responseBody)), "fail_to_fetch_task", resp.StatusCode)
 	}

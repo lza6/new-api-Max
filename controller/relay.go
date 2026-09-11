@@ -602,14 +602,12 @@ func executeTaskSubmissionWith(
 	var result *relay.TaskSubmitResult
 	var taskErr *taskdto.TaskError
 	durable := false
+	// unconfirmedPersisted 只有在 UNCONFIRMED 任务行真正落库后才置 true；
+	// 落库失败时 defer 仍必须回退退款，避免预扣额度滞留。
+	unconfirmedPersisted := false
 	stage := "start"
 	defer func() {
-		if !durable && relayInfo.Billing != nil {
-			// 提交结果不可确认（网络错/5xx/响应不可读）时不再退预扣费，
-			// 由落库的 unconfirmed 任务行在轮询阶段驱动兜底查询/窗口退款。
-			if unconfirmedInfo, ok := service.ReadUnconfirmedFromContext(c); ok && unconfirmedInfo.Unconfirmed {
-				return
-			}
+		if !durable && relayInfo.Billing != nil && !unconfirmedPersisted {
 			diagnostics.refund(stage)
 			relayInfo.Billing.Refund(c)
 		}
@@ -670,6 +668,9 @@ func executeTaskSubmissionWith(
 		c.Request.Body = io.NopCloser(bodyStorage)
 
 		stage = "submit"
+		// 上一 attempt 的 unconfirmed 标记不带入本轮：新渠道/新请求可能得到
+		// 明确结论（如 4xx 拒绝），以最后一轮的分类为准。
+		service.ClearUnconfirmedFromContext(c)
 		result, taskErr = submit(c, relayInfo)
 		if requestErr := c.Request.Context().Err(); requestErr != nil {
 			diagnostics.cancelled("after_submit", retryParam.GetRetry()+1)
@@ -703,6 +704,17 @@ func executeTaskSubmissionWith(
 	}
 
 	if taskErr != nil {
+		// 提交结果不可确认（网络错/5xx/响应不可读）：不退预扣费，改为落库一条
+		// UNCONFIRMED 任务行，由轮询阶段按 remote_task_id_hint / 窗口期兜底
+		// 结算或退款（见 service.ResolveUnconfirmedTasks）。落库失败则回退退款。
+		if unconfirmedInfo, ok := service.ReadUnconfirmedFromContext(c); ok && unconfirmedInfo.Unconfirmed && relayInfo.Billing != nil {
+			if persistUnconfirmedTask(c, relayInfo, unconfirmedInfo) {
+				durable = true
+				unconfirmedPersisted = true
+				logger.LogWarn(c, fmt.Sprintf("task submission unconfirmed (code=%s, http=%d): task row persisted, billing held for polling resolution",
+					taskErr.Code, taskErr.StatusCode))
+			}
+		}
 		diagnostics.failed(stage, "task_error", taskErr, false)
 		return nil, taskErr
 	}
@@ -856,6 +868,47 @@ func respondTaskSubmissionError(c *gin.Context, taskErr *taskdto.TaskError) {
 		return
 	}
 	respondTaskError(c, taskErr)
+}
+
+// persistUnconfirmedTask 在提交结果不可确认时落库一条 UNCONFIRMED 任务行。
+// 计费上下文与正常落库路径保持一致，保证轮询阶段能执行差额结算或全额退款；
+// remote_task_id_hint 非空时同步写入 PrivateData.UpstreamTaskID 供轮询直接查询。
+// 返回 true 表示落库成功（调用方据此停止 deferred refund）。
+func persistUnconfirmedTask(c *gin.Context, relayInfo *relaycommon.RelayInfo, info service.SubmitUnconfirmedInfo) bool {
+	platform := constant.TaskPlatform(c.GetString("platform"))
+	if platform == "" {
+		platform = relay.GetTaskPlatform(c)
+	}
+
+	task := model.InitTask(platform, relayInfo)
+	task.Status = model.TaskStatusUnconfirmed
+	task.Progress = "0%"
+	task.Action = relayInfo.Action
+	task.Quota = relayInfo.Billing.GetPreConsumedQuota()
+	task.PrivateData.Execution = service.TaskExecutionSnapshotFromContext(c)
+	task.PrivateData.BillingSource = relayInfo.BillingSource
+	task.PrivateData.SubscriptionId = relayInfo.SubscriptionId
+	task.PrivateData.TokenId = relayInfo.TokenId
+	task.PrivateData.NodeName = common.NodeName
+	task.PrivateData.BillingContext = &model.TaskBillingContext{
+		ModelPrice:      relayInfo.PriceData.ModelPrice,
+		GroupRatio:      relayInfo.PriceData.GroupRatioInfo.GroupRatio,
+		ModelRatio:      relayInfo.PriceData.ModelRatio,
+		OtherRatios:     relayInfo.PriceData.OtherRatios(),
+		OriginModelName: relayInfo.OriginModelName,
+		PerCallBilling:  common.StringsContains(constant.TaskPricePatches, relayInfo.OriginModelName) || relayInfo.PriceData.UsePrice,
+		TieredSnapshot:  relayInfo.TieredBillingSnapshot,
+	}
+	if info.RemoteTaskIDHint != "" {
+		task.PrivateData.UpstreamTaskID = info.RemoteTaskIDHint
+	}
+	service.AppendUnconfirmedSubmitMarker(task, info)
+
+	if insertErr := task.InsertWithContext(c.Request.Context()); insertErr != nil {
+		common.SysError("persist unconfirmed task error: " + insertErr.Error())
+		return false
+	}
+	return true
 }
 
 // respondTaskError 统一输出 Task 错误响应（含 429 限流提示改写）

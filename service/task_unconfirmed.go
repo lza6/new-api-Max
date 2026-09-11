@@ -36,7 +36,6 @@ For commercial licensing, please contact support@quantumnous.com
 package service
 
 import (
-	"net/http"
 	"strings"
 	"time"
 
@@ -60,31 +59,27 @@ type SubmitUnconfirmedInfo struct {
 
 // ClassifySubmitFailure 判定一次任务提交失败是否属于"结果不可确认"。
 //
-// 依据 aisix "cooldown 与 retryability 解耦"的错误分类器：
-//   - 网络层错误（status<=0）、408、5xx 或响应不可读（body 为空）→ 结果不可确认，
+// 复用 B2-1 的公共错误分类器（aisix "cooldown 与 retryability 解耦"模型）：
+//   - 网络层错误（status<=0）、408、5xx → 结果不可确认（Timeout/ServerError 类），
 //     远端可能已创建付费任务，Unconfirmed=true。
-//   - 明确 4xx（参数错误、鉴权失败等）→ 远端明确拒绝，结果可确认，Unconfirmed=false。
+//   - 2xx 但响应体为空（ParseResponse 失败路径）→ 响应不可读，Unconfirmed=true。
+//   - 其余（含 4xx 明确拒绝）→ 远端明确给出结论，结果可确认，Unconfirmed=false。
 func ClassifySubmitFailure(statusCode int, body []byte, upstreamErr error) SubmitUnconfirmedInfo {
 	info := SubmitUnconfirmedInfo{FailedAt: time.Now().Unix()}
 	if statusCode >= 200 && statusCode < 300 {
 		// 2xx 但响应体为空（ParseResponse 失败路径）：响应不可读 → 不可确认。
-		if len(body) == 0 {
-			info.Unconfirmed = true
-			return info
-		}
+		info.Unconfirmed = len(body) == 0
 		return info
 	}
-	if upstreamErr != nil {
-		// 网络层错误：连接超时/拒绝/重置，远端状态未知。
+	_, _, class := ClassifyHTTPStatus(statusCode, "")
+	switch class {
+	case ErrClassTimeout, ErrClassServerError:
 		info.Unconfirmed = true
-		return info
+	case ErrClassUnknown:
+		// 网络层错误在分类器中归 Timeout；走到 Unknown 说明响应形态异常，
+		// 保守视为不可确认（宁可不退，不可错退）。
+		info.Unconfirmed = upstreamErr != nil
 	}
-	if statusCode >= 500 || statusCode == http.StatusRequestTimeout {
-		// 5xx / 408：服务端故障，请求可能已被处理。
-		info.Unconfirmed = true
-		return info
-	}
-	// 其余（含 4xx 明确拒绝）可确认失败。
 	return info
 }
 
@@ -117,14 +112,6 @@ func ExtractRemoteTaskIDHint(body []byte) string {
 	return ""
 }
 
-// TaskSubmitError marks an unconfirmed task submission error so the caller can
-// persist an unconfirmed task row instead of refunding the pre-consumed quota.
-// It augments an existing TaskError with the classification result; callers
-// that already build TaskError directly should use MarkUnconfirmedOnError.
-func TaskSubmitError(statusCode int, body []byte, upstreamErr error) SubmitUnconfirmedInfo {
-	return ClassifySubmitFailure(statusCode, body, upstreamErr)
-}
-
 // MarkUnconfirmedOnError stamps the classification result onto a TaskError so
 // controller/relay.go can decide whether to refund or to persist unconfirmed.
 func MarkUnconfirmedOnError(taskErr *taskdto.TaskError, info SubmitUnconfirmedInfo) {
@@ -153,6 +140,13 @@ func MarkUnconfirmedOnContext(c *gin.Context, info SubmitUnconfirmedInfo) {
 func ReadUnconfirmedFromContext(c *gin.Context) (SubmitUnconfirmedInfo, bool) {
 	v, ok := common.GetContextKeyType[SubmitUnconfirmedInfo](c, constant.ContextKeySubmitUnconfirmed)
 	return v, ok
+}
+
+// ClearUnconfirmedFromContext removes the marker so a later attempt that ends
+// with a deterministic outcome (e.g. explicit 4xx) never inherits the previous
+// attempt's unconfirmed classification.
+func ClearUnconfirmedFromContext(c *gin.Context) {
+	c.Set(string(constant.ContextKeySubmitUnconfirmed), SubmitUnconfirmedInfo{})
 }
 
 // AppendUnconfirmedSubmitMarker merges unconfirmed metadata into task data so

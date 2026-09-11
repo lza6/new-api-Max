@@ -96,10 +96,10 @@ func ClassifyHTTPStatus(status int, retryAfter string) (retryable bool, needCool
 // RetryAfterCooldown 解析 HTTP Retry-After 头为冷却时长。
 // 支持两种标准格式：秒数（"120"）与 HTTP-date。
 // 非法值、0 和已过期的 date 返回 0；超过 cap 时钳制到 cap。
-// cap <= 0 时使用 DefaultCooldownCap。
-func RetryAfterCooldown(retryAfter string, cap time.Duration) time.Duration {
-	if cap <= 0 {
-		cap = DefaultCooldownCap
+// maxCap <= 0 时使用 DefaultCooldownCap。
+func RetryAfterCooldown(retryAfter string, maxCap time.Duration) time.Duration {
+	if maxCap <= 0 {
+		maxCap = DefaultCooldownCap
 	}
 	raw := strings.TrimSpace(retryAfter)
 	if raw == "" {
@@ -110,8 +110,8 @@ func RetryAfterCooldown(retryAfter string, cap time.Duration) time.Duration {
 			return 0
 		}
 		d := time.Duration(secs) * time.Second
-		if d > cap {
-			return cap
+		if d > maxCap {
+			return maxCap
 		}
 		return d
 	}
@@ -120,8 +120,8 @@ func RetryAfterCooldown(retryAfter string, cap time.Duration) time.Duration {
 		if d <= 0 {
 			return 0
 		}
-		if d > cap {
-			return cap
+		if d > maxCap {
+			return maxCap
 		}
 		return d
 	}

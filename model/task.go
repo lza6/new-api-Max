@@ -386,7 +386,9 @@ func GetAllUnFinishSyncTasks(limit int) []*Task {
 	var tasks []*Task
 	var err error
 	// get all tasks progress is not 100%
-	err = DB.Where("progress != ?", "100%").Where("status != ?", TaskStatusFailure).Where("status != ?", TaskStatusSuccess).Limit(limit).Order("id").Find(&tasks).Error
+	// UNCONFIRMED 任务由 ResolveUnconfirmedTasks 专用路径解析（常规轮询会拿
+	// 本地假 id 打上游 404 而误杀退款），这里必须排除。
+	err = DB.Where("progress != ?", "100%").Where("status != ?", TaskStatusFailure).Where("status != ?", TaskStatusSuccess).Where("status != ?", TaskStatusUnconfirmed).Limit(limit).Order("id").Find(&tasks).Error
 	if err != nil {
 		return nil
 	}
@@ -403,6 +405,7 @@ func HasUnfinishedSyncTasks() bool {
 		Where("progress != ?", "100%").
 		Where("status != ?", TaskStatusFailure).
 		Where("status != ?", TaskStatusSuccess).
+		Where("status != ?", TaskStatusUnconfirmed).
 		Limit(1).
 		Pluck("id", &id).Error
 	return err == nil && id != 0

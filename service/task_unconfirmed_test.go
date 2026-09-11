@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -22,21 +24,14 @@ type unconfirmedFetchAdaptor struct {
 	status model.TaskStatus
 	reason string
 	url    string
-
-	// lastKey 记录最近一次 FetchTask 收到的 key，便于断言渠道 key 解析。
-	lastKey *string
 }
 
 func (a *unconfirmedFetchAdaptor) Init(*relaycommon.RelayInfo) {}
-func (a *unconfirmedFetchAdaptor) FetchTask(_ string, key string, _ *model.Task, _ string) (*http.Response, error) {
-	// 调用方传 key 为空说明渠道元数据解析失败，让测试可见。
-	if a.lastKey != nil {
-		*a.lastKey = key
-	}
+func (a *unconfirmedFetchAdaptor) FetchTask(_ string, _ string, _ *model.Task, _ string) (*http.Response, error) {
 	body := fmt.Sprintf(`{"status":"%s","reason":"%s"}`, a.status, a.reason)
 	return &http.Response{
 		StatusCode: http.StatusOK,
-		Body:       io.NopCloser(newStringReader(body)),
+		Body:       io.NopCloser(strings.NewReader(body)),
 	}, nil
 }
 func (a *unconfirmedFetchAdaptor) ParseTaskResult(_ *model.Task, _ *http.Response, body []byte) (*relaycommon.TaskInfo, error) {
@@ -48,21 +43,6 @@ func (a *unconfirmedFetchAdaptor) ParseTaskResult(_ *model.Task, _ *http.Respons
 }
 func (a *unconfirmedFetchAdaptor) AdjustBillingOnComplete(*model.Task, *relaycommon.TaskInfo) int {
 	return 0
-}
-
-func newStringReader(s string) io.Reader { return &stringReader{s: s} }
-
-type stringReader struct {
-	s string
-}
-
-func (r *stringReader) Read(p []byte) (int, error) {
-	if len(r.s) == 0 {
-		return 0, io.EOF
-	}
-	n := copy(p, r.s)
-	r.s = r.s[n:]
-	return n, nil
 }
 
 // seedUnconfirmedTask 落库一条 UNCONFIRMED 任务。
@@ -85,14 +65,25 @@ func seedUnconfirmedTask(t *testing.T, userID, channelID, quota, tokenID int, ta
 	return task
 }
 
+// seedUnconfirmedChannel 落库解析用的测试渠道（含 key/baseURL 元数据）。
+func seedUnconfirmedChannel(t *testing.T, channelID int) {
+	t.Helper()
+	require.NoError(t, model.DB.Create(&model.Channel{
+		Id:     channelID,
+		Type:   constant.ChannelTypeKling,
+		Name:   "unconf-ch",
+		Key:    "sk-unconf-ch",
+		Status: common.ChannelStatusEnabled,
+	}).Error)
+}
+
 func TestClassifySubmitFailure(t *testing.T) {
 	testCases := []struct {
-		name      string
-		status    int
-		body      []byte
-		upErr     error
-		wantUn    bool
-		wantClass string
+		name   string
+		status int
+		body   []byte
+		upErr  error
+		wantUn bool
 	}{
 		{name: "network error", status: 0, upErr: fmt.Errorf("dial tcp: timeout"), wantUn: true},
 		{name: "500 server", status: http.StatusInternalServerError, wantUn: true},
@@ -123,32 +114,19 @@ func TestExtractRemoteTaskIDHint(t *testing.T) {
 
 func TestMarkUnconfirmedOnContext(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	c, _ := gin.CreateTestContext(newWriter())
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	info := ClassifySubmitFailure(http.StatusBadGateway, nil, nil)
 	MarkUnconfirmedOnContext(c, info)
 	got, ok := ReadUnconfirmedFromContext(c)
 	require.True(t, ok)
 	require.True(t, got.Unconfirmed)
 	assert.Positive(t, got.FailedAt)
+
+	// ClearUnconfirmedFromContext 之后标记等价于无标记。
+	ClearUnconfirmedFromContext(c)
+	cleared, ok := ReadUnconfirmedFromContext(c)
+	require.False(t, ok && cleared.Unconfirmed)
 }
-
-// newWriter 提供 gin.CreateTestContext 所需的 ResponseWriter。
-type writer struct{}
-
-func newWriter() *writer { return &writer{} }
-
-func (w *writer) Write(b []byte) (int, error)               { return len(b), nil }
-func (w *writer) WriteString(s string) (int, error)         { return len(s), nil }
-func (w *writer) WriteHeader(code int)                      {}
-func (w *writer) WriteHeaderNow()                           {}
-func (w *writer) Status() int                               { return 200 }
-func (w *writer) Size() int                                 { return 0 }
-func (w *writer) Written() bool                             { return false }
-func (w *writer) Flush()                                    {}
-func (w *writer) Pusher() http.Pusher                       { return nil }
-func (w *writer) Hijack() (interface{}, interface{}, error) { return nil, nil, nil }
-func (w *writer) CloseNotify() <-chan bool                  { return nil }
-func (w *writer) Header() http.Header                       { return http.Header{} }
 
 // TestResolveUnconfirmedTasksHintSuccess 有 hint → 按 hint 查到成功 → 正常结算。
 func TestResolveUnconfirmedTasksHintSuccess(t *testing.T) {
@@ -164,18 +142,10 @@ func TestResolveUnconfirmedTasksHintSuccess(t *testing.T) {
 		time.Now().Add(-time.Minute).Unix())
 
 	adaptor := &unconfirmedFetchAdaptor{status: model.TaskStatusSuccess, url: "https://media.example/v.mp4"}
-	var lastKey string
-	adaptor.lastKey = &lastKey
 	previousFactory := GetTaskAdaptorFunc
 	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
 	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
-	require.NoError(t, model.DB.Create(&model.Channel{
-		Id:     channelID,
-		Type:   constant.ChannelTypeKling,
-		Name:   "unconf-ch",
-		Key:    "sk-unconf-ch",
-		Status: common.ChannelStatusEnabled,
-	}).Error)
+	seedUnconfirmedChannel(t, channelID)
 
 	require.NoError(t, ResolveUnconfirmedTasks(context.Background()))
 
@@ -183,7 +153,7 @@ func TestResolveUnconfirmedTasksHintSuccess(t *testing.T) {
 	require.NoError(t, model.DB.First(&persisted, task.ID).Error)
 	assert.EqualValues(t, model.TaskStatusSuccess, persisted.Status)
 	assert.Equal(t, "https://media.example/v.mp4", persisted.GetResultURL())
-	// 结算成功不退款；预扣保持 4000（与常规轮询成功路径语义一致）。
+	// 结算成功不退款；预扣保持（与常规轮询成功路径语义一致）。
 	assert.Equal(t, initialQuota, getUserQuota(t, userID))
 	assert.Zero(t, countLogs(t), "成功解析不产生退款/结算日志")
 	var data map[string]any
@@ -208,13 +178,7 @@ func TestResolveUnconfirmedTasksHintFailure(t *testing.T) {
 	previousFactory := GetTaskAdaptorFunc
 	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
 	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
-	require.NoError(t, model.DB.Create(&model.Channel{
-		Id:     channelID,
-		Type:   constant.ChannelTypeKling,
-		Name:   "unconf-ch-fail",
-		Key:    "sk-unconf-ch-fail",
-		Status: common.ChannelStatusEnabled,
-	}).Error)
+	seedUnconfirmedChannel(t, channelID)
 
 	require.NoError(t, ResolveUnconfirmedTasks(context.Background()))
 
@@ -230,6 +194,10 @@ func TestResolveUnconfirmedTasksHintFailure(t *testing.T) {
 	var data map[string]any
 	require.NoError(t, common.Unmarshal(persisted.Data, &data))
 	assert.Equal(t, "failure", data["resolution"])
+	// B2-3 退款可见性标记同时存在于 Task.Data。
+	refund, ok := data["refund"].(map[string]any)
+	require.True(t, ok, "退款任务 Task.Data 必须带 refund 摘要")
+	assert.Equal(t, float64(preConsumed), refund["quota"])
 }
 
 // TestResolveUnconfirmedTasksWindowExpiredNoHint 无 hint 且超窗 → 退款并标记 refunded_after_window。
@@ -250,13 +218,7 @@ func TestResolveUnconfirmedTasksWindowExpiredNoHint(t *testing.T) {
 	previousFactory := GetTaskAdaptorFunc
 	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
 	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
-	require.NoError(t, model.DB.Create(&model.Channel{
-		Id:     channelID,
-		Type:   constant.ChannelTypeKling,
-		Name:   "unconf-ch-window",
-		Key:    "sk-unconf-ch-window",
-		Status: common.ChannelStatusEnabled,
-	}).Error)
+	seedUnconfirmedChannel(t, channelID)
 
 	require.NoError(t, ResolveUnconfirmedTasks(context.Background()))
 
@@ -287,6 +249,7 @@ func TestResolveUnconfirmedTasksPendingWithinWindow(t *testing.T) {
 	previousFactory := GetTaskAdaptorFunc
 	GetTaskAdaptorFunc = func(constant.TaskPlatform) TaskPollingAdaptor { return adaptor }
 	t.Cleanup(func() { GetTaskAdaptorFunc = previousFactory })
+	seedUnconfirmedChannel(t, channelID)
 
 	require.NoError(t, ResolveUnconfirmedTasks(context.Background()))
 
@@ -298,7 +261,7 @@ func TestResolveUnconfirmedTasksPendingWithinWindow(t *testing.T) {
 
 // TestRefundTaskQuotaAppendsRefundMarker B2-3 退款可见性：
 // RefundTaskQuota 成功后 Task.Data 必须携带 refund 摘要（quota/reason/settled_at），
-// 任务详情页据此展示"本次失败已退回"。
+// 任务详情页据此在失败原因同一处展示退回额度。
 func TestRefundTaskQuotaAppendsRefundMarker(t *testing.T) {
 	truncate(t)
 

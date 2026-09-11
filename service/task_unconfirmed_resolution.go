@@ -65,11 +65,6 @@ func unconfirmedResolution(ctx context.Context, adaptor TaskPollingAdaptor, task
 	if baseURL == "" && channelType >= 0 {
 		baseURL = constant.GetChannelBaseURL(channelType)
 	}
-	logger.LogInfo(ctx, fmt.Sprintf("unconfirmed task %s resolve channel key=%s base=%s type=%d",
-		task.TaskID, key, baseURL, channelType))
-
-	logger.LogInfo(ctx, fmt.Sprintf("unconfirmed task %s resolve channel key=%s base=%s type=%d",
-		task.TaskID, key, baseURL, channelType))
 
 	if hint == "" {
 		// 无 hint：有限窗口内反复查询，超窗退款。
@@ -95,25 +90,6 @@ func unconfirmedResolution(ctx context.Context, adaptor TaskPollingAdaptor, task
 		return refundUnconfirmedTask(ctx, adaptor, task, reason, string(UnconfirmedResolvedRefund))
 	}
 	return false
-}
-
-// debugUnconfirmedResolutionInfo 输出解析前快照（供测试/运维诊断）。
-func debugUnconfirmedResolutionInfo(task *model.Task) map[string]any {
-	var data map[string]any
-	_ = task.GetData(&data)
-	info := map[string]any{"status": string(task.Status), "progress": task.Progress, "quota": task.Quota}
-	if data != nil {
-		info["data"] = data
-	}
-	if ch, err := model.GetChannelById(task.ChannelId, true); err == nil {
-		info["channel_type"] = ch.Type
-		info["channel_key"] = ch.Key
-		info["channel_base"] = ch.GetBaseURL()
-	} else {
-		info["channel_err"] = err.Error()
-	}
-	info["adaptor"] = GetTaskAdaptorFunc != nil
-	return info
 }
 
 // resolveWithUpstreamID 按给定上游 id 查询一次任务状态。
@@ -289,26 +265,6 @@ func loadUnconfirmedTaskWithChannel(task *model.Task) *model.Task {
 	}
 	task.PrivateData.Key = ch.Key
 	return task
-}
-
-// debugResolvePath 暴露解析路径关键中间值，供测试断言根因。
-func debugResolvePath(task *model.Task) map[string]any {
-	out := map[string]any{}
-	var data map[string]any
-	_ = task.GetData(&data)
-	if data == nil {
-		data = map[string]any{}
-	}
-	out["data"] = data
-	if ch, err := model.GetChannelById(task.ChannelId, false); err == nil {
-		out["channel_type"] = ch.Type
-		out["channel_key"] = ch.Key
-		out["channel_base"] = ch.GetBaseURL()
-	} else {
-		out["channel_err"] = err.Error()
-	}
-	out["adaptor"] = GetTaskAdaptorFunc != nil
-	return out
 }
 
 func getUnconfirmedWindowMinutes() int {
