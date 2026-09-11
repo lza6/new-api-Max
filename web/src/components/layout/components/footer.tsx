@@ -212,7 +212,7 @@ export function Footer(props: FooterProps) {
           },
           {
             text: t('footer.columns.related.links.newApiKeyTool'),
-            href: 'https://github.com/Calcium-Ion/new-api-key-tool',
+            href: 'https://github.com/lza6/new-api-Max-key-tool',
           },
         ],
       },
