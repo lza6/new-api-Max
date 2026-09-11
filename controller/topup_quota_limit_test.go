@@ -94,11 +94,28 @@ func TestValidateTopUpQuotaReturnsMaximumAmount(t *testing.T) {
 	require.EqualError(t, err, fmt.Sprintf("单笔充值数量不能大于 %d", maxAmount))
 }
 
+// enableTopUpForTest 打开在线充值开关（RequestAmount 入口有
+// IsTopUpEnabled 门禁），测试结束后恢复原值。
+func enableTopUpForTest(t *testing.T) {
+	t.Helper()
+	ps := operation_setting.GetPaymentSetting()
+	oldCompliance, oldVersion, oldEnabled := ps.ComplianceConfirmed, ps.ComplianceTermsVersion, ps.TopUpEnabled
+	ps.ComplianceConfirmed = true
+	ps.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
+	ps.TopUpEnabled = true
+	t.Cleanup(func() {
+		ps.ComplianceConfirmed = oldCompliance
+		ps.ComplianceTermsVersion = oldVersion
+		ps.TopUpEnabled = oldEnabled
+	})
+}
+
 func TestRequestAmountRejectsTopUpThatCannotBeSettled(t *testing.T) {
 	oldQuotaPerUnit := common.QuotaPerUnit
 	oldDisplayType := operation_setting.GetGeneralSetting().QuotaDisplayType
 	common.QuotaPerUnit = 500000
 	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeUSD
+	enableTopUpForTest(t)
 	t.Cleanup(func() {
 		common.QuotaPerUnit = oldQuotaPerUnit
 		operation_setting.GetGeneralSetting().QuotaDisplayType = oldDisplayType
@@ -129,6 +146,7 @@ func TestRequestAmountRejectsTopUpThatWouldOverflowWallet(t *testing.T) {
 	oldDB := model.DB
 	common.QuotaPerUnit = 500000
 	operation_setting.GetGeneralSetting().QuotaDisplayType = operation_setting.QuotaDisplayTypeUSD
+	enableTopUpForTest(t)
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
