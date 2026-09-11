@@ -32,12 +32,14 @@ export const DEFAULT_DASHBOARD_CHART_PREFERENCES: DashboardChartPreferences = {
 }
 
 export const TIME_RANGE_BY_GRANULARITY = {
+  minute: 1 / 60,
   hour: 1,
   day: 7,
   week: 30,
 } as const
 
 export const TIME_GRANULARITY_OPTIONS = [
+  { label: 'Minute', value: 'minute' },
   { label: 'Hour', value: 'hour' },
   { label: 'Day', value: 'day' },
   { label: 'Week', value: 'week' },

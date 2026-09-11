@@ -222,8 +222,14 @@ export function useTopupInfo() {
       if (!cancelled) void fetchTopupInfo()
     })
 
+    // 每 5 分钟自动刷新充值信息，管理员热更新开关/支付方式后无需手动刷新页面
+    const interval = setInterval(() => {
+      if (!cancelled) void fetchTopupInfo()
+    }, 5 * 60 * 1000)
+
     return () => {
       cancelled = true
+      clearInterval(interval)
     }
   }, [fetchTopupInfo])
 

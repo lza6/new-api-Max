@@ -24,7 +24,7 @@ import dayjs from '@/lib/dayjs'
 /**
  * Time granularity type
  */
-export type TimeGranularity = 'hour' | 'day' | 'week'
+export type TimeGranularity = 'hour' | 'minute' | 'day' | 'week'
 
 /**
  * Convert Date object to Unix timestamp (seconds)
@@ -129,9 +129,10 @@ export function computeTimeRange(
   }
 
   // Normal mode without day normalization
-  // Add 1 hour buffer to end time (matches legacy frontend behavior)
-  // This ensures the current hour's data is fully included
-  const end = endDate ? dateToUnixTimestamp(endDate) : now + 3600
+  // Add buffer to end time to include the current period's data (legacy
+  // frontend behavior used 1 hour; minute-granularity views use 10 minutes).
+  const endBuffer = endDate ? 0 : 600
+  const end = endDate ? dateToUnixTimestamp(endDate) : now + endBuffer
   const start = startDate
     ? dateToUnixTimestamp(startDate)
     : end - days * 24 * 3600
@@ -166,7 +167,9 @@ export function formatChartTime(
   const d = dayjs(timestamp * 1000)
   let result = d.format('MM-DD')
 
-  if (granularity === 'hour') {
+  if (granularity === 'minute') {
+    result += ` ${d.format('HH:mm')}`
+  } else if (granularity === 'hour') {
     result += ` ${d.format('HH')}:00`
   } else if (granularity === 'week') {
     const weekEnd = d.add(6, 'day')

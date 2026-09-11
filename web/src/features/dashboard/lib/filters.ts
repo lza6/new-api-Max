@@ -34,7 +34,7 @@ import type {
 import { getRollingDateRange, type TimeGranularity } from '@/lib/time'
 
 function isTimeGranularity(value: unknown): value is TimeGranularity {
-  return value === 'hour' || value === 'day' || value === 'week'
+  return value === 'hour' || value === 'minute' || value === 'day' || value === 'week'
 }
 
 function getLegacySavedGranularity(): TimeGranularity {
@@ -137,6 +137,8 @@ export function saveChartPreferences(
 
 export function getDefaultDays(granularity?: TimeGranularity): number {
   if (!granularity) return getSavedChartPreferences().defaultTimeRangeDays
+  // Minute granularity shows the last hour of data by default (0.0417 day);
+  // hour stays at 1 day, day at 7 days, week at 30 days.
   return TIME_RANGE_BY_GRANULARITY[getSavedGranularity(granularity)]
 }
 

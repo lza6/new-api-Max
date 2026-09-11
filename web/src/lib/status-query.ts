@@ -154,6 +154,9 @@ export const statusQueryOptions = queryOptions({
   queryFn: fetchStatus,
   // Data becomes stale after 5 minutes
   staleTime: 5 * 60 * 1000,
+  // Re-fetch every 5 minutes so branding/site-level switches (e.g. top-up
+  // gates, announcements) propagate without a manual page reload.
+  refetchInterval: 5 * 60 * 1000,
   // Cache expires after 30 minutes
   gcTime: 30 * 60 * 1000,
 })

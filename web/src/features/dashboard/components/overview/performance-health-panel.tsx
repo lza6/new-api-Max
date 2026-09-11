@@ -65,6 +65,7 @@ export function PerformanceHealthPanel() {
         await getPerfMetricsSummary(PERFORMANCE_WINDOW_HOURS)
       ),
     staleTime: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
     retry: false,
   })
 
