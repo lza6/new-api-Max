@@ -232,6 +232,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		if newAPIError == nil {
 			relayInfo.LastError = nil
+			// B3-3：成功结果计入渠道健康分聚合。
+			service.RecordChannelOutcome(channel.Id, true, time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)), service.ErrClassOK)
 			return
 		}
 
@@ -396,6 +398,16 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError, relayInfo *relaycommon.RelayInfo) {
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
+	// B3-1/B3-3：唯一冷却决策点。开关 off 时 DecideCooldown 为 no-op，
+	// 行为与旧版完全一致；on 时按 B2-1 错误类冷却并记录健康分。
+	// 上游 Retry-After 头未在各 relay 格式保留，暂传 0（按类默认时长冷却）。
+	_, _, errClass := service.ClassifyHTTPStatus(err.StatusCode, "")
+	latency := time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime))
+	if cool, until := service.DecideCooldown(channelError.ChannelId, errClass, 0); cool {
+		service.RecordChannelCooldownMatch(channelError.ChannelId)
+		logger.LogWarn(c, fmt.Sprintf("channel #%d cooling down until %s (class=%v)", channelError.ChannelId, until.Format("15:04:05"), errClass))
+	}
+	service.RecordChannelOutcome(channelError.ChannelId, false, latency, errClass)
 	// 不要使用context获取渠道信息，异步处理时可能会出现渠道信息不一致的情况
 	// do not use context to get channel info, there may be inconsistent channel info when processing asynchronously
 	if service.ShouldDisableChannel(err) && channelError.AutoBan {

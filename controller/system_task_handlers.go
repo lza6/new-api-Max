@@ -13,15 +13,36 @@ import (
 )
 
 // RegisterScheduledSystemTasks wires the periodic channel test, upstream model
-// update, and async task polling (Midjourney / Suno / video) jobs into the
-// system task framework so a DB lease dedups execution across multiple master
-// instances and each run is recorded as one task row. Call this before
-// service.StartSystemTaskRunner.
+// update, async task polling (Midjourney / Suno / video), and channel cooldown
+// recovery jobs into the system task framework so a DB lease dedups execution
+// across multiple master instances and each run is recorded as one task row.
+// Call this before service.StartSystemTaskRunner.
 func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(channelTestHandler{})
 	service.RegisterSystemTaskHandler(modelUpdateHandler{})
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
+	service.RegisterSystemTaskHandler(cooldownRecoveryHandler{})
+}
+
+// cooldownRecoveryHandler periodically recovers channels whose B3-1 cooldown
+// (channel.cooldown_v2) has expired. Enablement folds in both the switch and
+// "is anything actually cooling" so an idle system schedules no rows.
+type cooldownRecoveryHandler struct{}
+
+func (cooldownRecoveryHandler) Type() string { return model.SystemTaskTypeCooldownRecovery }
+
+func (cooldownRecoveryHandler) Enabled() bool {
+	return service.HasCoolingDownChannels()
+}
+
+func (cooldownRecoveryHandler) Interval() time.Duration { return time.Minute }
+
+func (cooldownRecoveryHandler) NewPayload() any { return nil }
+
+func (cooldownRecoveryHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	service.CooldownRecoverySweep(ctx)
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, nil, nil)
 }
 
 // channelTestHandler runs the scheduled "test all channels" job. Enablement and
