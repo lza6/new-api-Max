@@ -129,10 +129,11 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   create_manifests:
-    name: Create multi-arch manifests (Docker Hub)
+    name: Create multi-arch manifests (GHCR)
     needs: [prepare, build_single_arch]
     runs-on: ubuntu-latest
     permissions:
+      packages: write
       id-token: write
     steps:
       - name: Log in to GHCR
@@ -142,14 +143,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Create & push manifest (Docker Hub - branch)
+      - name: Create & push manifest (GHCR - branch)
         run: |
           docker buildx imagetools create \
             -t ghcr.io/lza6/new-api-max:${{ needs.prepare.outputs.tag_prefix }} \
             ghcr.io/lza6/new-api-max:${{ needs.prepare.outputs.tag_prefix }}-amd64 \
             ghcr.io/lza6/new-api-max:${{ needs.prepare.outputs.tag_prefix }}-arm64
 
-      - name: Create & push manifest (Docker Hub - versioned)
+      - name: Create & push manifest (GHCR - versioned)
         run: |
           docker buildx imagetools create \
             -t ghcr.io/lza6/new-api-max:${{ needs.prepare.outputs.version }} \
