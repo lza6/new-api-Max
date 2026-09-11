@@ -14,6 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/pkg/billingexpr"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
@@ -43,6 +44,8 @@ func TestMain(m *testing.M) {
 	common.RedisEnabled = false
 	common.BatchUpdateEnabled = false
 	common.LogConsumeEnabled = true
+	// 测试环境不跑 InitEnv，Limit(0) 会导致轮询查询查不到任何任务。
+	constant.TaskQueryLimit = 1000
 
 	if err := db.AutoMigrate(
 		&model.Task{},

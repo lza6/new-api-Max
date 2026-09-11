@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
@@ -251,7 +252,35 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 	if err := task.UpdateQuota(); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("退款成功但清除 task quota 失败 task %s: %s", task.TaskID, err.Error()))
 	}
+
+	// 6. 退款可见性：把退款金额/原因写进 Task.Data 的 refund 字段，
+	// 任务详情页据此展示"本次失败已退回"（与失败原因同一处呈现）。
+	AppendTaskRefundMarker(task, quota, reason)
+	if err := task.UpdateDataColumn(); err != nil {
+		logger.LogError(ctx, fmt.Sprintf("退款成功但回写 task refund 标记失败 task %s: %s", task.TaskID, err.Error()))
+	}
 	return true
+}
+
+// AppendTaskRefundMarker 在 Task.Data 中追加 refund 摘要。
+// 失败与补偿在同一处呈现（参考 Open-Generative-AI "Refunded N credits" 设计）。
+func AppendTaskRefundMarker(task *model.Task, quota int, reason string) {
+	if task == nil || quota <= 0 {
+		return
+	}
+	var data map[string]any
+	if len(task.Data) > 0 {
+		_ = common.Unmarshal(task.Data, &data)
+	}
+	if data == nil {
+		data = map[string]any{}
+	}
+	data["refund"] = map[string]any{
+		"quota":      quota,
+		"reason":     reason,
+		"settled_at": time.Now().Unix(),
+	}
+	task.SetData(data)
 }
 
 // RecalculateTaskQuota 通用的异步差额结算。

@@ -79,4 +79,10 @@ const (
 	ContextKeyTokenAuditParams ContextKey = "token_audit_params"
 	// ContextKeyTokenAuditSucceeded disambiguates token responses that exceed the audit buffer.
 	ContextKeyTokenAuditSucceeded ContextKey = "token_audit_succeeded"
+
+	// ContextKeySubmitUnconfirmed carries the unconfirmed submit marker
+	// (service.SubmitUnconfirmedInfo) so the task submission controller can
+	// decide between refunding the pre-consumed quota and persisting an
+	// unconfirmed task row.
+	ContextKeySubmitUnconfirmed ContextKey = "submit_unconfirmed"
 )

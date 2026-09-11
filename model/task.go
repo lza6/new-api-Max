@@ -19,7 +19,7 @@ type TaskStatus string
 func (t TaskStatus) ToVideoStatus() string {
 	var status string
 	switch t {
-	case TaskStatusNotStart, TaskStatusQueued, TaskStatusSubmitted:
+	case TaskStatusNotStart, TaskStatusQueued, TaskStatusSubmitted, TaskStatusUnconfirmed:
 		status = dto.VideoStatusQueued
 	case TaskStatusInProgress:
 		status = dto.VideoStatusInProgress
@@ -41,6 +41,12 @@ const (
 	TaskStatusFailure               = "FAILURE"
 	TaskStatusSuccess               = "SUCCESS"
 	TaskStatusUnknown               = "UNKNOWN"
+	// TaskStatusUnconfirmed marks a task whose submission reached the upstream
+	// but whose result could not be confirmed (timeout / 5xx / unreadable
+	// response). The remote may have created a paid task, so the pre-consumed
+	// quota must NOT be refunded up front; the polling loop drives a resolution
+	// (see service.UnconfirmedTaskResolution).
+	TaskStatusUnconfirmed TaskStatus = "UNCONFIRMED"
 )
 
 // TaskRefundLegacyCutoff separates tasks created before timeout refunds were
@@ -349,10 +355,26 @@ func TaskGetAllTasks(startIdx int, num int, queryParams SyncTaskQueryParams) []*
 func GetTimedOutUnfinishedTasks(cutoffUnix int64, limit int) []*Task {
 	var tasks []*Task
 	err := DB.Where("progress != ?", "100%").
-		Where("status NOT IN ?", []string{TaskStatusFailure, TaskStatusSuccess}).
+		Where("status NOT IN ?", []string{string(TaskStatusFailure), string(TaskStatusSuccess), string(TaskStatusUnconfirmed)}).
 		Where("submit_time < ?", cutoffUnix).
 		Order("submit_time").
 		Limit(limit).
+		Find(&tasks).Error
+	if err != nil {
+		return nil
+	}
+	return tasks
+}
+
+// GetUnconfirmedUnfinishedTasks returns tasks in the UNCONFIRMED submit state
+// that are still awaiting a resolution (progress != 100%). These are picked up
+// by the polling loop which drives the unconfirmed resolution path.
+func GetUnconfirmedUnfinishedTasks(limit int) []*Task {
+	var tasks []*Task
+	err := DB.Where("status = ?", TaskStatusUnconfirmed).
+		Where("progress != ?", "100%").
+		Limit(limit).
+		Order("id").
 		Find(&tasks).Error
 	if err != nil {
 		return nil
@@ -381,6 +403,19 @@ func HasUnfinishedSyncTasks() bool {
 		Where("progress != ?", "100%").
 		Where("status != ?", TaskStatusFailure).
 		Where("status != ?", TaskStatusSuccess).
+		Limit(1).
+		Pluck("id", &id).Error
+	return err == nil && id != 0
+}
+
+// HasUnconfirmedUnfinishedTasks reports whether at least one task is awaiting an
+// unconfirmed resolution. It mirrors HasUnfinishedSyncTasks for the UNCONFIRMED
+// submit state so the polling scheduler keeps running while resolutions pend.
+func HasUnconfirmedUnfinishedTasks() bool {
+	var id int64
+	err := DB.Model(&Task{}).
+		Where("status = ?", TaskStatusUnconfirmed).
+		Where("progress != ?", "100%").
 		Limit(1).
 		Pluck("id", &id).Error
 	return err == nil && id != 0
@@ -519,6 +554,12 @@ func (Task *Task) Update() error {
 
 func (t *Task) UpdateQuota() error {
 	return DB.Model(t).Update("quota", t.Quota).Error
+}
+
+// UpdateDataColumn 只持久化 Task.Data 列（json）。用于退款标记等
+// 不涉及状态迁移的局部回写，避免全量 Save 与轮询 CAS 互相覆盖。
+func (t *Task) UpdateDataColumn() error {
+	return DB.Model(t).Update("data", t.Data).Error
 }
 
 // UpdateWithStatus performs a conditional UPDATE guarded by fromStatus (CAS).

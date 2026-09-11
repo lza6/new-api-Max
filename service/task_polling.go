@@ -143,6 +143,13 @@ func RunTaskPollingOnce(ctx context.Context, report func(processed, total int)) 
 
 	common.SysLog("任务进度轮询开始")
 	sweepTimedOutTasks(ctx)
+
+	// unconfirmed 任务解析：提交结果不可确认的任务先走专用解析路径。
+	// 与常规轮询分开处理，避免带 remote_task_id_hint 的任务被普通轮询重复查询丢 id。
+	if err := ResolveUnconfirmedTasks(ctx); err != nil {
+		common.SysLog(fmt.Sprintf("ResolveUnconfirmedTasks fail: %s", err))
+	}
+
 	allTasks := model.GetAllUnFinishSyncTasks(constant.TaskQueryLimit)
 	summary.UnfinishedTasks = len(allTasks)
 	platformTask := make(map[constant.TaskPlatform][]*model.Task)

@@ -605,6 +605,11 @@ func executeTaskSubmissionWith(
 	stage := "start"
 	defer func() {
 		if !durable && relayInfo.Billing != nil {
+			// 提交结果不可确认（网络错/5xx/响应不可读）时不再退预扣费，
+			// 由落库的 unconfirmed 任务行在轮询阶段驱动兜底查询/窗口退款。
+			if unconfirmedInfo, ok := service.ReadUnconfirmedFromContext(c); ok && unconfirmedInfo.Unconfirmed {
+				return
+			}
 			diagnostics.refund(stage)
 			relayInfo.Billing.Refund(c)
 		}

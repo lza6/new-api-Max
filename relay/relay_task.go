@@ -344,6 +344,9 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// 9. 发送请求
 	resp, err := adaptor.DoRequest(c, info, requestBody)
 	if err != nil {
+		// 网络层错误：结果不可确认，远端可能已创建付费任务 → 不退款，落 unconfirmed。
+		unconfirmedInfo := service.ClassifySubmitFailure(0, nil, err)
+		service.MarkUnconfirmedOnContext(c, unconfirmedInfo)
 		return nil, service.TaskErrorWrapper(err, "do_request_failed", http.StatusInternalServerError)
 	}
 	if resp == nil {
@@ -352,6 +355,8 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		responseBody, _ := io.ReadAll(resp.Body)
+		unconfirmedInfo := service.ClassifySubmitFailure(resp.StatusCode, responseBody, nil)
+		service.MarkUnconfirmedOnContext(c, unconfirmedInfo)
 		return nil, service.TaskErrorWrapper(fmt.Errorf("%s", string(responseBody)), "fail_to_fetch_task", resp.StatusCode)
 	}
 
@@ -359,6 +364,9 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	// task barrier and billing settlement.
 	parsed, taskErr := adaptor.ParseResponse(c, resp, info)
 	if taskErr != nil {
+		// 2xx 但响应不可读/解析失败：远端可能已创建任务 → 不可确认。
+		unconfirmedInfo := service.ClassifySubmitFailure(resp.StatusCode, nil, taskErr.Error)
+		service.MarkUnconfirmedOnContext(c, unconfirmedInfo)
 		return nil, taskErr
 	}
 	if parsed == nil {
