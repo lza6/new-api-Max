@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
@@ -145,6 +146,10 @@ func RequestWaffoAmount(c *gin.Context) {
 
 // RequestWaffoPay 创建 Waffo 支付订单
 func RequestWaffoPay(c *gin.Context) {
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 	if !setting.WaffoEnabled {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Waffo 支付未启用"})
 		return

@@ -11,8 +11,13 @@ func isPaymentComplianceConfirmed() bool {
 	return operation_setting.IsPaymentComplianceConfirmed()
 }
 
+// isTopUpEnabled 充值总开关：合规确认 + 管理员开关同时满足才可用
+func isTopUpEnabled() bool {
+	return operation_setting.IsTopUpEnabled()
+}
+
 func isStripeTopUpEnabled() bool {
-	if !isPaymentComplianceConfirmed() {
+	if !isTopUpEnabled() {
 		return false
 	}
 	return strings.TrimSpace(setting.StripeApiSecret) != "" &&
@@ -29,7 +34,7 @@ func isStripeWebhookEnabled() bool {
 }
 
 func isCreemTopUpEnabled() bool {
-	if !isPaymentComplianceConfirmed() {
+	if !isTopUpEnabled() {
 		return false
 	}
 	products := strings.TrimSpace(setting.CreemProducts)
@@ -47,7 +52,7 @@ func isCreemWebhookEnabled() bool {
 }
 
 func isWaffoTopUpEnabled() bool {
-	if !isPaymentComplianceConfirmed() {
+	if !isTopUpEnabled() {
 		return false
 	}
 	if !setting.WaffoEnabled {
@@ -74,7 +79,7 @@ func isWaffoWebhookEnabled() bool {
 }
 
 func isWaffoPancakeTopUpEnabled() bool {
-	if !isPaymentComplianceConfirmed() {
+	if !isTopUpEnabled() {
 		return false
 	}
 	// Presence-of-credentials = enabled. Webhook public keys ship inside
@@ -93,7 +98,7 @@ func isWaffoPancakeWebhookEnabled() bool {
 }
 
 func isEpayTopUpEnabled() bool {
-	if !isPaymentComplianceConfirmed() {
+	if !isTopUpEnabled() {
 		return false
 	}
 	return isEpayWebhookConfigured() && len(operation_setting.PayMethods) > 0

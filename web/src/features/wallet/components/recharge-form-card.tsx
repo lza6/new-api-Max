@@ -130,18 +130,21 @@ export function RechargeFormCard({
     }
   }
 
+  const topupMasterEnabled = topupInfo?.topup_enabled !== false
   const hasConfigurableTopup =
-    topupInfo?.enable_online_topup ||
-    topupInfo?.enable_stripe_topup ||
-    enableWaffoTopup ||
-    enableWaffoPancakeTopup
-  const hasAnyTopup = hasConfigurableTopup || enableCreemTopup
+    topupMasterEnabled &&
+    (topupInfo?.enable_online_topup ||
+      topupInfo?.enable_stripe_topup ||
+      enableWaffoTopup ||
+      enableWaffoPancakeTopup)
+  const hasAnyTopup = hasConfigurableTopup || (topupMasterEnabled && enableCreemTopup)
   const hasStandardPaymentMethods =
     Array.isArray(topupInfo?.pay_methods) && topupInfo.pay_methods.length > 0
   const hasWaffoPaymentMethods =
     Array.isArray(waffoPayMethods) && waffoPayMethods.length > 0
   const minTopup = getMinTopupAmount(topupInfo)
-  const redemptionEnabled = topupInfo?.enable_redemption !== false
+  const redemptionEnabled =
+    topupMasterEnabled && topupInfo?.enable_redemption !== false
 
   if (loading) {
     return (

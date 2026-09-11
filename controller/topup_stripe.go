@@ -17,6 +17,7 @@ import (
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/i18n"
 	"github.com/shopspring/decimal"
 	"github.com/stripe/stripe-go/v81"
 	"github.com/stripe/stripe-go/v81/checkout/session"
@@ -152,6 +153,10 @@ func RequestStripeAmount(c *gin.Context) {
 }
 
 func RequestStripePay(c *gin.Context) {
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 	var req StripePayRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {

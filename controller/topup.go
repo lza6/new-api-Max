@@ -18,6 +18,7 @@ import (
 
 	"github.com/Calcium-Ion/go-epay/epay"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/i18n"
 	"github.com/samber/lo"
 	"github.com/shopspring/decimal"
 )
@@ -102,8 +103,9 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
-		"enable_redemption":                complianceConfirmed,
+		"enable_redemption":                operation_setting.IsRedemptionEnabled(),
 		"payment_compliance_confirmed":     complianceConfirmed,
+		"topup_enabled":                    operation_setting.IsTopUpEnabled(),
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,
 		"waffo_pay_methods": func() any {
 			if enableWaffo {
@@ -268,6 +270,10 @@ func rejectInvalidTopUpQuota(c *gin.Context, userId int, amount int64) bool {
 }
 
 func RequestEpay(c *gin.Context) {
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 	var req EpayRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {

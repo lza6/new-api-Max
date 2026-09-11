@@ -337,6 +337,8 @@ export type BillingSettings = {
   'checkin_setting.enabled': boolean
   'checkin_setting.min_quota': number
   'checkin_setting.max_quota': number
+  'payment_setting.topup_enabled': boolean
+  'payment_setting.redemption_enabled': boolean
 }
 
 export type OperationsSettings = {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
@@ -340,6 +341,10 @@ func getWaffoPancakeBuyerIdentity(user *model.User) string {
 }
 
 func RequestWaffoPancakePay(c *gin.Context) {
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 	if !isWaffoPancakeTopUpEnabled() {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "Waffo Pancake 配置不完整"})
 		return

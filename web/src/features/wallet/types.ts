@@ -154,6 +154,8 @@ export interface TopupInfo {
   enable_redemption?: boolean
   /** Whether compliance confirmation has been completed */
   payment_compliance_confirmed?: boolean
+  /** Master top-up switch (admin controlled) */
+  topup_enabled?: boolean
   /** Current compliance terms version */
   payment_compliance_terms_version?: string
 }

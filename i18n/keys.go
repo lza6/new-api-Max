@@ -159,6 +159,7 @@ const (
 	MsgPaymentPriceIdNotConfig   = "payment.price_id_not_configured"
 	MsgPaymentCreemNotConfig     = "payment.creem_not_configured"
 	MsgPaymentComplianceRequired = "payment.compliance_required"
+	MsgTopUpDisabled             = "payment.topup_disabled"
 )
 
 // Topup related messages

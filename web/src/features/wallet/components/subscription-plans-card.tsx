@@ -117,10 +117,13 @@ export function SubscriptionPlansCard({
   const [purchaseOpen, setPurchaseOpen] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<PlanRecord | null>(null)
 
-  const enableStripe = !!topupInfo?.enable_stripe_topup
-  const enableCreem = !!topupInfo?.enable_creem_topup
-  const enableWaffoPancake = !!topupInfo?.enable_waffo_pancake_topup
-  const enableOnlineTopUp = !!topupInfo?.enable_online_topup
+  const topupMasterEnabled = topupInfo?.topup_enabled !== false
+  const enableStripe = topupMasterEnabled && !!topupInfo?.enable_stripe_topup
+  const enableCreem = topupMasterEnabled && !!topupInfo?.enable_creem_topup
+  const enableWaffoPancake =
+    topupMasterEnabled && !!topupInfo?.enable_waffo_pancake_topup
+  const enableOnlineTopUp =
+    topupMasterEnabled && !!topupInfo?.enable_online_topup
   const epayMethods = useMemo(
     () => getEpayMethods(topupInfo?.pay_methods),
     [topupInfo?.pay_methods]
@@ -610,6 +613,10 @@ export function SubscriptionPlansCard({
                           {t('Purchase limit reached')} ({count}/{limit})
                         </TooltipContent>
                       </Tooltip>
+                    ) : !topupMasterEnabled ? (
+                      <Button variant='outline' className='w-full' disabled>
+                        {t('Top-up is currently disabled')}
+                      </Button>
                     ) : (
                       <Button
                         variant='outline'

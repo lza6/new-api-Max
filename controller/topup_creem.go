@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/setting"
@@ -18,6 +19,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
@@ -151,6 +153,10 @@ func (*CreemAdaptor) RequestPay(c *gin.Context, req *CreemPayRequest) {
 }
 
 func RequestCreemPay(c *gin.Context) {
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 	var req CreemPayRequest
 
 	// 读取body内容用于打印，同时保留原始数据供后续使用

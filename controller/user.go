@@ -1237,6 +1237,10 @@ func TopUp(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgPaymentComplianceRequired)
 		return
 	}
+	if !operation_setting.IsRedemptionEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 
 	id := c.GetInt("id")
 	lock := getTopUpLock(id)
