@@ -26,9 +26,9 @@ import (
 func GetTopUpInfo(c *gin.Context) {
 	complianceConfirmed := operation_setting.IsPaymentComplianceConfirmed()
 
-	// 获取支付方式
+	// 获取支付方式（合规未确认或充值总开关关闭时不暴露支付方式配置）
 	payMethods := operation_setting.PayMethods
-	if !complianceConfirmed {
+	if !complianceConfirmed || !operation_setting.IsTopUpEnabled() {
 		payMethods = []map[string]string{}
 	}
 

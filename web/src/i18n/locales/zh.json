@@ -6213,13 +6213,13 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
-  },
-  "Top-Up & Redemption Switches": "充值与兑换开关",
-  "Save top-up switch settings": "保存充值开关设置",
-  "Enable Top-Up": "启用充值功能",
-  "Master switch for all top-up channels (redemption codes, online payment, subscriptions). When off, users cannot add funds.": "所有充值渠道（兑换码、在线支付、订阅）的总开关。关闭后用户无法充值。",
-  "Enable Redemption Code Top-Up": "启用兑换码充值",
-  "Allow users to redeem quota cards. Administrators can still generate codes while this is off.": "允许用户兑换额度卡。关闭后管理员仍可生成兑换码。",
-  "Top-up is currently disabled": "充值功能已关闭"
+    "Zoom": "缩放",
+    "Top-Up & Redemption Switches": "充值与兑换开关",
+    "Save top-up switch settings": "保存充值开关设置",
+    "Enable Top-Up": "启用充值功能",
+    "Master switch for all top-up channels (redemption codes, online payment, subscriptions). When off, users cannot add funds.": "所有充值渠道（兑换码、在线支付、订阅）的总开关。关闭后用户无法充值。",
+    "Enable Redemption Code Top-Up": "启用兑换码充值",
+    "Allow users to redeem quota cards. Administrators can still generate codes while this is off.": "允许用户兑换额度卡。关闭后管理员仍可生成兑换码。",
+    "Top-up is currently disabled": "充值功能已关闭"
+  }
 }

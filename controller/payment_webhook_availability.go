@@ -7,10 +7,6 @@ import (
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
-func isPaymentComplianceConfirmed() bool {
-	return operation_setting.IsPaymentComplianceConfirmed()
-}
-
 // isTopUpEnabled 充值总开关：合规确认 + 管理员开关同时满足才可用
 func isTopUpEnabled() bool {
 	return operation_setting.IsTopUpEnabled()
@@ -33,7 +29,7 @@ func isStripeWebhookConfigured() bool {
 // must always land regardless of the runtime top-up switch (which blocks new
 // orders, not settlement of money already paid).
 func isStripeWebhookEnabled() bool {
-	return isPaymentComplianceConfirmed() &&
+	return operation_setting.IsPaymentComplianceConfirmed() &&
 		strings.TrimSpace(setting.StripeApiSecret) != "" &&
 		strings.TrimSpace(setting.StripeWebhookSecret) != "" &&
 		strings.TrimSpace(setting.StripePriceId) != ""
@@ -55,7 +51,7 @@ func isCreemWebhookConfigured() bool {
 
 func isCreemWebhookEnabled() bool {
 	products := strings.TrimSpace(setting.CreemProducts)
-	return isPaymentComplianceConfirmed() &&
+	return operation_setting.IsPaymentComplianceConfirmed() &&
 		strings.TrimSpace(setting.CreemApiKey) != "" &&
 		products != "" &&
 		products != "[]" &&
@@ -86,7 +82,7 @@ func isWaffoWebhookConfigured() bool {
 }
 
 func isWaffoWebhookEnabled() bool {
-	return isPaymentComplianceConfirmed() && setting.WaffoEnabled && isWaffoWebhookConfigured()
+	return operation_setting.IsPaymentComplianceConfirmed() && setting.WaffoEnabled && isWaffoWebhookConfigured()
 }
 
 func isWaffoPancakeTopUpEnabled() bool {
@@ -105,7 +101,7 @@ func isWaffoPancakeWebhookConfigured() bool {
 }
 
 func isWaffoPancakeWebhookEnabled() bool {
-	return isPaymentComplianceConfirmed() &&
+	return operation_setting.IsPaymentComplianceConfirmed() &&
 		strings.TrimSpace(setting.WaffoPancakeMerchantID) != "" &&
 		strings.TrimSpace(setting.WaffoPancakePrivateKey) != "" &&
 		strings.TrimSpace(setting.WaffoPancakeProductID) != ""
