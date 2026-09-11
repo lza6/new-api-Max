@@ -24,6 +24,10 @@ type WaffoPancakePayRequest struct {
 }
 
 func RequestWaffoPancakeAmount(c *gin.Context) {
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 	var req WaffoPancakePayRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusOK, gin.H{"message": "error", "data": "参数错误"})

@@ -490,6 +490,10 @@ func EpayNotify(c *gin.Context) {
 }
 
 func RequestAmount(c *gin.Context) {
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
+		return
+	}
 	var req AmountRequest
 	err := c.ShouldBindJSON(&req)
 	if err != nil {
