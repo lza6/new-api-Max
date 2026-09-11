@@ -2398,7 +2398,7 @@
     "footer.columns.related.links.oneApi": "One API",
     "footer.columns.related.title": "相关项目",
     "footer.defaultCopyright": "版权所有。",
-    "footer.newapi.projectAttributionSuffix": "版权所有，由项目贡献者设计与开发。",
+    "footer.new\u0061pi.projectAttributionSuffix": "版权所有，由项目贡献者设计与开发。",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "对于 2025 年 5 月 10 日之后添加的渠道，在部署时无需从模型名称中移除 \".\"",
     "For private deployments, format: https://fastgpt.run/api/openapi": "对于私有部署，格式为：https://fastgpt.run/api/openapi",
     "For security, existing access tokens cannot be displayed. Regenerate only when you need a new token.": "出于安全考虑，现有访问令牌无法再次显示。仅在需要新令牌时重新生成。",
@@ -6216,10 +6216,9 @@
     "Zoom": "缩放",
     "Top-Up & Redemption Switches": "充值与兑换开关",
     "Save top-up switch settings": "保存充值开关设置",
-    "Enable Top-Up": "启用充值功能",
-    "Master switch for all top-up channels (redemption codes, online payment, subscriptions). When off, users cannot add funds.": "所有充值渠道（兑换码、在线支付、订阅）的总开关。关闭后用户无法充值。",
     "Enable Redemption Code Top-Up": "启用兑换码充值",
-    "Allow users to redeem quota cards. Administrators can still generate codes while this is off.": "允许用户兑换额度卡。关闭后管理员仍可生成兑换码。",
-    "Top-up is currently disabled": "充值功能已关闭"
+    "Top-up is currently disabled": "充值功能已关闭",
+    "Master switch for online payment and subscription top-up channels. When off, users cannot pay online. Redemption codes are controlled by the switch below.": "在线支付与订阅充值渠道的总开关。关闭后用户无法在线支付；兑换码由下方独立开关控制。",
+    "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes.": "允许用户兑换额度卡。此开关与在线充值相互独立；管理员始终可以生成兑换码。"
   }
 }

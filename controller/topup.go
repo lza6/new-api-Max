@@ -103,7 +103,7 @@ func GetTopUpInfo(c *gin.Context) {
 		"enable_creem_topup":               isCreemTopUpEnabled(),
 		"enable_waffo_topup":               enableWaffo,
 		"enable_waffo_pancake_topup":       enableWaffoPancake,
-		"enable_redemption":                operation_setting.IsTopUpEnabled() && operation_setting.IsRedemptionEnabled(),
+		"enable_redemption":                operation_setting.IsRedemptionEnabled(),
 		"payment_compliance_confirmed":     complianceConfirmed,
 		"topup_enabled":                    operation_setting.IsTopUpEnabled(),
 		"payment_compliance_terms_version": operation_setting.CurrentComplianceTermsVersion,

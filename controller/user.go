@@ -1233,7 +1233,8 @@ func getTopUpLock(userID int) *topUpTryLock {
 }
 
 func TopUp(c *gin.Context) {
-	if !operation_setting.IsTopUpEnabled() || !operation_setting.IsRedemptionEnabled() {
+	// 兑换码与充值总开关相互独立：只受兑换码开关（含合规确认）控制。
+	if !operation_setting.IsRedemptionEnabled() {
 		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
 		return
 	}

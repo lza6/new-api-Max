@@ -6213,6 +6213,12 @@
     "Zero retention": "Không lưu dữ liệu",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Top-Up & Redemption Switches": "Top-Up & Redemption Switches",
+    "Save top-up switch settings": "Save top-up switch settings",
+    "Enable Redemption Code Top-Up": "Enable Redemption Code Top-Up",
+    "Top-up is currently disabled": "Top-up is currently disabled",
+    "Master switch for online payment and subscription top-up channels. When off, users cannot pay online. Redemption codes are controlled by the switch below.": "Master switch for online payment and subscription top-up channels. When off, users cannot pay online. Redemption codes are controlled by the switch below.",
+    "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes.": "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes."
   }
 }

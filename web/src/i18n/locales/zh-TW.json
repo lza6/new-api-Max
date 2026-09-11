@@ -6213,6 +6213,12 @@
     "Zero retention": "零數據保留",
     "Zhipu": "智譜",
     "Zhipu V4": "智譜 V4",
-    "Zoom": "縮放"
+    "Zoom": "縮放",
+    "Top-Up & Redemption Switches": "Top-Up & Redemption Switches",
+    "Save top-up switch settings": "Save top-up switch settings",
+    "Enable Redemption Code Top-Up": "Enable Redemption Code Top-Up",
+    "Top-up is currently disabled": "Top-up is currently disabled",
+    "Master switch for online payment and subscription top-up channels. When off, users cannot pay online. Redemption codes are controlled by the switch below.": "線上支付與訂閱儲值渠道的總開關。關閉後使用者無法線上支付；兌換碼由下方獨立開關控制。",
+    "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes.": "允許使用者兌換額度卡。此開關與線上儲值相互獨立；管理員始終可以生成兌換碼。"
   }
 }

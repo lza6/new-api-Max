@@ -106,10 +106,10 @@ export function TopUpGateSettingsSection({
             render={({ field }) => (
               <SettingsSwitchItem>
                 <SettingsSwitchContent>
-                  <FormLabel>{t('Enable Top-Up')}</FormLabel>
+                  <FormLabel>{t('Enable Online Top-Up')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Master switch for all top-up channels (redemption codes, online payment, subscriptions). When off, users cannot add funds.'
+                      'Master switch for online payment and subscription top-up channels. When off, users cannot pay online. Redemption codes are controlled by the switch below.'
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>
@@ -132,7 +132,7 @@ export function TopUpGateSettingsSection({
                   <FormLabel>{t('Enable Redemption Code Top-Up')}</FormLabel>
                   <FormDescription>
                     {t(
-                      'Allow users to redeem quota cards. Administrators can still generate codes while this is off.'
+                      'Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes.'
                     )}
                   </FormDescription>
                 </SettingsSwitchContent>
