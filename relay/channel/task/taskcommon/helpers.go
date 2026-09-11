@@ -4,11 +4,11 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 )
 
 // UnmarshalMetadata converts a map[string]any metadata to a typed struct via JSON round-trip.

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 
-	"github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/lza6/new-api-Max/pkg/jsplugin"
 )
 
 //go:embed tasks

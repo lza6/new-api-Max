@@ -9,24 +9,24 @@ import (
 	"strings"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/relay/channel"
-	"github.com/QuantumNous/new-api/relay/channel/claude"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relay/helper"
-	"github.com/QuantumNous/new-api/relaykit/dto"
-	"github.com/QuantumNous/new-api/relaykit/types"
-	"github.com/QuantumNous/new-api/service"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/relay/channel"
+	"github.com/lza6/new-api-Max/relay/channel/claude"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relay/helper"
+	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/relaykit/types"
+	"github.com/lza6/new-api-Max/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
 
-	"github.com/QuantumNous/new-api/setting/model_setting"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/bedrockruntime"
 	bedrockruntimeTypes "github.com/aws/aws-sdk-go-v2/service/bedrockruntime/types"
 	"github.com/aws/smithy-go/auth/bearer"
+	"github.com/lza6/new-api-Max/setting/model_setting"
 )
 
 // getAwsErrorStatusCode extracts HTTP status code from AWS SDK error

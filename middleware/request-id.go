@@ -3,8 +3,8 @@ package middleware
 import (
 	"context"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
 )
 
 func RequestId() func(c *gin.Context) {

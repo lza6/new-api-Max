@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
+	"github.com/lza6/new-api-Max/common"
 	"gorm.io/gorm"
 )
 

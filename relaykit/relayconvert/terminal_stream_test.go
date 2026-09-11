@@ -3,9 +3,9 @@ package relayconvert
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/relaykit/dto"
-	"github.com/QuantumNous/new-api/relaykit/relayconvert/convmeta"
-	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/relaykit/relayconvert/convmeta"
+	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

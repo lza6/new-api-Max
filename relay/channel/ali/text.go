@@ -1,7 +1,7 @@
 package ali
 
 import (
-	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/samber/lo"
 )
 

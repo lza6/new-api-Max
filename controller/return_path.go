@@ -3,7 +3,7 @@ package controller
 import (
 	"strings"
 
-	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 )
 
 func paymentReturnPath(suffix string) string {

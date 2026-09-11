@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"unicode/utf8"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/i18n"
-	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/i18n"
+	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 
 	"github.com/gin-gonic/gin"
 )

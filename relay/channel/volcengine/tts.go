@@ -10,12 +10,12 @@ import (
 	"net/http"
 	"strings"
 
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relaykit/dto"
-	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/relaykit/types"
 )
 
 type VolcengineTTSRequest struct {

@@ -8,10 +8,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/common/limiter"
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/common/limiter"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"

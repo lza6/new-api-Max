@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/relaykit/types"
 )
 
 // SystemPerformanceCheck 检查系统性能中间件

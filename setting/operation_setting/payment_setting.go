@@ -1,6 +1,6 @@
 package operation_setting
 
-import "github.com/QuantumNous/new-api/setting/config"
+import "github.com/lza6/new-api-Max/setting/config"
 
 type PaymentSetting struct {
 	AmountOptions  []int           `json:"amount_options"`

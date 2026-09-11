@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"sort"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
 	"github.com/casbin/casbin/v2"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

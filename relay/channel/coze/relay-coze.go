@@ -9,12 +9,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relay/helper"
-	"github.com/QuantumNous/new-api/relaykit/dto"
-	"github.com/QuantumNous/new-api/relaykit/types"
-	"github.com/QuantumNous/new-api/service"
+	"github.com/lza6/new-api-Max/common"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relay/helper"
+	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/relaykit/types"
+	"github.com/lza6/new-api-Max/service"
 	"github.com/samber/lo"
 
 	"github.com/gin-gonic/gin"

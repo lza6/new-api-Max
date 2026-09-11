@@ -7,9 +7,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 )
 
 const TaskArtifactAccessContextKey = "task_artifact_access"

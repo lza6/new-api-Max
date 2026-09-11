@@ -13,25 +13,25 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/relay/channel"
-	"github.com/QuantumNous/new-api/relay/channel/ai360"
-	"github.com/QuantumNous/new-api/relay/channel/lingyiwanwu"
-	"github.com/QuantumNous/new-api/relay/channel/openrouter"
-	"github.com/QuantumNous/new-api/relaykit/dto"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/relay/channel"
+	"github.com/lza6/new-api-Max/relay/channel/ai360"
+	"github.com/lza6/new-api-Max/relay/channel/lingyiwanwu"
+	"github.com/lza6/new-api-Max/relay/channel/openrouter"
+	"github.com/lza6/new-api-Max/relaykit/dto"
 
-	//"github.com/QuantumNous/new-api/relay/channel/minimax"
-	"github.com/QuantumNous/new-api/relay/channel/xinference"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relay/common_handler"
-	relayconstant "github.com/QuantumNous/new-api/relay/constant"
-	kitreasoning "github.com/QuantumNous/new-api/relaykit/relayconvert/reasoning"
-	"github.com/QuantumNous/new-api/relaykit/types"
-	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting/model_setting"
-	"github.com/QuantumNous/new-api/setting/reasoning"
+	//"github.com/lza6/new-api-Max/relay/channel/minimax"
+	"github.com/lza6/new-api-Max/relay/channel/xinference"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relay/common_handler"
+	relayconstant "github.com/lza6/new-api-Max/relay/constant"
+	kitreasoning "github.com/lza6/new-api-Max/relaykit/relayconvert/reasoning"
+	"github.com/lza6/new-api-Max/relaykit/types"
+	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/setting/model_setting"
+	"github.com/lza6/new-api-Max/setting/reasoning"
 	"github.com/samber/lo"
 
 	"github.com/gin-gonic/gin"
@@ -233,10 +233,10 @@ func (a *Adaptor) SetupRequestHeader(c *gin.Context, header *http.Header, info *
 	}
 	if info.ChannelType == constant.ChannelTypeOpenRouter {
 		if header.Get("HTTP-Referer") == "" {
-			header.Set("HTTP-Referer", "https://www.newapi.ai")
+			header.Set("HTTP-Referer", "https://github.com/lza6/new-api-Max")
 		}
 		if header.Get("X-OpenRouter-Title") == "" {
-			header.Set("X-OpenRouter-Title", "New API")
+			header.Set("X-OpenRouter-Title", "new-api-Max")
 		}
 	}
 	return nil

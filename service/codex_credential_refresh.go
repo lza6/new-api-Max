@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/model"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/model"
 )
 
 type CodexCredentialRefreshOptions struct {

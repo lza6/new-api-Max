@@ -15,32 +15,20 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Calcium-Ion/new-api/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Calcium-Ion/new-api?color=brightgreen" alt="licence">
+  <a href="https://raw.githubusercontent.com/lza6/new-api-Max/main/LICENSE">
+    <img src="https://img.shields.io/github/license/lza6/new-api-Max?color=brightgreen" alt="licence">
   </a><!--
-  --><a href="https://github.com/Calcium-Ion/new-api/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Calcium-Ion/new-api?color=brightgreen&include_prereleases" alt="version">
+  --><a href="https://github.com/lza6/new-api-Max/releases/latest">
+    <img src="https://img.shields.io/github/v/release/lza6/new-api-Max?color=brightgreen&include_prereleases" alt="version">
   </a><!--
-  --><a href="https://hub.docker.com/r/CalciumIon/new-api">
+  --><a href="https://hub.docker.com/r/lza6/new-api-max">
     <img src="https://img.shields.io/badge/docker-dockerHub-blue" alt="docker">
-  </a>
-  <a href="https://atomgit.com/QuantumNous/new-api" target="_blank">
-    <img alt="AtomGit G-Star" src="https://atomgit.com/QuantumNous/new-api/star/badge.svg"/>
   </a>
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/20180" target="_blank">
-    <img src="https://trendshift.io/api/badge/repositories/20180" alt="QuantumNous%2Fnew-api | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
-  </a>
-  <br>
-  <a href="https://hellogithub.com/repository/QuantumNous/new-api" target="_blank">
-    <img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=539ac4217e69431684ad4a0bab768811&claim_uid=tbFPfKIDHpc4TzR" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" />
-  </a><!--
+  <br><!--
   -->
-  <a href="https://atomgit.com/QuantumNous/new-api" target="_blank">
-    <img alt="AtomGit G-Star" src="https://atomgit.com/QuantumNous/new-api/star/new_badge.svg" width="250" height="55" />
-  </a>
 </p>
 
 <p align="center">
@@ -112,7 +100,7 @@
 
 ```bash
 # Cloner le projet
-git clone https://github.com/QuantumNous/new-api.git
+git clone https://github.com/lza6/new-api-Max.git
 cd new-api
 
 # Modifier la configuration docker-compose.yml
@@ -164,7 +152,7 @@ docker run --name new-api -d --restart always \
 
 <div align="center">
 
-### 📖 [Documentation officielle](https://docs.newapi.pro/en/docs) | [![Demander à DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/QuantumNous/new-api)
+### 📖 [Documentation officielle](https://docs.newapi.pro/en/docs) | [![Demander à DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lza6/new-api-Max)
 
 </div>
 
@@ -207,7 +195,7 @@ docker run --name new-api -d --restart always \
 - 🤖 Connexion par autorisation LinuxDO
 - 📱 Connexion par autorisation Telegram
 - 🔑 Authentification unifiée OIDC
-- 🔍 Requête de quota d'utilisation de clé (avec [new-api-key-tool](https://github.com/Calcium-Ion/new-api-key-tool))
+- 🔍 Requête de quota d'utilisation de clé (avec [new-api-key-tool](https://github.com/lza6/new-api-Max-key-tool))
 
 ### 🚀 Fonctionnalités avancées
 
@@ -350,7 +338,7 @@ docker run --name new-api -d --restart always \
 
 ```bash
 # Cloner le projet
-git clone https://github.com/QuantumNous/new-api.git
+git clone https://github.com/lza6/new-api-Max.git
 cd new-api
 
 # Modifier la configuration
@@ -442,8 +430,8 @@ Consultez [Authentification utilisateur et sessions de connexion](./docs/authent
 
 | Projet | Description |
 |------|------|
-| [new-api-key-tool](https://github.com/Calcium-Ion/new-api-key-tool) | Outil de recherche de quota d'utilisation avec une clé |
-| [new-api-horizon](https://github.com/Calcium-Ion/new-api-horizon) | Version optimisée haute performance de New API |
+| [new-api-key-tool](https://github.com/lza6/new-api-Max-key-tool) | Outil de recherche de quota d'utilisation avec une clé |
+| [new-api-horizon](https://github.com/lza6/new-api-Max-horizon) | Version optimisée haute performance de New API |
 
 ---
 
@@ -483,7 +471,7 @@ Si les politiques de votre organisation ne permettent pas l'utilisation de logic
 
 <div align="center">
 
-[![Graphique de l'historique des étoiles](https://api.star-history.com/svg?repos=Calcium-Ion/new-api&type=Date)](https://star-history.com/#Calcium-Ion/new-api&Date)
+[![Graphique de l'historique des étoiles](https://api.star-history.com/svg?repos=lza6/new-api-Max&type=Date)](https://star-history.com/#lza6/new-api-Max&Date)
 
 </div>
 
@@ -495,8 +483,8 @@ Si les politiques de votre organisation ne permettent pas l'utilisation de logic
 
 Si ce projet vous est utile, bienvenue à nous donner une ⭐️ Étoile！
 
-**[Documentation officielle](https://docs.newapi.pro/en/docs)** • **[Commentaires sur les problèmes](https://github.com/Calcium-Ion/new-api/issues)** • **[Dernière version](https://github.com/Calcium-Ion/new-api/releases)**
+**[Documentation officielle](https://docs.newapi.pro/en/docs)** • **[Commentaires sur les problèmes](https://github.com/lza6/new-api-Max/issues)** • **[Dernière version](https://github.com/lza6/new-api-Max/releases)**
 
-<sub>Construit avec ❤️ par QuantumNous</sub>
+<sub>Construit avec ❤️ par lza6</sub>
 
 </div>

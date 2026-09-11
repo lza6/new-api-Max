@@ -15,23 +15,23 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/controller"
-	"github.com/QuantumNous/new-api/i18n"
-	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/middleware"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/oauth"
-	"github.com/QuantumNous/new-api/pkg/jsplugin"
-	perfmetrics "github.com/QuantumNous/new-api/pkg/perf_metrics"
-	"github.com/QuantumNous/new-api/relay"
-	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
-	"github.com/QuantumNous/new-api/router"
-	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/service/authz"
-	_ "github.com/QuantumNous/new-api/setting/performance_setting"
-	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/controller"
+	"github.com/lza6/new-api-Max/i18n"
+	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/middleware"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/oauth"
+	"github.com/lza6/new-api-Max/pkg/jsplugin"
+	perfmetrics "github.com/lza6/new-api-Max/pkg/perf_metrics"
+	"github.com/lza6/new-api-Max/relay"
+	kitutil "github.com/lza6/new-api-Max/relaykit/relayconvert/kitutil"
+	"github.com/lza6/new-api-Max/router"
+	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/service/authz"
+	_ "github.com/lza6/new-api-Max/setting/performance_setting"
+	"github.com/lza6/new-api-Max/setting/ratio_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
@@ -185,7 +185,7 @@ func main() {
 		common.SysLog(fmt.Sprintf("panic detected: %v", err))
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": gin.H{
-				"message": fmt.Sprintf("Panic detected, error: %v. Please submit a issue here: https://github.com/Calcium-Ion/new-api", err),
+				"message": fmt.Sprintf("Panic detected, error: %v. Please submit a issue here: https://github.com/lza6/new-api-Max", err),
 				"type":    "new_api_panic",
 			},
 		})

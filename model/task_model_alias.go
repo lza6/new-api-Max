@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/pkg/jsplugin"
 )
 
 // TaskAliasTarget is one mapping-derived alias after cross-channel aggregation.

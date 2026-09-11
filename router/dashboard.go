@@ -1,8 +1,8 @@
 package router
 
 import (
-	"github.com/QuantumNous/new-api/controller"
-	"github.com/QuantumNous/new-api/middleware"
+	"github.com/lza6/new-api-Max/controller"
+	"github.com/lza6/new-api-Max/middleware"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 )

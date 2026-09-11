@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/QuantumNous/new-api/common"
+	"github.com/lza6/new-api-Max/common"
 )
 
 // AuditOther is the structured metadata stored with an audit event. Privileged

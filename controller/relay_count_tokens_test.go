@@ -6,9 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

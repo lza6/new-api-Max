@@ -9,12 +9,12 @@ import (
 	"sync"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/dto"
-	"github.com/QuantumNous/new-api/logger"
-	kitdto "github.com/QuantumNous/new-api/relaykit/dto"
-	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/dto"
+	"github.com/lza6/new-api-Max/logger"
+	kitdto "github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/setting/ratio_setting"
 )
 
 var group2model2channels map[string]map[string][]int // enabled channel

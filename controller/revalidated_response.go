@@ -3,8 +3,8 @@ package controller
 import (
 	"net/http"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
 )
 
 // etagVersionPublicContent namespaces the public-content ETag; bump it when

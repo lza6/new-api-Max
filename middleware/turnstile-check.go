@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
 )
 
 type turnstileCheckResponse struct {

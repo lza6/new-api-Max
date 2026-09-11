@@ -4,10 +4,10 @@ import (
 	"maps"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
-	hostreasoning "github.com/QuantumNous/new-api/setting/reasoning"
-	"github.com/QuantumNous/new-api/types"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
+	hostreasoning "github.com/lza6/new-api-Max/setting/reasoning"
+	"github.com/lza6/new-api-Max/types"
 )
 
 // from songquanpeng/one-api

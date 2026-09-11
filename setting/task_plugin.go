@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
+	"github.com/lza6/new-api-Max/common"
 )
 
 const (

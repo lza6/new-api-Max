@@ -3,9 +3,9 @@ package tencent
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/relay/channel/openai"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/relay/channel/openai"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

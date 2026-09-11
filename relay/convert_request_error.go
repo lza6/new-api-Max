@@ -4,10 +4,10 @@ import (
 	"errors"
 	"net/http"
 
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	kitreasoning "github.com/QuantumNous/new-api/relaykit/relayconvert/reasoning"
-	"github.com/QuantumNous/new-api/relaykit/types"
 	"github.com/gin-gonic/gin"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	kitreasoning "github.com/lza6/new-api-Max/relaykit/relayconvert/reasoning"
+	"github.com/lza6/new-api-Max/relaykit/types"
 )
 
 func newConvertRequestFailedError(c *gin.Context, info *relaycommon.RelayInfo, err error) *types.NewAPIError {

@@ -5,8 +5,8 @@ import (
 	"mime"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
 	"github.com/tidwall/sjson"
 )
 

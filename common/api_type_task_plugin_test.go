@@ -3,7 +3,7 @@ package common
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/constant"
+	"github.com/lza6/new-api-Max/constant"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/setting/operation_setting"
 	"github.com/bytedance/gopkg/util/gopool"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"gorm.io/gorm"
 )
 

@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 	"github.com/coreos/go-oidc/v3/oidc"
 	"github.com/gin-gonic/gin"
 	"golang.org/x/oauth2"

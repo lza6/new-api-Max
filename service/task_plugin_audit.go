@@ -1,10 +1,10 @@
 package service
 
 import (
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
-	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
+	pluginruntime "github.com/lza6/new-api-Max/pkg/jsplugin"
 )
 
 // TaskExecutionSnapshotFromContext captures immutable request and plugin

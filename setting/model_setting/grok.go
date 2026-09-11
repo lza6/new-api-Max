@@ -1,6 +1,6 @@
 package model_setting
 
-import "github.com/QuantumNous/new-api/setting/config"
+import "github.com/lza6/new-api-Max/setting/config"
 
 // GrokSettings defines Grok model configuration.
 type GrokSettings struct {

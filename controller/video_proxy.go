@@ -15,13 +15,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/model"
-	relaychannel "github.com/QuantumNous/new-api/relay/channel"
-	"github.com/QuantumNous/new-api/service"
-	"github.com/QuantumNous/new-api/setting/system_setting"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/model"
+	relaychannel "github.com/lza6/new-api-Max/relay/channel"
+	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 	"golang.org/x/net/http/httpguts"
 )
 

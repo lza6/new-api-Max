@@ -1,6 +1,6 @@
 package convmeta
 
-import "github.com/QuantumNous/new-api/relaykit/types"
+import "github.com/lza6/new-api-Max/relaykit/types"
 
 // Options is the per-request snapshot of host configuration that converters
 // consult. The host fills it from its settings system when constructing the

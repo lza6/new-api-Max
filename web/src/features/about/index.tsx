@@ -50,31 +50,31 @@ function EmptyAboutState() {
           <p>
             {t('New API Project Repository:')}{' '}
             <a
-              href='https://github.com/QuantumNous/new-api'
+              href='https://github.com/lza6/new-api-Max'
               target='_blank'
               rel='noopener noreferrer'
               className='text-primary hover:underline'
             >
-              {t('https://github.com/QuantumNous/new-api')}
+              {t('https://github.com/lza6/new-api-Max')}
             </a>
           </p>
           <p className='text-muted-foreground'>
             <a
-              href='https://github.com/QuantumNous/new-api'
+              href='https://github.com/lza6/new-api-Max'
               target='_blank'
               rel='noopener noreferrer'
               className='text-primary hover:underline'
             >
-              {t('NewAPI')}
+              {t('new-api-Max')}
             </a>{' '}
             © {currentYear}{' '}
             <a
-              href='https://github.com/QuantumNous'
+              href='https://github.com/lza6'
               target='_blank'
               rel='noopener noreferrer'
               className='text-primary hover:underline'
             >
-              {t('QuantumNous')}
+              {t('lza6')}
             </a>{' '}
             {t('| Based on')}{' '}
             <a
@@ -98,7 +98,7 @@ function EmptyAboutState() {
           <p className='text-muted-foreground'>
             {t('This project must be used in compliance with the')}{' '}
             <a
-              href='https://github.com/QuantumNous/new-api/blob/main/LICENSE'
+              href='https://github.com/lza6/new-api-Max/blob/main/LICENSE'
               target='_blank'
               rel='noopener noreferrer'
               className='text-primary hover:underline'

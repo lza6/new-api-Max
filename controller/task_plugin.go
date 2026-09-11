@@ -14,13 +14,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/logger"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/pkg/jsplugin"
-	"github.com/QuantumNous/new-api/plugins"
-	"github.com/QuantumNous/new-api/setting"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/pkg/jsplugin"
+	"github.com/lza6/new-api-Max/plugins"
+	"github.com/lza6/new-api-Max/setting"
 	"gorm.io/gorm"
 )
 

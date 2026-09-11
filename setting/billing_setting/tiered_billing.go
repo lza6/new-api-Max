@@ -6,13 +6,13 @@ import (
 	"math"
 	"sort"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/pkg/billingexpr"
-	"github.com/QuantumNous/new-api/pkg/jsplugin"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relaykit/dto"
-	"github.com/QuantumNous/new-api/setting/config"
-	"github.com/QuantumNous/new-api/setting/ratio_setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/pkg/billingexpr"
+	"github.com/lza6/new-api-Max/pkg/jsplugin"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/setting/config"
+	"github.com/lza6/new-api-Max/setting/ratio_setting"
 	"github.com/samber/lo"
 )
 

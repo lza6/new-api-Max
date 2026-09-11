@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
 )
 
 const (

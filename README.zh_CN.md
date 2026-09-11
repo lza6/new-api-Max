@@ -15,32 +15,20 @@
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/Calcium-Ion/new-api/main/LICENSE">
-    <img src="https://img.shields.io/github/license/Calcium-Ion/new-api?color=brightgreen" alt="license">
+  <a href="https://raw.githubusercontent.com/lza6/new-api-Max/main/LICENSE">
+    <img src="https://img.shields.io/github/license/lza6/new-api-Max?color=brightgreen" alt="license">
   </a><!--
-  --><a href="https://github.com/Calcium-Ion/new-api/releases/latest">
-    <img src="https://img.shields.io/github/v/release/Calcium-Ion/new-api?color=brightgreen&include_prereleases" alt="release">
+  --><a href="https://github.com/lza6/new-api-Max/releases/latest">
+    <img src="https://img.shields.io/github/v/release/lza6/new-api-Max?color=brightgreen&include_prereleases" alt="release">
   </a><!--
-  --><a href="https://hub.docker.com/r/CalciumIon/new-api">
+  --><a href="https://hub.docker.com/r/lza6/new-api-max">
     <img src="https://img.shields.io/badge/docker-dockerHub-blue" alt="docker">
-  </a>
-  <a href="https://atomgit.com/QuantumNous/new-api" target="_blank">
-    <img alt="AtomGit G-Star" src="https://atomgit.com/QuantumNous/new-api/star/badge.svg"/>
   </a>
 </p>
 
 <p align="center">
-  <a href="https://trendshift.io/repositories/20180" target="_blank">
-    <img src="https://trendshift.io/api/badge/repositories/20180" alt="QuantumNous%2Fnew-api | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/>
-  </a>
-  <br>
-  <a href="https://hellogithub.com/repository/QuantumNous/new-api" target="_blank">
-    <img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=539ac4217e69431684ad4a0bab768811&claim_uid=tbFPfKIDHpc4TzR" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" />
-  </a><!--
+  <br><!--
   -->
-  <a href="https://atomgit.com/QuantumNous/new-api" target="_blank">
-    <img alt="AtomGit G-Star" src="https://atomgit.com/QuantumNous/new-api/star/new_badge.svg" width="250" height="55" />
-  </a>
 </p>
 
 <p align="center">
@@ -112,7 +100,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/QuantumNous/new-api.git
+git clone https://github.com/lza6/new-api-Max.git
 cd new-api
 
 # 编辑 docker-compose.yml 配置
@@ -164,7 +152,7 @@ docker run --name new-api -d --restart always \
 
 <div align="center">
 
-### 📖 [官方文档](https://docs.newapi.pro/zh/docs) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/QuantumNous/new-api)
+### 📖 [官方文档](https://docs.newapi.pro/zh/docs) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lza6/new-api-Max)
 
 </div>
 
@@ -207,7 +195,7 @@ docker run --name new-api -d --restart always \
 - 🤖 LinuxDO 授权登录
 - 📱 Telegram 授权登录
 - 🔑 OIDC 统一认证
-- 🔍 Key 查询使用额度（配合 [new-api-key-tool](https://github.com/Calcium-Ion/new-api-key-tool)）
+- 🔍 Key 查询使用额度（配合 [new-api-key-tool](https://github.com/lza6/new-api-Max-key-tool)）
 
 ### 🚀 高级功能
 
@@ -350,7 +338,7 @@ docker run --name new-api -d --restart always \
 
 ```bash
 # 克隆项目
-git clone https://github.com/QuantumNous/new-api.git
+git clone https://github.com/lza6/new-api-Max.git
 cd new-api
 
 # 编辑配置
@@ -442,8 +430,8 @@ Token、Origin 校验和 PAT 契约见[用户鉴权与登录会话](./docs/authe
 
 | 项目 | 说明 |
 |------|------|
-| [new-api-key-tool](https://github.com/Calcium-Ion/new-api-key-tool) | Key 额度查询工具 |
-| [new-api-horizon](https://github.com/Calcium-Ion/new-api-horizon) | New API 高性能优化版 |
+| [new-api-key-tool](https://github.com/lza6/new-api-Max-key-tool) | Key 额度查询工具 |
+| [new-api-horizon](https://github.com/lza6/new-api-Max-horizon) | New API 高性能优化版 |
 
 ---
 
@@ -483,7 +471,7 @@ Token、Origin 校验和 PAT 契约见[用户鉴权与登录会话](./docs/authe
 
 <div align="center">
 
-[![Star History Chart](https://api.star-history.com/svg?repos=Calcium-Ion/new-api&type=Date)](https://star-history.com/#Calcium-Ion/new-api&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=lza6/new-api-Max&type=Date)](https://star-history.com/#lza6/new-api-Max&Date)
 
 </div>
 
@@ -495,8 +483,8 @@ Token、Origin 校验和 PAT 契约见[用户鉴权与登录会话](./docs/authe
 
 如果这个项目对你有帮助，欢迎给我们一个 ⭐️ Star！
 
-**[官方文档](https://docs.newapi.pro/zh/docs)** • **[问题反馈](https://github.com/Calcium-Ion/new-api/issues)** • **[最新发布](https://github.com/Calcium-Ion/new-api/releases)**
+**[官方文档](https://docs.newapi.pro/zh/docs)** • **[问题反馈](https://github.com/lza6/new-api-Max/issues)** • **[最新发布](https://github.com/lza6/new-api-Max/releases)**
 
-<sub>Built with ❤️ by QuantumNous</sub>
+<sub>Built with ❤️ by lza6</sub>
 
 </div>

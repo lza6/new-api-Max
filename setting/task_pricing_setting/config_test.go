@@ -3,7 +3,7 @@ package task_pricing_setting
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/setting/config"
+	"github.com/lza6/new-api-Max/setting/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

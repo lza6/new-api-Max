@@ -6,8 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	relayconstant "github.com/QuantumNous/new-api/relay/constant"
 	"github.com/gin-gonic/gin"
+	relayconstant "github.com/lza6/new-api-Max/relay/constant"
 	"github.com/stretchr/testify/require"
 )
 

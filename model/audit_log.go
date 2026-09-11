@@ -8,9 +8,9 @@ import (
 	"strings"
 
 	"github.com/ClickHouse/clickhouse-go/v2"
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/logger"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/logger"
 	"gorm.io/gorm"
 )
 

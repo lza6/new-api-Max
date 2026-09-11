@@ -4,7 +4,7 @@ import (
 	"context"
 	"reflect"
 
-	"github.com/QuantumNous/new-api/relaykit/types"
+	"github.com/lza6/new-api-Max/relaykit/types"
 )
 
 type collectorKey struct{}

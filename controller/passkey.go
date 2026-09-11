@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/middleware"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/service"
-	passkeysvc "github.com/QuantumNous/new-api/service/passkey"
-	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/middleware"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
+	passkeysvc "github.com/lza6/new-api-Max/service/passkey"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-webauthn/webauthn/protocol"

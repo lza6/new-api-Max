@@ -8,11 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
-	vertexcore "github.com/QuantumNous/new-api/relay/channel/vertex"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	pluginruntime "github.com/lza6/new-api-Max/pkg/jsplugin"
+	vertexcore "github.com/lza6/new-api-Max/relay/channel/vertex"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

@@ -7,10 +7,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/oauth"
-	"github.com/QuantumNous/new-api/setting/system_setting"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/oauth"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 	"gorm.io/gorm"
 )
 

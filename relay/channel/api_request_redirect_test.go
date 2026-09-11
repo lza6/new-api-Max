@@ -9,9 +9,9 @@ import (
 	"sync/atomic"
 	"testing"
 
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/service"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

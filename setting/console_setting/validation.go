@@ -9,7 +9,7 @@ import (
 	"time"
 	"unicode/utf16"
 
-	"github.com/QuantumNous/new-api/common"
+	"github.com/lza6/new-api-Max/common"
 )
 
 var (

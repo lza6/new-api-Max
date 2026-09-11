@@ -1,10 +1,10 @@
 package service
 
 import (
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/relaykit/dto"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/relaykit/dto"
 )
 
 //func GetPromptTokens(textRequest dto.GeneralOpenAIRequest, relayMode int) (int, error) {

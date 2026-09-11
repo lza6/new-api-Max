@@ -5,9 +5,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/casbin/casbin/v2"
 	casbinmodel "github.com/casbin/casbin/v2/model"
+	"github.com/lza6/new-api-Max/common"
 	"gorm.io/gorm"
 )
 

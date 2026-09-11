@@ -4,8 +4,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/QuantumNous/new-api/common"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
 )
 
 func ConfigureTrustedProxies(engine *gin.Engine) error {

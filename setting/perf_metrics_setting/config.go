@@ -1,6 +1,6 @@
 package perf_metrics_setting
 
-import "github.com/QuantumNous/new-api/setting/config"
+import "github.com/lza6/new-api-Max/setting/config"
 
 type PerfMetricsSetting struct {
 	Enabled       bool   `json:"enabled"`

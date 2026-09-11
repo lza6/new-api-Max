@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/QuantumNous/new-api/constant"
+	"github.com/lza6/new-api-Max/constant"
 )
 
 type RouteType string

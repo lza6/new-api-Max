@@ -1,4 +1,4 @@
-module github.com/QuantumNous/new-api
+module github.com/lza6/new-api-Max
 
 // +heroku goVersion go1.18
 go 1.25.1
@@ -113,7 +113,7 @@ require (
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/expr-lang/expr v1.17.8
-	github.com/fxamacker/cbor/v2 v2.9.0 // indirect
+	github.com/fxamacker/cbor/v2 v2.9.0
 	github.com/gabriel-vasile/mimetype v1.4.3 // indirect
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/glebarez/go-sqlite v1.21.2
@@ -173,7 +173,7 @@ require (
 
 require (
 	github.com/ClickHouse/clickhouse-go/v2 v2.46.0
-	github.com/QuantumNous/new-api/relaykit v0.0.0
+	github.com/lza6/new-api-Max/relaykit v0.0.0
 )
 
-replace github.com/QuantumNous/new-api/relaykit => ./relaykit
+replace github.com/lza6/new-api-Max/relaykit => ./relaykit

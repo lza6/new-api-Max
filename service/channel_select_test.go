@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/QuantumNous/new-api/constant"
-	"github.com/QuantumNous/new-api/pkg/jsplugin"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/pkg/jsplugin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

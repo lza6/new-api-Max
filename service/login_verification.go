@@ -3,8 +3,8 @@ package service
 import (
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/model"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
 )
 
 const LoginVerificationTTL = 5 * time.Minute

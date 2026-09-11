@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 
-	rootcommon "github.com/QuantumNous/new-api/common"
-	relaycommon "github.com/QuantumNous/new-api/relay/common"
-	"github.com/QuantumNous/new-api/relaykit/dto"
-	hostreasoning "github.com/QuantumNous/new-api/setting/reasoning"
 	"github.com/gin-gonic/gin"
+	rootcommon "github.com/lza6/new-api-Max/common"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relaykit/dto"
+	hostreasoning "github.com/lza6/new-api-Max/setting/reasoning"
 )
 
 func ModelMappedHelper(c *gin.Context, info *relaycommon.RelayInfo, request dto.Request) error {

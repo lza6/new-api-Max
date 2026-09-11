@@ -9,13 +9,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/i18n"
-	"github.com/QuantumNous/new-api/middleware"
-	"github.com/QuantumNous/new-api/model"
-	"github.com/QuantumNous/new-api/oauth"
-	"github.com/QuantumNous/new-api/service"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/i18n"
+	"github.com/lza6/new-api-Max/middleware"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/oauth"
+	"github.com/lza6/new-api-Max/service"
 	"gorm.io/gorm"
 )
 

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	kitutil "github.com/QuantumNous/new-api/relaykit/relayconvert/kitutil"
+	kitutil "github.com/lza6/new-api-Max/relaykit/relayconvert/kitutil"
 )
 
 func claudeCitationsToChat(raw json.RawMessage, text string, textOffset int) ([]any, error) {

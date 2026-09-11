@@ -3,8 +3,8 @@ package relay
 import (
 	"testing"
 
-	"github.com/QuantumNous/new-api/constant"
-	pluginruntime "github.com/QuantumNous/new-api/pkg/jsplugin"
+	"github.com/lza6/new-api-Max/constant"
+	pluginruntime "github.com/lza6/new-api-Max/pkg/jsplugin"
 	"github.com/stretchr/testify/assert"
 )
 

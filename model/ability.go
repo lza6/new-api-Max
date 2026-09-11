@@ -7,8 +7,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/QuantumNous/new-api/common"
-	"github.com/QuantumNous/new-api/dto"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/dto"
 
 	"github.com/samber/lo"
 	"gorm.io/gorm"

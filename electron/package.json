@@ -18,10 +18,10 @@
     "openai",
     "claude"
   ],
-  "author": "QuantumNous",
+  "author": "lza6",
   "repository": {
     "type": "git",
-    "url": "https://github.com/QuantumNous/new-api"
+    "url": "https://github.com/lza6/new-api-Max"
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
