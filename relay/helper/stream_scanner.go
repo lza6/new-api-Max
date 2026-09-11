@@ -14,8 +14,10 @@ import (
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
 
@@ -74,14 +76,38 @@ func ExtendWriteDeadline(c *gin.Context) {
 	_ = http.NewResponseController(c.Writer).SetWriteDeadline(time.Now().Add(streamWriteTimeout))
 }
 
-func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string, sr *StreamResult)) {
+func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon.RelayInfo, dataHandler func(data string, sr *StreamResult)) (fatalErr *types.NewAPIError) {
 
 	if resp == nil || dataHandler == nil {
-		return
+		return nil
 	}
 
 	// 无条件新建 StreamStatus
 	info.StreamStatus = relaycommon.NewStreamStatus()
+
+	// B3-2 流式首包缓冲 fallover（开关 relay.stream_fallover，默认 off）：
+	// 安装缓冲 Writer 挡住客户端写；收到首个有效 data 块时 Commit 放行；
+	// 首包超时则放弃本次 attempt（返回 fatalErr 交还渠道重试链）。
+	// 缓冲期间 ping 保活必须关闭（PING 注释行会提前上线响应头）。
+	fallover := relay_setting.GetRelaySetting().StreamFallover
+	var bufferWriter *FirstPacketBufferWriter
+	var firstTokenTimer *time.Timer
+	firstTokenTimedOut := false
+	if fallover {
+		bufferWriter = NewFirstPacketBufferWriter(c.Writer)
+		c.Writer = bufferWriter
+		info.DisablePing = true
+		firstTokenTimer = time.NewTimer(time.Duration(relay_setting.GetStreamFirstTokenTimeout()) * time.Second)
+		defer firstTokenTimer.Stop()
+	}
+	commitBuffer := func() {
+		if bufferWriter != nil {
+			bufferWriter.Commit()
+		}
+		if firstTokenTimer != nil {
+			firstTokenTimer.Stop()
+		}
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -265,6 +291,8 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			if !strings.HasPrefix(data, "[DONE]") {
 				info.SetFirstResponseTime()
 				info.ReceivedResponseCount++
+				// B3-2：首个有效 data 块到达 → 一次性放行缓冲，进入直通。
+				commitBuffer()
 
 				select {
 				case dataChan <- data:
@@ -289,6 +317,12 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonEOF, nil)
 	})
 
+	// B3-2 首包超时 channel：fallover 关闭/禁用超时时为 nil（select 永不命中）。
+	var firstTokenCh <-chan time.Time
+	if firstTokenTimer != nil {
+		firstTokenCh = firstTokenTimer.C
+	}
+
 	// 主循环等待完成或超时
 	select {
 	case <-ticker.C:
@@ -299,6 +333,21 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		// 客户端断开：立即 cleanup 关闭上游 resp.Body，解除 scanner 阻塞并让上游停止生成，
 		// 避免为已放弃的请求继续消费上游 token。
 		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonClientGone, c.Request.Context().Err())
+	case <-firstTokenCh:
+		// B3-2 首包超时：上游一个有效 data 块都没发出（响应头未上线），
+		// 判定本次渠道失败，交还重试链换下一候选。
+		firstTokenTimedOut = true
+		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonTimeout, nil)
+	}
+
+	if firstTokenTimedOut {
+		logger.LogWarn(c, fmt.Sprintf("stream first-token timeout (%ds), failover to next channel", relay_setting.GetStreamFirstTokenTimeout()))
+		fatalErr = types.NewError(
+			fmt.Errorf("upstream stream first-token timeout after %ds", relay_setting.GetStreamFirstTokenTimeout()),
+			types.ErrorCodeDoRequestFailed,
+			types.ErrOptionWithHideErrMsg("upstream stream timeout"),
+		)
+		return fatalErr
 	}
 
 	cleanup()
@@ -307,4 +356,5 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	} else {
 		logger.LogError(c, fmt.Sprintf("stream ended: %s, received=%d", info.StreamStatus.Summary(), info.ReceivedResponseCount))
 	}
+	return nil
 }
