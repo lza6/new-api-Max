@@ -5,12 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/lza6/new-api-Max/common"
-	"github.com/lza6/new-api-Max/controller"
-	"github.com/lza6/new-api-Max/middleware"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-contrib/static"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/controller"
+	"github.com/lza6/new-api-Max/middleware"
 )
 
 // WebAssets holds the embedded dashboard frontend assets.

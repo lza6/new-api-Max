@@ -1,10 +1,10 @@
 package router
 
 import (
-	"github.com/lza6/new-api-Max/controller"
-	"github.com/lza6/new-api-Max/middleware"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/controller"
+	"github.com/lza6/new-api-Max/middleware"
 )
 
 func SetDashboardRouter(router *gin.Engine) {

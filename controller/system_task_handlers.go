@@ -23,6 +23,7 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(midjourneyPollHandler{})
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
 	service.RegisterSystemTaskHandler(cooldownRecoveryHandler{})
+	service.RegisterSystemTaskHandler(probeScheduledChannelsHandler{})
 }
 
 // cooldownRecoveryHandler periodically recovers channels whose B3-1 cooldown

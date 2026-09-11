@@ -45,7 +45,10 @@ type Channel struct {
 	Priority          *int64  `json:"priority" gorm:"bigint;default:0"`
 	AutoBan           *int    `json:"auto_ban" gorm:"default:1"`
 	OtherInfo         string  `json:"other_info"`
-	Tag               *string `json:"tag" gorm:"index"`
+	// ProbeResult B4-1 渠道验真探测报告（json 字符串，见 service/probe）。
+	// 新列 TEXT，三库 AutoMigrate 自动补齐；只增不改语义。
+	ProbeResult *string `json:"probe_result" gorm:"type:text"`
+	Tag         *string `json:"tag" gorm:"index"`
 	Setting           *string `json:"setting" gorm:"type:text"` // 渠道额外设置
 	ParamOverride     *string `json:"param_override" gorm:"type:text"`
 	HeaderOverride    *string `json:"header_override" gorm:"type:text"`

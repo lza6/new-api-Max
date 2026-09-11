@@ -3,11 +3,11 @@ package router
 import (
 	"fmt"
 
+	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/controller"
 	"github.com/lza6/new-api-Max/middleware"
 	pluginruntime "github.com/lza6/new-api-Max/pkg/jsplugin"
 	"github.com/lza6/new-api-Max/relaykit/types"
-	"github.com/gin-gonic/gin"
 )
 
 func SetTaskPluginProtocolRouter(router *gin.Engine) {

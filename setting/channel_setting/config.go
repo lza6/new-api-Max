@@ -9,6 +9,9 @@ type ChannelSetting struct {
 	// 到期后自动恢复。关闭时保持旧行为（仅 AutomaticDisable 关键词/状态码
 	// 触发硬禁用，无时长冷却）。
 	CooldownV2 bool `json:"cooldown_v2"`
+	// ProbeScheduleEnabled 启用 B4-2 每日定时验真探测（默认 off；
+	// 手动「立即探测」不受此开关限制）。
+	ProbeScheduleEnabled bool `json:"probe_schedule_enabled"`
 }
 
 var channelSetting = ChannelSetting{

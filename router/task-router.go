@@ -1,9 +1,9 @@
 package router
 
 import (
+	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/controller"
 	"github.com/lza6/new-api-Max/middleware"
-	"github.com/gin-gonic/gin"
 )
 
 // SetTaskRouter registers the generic task-plugin API surface.

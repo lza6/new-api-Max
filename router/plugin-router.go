@@ -13,13 +13,13 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/controller"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/middleware"
 	"github.com/lza6/new-api-Max/pkg/jsplugin"
-	"github.com/gin-gonic/gin"
 )
 
 type pluginDispatchStateKey struct{}

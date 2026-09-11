@@ -3,10 +3,10 @@ package router
 import (
 	"net/http"
 
+	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/controller"
 	"github.com/lza6/new-api-Max/middleware"
 	"github.com/lza6/new-api-Max/service/authz"
-	"github.com/gin-gonic/gin"
 )
 
 type permissionRoute struct {
@@ -39,6 +39,8 @@ func registerChannelRoutes(apiRouter *gin.RouterGroup) {
 var channelPermissionRoutes = []permissionRoute{
 	{method: http.MethodGet, path: "/", permission: authz.ChannelRead, handler: controller.GetAllChannels},
 	{method: http.MethodGet, path: "/health_scores", permission: authz.ChannelRead, handler: controller.GetChannelHealthScores},
+	{method: http.MethodPost, path: "/probe/:id", permission: authz.ChannelOperate, handler: controller.ProbeChannel},
+	{method: http.MethodGet, path: "/probe_result/:id", permission: authz.ChannelRead, handler: controller.GetChannelProbeResult},
 	{method: http.MethodGet, path: "/search", permission: authz.ChannelRead, handler: controller.SearchChannels},
 	{method: http.MethodGet, path: "/models", permission: authz.ChannelRead, handler: controller.ChannelListModels},
 	{method: http.MethodGet, path: "/models_enabled", permission: authz.ChannelRead, handler: controller.EnabledListModels},
