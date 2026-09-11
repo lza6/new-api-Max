@@ -73,6 +73,20 @@ function formatTaskTimestamp(value?: number): string {
   return value ? formatTimestampToDate(value, 'seconds') : '-'
 }
 
+/**
+ * 从任务 data 字段读取退款摘要（B2-3 退款可见性）。
+ * 后端在 RefundTaskQuota 成功后写入 {refund: {quota, reason, settled_at}}。
+ */
+function readTaskRefund(data: unknown): { quota: number; reason?: string } | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  const refund = (data as Record<string, unknown>).refund
+  if (!refund || typeof refund !== 'object' || Array.isArray(refund)) return null
+  const quota = Number((refund as Record<string, unknown>).quota)
+  if (!Number.isFinite(quota) || quota <= 0) return null
+  const reason = (refund as Record<string, unknown>).reason
+  return { quota, reason: typeof reason === 'string' ? reason : undefined }
+}
+
 interface TaskDetailsDialogProps {
   log: TaskLog
   isAdmin: boolean
@@ -87,6 +101,7 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
   const plugin = access.plugin
   const runtime = access.runtime
   const properties = props.log.properties
+  const refund = readTaskRefund(props.log.data)
 
   return (
     <Dialog
@@ -157,6 +172,14 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
           ) : null}
           {props.log.fail_reason ? (
             <DetailRow label={t('Fail Reason')} value={props.log.fail_reason} />
+          ) : null}
+          {refund ? (
+            <DetailRow
+              label={t('Refund')}
+              value={t('Refunded {{quota}} credits', {
+                quota: formatLogQuota(refund.quota),
+              })}
+            />
           ) : null}
         </DetailSection>
 
