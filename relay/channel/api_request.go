@@ -488,6 +488,15 @@ func keepUpstreamRedirectResponse(_ *http.Request, _ []*http.Request) error {
 }
 
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
+	// B1-2 SSRF 二次解析：在即将发起上游请求时再次校验目标地址（防 DNS
+	// rebinding「保存合法、使用时解析到内网」窗口）。结果按 host 缓存 5 分钟。
+	// 拒绝不 skip retry：换渠道后 base_url 不同，可正常继续。
+	if req != nil && req.URL != nil {
+		if err := service.ValidateChannelURL(req.URL.String()); err != nil {
+			logger.LogError(c, "ssrf guard: "+err.Error())
+			return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream address rejected"))
+		}
+	}
 	client, err := service.GetHttpClientWithProxySettings(info.ChannelSetting.Proxy, info.ChannelSetting)
 	if err != nil {
 		return nil, fmt.Errorf("new proxy http client failed: %w", err)

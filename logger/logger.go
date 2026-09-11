@@ -98,6 +98,7 @@ func LogDebug(ctx context.Context, msg string, args ...any) {
 }
 
 func logHelper(ctx context.Context, level string, msg string) {
+	msg = common.MaskMessage(msg) // B1-1 密钥日志指纹化：出口单点脱敏
 	var id any = "SYSTEM"
 	if ctx != nil {
 		if requestID := ctx.Value(common.RequestIdKey); requestID != nil {

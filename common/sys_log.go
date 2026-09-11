@@ -15,6 +15,7 @@ import (
 var LogWriterMu sync.RWMutex
 
 func SysLog(s string) {
+	s = MaskMessage(s) // B1-1 密钥日志指纹化：出口单点脱敏
 	t := time.Now()
 	LogWriterMu.RLock()
 	_, _ = fmt.Fprintf(gin.DefaultWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
@@ -22,6 +23,7 @@ func SysLog(s string) {
 }
 
 func SysError(s string) {
+	s = MaskMessage(s) // B1-1 密钥日志指纹化：出口单点脱敏
 	t := time.Now()
 	LogWriterMu.RLock()
 	_, _ = fmt.Fprintf(gin.DefaultErrorWriter, "[SYS] %v | %s \n", t.Format("2006/01/02 - 15:04:05"), s)
