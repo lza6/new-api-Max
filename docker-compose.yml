@@ -16,7 +16,7 @@ version: '3.4' # For compatibility with older Docker versions
 
 services:
   new-api:
-    image: lza6/new-api-max:latest
+    image: ghcr.io/lza6/new-api-max:latest
     container_name: new-api
     restart: always
     command: --log-dir /app/logs
