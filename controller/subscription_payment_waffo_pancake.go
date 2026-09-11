@@ -8,10 +8,12 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/shopspring/decimal"
 	"github.com/thanhpk/randstr"
 )
@@ -22,6 +24,10 @@ type SubscriptionWaffoPancakePayRequest struct {
 
 func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
+		return
+	}
+	if !operation_setting.IsTopUpEnabled() {
+		common.ApiErrorI18n(c, i18n.MsgTopUpDisabled)
 		return
 	}
 

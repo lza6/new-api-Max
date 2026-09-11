@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"maps"
 	"strconv"
 	"strings"
@@ -595,7 +596,11 @@ func updateOptionMap(key string, value string) (err error) {
 	case "AudioCompletionRatio":
 		err = ratio_setting.UpdateAudioCompletionRatioByJSONString(value)
 	case "TopUpLink":
-		common.TopUpLink = value
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" && !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
+			return errors.New("TopUpLink must be a valid http(s) URL")
+		}
+		common.TopUpLink = trimmed
 	//case "ChatLink":
 	//	common.ChatLink = value
 	//case "ChatLink2":

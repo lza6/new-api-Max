@@ -29,8 +29,14 @@ func isStripeWebhookConfigured() bool {
 	return strings.TrimSpace(setting.StripeWebhookSecret) != ""
 }
 
+// Webhook availability checks only credentials/config: a paid order's callback
+// must always land regardless of the runtime top-up switch (which blocks new
+// orders, not settlement of money already paid).
 func isStripeWebhookEnabled() bool {
-	return isStripeTopUpEnabled()
+	return isPaymentComplianceConfirmed() &&
+		strings.TrimSpace(setting.StripeApiSecret) != "" &&
+		strings.TrimSpace(setting.StripeWebhookSecret) != "" &&
+		strings.TrimSpace(setting.StripePriceId) != ""
 }
 
 func isCreemTopUpEnabled() bool {
@@ -48,7 +54,12 @@ func isCreemWebhookConfigured() bool {
 }
 
 func isCreemWebhookEnabled() bool {
-	return isCreemTopUpEnabled() && isCreemWebhookConfigured()
+	products := strings.TrimSpace(setting.CreemProducts)
+	return isPaymentComplianceConfirmed() &&
+		strings.TrimSpace(setting.CreemApiKey) != "" &&
+		products != "" &&
+		products != "[]" &&
+		isCreemWebhookConfigured()
 }
 
 func isWaffoTopUpEnabled() bool {
@@ -75,7 +86,7 @@ func isWaffoWebhookConfigured() bool {
 }
 
 func isWaffoWebhookEnabled() bool {
-	return isWaffoTopUpEnabled()
+	return isPaymentComplianceConfirmed() && setting.WaffoEnabled && isWaffoWebhookConfigured()
 }
 
 func isWaffoPancakeTopUpEnabled() bool {
@@ -94,7 +105,10 @@ func isWaffoPancakeWebhookConfigured() bool {
 }
 
 func isWaffoPancakeWebhookEnabled() bool {
-	return isWaffoPancakeTopUpEnabled()
+	return isPaymentComplianceConfirmed() &&
+		strings.TrimSpace(setting.WaffoPancakeMerchantID) != "" &&
+		strings.TrimSpace(setting.WaffoPancakePrivateKey) != "" &&
+		strings.TrimSpace(setting.WaffoPancakeProductID) != ""
 }
 
 func isEpayTopUpEnabled() bool {

@@ -39,10 +39,6 @@ func generateCreemSignature(payload string, secret string) string {
 func verifyCreemSignature(payload string, signature string, secret string) bool {
 	if secret == "" {
 		logger.LogWarn(context.Background(), fmt.Sprintf("Creem webhook secret 未配置 test_mode=%t signature=%q body=%q", setting.CreemTestMode, signature, payload))
-		if setting.CreemTestMode {
-			logger.LogInfo(context.Background(), fmt.Sprintf("Creem webhook 验签已跳过 reason=test_mode signature=%q body=%q", signature, payload))
-			return true
-		}
 		return false
 	}
 
