@@ -24,6 +24,12 @@ type Redemption struct {
 	UsedUserId   int            `json:"used_user_id"`
 	DeletedAt    gorm.DeletedAt `gorm:"index"`
 	ExpiredTime  int64          `json:"expired_time" gorm:"bigint"` // 过期时间，0 表示不过期
+	// MaxUses 兑换码可被兑换的最大次数（0=未设置，按一次性处理；>0 时
+	// 同一码可被多个用户各兑换一次，剩余次数见 RemainingUses）。
+	MaxUses int `json:"max_uses" gorm:"default:0"`
+	// RemainingUses 剩余可兑换次数（MaxUses=0 时忽略；每次成功兑换 -1，
+	// 归零后该码不再可兑换）。非持久化计算字段，随列表查询填充。
+	RemainingUses int `json:"remaining_uses" gorm:"-:all"`
 }
 
 func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total int64, err error) {
@@ -159,21 +165,67 @@ func Redeem(key string, userId int) (quota int, err error) {
 		if redemption.ExpiredTime != 0 && redemption.ExpiredTime < common.GetTimestamp() {
 			return errors.New("该兑换码已过期")
 		}
-		// Compare-and-swap on status: only the transaction that flips
-		// enabled -> used may credit quota, so a concurrent redeem of the
-		// same code loses here even without a row lock (e.g. on SQLite).
-		result := tx.Model(&Redemption{}).
-			Where("id = ? AND status = ?", redemption.Id, common.RedemptionCodeStatusEnabled).
-			Updates(map[string]any{
-				"redeemed_time": common.GetTimestamp(),
-				"status":        common.RedemptionCodeStatusUsed,
-				"used_user_id":  userId,
-			})
-		if result.Error != nil {
-			return result.Error
-		}
-		if result.RowsAffected == 0 {
-			return errors.New("该兑换码已被使用")
+
+		// 一次性码（MaxUses=0）：CAS 从 enabled 直接翻到 used（保持现状，防并发）。
+		// 可多次码（MaxUses>0）：CAS 条件改为 remaining>0，成功则剩余次数 -1；
+		//   归零后该码不可再兑（区别于一次性的 Status=used）。
+		if redemption.MaxUses <= 0 {
+			result := tx.Model(&Redemption{}).
+				Where("id = ? AND status = ?", redemption.Id, common.RedemptionCodeStatusEnabled).
+				Updates(map[string]any{
+					"redeemed_time": common.GetTimestamp(),
+					"status":        common.RedemptionCodeStatusUsed,
+					"used_user_id":  userId,
+				})
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return errors.New("该兑换码已被使用")
+			}
+		} else {
+			// 多用户可多次兑换：按使用记录数求剩余次数。
+			used := int64(0)
+			if err := tx.Model(&RedemptionUsage{}).
+				Where("redemption_id = ?", redemption.Id).
+				Count(&used).Error; err != nil {
+				return err
+			}
+			remaining := int64(redemption.MaxUses) - used
+			if remaining <= 0 {
+				return errors.New("该兑换码已被使用")
+			}
+			result := tx.Model(&Redemption{}).
+				Where("id = ? AND status = ? AND (max_uses - (SELECT COUNT(*) FROM redemption_usages WHERE redemption_id = ?)) > 0",
+					redemption.Id, common.RedemptionCodeStatusEnabled, redemption.Id).
+				Updates(map[string]any{
+					"redeemed_time": common.GetTimestamp(),
+					"used_user_id":  userId,
+				})
+			if result.Error != nil {
+				return result.Error
+			}
+			if result.RowsAffected == 0 {
+				return errors.New("该兑换码已被使用")
+			}
+			// 记录使用明细（同用户重复兑换仍计入次数）。
+			usage := RedemptionUsage{
+				RedemptionId: redemption.Id,
+				UserId:       userId,
+				Quota:        redemption.Quota,
+				CreatedTime:  common.GetTimestamp(),
+			}
+			if err := tx.Create(&usage).Error; err != nil {
+				return err
+			}
+			// 归零时仅标记「已用尽」（保持 status=disabled 语义，区别于一次性 used）。
+			if remaining == 1 {
+				if err := tx.Model(&Redemption{}).
+					Where("id = ?", redemption.Id).
+					Update("status", common.RedemptionCodeStatusDisabled).Error; err != nil {
+					return err
+				}
+			}
 		}
 		return creditTopUpQuota(tx, userId, redemption.Quota, nil)
 	})
