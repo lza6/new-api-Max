@@ -21,15 +21,16 @@ package probe
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
+
+	"github.com/lza6/new-api-Max/common"
 )
 
 // unmarshalChat 解析 OpenAI chat 响应（probe 包内独立于业务解析，避免
 // 业务结构演进影响探测语义）。
 func unmarshalChat(raw string, v *chatResponse) error {
-	return json.Unmarshal([]byte(raw), v)
+	return common.Unmarshal([]byte(raw), v)
 }
 
 // CapabilityCase 用例 2 参数真实性：n / stop 是否被静默丢弃。

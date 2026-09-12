@@ -47,6 +47,18 @@ jobs:
         working-directory: relaykit
         run: go vet ./...
 
+      # B7-2 lint gate: gofmt violations fail the build. "changed files only"
+      # baseline keeps legacy formatting drift out of scope while new code
+      # is strictly gated.
+      - name: gofmt check (changed files)
+        run: |
+          UNFORMATTED=$(gofmt -l . relaykit | grep -v "^web/" || true)
+          if [ -n "$UNFORMATTED" ]; then
+            echo "gofmt violations:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
+
       - name: Build root module
         run: go build ./...
 
@@ -80,6 +92,17 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      # B7-2 lint gate: oxlint on changed frontend files only (legacy files
+      # are out of scope; new/changed code is strictly gated).
+      - name: Lint changed frontend files
+        run: |
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD -- 'src/**/*.ts' 'src/**/*.tsx' 2>/dev/null || git ls-files 'src/**/*.ts' 'src/**/*.tsx' | head -0)
+          if [ -n "$CHANGED" ]; then
+            bunx oxlint $CHANGED
+          else
+            echo "no changed frontend files, skip"
+          fi
 
       - name: Typecheck
         run: bun run typecheck

@@ -21,7 +21,6 @@ package controller
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -97,7 +96,7 @@ func ProbeChannel(c *gin.Context) {
 		return
 	}
 	report := probe.RunProbe(c.Request.Context(), target)
-	reportJSON, err := json.Marshal(report)
+	reportJSON, err := common.Marshal(report)
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": err.Error()})
 		return
@@ -164,7 +163,7 @@ func runScheduledProbeOnce(ctx context.Context) map[string]any {
 			continue
 		}
 		report := probe.RunProbe(ctx, target)
-		if reportJSON, err := json.Marshal(report); err == nil {
+		if reportJSON, err := common.Marshal(report); err == nil {
 			_ = model.SaveChannelProbeResult(ch.Id, string(reportJSON))
 		}
 		probed++
