@@ -84,6 +84,7 @@ import {
 import { parseUpstreamUpdateMeta } from '../lib/upstream-update-utils'
 import type { Channel } from '../types'
 import { ChannelRowActionsLayoutContext } from './channel-row-actions-context'
+import { ChannelHealthCell } from './channel-health-cell'
 import { TaskPluginChannelBadge } from './channel-type-badge'
 import { useChannels } from './channels-provider'
 import { DataTableRowActions } from './data-table-row-actions'
@@ -1031,6 +1032,21 @@ export function useChannelsColumns(
           return false
         },
         size: 120,
+        enableSorting: false,
+      },
+
+      // Health column (B4-3): probe grade / health score badge
+      {
+        accessorKey: 'probe_result',
+        header: t('Health'),
+        meta: { mobileHidden: true },
+        cell: ({ row }) => {
+          if (isTagAggregateRow(row.original)) {
+            return <span className='text-muted-foreground text-xs'>-</span>
+          }
+          return <ChannelHealthCell channel={row.original} />
+        },
+        size: 90,
         enableSorting: false,
       },
 

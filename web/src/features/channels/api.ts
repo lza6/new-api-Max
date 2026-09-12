@@ -26,6 +26,7 @@ import type {
   BatchSetTagParams,
   Channel,
   ChannelBalanceResponse,
+  ChannelHealthScoresResponse,
   ChannelOpsResponse,
   ChannelTestResponse,
   CopyChannelParams,
@@ -130,6 +131,15 @@ export async function getChannel(id: number): Promise<GetChannelResponse> {
  */
 export async function getChannelOps(): Promise<ChannelOpsResponse> {
   const res = await api.get('/api/channel/ops', channelActionConfig())
+  return res.data
+}
+
+/**
+ * Get health score snapshots for all channels (B3-3, admin only).
+ * Returns a map of channel id -> health snapshot.
+ */
+export async function getChannelHealthScores(): Promise<ChannelHealthScoresResponse> {
+  const res = await api.get('/api/channel/health_scores')
   return res.data
 }
 

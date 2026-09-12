@@ -71,6 +71,7 @@ export const channelSchema = z.object({
     multi_key_mode: 'random',
   }),
   settings: z.string().default('{}'), // other_settings JSON
+  probe_result: z.string().nullish(), // B4-1 probe report history (json array, newest first)
 })
 
 export type Channel = z.infer<typeof channelSchema>
@@ -141,6 +142,50 @@ export type AdvancedCustomConverter =
   | 'openai_chat_completions_to_gemini_generate_content'
 
 export type AdvancedCustomAuthType = 'none' | 'header' | 'query'
+
+// ============================================================================
+// Channel Health & Probe Types (B3-3 / B4-1 backend contracts)
+// ============================================================================
+
+/** One probe case result from the backend probe report (service/probe). */
+export interface ProbeCaseResult {
+  name?: string
+  passed?: boolean
+  score?: number
+  weight?: number
+  evidence?: string
+  error?: string
+}
+
+/** One probe round report (service/probe.ProbeReport). */
+export interface ProbeReport {
+  probed_at?: number
+  model?: string
+  score?: number
+  grade?: string
+  total_weight?: number
+  results?: ProbeCaseResult[]
+  duration_ms?: number
+  skipped?: string
+}
+
+export interface ChannelHealthScoresResponse {
+  success: boolean
+  message?: string
+  data?: Record<
+    string,
+    {
+      score: number
+      success_rate: number
+      p50_latency_ms: number
+      p95_latency_ms: number
+      cool_count: number
+      sample_count: number
+      cooling_down: boolean
+      cool_until: number
+    }
+  >
+}
 
 // ============================================================================
 // API Response Types
