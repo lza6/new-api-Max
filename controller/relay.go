@@ -334,6 +334,26 @@ func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
 }
 
 func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service.RetryParam) (*model.Channel, *types.NewAPIError) {
+	// Combo 组合路由：请求模型名命中启用组合时，先按组合策略取候选渠道#模型。
+	// 候选失败后 ComboFailAndAdvance 推进游标；组合内全部失败才落普通渠道选择。
+	if combo := service.ResolveComboForModel(info.OriginModelName); combo != nil {
+		cand := service.NextComboCandidate(combo)
+		if cand != nil && !service.ComboCandidateCoolingDown(cand.ChannelID) {
+			ch, err := model.CacheGetChannel(cand.ChannelID)
+			if err == nil && ch != nil {
+				// 候选渠道必须支持该模型；不支持则推进到下一个候选。
+				if channelSupportsModel(ch, cand.Model) {
+					service.RecordComboSelected(combo.Name, cand.ChannelID, cand.Model)
+					info.UpstreamModelName = cand.Model
+					newAPIError := middleware.SetupContextForSelectedChannel(c, ch, cand.Model)
+					if newAPIError == nil {
+						return ch, nil
+					}
+				}
+				service.ComboFailAndAdvance(combo)
+			}
+		}
+	}
 	if info.ChannelMeta == nil {
 		autoBan := c.GetBool("auto_ban")
 		autoBanInt := 1
@@ -362,6 +382,22 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 		return nil, newAPIError
 	}
 	return channel, nil
+}
+
+// channelSupportsModel 检查渠道 models 列表是否包含目标模型。
+func channelSupportsModel(ch *model.Channel, model string) bool {
+	if ch == nil {
+		return false
+	}
+	if strings.Contains(ch.Models, ",") {
+		for _, m := range strings.Split(ch.Models, ",") {
+			if strings.TrimSpace(m) == model {
+				return true
+			}
+		}
+		return false
+	}
+	return ch.Models == model
 }
 
 func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) bool {

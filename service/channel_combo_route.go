@@ -2,11 +2,13 @@ package service
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
 )
 
@@ -45,6 +47,35 @@ type ComboCandidate struct {
 	ChannelID int
 	Model     string
 	ComboName string
+}
+
+// ResolveComboForModel 按请求模型名解析启用组合（nil = 非组合）。
+func ResolveComboForModel(modelName string) *model.ChannelCombo {
+	if modelName == "" {
+		return nil
+	}
+	combo, err := model.GetEnabledComboByName(modelName)
+	if err != nil || combo == nil {
+		return nil
+	}
+	return combo
+}
+
+// NextComboCandidate 便捷封装：取组合下一个候选（nil = 组合无效/无候选）。
+func NextComboCandidate(combo *model.ChannelCombo) *ComboCandidate {
+	if combo == nil {
+		return nil
+	}
+	cand, err := ComboNextCandidate(combo)
+	if err != nil {
+		return nil
+	}
+	return cand
+}
+
+// RecordComboSelected 记录组合命中候选（供审计/观测）。
+func RecordComboSelected(comboName string, channelID int, modelName string) {
+	common.SysLog(fmt.Sprintf("combo %q -> channel #%d model %s", comboName, channelID, modelName))
 }
 
 // ComboNextCandidate 按组合策略返回下一个候选（下标/粘性逻辑）。

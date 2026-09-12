@@ -38,6 +38,10 @@ func registerChannelRoutes(apiRouter *gin.RouterGroup) {
 
 var channelPermissionRoutes = []permissionRoute{
 	{method: http.MethodGet, path: "/", permission: authz.ChannelRead, handler: controller.GetAllChannels},
+	{method: http.MethodGet, path: "/combos", permission: authz.ChannelRead, handler: controller.GetAllCombos},
+	{method: http.MethodPost, path: "/combos", permission: authz.ChannelSensitiveWrite, handler: controller.CreateCombo},
+	{method: http.MethodPut, path: "/combos", permission: authz.ChannelSensitiveWrite, handler: controller.UpdateCombo},
+	{method: http.MethodDelete, path: "/combos/:id", permission: authz.ChannelSensitiveWrite, handler: controller.DeleteCombo},
 	{method: http.MethodGet, path: "/health_scores", permission: authz.ChannelRead, handler: controller.GetChannelHealthScores},
 	{method: http.MethodPost, path: "/probe/:id", permission: authz.ChannelOperate, handler: controller.ProbeChannel},
 	{method: http.MethodGet, path: "/probe_result/:id", permission: authz.ChannelRead, handler: controller.GetChannelProbeResult},
