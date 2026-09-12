@@ -486,6 +486,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		other = GenerateTextOtherInfo(ctx, relayInfo, summary.ModelRatio, summary.GroupRatio, summary.CompletionRatio, summary.CacheTokens, summary.CacheRatio, summary.ModelPrice, relayInfo.PriceData.GroupRatioInfo.GroupSpecialRatio)
 	}
 	appendUsageBillingPathForLog(other, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens), originUsage)
+	// B5-1 解释性日志：facts 来自现有计费数据（零额外计算），结构化写入
+	// other.explain 供前端"费用解释"卡片渲染。
+	appendBillingExplain(other, summary)
 	if adminRejectReason != "" {
 		other.SetAdmin("reject_reason", adminRejectReason)
 	}

@@ -694,6 +694,11 @@ func (user *User) Insert(inviterId int) error {
 			// 初始化用户设置，包括默认的边栏配置
 			if user.Setting == "" {
 				defaultSetting := dto.UserSetting{}
+				// B6-3 新用户默认开启成本告警：阈值设为 80% 告警档
+				// （QuotaForNewUser 的 80%），存量用户零值保持现状不受影响。
+				if common.QuotaForNewUser > 0 {
+					defaultSetting.QuotaWarningThreshold = float64(common.QuotaForNewUser) * 0.8
+				}
 				// 这里暂时不设置SidebarModules，因为需要在用户创建后根据角色设置
 				user.SetSetting(defaultSetting)
 			}
