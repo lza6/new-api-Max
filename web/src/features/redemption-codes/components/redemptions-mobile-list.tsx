@@ -167,6 +167,20 @@ export function RedemptionsMobileList(props: RedemptionsMobileListProps) {
                 {formatQuota(redemption.quota)}
               </span>
             </div>
+
+            <div className='flex items-center justify-between gap-2 text-xs'>
+              <span className='text-muted-foreground'>
+                {t('Redemption Code Usage')}
+              </span>
+              {redemption.max_uses ? (
+                <span className='font-medium tabular-nums'>
+                  {redemption.remaining_uses ?? redemption.max_uses}/
+                  {redemption.max_uses}
+                </span>
+              ) : (
+                <span className='text-muted-foreground'>{t('One-time')}</span>
+              )}
+            </div>
           </div>
         )
       })}

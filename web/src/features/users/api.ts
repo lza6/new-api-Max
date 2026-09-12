@@ -29,6 +29,8 @@ import type {
   UserFormData,
   ManageUserAction,
   ManageUserQuotaPayload,
+  BatchManageUsersPayload,
+  BatchManageUsersResult,
   ApiResponse,
 } from './types'
 
@@ -137,6 +139,17 @@ export async function adjustUserQuota(
   payload: ManageUserQuotaPayload
 ): Promise<ApiResponse<Partial<User>>> {
   const res = await api.post('/api/user/manage', payload)
+  return res.data
+}
+
+/**
+ * Batch manage users (enable/disable/delete/add_quota) in one request.
+ * Individual failures are skipped without interrupting the rest.
+ */
+export async function batchManageUsers(
+  payload: BatchManageUsersPayload
+): Promise<ApiResponse<BatchManageUsersResult>> {
+  const res = await api.post('/api/user/manage/batch', payload)
   return res.data
 }
 

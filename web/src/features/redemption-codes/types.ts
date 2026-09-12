@@ -33,6 +33,8 @@ export const redemptionSchema = z.object({
   redeemed_time: z.number(),
   expired_time: z.number(), // 0 for never expires
   used_user_id: z.number(),
+  max_uses: z.number().optional(),
+  remaining_uses: z.number().optional(),
 })
 
 export type Redemption = z.infer<typeof redemptionSchema>
@@ -76,6 +78,7 @@ export interface RedemptionFormData {
   quota: number
   expired_time: number
   count?: number // Only for create
+  max_uses?: number // Only for create; 0 = single-use, >0 = number of distinct users who can each redeem once
   status?: number // Only for status update
 }
 

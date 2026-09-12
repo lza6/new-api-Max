@@ -434,6 +434,39 @@ export function RedemptionsMutateDrawer({
                       )}
                     />
                   )}
+
+                  {!isUpdate && (
+                    <FormField
+                      control={form.control}
+                      name='max_uses'
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            {t('Number of times each code can be redeemed')}
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type='number'
+                              min='0'
+                              placeholder={t('0')}
+                              onChange={(e) =>
+                                field.onChange(
+                                  Number.parseInt(e.target.value, 10) || 0
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            {t(
+                              '0 means the code can be redeemed once by a single user; a number greater than 0 means it can be redeemed once by that many distinct users.'
+                            )}
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </SideDrawerSection>
               </fieldset>
             </form>

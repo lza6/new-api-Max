@@ -163,11 +163,14 @@ const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = 
 /**
  * B6-2：把技术性错误文本/状态码映射为面向用户的人话（已翻译）。
  * 未命中返回 null，调用方保持原有文案行为。
+ * 带 safeServerErrorMessage 标记的错误（认证安全消息）不走此映射，
+ * 避免用隐藏的技术细节覆盖专用安全文案。
  */
 export function getFriendlyErrorMessage(value: unknown): string | null {
-  const status = getServerErrorStatus(value)
+  const sources = getServerErrorSources(value)
+  if (sources.some((source) => source[safeServerErrorMessage])) return null
   const haystacks: string[] = []
-  for (const source of getServerErrorSources(value)) {
+  for (const source of sources) {
     const code = typeof source.code === 'string' ? source.code : undefined
     if (code) haystacks.push(code)
     if (typeof source.message === 'string') haystacks.push(source.message)
@@ -180,7 +183,6 @@ export function getFriendlyErrorMessage(value: unknown): string | null {
       }
     }
   }
-  if (typeof status === 'number') haystacks.push(String(status))
   const haystack = haystacks.join('\n')
   if (!haystack) return null
   for (const { pattern, messageKey } of FRIENDLY_ERROR_PATTERNS) {

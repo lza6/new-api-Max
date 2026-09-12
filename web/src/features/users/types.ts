@@ -138,11 +138,25 @@ export type ManageUserAction =
 
 export type QuotaAdjustMode = 'add' | 'subtract' | 'override'
 
+export type BatchUserAction = 'enable' | 'disable' | 'delete' | 'add_quota'
+
 export interface ManageUserQuotaPayload {
   id: number
   action: 'add_quota'
   mode: QuotaAdjustMode
   value: number
+}
+
+export interface BatchManageUsersPayload {
+  ids: number[]
+  action: BatchUserAction
+  mode?: QuotaAdjustMode
+  value?: number
+}
+
+export interface BatchManageUsersResult {
+  processed: number
+  total: number
 }
 
 // ============================================================================

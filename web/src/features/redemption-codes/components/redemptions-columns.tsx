@@ -171,6 +171,40 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
       size: 120,
     },
     {
+      id: 'max_uses',
+      accessorKey: 'max_uses',
+      header: t('Redemption Code Usage'),
+      cell: ({ row }) => {
+        const maxUses = row.getValue('max_uses') as number | undefined
+        if (!maxUses) {
+          return (
+            <StatusBadge
+              label={t('One-time')}
+              variant='neutral'
+              copyable={false}
+              className='-ml-1.5'
+            />
+          )
+        }
+        const remainingUses = row.getValue('remaining_uses') as
+          | number
+          | undefined
+        const remaining = remainingUses ?? maxUses
+        return (
+          <StatusBadge
+            label={t('{{remaining}}/{{total}}', {
+              remaining,
+              total: maxUses,
+            })}
+            variant='neutral'
+            copyable={false}
+            className='-ml-1.5'
+          />
+        )
+      },
+      size: 140,
+    },
+    {
       accessorKey: 'created_time',
       header: t('Created'),
       meta: { mobileHidden: true },
@@ -233,7 +267,7 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
                   className='cursor-help'
                 />
               }
-            ></TooltipTrigger>
+            />
             <TooltipContent>
               <div className='space-y-1 text-xs'>
                 <div>
