@@ -57,6 +57,7 @@ func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total 
 		tx.Rollback()
 		return nil, 0, err
 	}
+	fillRedemptionRemainingUses(tx, redemptions)
 
 	// 提交事务
 	if err = tx.Commit().Error; err != nil {
@@ -122,6 +123,7 @@ func SearchRedemptions(keyword string, status string, startIdx int, num int) (re
 		tx.Rollback()
 		return nil, 0, err
 	}
+	fillRedemptionRemainingUses(tx, redemptions)
 
 	if err = tx.Commit().Error; err != nil {
 		return nil, 0, err
@@ -303,5 +305,55 @@ func BatchDeleteRedemptions(ids []int) (int64, error) {
 		}
 	}
 	result := DB.Where("id IN ?", ids).Delete(&Redemption{})
+	if result.Error == nil {
+		_ = DeleteRedemptionUsagesByRedemptionIds(ids)
+	}
 	return result.RowsAffected, result.Error
+}
+
+// fillRedemptionRemainingUses 为可多次兑换码填充 remaining_uses。
+// 一次性码（max_uses=0）忽略。对批量结果做一次聚合查询后按 id 回填，
+// 避免逐行 N+1。
+func fillRedemptionRemainingUses(tx *gorm.DB, redemptions []*Redemption) {
+	if len(redemptions) == 0 {
+		return
+	}
+	var usageCounts []struct {
+		RedemptionId int
+		Cnt          int64
+	}
+	err := tx.Model(&RedemptionUsage{}).
+		Where("redemption_id IN ?", mapIDSlice(redemptions)).
+		Select("redemption_id, COUNT(*) AS cnt").
+		Group("redemption_id").
+		Scan(&usageCounts).Error
+	if err != nil {
+		return
+	}
+	byId := make(map[int]int64, len(usageCounts))
+	for _, row := range usageCounts {
+		byId[row.RedemptionId] = row.Cnt
+	}
+	for _, r := range redemptions {
+		if r.MaxUses <= 0 {
+			r.RemainingUses = 0
+			continue
+		}
+		remaining := int64(r.MaxUses) - byId[r.Id]
+		if remaining < 0 {
+			remaining = 0
+		}
+		r.RemainingUses = int(remaining)
+	}
+}
+
+// mapIDSlice 提取兑换码主键列表（用于聚合查询）。
+func mapIDSlice(redemptions []*Redemption) []int {
+	ids := make([]int, 0, len(redemptions))
+	for _, r := range redemptions {
+		if r != nil {
+			ids = append(ids, r.Id)
+		}
+	}
+	return ids
 }

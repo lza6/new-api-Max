@@ -86,6 +86,11 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgRedemptionCountMax)
 		return
 	}
+	// max_uses 非负校验（0=一次性，>0=可被 N 个不同用户各兑换一次）。
+	if redemption.MaxUses < 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
 	if redemption.Quota <= 0 {
 		common.ApiError(c, errors.New("redemption quota must be positive"))
 		return
@@ -108,6 +113,7 @@ func AddRedemption(c *gin.Context) {
 			CreatedTime: common.GetTimestamp(),
 			Quota:       redemption.Quota,
 			ExpiredTime: redemption.ExpiredTime,
+			MaxUses:     redemption.MaxUses,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
