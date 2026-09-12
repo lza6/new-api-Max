@@ -16,10 +16,13 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { CheckCircle2 } from 'lucide-react'
+import { CheckCircle2, KeyRound, RadioTower, TerminalSquare } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from '@tanstack/react-router'
 
 import { StatusBadge } from '@/components/status-badge'
+import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 
 import type { SetupFormValues, SetupStatus } from '../types'
@@ -42,6 +45,92 @@ const DATABASE_VARIANT: Record<
   sqlite: 'warning',
   mysql: 'success',
   postgres: 'success',
+}
+
+// B6-1 onboarding 引导：完成标记持久化 key。
+const ONBOARDING_DISMISSED_KEY = 'onboarding_dismissed'
+
+function readOnboardingDismissed(): boolean {
+  try {
+    return window.localStorage.getItem(ONBOARDING_DISMISSED_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+/** B6-1 下一步引导：完成卡片下方的三步静态提示卡（不做后端存在性检测）。 */
+function OnboardingSteps() {
+  const { t } = useTranslation()
+  const [dismissed, setDismissed] = useState(readOnboardingDismissed)
+  if (dismissed) return null
+
+  const dismiss = () => {
+    setDismissed(true)
+    try {
+      window.localStorage.setItem(ONBOARDING_DISMISSED_KEY, 'true')
+    } catch {
+      // localStorage 不可用时仅本次会话隐藏
+    }
+  }
+
+  const steps = [
+    {
+      title: t('1. Add the first channel'),
+      description: t('Connect an upstream provider so requests have a route.'),
+      to: '/channels' as const,
+      icon: RadioTower,
+    },
+    {
+      title: t('2. Generate an API token'),
+      description: t('Create a key for your app or service'),
+      to: '/keys' as const,
+      icon: KeyRound,
+    },
+    {
+      title: t('3. Make the first request'),
+      description: t('Verify routing with Playground or your client'),
+      to: '/playground' as const,
+      icon: TerminalSquare,
+    },
+  ]
+
+  return (
+    <div className='bg-card w-full rounded-xl border p-6 text-left shadow-sm sm:p-8'>
+      <div className='mb-4 flex flex-wrap items-center justify-between gap-2'>
+        <h3 className='text-base font-semibold tracking-tight'>
+          {t('Next steps')}
+        </h3>
+        <Button
+          variant='ghost'
+          size='sm'
+          className='text-muted-foreground h-7 px-2 text-xs'
+          onClick={dismiss}
+        >
+          {t("Don't show again")}
+        </Button>
+      </div>
+      <div className='grid gap-3 sm:grid-cols-3'>
+        {steps.map((step) => {
+          const Icon = step.icon
+          return (
+            <Link
+              key={step.to}
+              to={step.to}
+              className='hover:bg-muted/50 focus-visible:ring-ring flex min-w-0 flex-col gap-2 rounded-lg border p-3 transition-colors outline-none focus-visible:ring-2'
+            >
+              <span className='flex items-center gap-2 text-sm font-medium'>
+                <Icon className='text-muted-foreground size-4 shrink-0' aria-hidden='true' />
+                <span className='truncate'>{step.title}</span>
+              </span>
+              <span className='text-muted-foreground line-clamp-2 text-xs leading-relaxed'>
+                {step.description}
+              </span>
+            </Link>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 export function CompleteStep({ status, values }: CompleteStepProps) {
@@ -105,6 +194,8 @@ export function CompleteStep({ status, values }: CompleteStepProps) {
           </div>
         </dl>
       </div>
+
+      <OnboardingSteps />
     </div>
   )
 }

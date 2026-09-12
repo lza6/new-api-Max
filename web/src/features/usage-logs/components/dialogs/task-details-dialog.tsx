@@ -28,7 +28,7 @@ import { cn } from '@/lib/utils'
 
 import { taskActionMapper, taskStatusMapper } from '../../lib/mappers'
 import { resolveTaskDetailAccess } from '../../lib/task-details'
-import type { TaskLog } from '../../types'
+import { readTaskStructuredProgress, type TaskLog } from '../../types'
 import { PluginAuthorLink } from '../plugin-author-link'
 
 function DetailRow(props: {
@@ -73,6 +73,43 @@ function formatTaskTimestamp(value?: number): string {
   return value ? formatTimestampToDate(value, 'seconds') : '-'
 }
 
+/** B5-3 结构化进度条：current/total 分段 + step 名，数值异常时降级为不渲染。 */
+function TaskStructuredProgressRow(props: {
+  current: number
+  total: number
+  step?: string
+}) {
+  const { t } = useTranslation()
+  const percent = Math.min(
+    100,
+    Math.max(0, Math.round((props.current / props.total) * 100))
+  )
+  return (
+    <div className='min-w-0 space-y-1.5'>
+      <div className='flex items-center justify-between gap-2 text-xs'>
+        <span className='text-muted-foreground min-w-0 truncate'>
+          {props.step ? `${t('Step')}: ${props.step}` : t('Progress')}
+        </span>
+        <span className='shrink-0 font-mono tabular-nums'>
+          {props.current}/{props.total} ({percent}%)
+        </span>
+      </div>
+      <div
+        className='bg-muted h-2 w-full overflow-hidden rounded-full'
+        role='progressbar'
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={percent}
+      >
+        <div
+          className='bg-primary h-full transition-all'
+          style={{ width: `${percent}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 /**
  * 从任务 data 字段读取退款摘要（B2-3 退款可见性）。
  * 后端在 RefundTaskQuota 成功后写入 {refund: {quota, reason, settled_at}}。
@@ -102,6 +139,7 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
   const runtime = access.runtime
   const properties = props.log.properties
   const refund = readTaskRefund(props.log.data)
+  const structuredProgress = readTaskStructuredProgress(props.log.data)
 
   return (
     <Dialog
@@ -141,6 +179,15 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
             value={props.log.progress || '-'}
             mono
           />
+          {structuredProgress ? (
+            <div className='pt-1'>
+              <TaskStructuredProgressRow
+                current={structuredProgress.current}
+                total={structuredProgress.total}
+                step={structuredProgress.step}
+              />
+            </div>
+          ) : null}
           <DetailRow
             label={t('Submit Time')}
             value={formatTaskTimestamp(props.log.submit_time)}

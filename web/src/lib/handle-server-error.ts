@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { toast } from 'sonner'
 
 import {
+  getFriendlyErrorMessage,
   getServerErrorMessage,
   getServerErrorSources,
   isServerErrorCancelled,
@@ -41,11 +42,23 @@ export function handleServerError(
   const reported = sources.some((source) => reportedErrors.has(source))
   markServerErrorHandled(error)
   if (reported) return
+  if (presentation?.description) {
+    const message =
+      presentation.title || getServerErrorMessage(error, fallbackMessage)
+    toast.error(message, { description: presentation.description })
+    return
+  }
+  // B6-2：命中人话映射时，首行显示人话，原始技术消息放 description 折叠。
+  const friendly = getFriendlyErrorMessage(error)
+  if (friendly) {
+    const technical =
+      presentation?.title || getServerErrorMessage(error, fallbackMessage)
+    toast.error(friendly, {
+      description: technical === friendly ? undefined : technical,
+    })
+    return
+  }
   const message =
     presentation?.title || getServerErrorMessage(error, fallbackMessage)
-  if (presentation?.description) {
-    toast.error(message, { description: presentation.description })
-  } else {
-    toast.error(message)
-  }
+  toast.error(message)
 }

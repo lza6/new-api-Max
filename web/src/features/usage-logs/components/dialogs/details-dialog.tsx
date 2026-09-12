@@ -366,8 +366,7 @@ function BillingBreakdown(props: {
   )
 }
 
-function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {
-  const { t } = useTranslation()
+function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {  const { t } = useTranslation()
   const { log, other } = props
 
   const promptTokens = log.prompt_tokens || 0
@@ -438,6 +437,89 @@ interface DetailsDialogProps {
   isRoot: boolean
   open: boolean
   onOpenChange: (open: boolean) => void
+}
+
+/** B5-1 费用解释卡：渲染 other.explain 的 facts 表格与 inferences 列表。 */
+function ExplainBreakdown(props: { other: LogOtherData }) {
+  const { t } = useTranslation()
+  const { other } = props
+  const explain = other.explain
+  if (!explain) return null
+  const facts = Array.isArray(explain.facts)
+    ? explain.facts.filter(
+        (fact) =>
+          fact != null &&
+          typeof fact === 'object' &&
+          typeof fact.label === 'string' &&
+          fact.label !== ''
+      )
+    : []
+  const inferences = Array.isArray(explain.inferences)
+    ? explain.inferences.filter(
+        (item) =>
+          item != null && typeof item === 'object' && typeof item.text === 'string' && item.text !== ''
+      )
+    : []
+  if (facts.length === 0 && inferences.length === 0) return null
+
+  return (
+    <DetailSection label={t('Fee Explanation')}>
+      {facts.length > 0 && (
+        <>
+          <Label className='text-muted-foreground text-[11px] font-semibold tracking-wide uppercase'>
+            {t('Observed facts')}
+          </Label>
+          <div className='min-w-0 overflow-hidden rounded-md border'>
+            {facts.map((fact, index) => (
+              <div
+                key={`${fact.label}-${String(fact.value)}`}
+                className={cn(
+                  'grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-2 px-2 py-1 text-xs',
+                  index % 2 === 1 && 'bg-muted/40'
+                )}
+              >
+                <span className='text-muted-foreground min-w-0 truncate font-mono'>
+                  {fact.label}
+                </span>
+                <span className='min-w-0 text-right font-mono break-all sm:wrap-break-word'>
+                  {String(fact.value ?? '')}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+      {inferences.length > 0 && (
+        <>
+          <Label className='text-muted-foreground text-[11px] font-semibold tracking-wide uppercase'>
+            {t('System inference')}
+          </Label>
+          <ul className='min-w-0 space-y-1'>
+            {inferences.map((item) => (
+              <li
+                key={`${item.kind ?? 'inference'}-${item.text}`}
+                className='flex min-w-0 items-start gap-1.5 text-xs'
+              >
+                <Info
+                  className='text-muted-foreground mt-0.5 size-3 shrink-0'
+                  aria-hidden='true'
+                />
+                <span className='min-w-0 break-all sm:wrap-break-word'>
+                  {item.text}
+                  {item.kind ? (
+                    <span className='text-muted-foreground'>
+                      {' '}
+                      ({item.kind})
+                    </span>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </DetailSection>
+  )
 }
 
 export function DetailsDialog(props: DetailsDialogProps) {
@@ -1112,6 +1194,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
             isAdmin={props.isAdmin}
           />
         )}
+
+        {/* Fee explanation (B5-1)：老日志无 explain 字段时优雅降级不渲染 */}
+        {other?.explain && <ExplainBreakdown other={other} />}
 
         {/* Tiered pricing breakdown (when billing_mode is tiered_expr) */}
         {isTieredBilling && other?.expr_b64 && (

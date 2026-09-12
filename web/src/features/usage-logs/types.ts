@@ -113,6 +113,23 @@ export interface ToolSurchargeItem {
   price: number
 }
 
+// B5-1 解释性日志：后端把计费要素结构化写入 other.explain。
+// facts 是观察到的事实（label/value 对），inferences 是系统推断文本。
+export interface LogExplainFact {
+  label?: string
+  value?: string | number | boolean
+}
+
+export interface LogExplainInference {
+  text?: string
+  kind?: string
+}
+
+export interface LogExplain {
+  facts?: LogExplainFact[]
+  inferences?: LogExplainInference[]
+}
+
 export interface LogOtherData {
   admin_info?: {
     is_multi_key?: boolean
@@ -244,6 +261,8 @@ export interface LogOtherData {
   is_task?: boolean
   task_id?: string
   reason?: string
+  // B5-1 解释性日志：计费要素 facts + 系统推断 inferences（可选，老日志无此字段）
+  explain?: LogExplain
   // Subscription billing fields
   subscription_plan_id?: string
   subscription_plan_title?: string
@@ -339,6 +358,38 @@ export interface TaskPluginInfo {
   name: string
   version?: string
   author?: TaskPluginAuthor
+}
+
+// B5-3 结构化任务进度：data.progress={event_type,current,total,step}
+export interface TaskStructuredProgress {
+  event_type?: string
+  current: number
+  total: number
+  step?: string
+}
+
+/**
+ * 严格容错解析任务 data 字段中的结构化进度。
+ * 仅当 data 是对象、progress 是对象且 current/total 均为有限数字时返回结果，
+ * 否则返回 null（调用方维持原有 progress 字符串展示）。
+ */
+export function readTaskStructuredProgress(
+  data: unknown
+): TaskStructuredProgress | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  const progress = (data as Record<string, unknown>).progress
+  if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
+    return null
+  }
+  const record = progress as Record<string, unknown>
+  const current = Number(record.current)
+  const total = Number(record.total)
+  if (!Number.isFinite(current) || !Number.isFinite(total)) return null
+  if (total <= 0) return null
+  const step = typeof record.step === 'string' ? record.step : undefined
+  const eventType =
+    typeof record.event_type === 'string' ? record.event_type : undefined
+  return { current, total, step, event_type: eventType }
 }
 
 export interface TaskPluginAuthor {
