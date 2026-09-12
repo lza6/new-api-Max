@@ -92,6 +92,11 @@ func ClaudeHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *typ
 			return types.NewErrorWithStatusCode(err, types.ErrorCodeReadRequestBodyFailed, http.StatusBadRequest, types.ErrOptionWithSkipRetry())
 		}
 		requestBody = common.NewReplayableBodyReader(storage)
+		// Claude 直通时剔除顶层 OpenAI 惯用 reasoning_effort 键：
+		// 部分 Claude 兼容上游把该字段误判为 Anthropic 顶层字段而 400
+		// (field ReasoningEffort invalid)。直通应保持字节级一致，仅剔除
+		// 这一个会破坏协议的关键字。
+		requestBody = stripClaudePassThroughReasoningEffort(c, requestBody)
 	} else {
 		convertedRequest, err := adaptor.ConvertClaudeRequest(c, info, request)
 		if err != nil {
