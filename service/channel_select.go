@@ -106,6 +106,29 @@ func (p *RetryParam) ResetRetryNextTry() {
 //	Retry=3: GroupB, priority1 (startRetryIndex=2, priorityRetry=1)
 //	         分组B, 优先级1
 func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, error) {
+	// Combo 自动路由：请求模型命中启用组合时，优先按组合策略取候选渠道#模型。
+	// 候选渠道必须支持目标模型；不支持/冷却中则推进到下一候选（fallback），
+	// 组合耗尽才落普通加权选择。
+	if combo := ResolveComboForModel(param.ModelName); combo != nil {
+		for range 10 {
+			cand := NextComboCandidate(combo)
+			if cand == nil {
+				break
+			}
+			if ComboCandidateCoolingDown(cand.ChannelID) {
+				ComboFailAndAdvance(combo)
+				continue
+			}
+			ch, err := model.CacheGetChannel(cand.ChannelID)
+			if err == nil && ch != nil && channelSupportsComboModel(ch, cand.Model) {
+				if param.Ctx != nil {
+					RecordComboSelected(combo.Name, cand.ChannelID, cand.Model)
+				}
+				return ch, param.TokenGroup, nil
+			}
+			ComboFailAndAdvance(combo)
+		}
+	}
 	var channel *model.Channel
 	var err error
 	selectGroup := param.TokenGroup

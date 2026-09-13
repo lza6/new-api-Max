@@ -61,6 +61,22 @@ func ResolveComboForModel(modelName string) *model.ChannelCombo {
 	return combo
 }
 
+// channelSupportsComboModel 检查渠道 models 列表是否包含目标模型。
+func channelSupportsComboModel(ch *model.Channel, modelName string) bool {
+	if ch == nil {
+		return false
+	}
+	if modelName == "" {
+		return false
+	}
+	for _, m := range ch.GetModels() {
+		if m == modelName {
+			return true
+		}
+	}
+	return false
+}
+
 // NextComboCandidate 便捷封装：取组合下一个候选（nil = 组合无效/无候选）。
 func NextComboCandidate(combo *model.ChannelCombo) *ComboCandidate {
 	if combo == nil {
