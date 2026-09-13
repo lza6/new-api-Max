@@ -44,6 +44,10 @@ const (
 	ContextKeyAutoGroupIndex      ContextKey = "auto_group_index"
 	ContextKeyAutoGroupRetryIndex ContextKey = "auto_group_retry_index"
 
+	// ContextKeyRoutingExplainedChannels 记录本次请求渠道选择过程中经过（候选
+	// 但未命中/已尝试）的渠道 id，供解释性日志（B5-1）统计候选渠道数。
+	ContextKeyRoutingExplainedChannels ContextKey = "routing_explained_channels"
+
 	/* user related keys */
 	ContextKeyUserId      ContextKey = "id"
 	ContextKeyUserSetting ContextKey = "user_setting"

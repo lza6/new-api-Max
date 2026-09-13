@@ -67,6 +67,13 @@ type textQuotaSummary struct {
 	ToolSurchargeItems     []ToolSurchargeItem
 	ToolCallSurchargeQuota decimal.Decimal
 	FixedPriceBilling      bool
+	// FixedPriceTier 记录按请求计费（fixed-price）落到的 tier 名，来自
+	// tiered 结算结果；FixedPriceValue 为该档固定单价。两者仅 FixedPriceBilling
+	// 时有效，用于费用解释卡（B5-1）的事实与推断。
+	FixedPriceTier  string
+	FixedPriceValue float64
+	BillingUnit     string
+	MatchedTier     string
 }
 
 // hasBillableUsage reports whether this request should incur any charge.
@@ -428,6 +435,19 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 			if summary.FixedPriceBilling {
 				summary.AudioInputPrice = 0
 			}
+			// B5-1 解释性日志：tiered 结算结果回填进 summary，供费用解释卡
+			// 生成 tier_matched / fixed_price 事实与「命中阶梯价」推断。
+			if tieredRes != nil {
+				summary.MatchedTier = tieredRes.MatchedTier
+				summary.BillingUnit = string(tieredRes.BillingUnit)
+				if tieredRes.FixedPrice != nil {
+					summary.FixedPriceValue = *tieredRes.FixedPrice
+					summary.FixedPriceTier = tieredRes.MatchedTier
+				}
+			} else if snap := relayInfo.TieredBillingSnapshot; snap != nil {
+				summary.MatchedTier = snap.EstimatedTier
+				summary.BillingUnit = string(snap.EstimatedBillingUnit)
+			}
 		}
 	}
 
@@ -488,7 +508,7 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	appendUsageBillingPathForLog(other, common.GetContextKeyBool(ctx, constant.ContextKeyLocalCountTokens), originUsage)
 	// B5-1 解释性日志：facts 来自现有计费数据（零额外计算），结构化写入
 	// other.explain 供前端"费用解释"卡片渲染。
-	appendBillingExplain(other, summary)
+	appendBillingExplain(ctx, other, summary)
 	if adminRejectReason != "" {
 		other.SetAdmin("reject_reason", adminRejectReason)
 	}

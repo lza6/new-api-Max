@@ -115,6 +115,9 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			if cand == nil {
 				break
 			}
+			if param.Ctx != nil {
+				recordExplainedChannel(param.Ctx, cand.ChannelID)
+			}
 			if ComboCandidateCoolingDown(cand.ChannelID) {
 				ComboFailAndAdvance(combo)
 				continue
@@ -217,7 +220,28 @@ func CacheGetRandomSatisfiedChannel(param *RetryParam) (*model.Channel, string, 
 			return nil, param.TokenGroup, err
 		}
 	}
+	if channel != nil && param.Ctx != nil {
+		// B5-1：记录本次渠道选择实际经过（候选过/尝试过）的渠道 id，
+		// 供解释性日志的 channels_considered 事实统计。
+		recordExplainedChannel(param.Ctx, channel.Id)
+	}
 	return channel, selectGroup, nil
+}
+
+// recordExplainedChannel 记录一次解释性日志统计的渠道 id（去重）。零额外计算。
+func recordExplainedChannel(c *gin.Context, channelID int) {
+	if c == nil || channelID <= 0 {
+		return
+	}
+	raw, _ := common.GetContextKey(c, constant.ContextKeyRoutingExplainedChannels)
+	ids, _ := raw.([]int)
+	for _, id := range ids {
+		if id == channelID {
+			return
+		}
+	}
+	ids = append(ids, channelID)
+	common.SetContextKey(c, constant.ContextKeyRoutingExplainedChannels, ids)
 }
 
 func pinnedTaskPluginChannelTypes(c *gin.Context, expected string) []int {
