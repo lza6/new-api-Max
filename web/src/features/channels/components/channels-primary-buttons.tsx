@@ -25,6 +25,7 @@ import {
   Tags,
   TestTube,
   DollarSign,
+  Layers2,
   ListChecks,
   SortAsc,
   RefreshCw,
@@ -64,6 +65,7 @@ import {
   handleTestAllChannels,
   handleUpdateAllBalances,
 } from '../lib'
+import { ComboManagerDrawer } from './combo-manager-drawer'
 import { useChannels } from './channels-provider'
 
 export function ChannelsPrimaryButtons() {
@@ -83,6 +85,7 @@ export function ChannelsPrimaryButtons() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showConsistencyDialog, setShowConsistencyDialog] = useState(false)
   const [isRepairingConsistency, setIsRepairingConsistency] = useState(false)
+  const [comboDrawerOpen, setComboDrawerOpen] = useState(false)
   const currentUser = useAuthStore((s) => s.auth.user)
   const canEditSensitive = hasPermission(
     currentUser,
@@ -146,6 +149,21 @@ export function ChannelsPrimaryButtons() {
             onCheckedChange={handleIdSortToggle}
           />
         </div>
+
+        {/* Model Combos */}
+        <Tooltip>
+          <TooltipTrigger render={<span className='inline-flex' />}>
+            <Button
+              onClick={() => setComboDrawerOpen(true)}
+              size='sm'
+              variant='outline'
+            >
+              <Layers2 className='h-4 w-4' />
+              <span className='max-sm:hidden'>{t('Model Combos')}</span>
+              <span className='sm:hidden'>{t('Combos')}</span>
+            </Button>
+          </TooltipTrigger>
+        </Tooltip>
 
         {/* Create Channel */}
         <Tooltip>
@@ -324,6 +342,11 @@ export function ChannelsPrimaryButtons() {
             setIsRepairingConsistency(false)
           }
         }}
+      />
+
+      <ComboManagerDrawer
+        open={comboDrawerOpen}
+        onOpenChange={setComboDrawerOpen}
       />
     </>
   )
