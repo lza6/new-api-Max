@@ -63,6 +63,29 @@ const (
 	ErrClassUnknown
 )
 
+// RelayErrorClassString 返回错误类的稳定短标识，供渠道健康快照的
+// last_cool_class 字段（B5-2 hover 原因）与日志使用。
+func RelayErrorClassString(class RelayErrorClass) string {
+	switch class {
+	case ErrClassAuth:
+		return "auth"
+	case ErrClassRateLimited:
+		return "rate_limited"
+	case ErrClassServerError:
+		return "server_error"
+	case ErrClassTimeout:
+		return "timeout"
+	case ErrClassBadRequest:
+		return "bad_request"
+	case ErrClassCapability:
+		return "capability"
+	case ErrClassOK:
+		return "ok"
+	default:
+		return "unknown"
+	}
+}
+
 // DefaultCooldownCap 错误类冷却窗口上限：429/5xx/鉴权失败最多冷却 15 分钟，
 // 避免上游持续降级时网关把自己"冷却"成不可用。
 const DefaultCooldownCap = 15 * time.Minute

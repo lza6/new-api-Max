@@ -24,6 +24,13 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { StatusBadge } from '@/components/status-badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { getFriendlyErrorMessage } from '@/lib/server-error-message'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { getUserAvatarFallback, getUserAvatarStyle } from '@/lib/avatar'
 import { formatTimestampToDate } from '@/lib/format'
@@ -41,7 +48,8 @@ import {
   createProgressColumn,
 } from './column-helpers'
 
-function TaskDetailsCell(props: {
+/** B5-2 失败原因 hover 单元格：人话首行 + 原始技术消息 Tooltip。 */
+export function TaskDetailsCell(props: {
   log: TaskLog
   isAdmin: boolean
   isRoot: boolean
@@ -66,9 +74,33 @@ function TaskDetailsCell(props: {
           {t('View details')}
         </button>
         {props.log.fail_reason ? (
-          <span className='max-w-full truncate text-xs text-red-600 dark:text-red-400'>
-            {props.log.fail_reason}
-          </span>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span
+                    tabIndex={0}
+                    className='max-w-full cursor-help truncate text-xs text-red-600 dark:text-red-400'
+                  >
+                    {getFriendlyErrorMessage(props.log.fail_reason) ??
+                      props.log.fail_reason}
+                  </span>
+                }
+              />
+              <TooltipContent side='top' className='max-w-xs'>
+                <div className='space-y-1 text-xs'>
+                  {getFriendlyErrorMessage(props.log.fail_reason) ? (
+                    <p className='font-medium text-red-600 dark:text-red-400'>
+                      {getFriendlyErrorMessage(props.log.fail_reason)}
+                    </p>
+                  ) : null}
+                  <p className='text-muted-foreground break-all whitespace-pre-wrap'>
+                    {props.log.fail_reason}
+                  </p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         ) : null}
       </div>
       <TaskDetailsDialog

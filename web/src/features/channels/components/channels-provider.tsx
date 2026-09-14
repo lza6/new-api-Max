@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 /* eslint-disable react-refresh/only-export-components */
-import { useQueryClient } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import React, {
   createContext,
   useContext,
@@ -26,9 +26,15 @@ import React, {
   useMemo,
 } from 'react'
 
+import { requireServerSuccess } from '@/lib/server-error-message'
+
+import { getChannelHealthScores } from '../api'
 import { useChannelUpstreamUpdates } from '../hooks/use-channel-upstream-updates'
 import { channelsQueryKeys } from '../lib'
-import type { Channel } from '../types'
+import type { Channel, ChannelHealthScoresResponse } from '../types'
+
+// 与 ChannelHealthCell 相同的 queryKey/缓存，供状态列复用健康快照。
+const HEALTH_SCORES_QUERY_KEY = ['channels', 'health_scores'] as const
 
 // ============================================================================
 // Types
@@ -65,6 +71,7 @@ type ChannelsContextType = {
   sensitiveVisible: boolean
   setSensitiveVisible: (visible: boolean) => void
   upstream: UpstreamUpdateState
+  healthScores: NonNullable<ChannelHealthScoresResponse['data']> | null
 }
 
 // ============================================================================
@@ -98,6 +105,15 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
   }, [queryClient])
   const upstream = useChannelUpstreamUpdates(refreshChannels)
 
+  // 全渠道健康分快照由 Provider 统一拉取并注入 context（60s 缓存），
+  // 供状态列冷却原因 hover 与健康列复用，避免每行重复请求。
+  const healthQuery = useQuery({
+    queryKey: HEALTH_SCORES_QUERY_KEY,
+    queryFn: async () => requireServerSuccess(await getChannelHealthScores()),
+    staleTime: 60 * 1000,
+  })
+  const healthScores = healthQuery.data?.data ?? null
+
   // useState setters are stable, so the context value only needs to change when
   // an actual state value changes. Memoizing avoids handing every consumer
   // (including all channel cards/cells) a brand-new object on each render.
@@ -118,6 +134,7 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
       sensitiveVisible,
       setSensitiveVisible,
       upstream,
+      healthScores,
     }),
     [
       open,
@@ -128,6 +145,7 @@ export function ChannelsProvider({ children }: { children: React.ReactNode }) {
       batchMode,
       sensitiveVisible,
       upstream,
+      healthScores,
     ]
   )
 

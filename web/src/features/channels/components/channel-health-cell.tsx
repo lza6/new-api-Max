@@ -58,6 +58,7 @@ import {
   type ProbeReport,
 } from '../lib'
 import type { Channel } from '../types'
+import { useChannels } from './channels-provider'
 
 const HEALTH_SCORES_STALE_TIME = 60 * 1000
 
@@ -219,12 +220,13 @@ export function ChannelHealthCell(props: { channel: Channel }) {
   )
   const [popoverOpen, setPopoverOpen] = useState(false)
 
-  // Fetch the admin health score snapshot only when this column renders and
-  // the viewer may read it; cached for 60s across all rows.
+  // 健康分快照已由 ChannelsProvider 统一拉取（60s 缓存），此处复用 context
+  // 数据而非重复请求；fallback 到本组件直接查询（Provider 未注入时）。
+  const { healthScores: contextHealthScores } = useChannels()
   const query = useQuery({
     queryKey: ['channels', 'health_scores'],
     queryFn: async () => requireServerSuccess(await getChannelHealthScores()),
-    enabled: canReadHealth,
+    enabled: canReadHealth && !contextHealthScores,
     staleTime: HEALTH_SCORES_STALE_TIME,
   })
 
@@ -234,8 +236,12 @@ export function ChannelHealthCell(props: { channel: Channel }) {
     [channel.probe_result]
   )
   const snapshot = useMemo(
-    () => toHealthSnapshotView(query.data?.data, channel.id),
-    [query.data, channel.id]
+    () =>
+      toHealthSnapshotView(
+        query.data?.data ?? contextHealthScores ?? undefined,
+        channel.id
+      ),
+    [query.data, contextHealthScores, channel.id]
   )
 
   let variant: ProbeGradeVariant

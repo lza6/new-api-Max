@@ -795,6 +795,8 @@ func TestUpdateVideoSingleTaskPollClassification(t *testing.T) {
 		wantRefund    bool
 		wantReason    string
 		wantState     string
+		wantProgress  string
+		wantData      string
 		wantUnchanged bool
 	}{
 		{
@@ -865,6 +867,30 @@ func TestUpdateVideoSingleTaskPollClassification(t *testing.T) {
 			wantFailures:  1,
 			wantUnchanged: true,
 		},
+		{
+			name:       "structured progress merged into task data",
+			statusCode: http.StatusOK,
+			parse: &relaycommon.TaskInfo{
+				Status:   model.TaskStatusInProgress,
+				Progress: "3/10 voice",
+			},
+			wantStatus:   model.TaskStatusInProgress,
+			wantFailures: 0,
+			wantProgress: "3/10 voice",
+			wantData:     `{"progress":{"event_type":"generate","current":3,"total":10,"step":"voice"}}`,
+		},
+		{
+			name:       "percent progress preserved as plain string",
+			statusCode: http.StatusOK,
+			parse: &relaycommon.TaskInfo{
+				Status:   model.TaskStatusInProgress,
+				Progress: "30%",
+			},
+			wantStatus:   model.TaskStatusInProgress,
+			wantFailures: 0,
+			wantProgress: "30%",
+			wantData:     ``,
+		},
 	}
 
 	for _, testCase := range testCases {
@@ -908,6 +934,12 @@ func TestUpdateVideoSingleTaskPollClassification(t *testing.T) {
 			}
 			if testCase.wantState != "" {
 				assert.JSONEq(t, testCase.wantState, string(persisted.PrivateData.PluginState))
+			}
+			if testCase.wantProgress != "" {
+				assert.Equal(t, testCase.wantProgress, persisted.Progress)
+			}
+			if testCase.wantData != "" {
+				assert.JSONEq(t, testCase.wantData, string(persisted.Data))
 			}
 			if testCase.wantRefund {
 				assert.Equal(t, initialQuota+preConsumed, getUserQuota(t, userID))

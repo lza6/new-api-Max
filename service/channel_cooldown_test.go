@@ -146,3 +146,38 @@ func TestChannelHealthRingAggregation(t *testing.T) {
 	assert.Equal(t, 0, empty.SampleCount)
 	assert.InDelta(t, 0.0, empty.Score, 0.001)
 }
+
+// TestRecordChannelCooldownMatchWithClass B5-2：冷却原因（错误类）随事件记录，
+// 并反映到健康快照的 last_cool_class 字段。
+func TestRecordChannelCooldownMatchWithClass(t *testing.T) {
+	const channelId = 932
+	channelHealthMu.Lock()
+	delete(channelHealthTable, channelId)
+	channelHealthMu.Unlock()
+	t.Cleanup(func() {
+		channelHealthMu.Lock()
+		delete(channelHealthTable, channelId)
+		channelHealthMu.Unlock()
+	})
+
+	// 开关 off 时 RecordChannelOutcome 仍应记录失败样本。
+	RecordChannelOutcome(channelId, false, 2*time.Second, ErrClassRateLimited)
+
+	// 冷却事件带错误类的分支。
+	setCooldownV2ForTest(t, true)
+	cool, until := DecideCooldown(channelId, ErrClassRateLimited, 0)
+	require.True(t, cool)
+	require.False(t, until.IsZero())
+	RecordChannelCooldownMatchWithClass(channelId, ErrClassRateLimited)
+
+	snap := GetChannelHealthSnapshot(channelId)
+	require.True(t, snap.CoolingDown, "cooldown_v2 开关 on 时应处于冷却期")
+	assert.Equal(t, until.Unix(), snap.CoolUntil)
+	assert.Equal(t, "rate_limited", snap.LastCoolClass, "B5-2 应带最近冷却错误类")
+
+	// 旧封装 RecordChannelCooldownMatch（未知类）在未记录具体类时回退 unknown；
+	// 已有具体类后不会被覆盖为空。
+	RecordChannelCooldownMatch(channelId)
+	snap2 := GetChannelHealthSnapshot(channelId)
+	assert.Equal(t, "rate_limited", snap2.LastCoolClass, "未知类不应覆盖已记录的具体类")
+}

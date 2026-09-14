@@ -52,6 +52,9 @@ type channelHealthRing struct {
 	idx       int
 	coolCount int // 近 1h 冷却次数（累计计数 + 时间裁剪）
 	lastCool  time.Time
+	// lastCoolClass 最近一次冷却的错误类（B2-1），用于渠道状态徽章 hover 展示
+	// "连续 N 次 <类>，冷却至 <时间>"（B5-2）。零值 ErrClassOK 表示未知。
+	lastCoolClass RelayErrorClass
 }
 
 type channelHealthState struct {
@@ -93,24 +96,37 @@ func RecordChannelOutcome(channelId int, success bool, latency time.Duration, cl
 }
 
 // RecordChannelCooldownMatch 记录一次冷却事件（B3-1 调用），供健康分聚合。
+// 最近一次冷却的错误类随事件记录，供 B5-2 渠道状态徽章 hover 展示原因。
+// 未提供具体类（旧调用方）时保持已有类，避免用 unknown 覆盖已知原因。
 func RecordChannelCooldownMatch(channelId int) {
+	RecordChannelCooldownMatchWithClass(channelId, ErrClassUnknown)
+}
+
+// RecordChannelCooldownMatchWithClass 记录冷却事件并携带错误类（B5-2）。
+// 调用方（controller.processChannelError）在 DecideCooldown 判定后传入分类结果。
+func RecordChannelCooldownMatchWithClass(channelId int, class RelayErrorClass) {
 	r := getHealthRing(channelId)
 	channelHealthMu.Lock()
 	r.coolCount++
 	r.lastCool = time.Now()
+	if class != ErrClassUnknown {
+		r.lastCoolClass = class
+	}
 	channelHealthMu.Unlock()
 }
 
 // ChannelHealthSnapshot 渠道健康聚合结果。
 type ChannelHealthSnapshot struct {
-	Score        float64 `json:"score"`         // 0-100
-	SuccessRate  float64 `json:"success_rate"`  // 0-1
+	Score        float64 `json:"score"`        // 0-100
+	SuccessRate  float64 `json:"success_rate"` // 0-1
 	P50LatencyMs int64   `json:"p50_latency_ms"`
 	P95LatencyMs int64   `json:"p95_latency_ms"`
 	CoolCount    int     `json:"cool_count"`
 	SampleCount  int     `json:"sample_count"`
 	CoolingDown  bool    `json:"cooling_down"`
 	CoolUntil    int64   `json:"cool_until,omitempty"` // unix 秒，0 = 未冷却
+	// LastCoolClass 最近一次冷却的错误类（B2-1），供前端 hover 展示原因。
+	LastCoolClass string `json:"last_cool_class,omitempty"`
 }
 
 // GetChannelHealthSnapshot 计算渠道健康快照（近 1h 窗口）。
@@ -151,6 +167,9 @@ func GetChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
 	snap.CoolingDown = !until.IsZero() && time.Now().Before(until)
 	if snap.CoolingDown {
 		snap.CoolUntil = until.Unix()
+	}
+	if r.lastCoolClass != ErrClassOK {
+		snap.LastCoolClass = RelayErrorClassString(r.lastCoolClass)
 	}
 	return snap
 }

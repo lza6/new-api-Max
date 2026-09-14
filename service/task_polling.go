@@ -7,6 +7,7 @@ import (
 	"maps"
 	"net/http"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -550,6 +551,10 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	}
 
 	task.Data = redactVideoResponseBody(responseBody)
+	// B5-3 结构化任务进度：插件轮询返回的 progress 若已是结构化对象
+	// {event_type,current,total,step}，合并写入 Task.Data.progress（保留
+	// 已存在的 refund/resolution 等字段）；纯字符串/解析失败则维持原样。
+	applyStructuredTaskProgress(task, taskResult)
 	if len(taskResult.PluginState) > 0 {
 		task.PrivateData.PluginState = taskResult.PluginState
 	}
@@ -747,6 +752,59 @@ func isNonTerminalPollStatus(status model.TaskStatus) bool {
 	default:
 		return false
 	}
+}
+
+// applyStructuredTaskProgress B5-3：插件轮询返回的 progress 若已是结构化对象
+// {event_type,current,total,step}，合并写入 Task.Data.progress；同时保留
+// 已存在的 refund/resolution 等字段。纯字符串/解析失败则维持原样（零破坏）。
+func applyStructuredTaskProgress(task *model.Task, result *relaycommon.TaskInfo) {
+	if task == nil || result == nil {
+		return
+	}
+	tr, ok := structuredTaskProgress(result.Progress)
+	if !ok {
+		return
+	}
+	var data map[string]any
+	_ = task.GetData(&data)
+	if data == nil {
+		data = map[string]any{}
+	}
+	data["progress"] = tr
+	task.SetData(data)
+}
+
+// structuredTaskProgress 尝试把 "3/10 voice" 形式的进度字符串解析为
+// {current,total,step}。无法解析返回 (nil, false)。
+func structuredTaskProgress(raw string) (map[string]any, bool) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return nil, false
+	}
+	// 纯百分比（"30%"）或非 "current/total" 结构 → 不支持，维持原字符串。
+	slash := strings.Index(trimmed, "/")
+	if slash <= 0 {
+		return nil, false
+	}
+	current, errCurrent := strconv.Atoi(strings.TrimSpace(trimmed[:slash]))
+	rest := strings.TrimSpace(trimmed[slash+1:])
+	space := strings.IndexByte(rest, ' ')
+	totalRaw := rest
+	step := ""
+	if space >= 0 {
+		totalRaw = rest[:space]
+		step = strings.TrimSpace(rest[space+1:])
+	}
+	total, errTotal := strconv.Atoi(strings.TrimSpace(totalRaw))
+	if errCurrent != nil || errTotal != nil || current < 0 || total <= 0 {
+		return nil, false
+	}
+	return map[string]any{
+		"event_type": "generate",
+		"current":    current,
+		"total":      total,
+		"step":       step,
+	}, true
 }
 
 func pollFailureReason(class string, statusCode int, detail string) string {

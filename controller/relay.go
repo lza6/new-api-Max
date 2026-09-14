@@ -440,7 +440,7 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	_, _, errClass := service.ClassifyHTTPStatus(err.StatusCode, "")
 	latency := time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime))
 	if cool, until := service.DecideCooldown(channelError.ChannelId, errClass, 0); cool {
-		service.RecordChannelCooldownMatch(channelError.ChannelId)
+		service.RecordChannelCooldownMatchWithClass(channelError.ChannelId, errClass)
 		logger.LogWarn(c, fmt.Sprintf("channel #%d cooling down until %s (class=%v)", channelError.ChannelId, until.Format("15:04:05"), errClass))
 	}
 	service.RecordChannelOutcome(channelError.ChannelId, false, latency, errClass)

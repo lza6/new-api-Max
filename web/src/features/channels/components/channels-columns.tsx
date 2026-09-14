@@ -79,6 +79,7 @@ import {
   handleUpdateTagField,
   createChannelFieldUpdateScheduler,
   isTagAggregateRow,
+  toHealthSnapshotView,
   type TagRow,
 } from '../lib'
 import { parseUpstreamUpdateMeta } from '../lib/upstream-update-utils'
@@ -590,7 +591,7 @@ export function useChannelsColumns(
   } = {}
 ): ColumnDef<Channel>[] {
   const { t, i18n } = useTranslation()
-  const { sensitiveVisible } = useChannels()
+  const { sensitiveVisible, healthScores } = useChannels()
   const enableSelection = options.enableSelection ?? true
   const locale = toIntlLocale(i18n.resolvedLanguage || i18n.language)
   // The column definitions only depend on the translation function, the active
@@ -1009,6 +1010,54 @@ export function useChannelsColumns(
             }
           }
 
+          // B5-2 冷却 hover：启用渠道若处于冷却期，徽章旁追加 Tooltip 原因
+          // （最近一次冷却错误类 + 到期相对时间）。健康快照来自
+          // ChannelsProvider 注入的 healthScores（60s 缓存）。
+          const coolSnap = toHealthSnapshotView(healthScores ?? undefined, channel.id)
+          if (status === 1 && coolSnap.coolingDown) {
+            return (
+              <TooltipProvider delay={100}>
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <span
+                        tabIndex={0}
+                        className='inline-flex cursor-help items-center'
+                        aria-label={t('Health details')}
+                      />
+                    }
+                  >
+                    <StatusBadge
+                      label={label}
+                      variant={config.variant}
+                      size='sm'
+                      copyable={false}
+                      pulse
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side='top' className='max-w-xs'>
+                    <div className='space-y-1 text-xs'>
+                      <p className='font-medium'>
+                        {t('Cooling till {{time}}', {
+                          time: formatRelativeTime(
+                            coolSnap.coolUntil,
+                            i18n.language
+                          ),
+                        })}
+                      </p>
+                      {coolSnap.lastCoolClass ? (
+                        <p className='text-muted-foreground'>
+                          {t('Reason:')}{' '}
+                          {t(`cool-class.${coolSnap.lastCoolClass}`)}
+                        </p>
+                      ) : null}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )
+          }
+
           return (
             <StatusBadge
               label={label}
@@ -1248,6 +1297,6 @@ export function useChannelsColumns(
         meta: { pinned: 'right' as const },
       },
     ],
-    [enableSelection, t, locale, sensitiveVisible]
+    [enableSelection, t, locale, sensitiveVisible, healthScores, i18n.language]
   )
 }

@@ -29,6 +29,7 @@ import { cn } from '@/lib/utils'
 import { taskActionMapper, taskStatusMapper } from '../../lib/mappers'
 import { resolveTaskDetailAccess } from '../../lib/task-details'
 import { readTaskStructuredProgress, type TaskLog } from '../../types'
+import { getFriendlyErrorMessage } from '@/lib/server-error-message'
 import { PluginAuthorLink } from '../plugin-author-link'
 
 function DetailRow(props: {
@@ -218,7 +219,21 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
             />
           ) : null}
           {props.log.fail_reason ? (
-            <DetailRow label={t('Fail Reason')} value={props.log.fail_reason} />
+            <DetailRow
+              label={t('Fail Reason')}
+              value={
+                <span className='flex flex-col gap-0.5'>
+                  {getFriendlyErrorMessage(props.log.fail_reason) ? (
+                    <span className='text-red-600 dark:text-red-400'>
+                      {getFriendlyErrorMessage(props.log.fail_reason)}
+                    </span>
+                  ) : null}
+                  <span className='break-all whitespace-pre-wrap text-muted-foreground'>
+                    {props.log.fail_reason}
+                  </span>
+                </span>
+              }
+            />
           ) : null}
           {refund ? (
             <DetailRow

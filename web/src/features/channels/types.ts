@@ -183,6 +183,8 @@ export interface ChannelHealthScoresResponse {
       sample_count: number
       cooling_down: boolean
       cool_until: number
+      /** 最近一次冷却的错误类标识（B5-2 hover 原因，如 auth/rate_limited） */
+      last_cool_class?: string
     }
   >
 }

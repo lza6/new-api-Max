@@ -43,6 +43,8 @@ export interface ChannelHealthSnapshotView {
   sampleCount: number
   coolingDown: boolean
   coolUntil: number
+  /** 最近一次冷却的错误类标识（B5-2 hover 原因），如 auth/rate_limited/timeout */
+  lastCoolClass?: string
 }
 
 export const EMPTY_HEALTH_SNAPSHOT: ChannelHealthSnapshotView = {
@@ -107,6 +109,8 @@ export function toHealthSnapshotView(
     sampleCount: isFiniteNumber(raw.sample_count) ? raw.sample_count : 0,
     coolingDown: raw.cooling_down === true,
     coolUntil: isFiniteNumber(raw.cool_until) ? raw.cool_until : 0,
+    lastCoolClass:
+      typeof raw.last_cool_class === 'string' ? raw.last_cool_class : undefined,
   }
 }
 
