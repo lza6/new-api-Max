@@ -85,6 +85,17 @@ const (
 	// quota error
 	ErrorCodeInsufficientUserQuota      ErrorCode = "insufficient_user_quota"
 	ErrorCodePreConsumeTokenQuotaFailed ErrorCode = "pre_consume_token_quota_failed"
+
+	// ---------------------------------------------------------------
+	// B6-2 机器可读错误分类（error.type 稳定枚举，供前端人话映射）。
+	// 这些值会覆盖写进返回给客户端的 OpenAIError.Type/Code，与前端
+	// FRIENDLY_ERROR_PATTERNS 一一对应；新增时必须同步前端映射。
+	// ---------------------------------------------------------------
+	ErrorCodeInsufficientQuota   ErrorCode = "insufficient_quota"
+	ErrorCodeKeyInvalid          ErrorCode = "key_invalid"
+	ErrorCodeRateLimited         ErrorCode = "rate_limited"
+	ErrorCodeUpstreamUnavailable ErrorCode = "upstream_unavailable"
+	ErrorCodeContentFiltered     ErrorCode = "content_filtered"
 )
 
 type NewAPIError struct {
@@ -376,6 +387,22 @@ func IsSkipRetryError(err *NewAPIError) bool {
 	}
 
 	return err.skipRetry
+}
+
+// SetErrorCode 显式改写错误分类（B6-2）。用于把上游/业务错误归一为
+// 稳定的机器可读 error.type（如 rate_limited / upstream_unavailable），
+// 使客户端与前端人话映射无需依赖易变的上游文案。
+func (e *NewAPIError) SetErrorCode(code ErrorCode) {
+	if e == nil {
+		return
+	}
+	e.errorCode = code
+	// 同步改写 OpenAI 信封的 Type/Code，保证 ToOpenAIError 输出新分类。
+	if openAIError, ok := e.RelayError.(OpenAIError); ok {
+		openAIError.Type = string(code)
+		openAIError.Code = code
+		e.RelayError = openAIError
+	}
 }
 
 func ErrOptionWithSkipRetry() NewAPIErrorOptions {

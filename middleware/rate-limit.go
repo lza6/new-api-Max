@@ -137,11 +137,18 @@ func memoryRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark s
 // clients can back off instead of treating the rejection as a fatal error.
 // The in-memory limiter cannot report the remaining window, so callers
 // without a TTL pass the full window duration as a conservative upper bound.
+// B6-2：统一携带机器可读 error.type=rate_limited 供前端人话映射。
 func writeRateLimited(c *gin.Context, retryAfterSeconds int64) {
 	if retryAfterSeconds > 0 {
 		c.Header("Retry-After", strconv.FormatInt(retryAfterSeconds, 10))
 	}
-	c.Status(http.StatusTooManyRequests)
+	c.JSON(http.StatusTooManyRequests, gin.H{
+		"error": gin.H{
+			"message": "rate limited, please retry later",
+			"type":    "rate_limited",
+			"code":    "rate_limited",
+		},
+	})
 	c.Abort()
 }
 
