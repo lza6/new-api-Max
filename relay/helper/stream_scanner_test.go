@@ -17,6 +17,7 @@ import (
 	"github.com/lza6/new-api-Max/constant"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -570,4 +571,29 @@ func TestStreamScannerHandler_StreamStatus_ReplacesPreInitialized(t *testing.T) 
 
 	assert.Equal(t, relaycommon.StreamEndReasonDone, info.StreamStatus.EndReason)
 	assert.Equal(t, 0, info.StreamStatus.TotalErrorCount())
+}
+
+// TestStreamScannerHandler_FalloverOnCompletesImmediately B3-2 开关 on 缓冲期
+// 断言：首个有效 data 块 commit 前 recorder.Body 为空（响应头未上线）。
+func TestStreamScannerHandler_FalloverOnBuffersBodyBeforeFirstData(t *testing.T) {
+	rs := relay_setting.GetRelaySetting()
+	oldFallover := rs.StreamFallover
+	rs.StreamFallover = true
+	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	// 首包到达前（极短同步执行窗口内 recorder 应为空——由 writer commit 时机保证）。
+	bufferWriter := NewFirstPacketBufferWriter(c.Writer)
+	c.Writer = bufferWriter
+	// 模拟首包前：写入 data 行但未 commit。
+	_, _ = bufferWriter.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n"))
+	assert.Empty(t, recorder.Body.String(), "缓冲期响应体必须为空（响应头未上线）")
+	assert.False(t, bufferWriter.Committed())
+	assert.Positive(t, bufferWriter.BufferedBytes())
+
+	// commit 后缓冲穿透到 recorder。
+	bufferWriter.Commit()
+	assert.Contains(t, recorder.Body.String(), "x")
 }
