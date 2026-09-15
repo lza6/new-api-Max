@@ -138,3 +138,33 @@ func TestPreConsumeBillingRejectsNegativeQuotaBeforeDeduction(t *testing.T) {
 	require.Equal(t, http.StatusBadRequest, apiErr.StatusCode)
 	require.Nil(t, info.Billing)
 }
+
+// TestNotifyQuotaExhaustedNilSafety B6-3：额度用尽通知在空/零用户时不 panic。
+func TestNotifyQuotaExhaustedNilSafety(t *testing.T) {
+	// nil relayInfo 安全返回。
+	notifyQuotaExhausted(nil, 0)
+	// 零 userId 安全返回。
+	notifyQuotaExhausted(&relaycommon.RelayInfo{}, 0)
+}
+
+// TestPreConsumeWalletExhaustedReturnsInsufficientQuota B6-3：钱包额度为 0 时
+// 预扣费返回 insufficient_user_quota，且不会因通知路径 panic。
+func TestPreConsumeWalletExhaustedReturnsInsufficientQuota(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	const userID = 4301
+	truncate(t)
+	seedUser(t, userID, 0) // 额度 0 = 已用尽
+
+	c, _ := gin.CreateTestContext(nil)
+	info := &relaycommon.RelayInfo{
+		UserId:      userID,
+		UserSetting: dto.UserSetting{BillingPreference: "wallet_only"},
+	}
+
+	apiErr := PreConsumeBilling(c, 100, info)
+
+	require.NotNil(t, apiErr, "额度用尽时应拒绝预扣")
+	require.Equal(t, types.ErrorCodeInsufficientUserQuota, apiErr.GetErrorCode())
+	require.Equal(t, http.StatusForbidden, apiErr.StatusCode)
+	require.Nil(t, info.Billing)
+}

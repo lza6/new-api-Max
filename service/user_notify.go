@@ -8,7 +8,9 @@ import (
 	"strings"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/lza6/new-api-Max/setting/system_setting"
 )
@@ -18,6 +20,24 @@ func NotifyRootUser(t string, subject string, content string) {
 	err := NotifyUser(user.Id, user.Email, user.GetSetting(), dto.NewNotify(t, subject, content, nil))
 	if err != nil {
 		common.SysLog(fmt.Sprintf("failed to notify root user: %s", err.Error()))
+	}
+}
+
+// notifyQuotaExhausted B6-3 第二档：额度用尽时通知用户。
+// 与 checkAndSendQuotaNotify（剩余低于阈值提醒）互补；受通知限频保护，不扰动存量设置。
+func notifyQuotaExhausted(relayInfo *relaycommon.RelayInfo, userQuota int) {
+	if relayInfo == nil || relayInfo.UserId == 0 {
+		return
+	}
+	userSetting := relayInfo.UserSetting
+	prompt := "您的额度已用尽"
+	topUpLink := PaymentReturnURL("/wallet")
+	content := "{{value}}，剩余额度：{{value}}，请及时充值。<br/>充值链接：<a href='{{value}}'>{{value}}</a>"
+	values := []any{prompt, logger.FormatQuota(userQuota), topUpLink, topUpLink}
+	err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, userSetting,
+		dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values))
+	if err != nil {
+		common.SysLog(fmt.Sprintf("failed to send quota-exhausted notify to user %d: %s", relayInfo.UserId, err.Error()))
 	}
 }
 
