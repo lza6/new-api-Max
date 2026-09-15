@@ -97,3 +97,78 @@ func TestProcessChannelErrorUsesSnapshotWithoutLeakingChannelMetadata(t *testing
 		assert.NotContains(t, userOther, key)
 	}
 }
+
+// TestProcessChannelErrorClassifyToB62 B6-2：processChannelError 按 B2-1
+// 错误类把通用错误归一为机器可读 error.type。
+func TestProcessChannelErrorClassifyToB62(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	previousDB, previousLogDB := model.DB, model.LOG_DB
+	previousRedisEnabled := common.RedisEnabled
+	previousMainDatabaseType := common.MainDatabaseType()
+	previousLogDatabaseType := common.LogDatabaseType()
+	previousErrorLogEnabled := constant.ErrorLogEnabled
+
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(1)
+	require.NoError(t, database.AutoMigrate(&model.User{}, &model.Log{}))
+	model.DB, model.LOG_DB = database, database
+	common.RedisEnabled = false
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+	constant.ErrorLogEnabled = false // 不落错误日志，仅断言错误码改写
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB = previousDB, previousLogDB
+		common.RedisEnabled = previousRedisEnabled
+		common.SetDatabaseTypes(previousMainDatabaseType, previousLogDatabaseType)
+		constant.ErrorLogEnabled = previousErrorLogEnabled
+		require.NoError(t, sqlDB.Close())
+	})
+
+	channelSnapshot := types.ChannelError{ChannelId: 1, ChannelType: 1, AutoBan: false}
+
+	run := func(statusCode int, code types.ErrorCode) *types.NewAPIError {
+		recorder := httptest.NewRecorder()
+		ctx, _ := gin.CreateTestContext(recorder)
+		ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+		ctx.Set("id", 1)
+		ctx.Set("username", "u")
+		ctx.Set("token_name", "tk")
+		ctx.Set("token_id", 1)
+		ctx.Set("original_model", "m")
+		ctx.Set("group", "default")
+		ctx.Set("channel_id", 1)
+		common.SetContextKey(ctx, constant.ContextKeyRequestStartTime, time.Now())
+		apiErr := types.NewOpenAIError(errors.New("upstream"), code, statusCode)
+		processChannelError(ctx, channelSnapshot, apiErr, nil)
+		return apiErr
+	}
+
+	// 401 → key_invalid；429 → rate_limited；5xx → upstream_unavailable；
+	// prompt_blocked → content_filtered；业务渠道码（channel:invalid_key）保留。
+	assert.Equal(t, types.ErrorCodeKeyInvalid, run(http.StatusUnauthorized, types.ErrorCodeBadResponseStatusCode).GetErrorCode())
+	assert.Equal(t, types.ErrorCodeRateLimited, run(http.StatusTooManyRequests, types.ErrorCodeBadResponseStatusCode).GetErrorCode())
+	assert.Equal(t, types.ErrorCodeUpstreamUnavailable, run(http.StatusBadGateway, types.ErrorCodeBadResponseStatusCode).GetErrorCode())
+	assert.Equal(t, types.ErrorCodeContentFiltered, run(http.StatusBadRequest, types.ErrorCodePromptBlocked).GetErrorCode())
+	channelErr := types.NewOpenAIError(errors.New("key"), types.ErrorCodeChannelInvalidKey, http.StatusUnauthorized)
+	processChannelErrorWithError(t, channelSnapshot, channelErr)
+	assert.Equal(t, types.ErrorCodeChannelInvalidKey, channelErr.GetErrorCode())
+}
+
+// processChannelErrorWithError 复用同一快照直接调用，避免 table 里重复上下文。
+func processChannelErrorWithError(t *testing.T, ch types.ChannelError, apiErr *types.NewAPIError) {
+	t.Helper()
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	ctx.Set("id", 1)
+	ctx.Set("username", "u")
+	ctx.Set("token_name", "tk")
+	ctx.Set("token_id", 1)
+	ctx.Set("original_model", "m")
+	ctx.Set("group", "default")
+	ctx.Set("channel_id", 1)
+	common.SetContextKey(ctx, constant.ContextKeyRequestStartTime, time.Now())
+	processChannelError(ctx, ch, apiErr, nil)
+}

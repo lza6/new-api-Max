@@ -438,6 +438,27 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	// 行为与旧版完全一致；on 时按 B2-1 错误类冷却并记录健康分。
 	// 上游 Retry-After 头未在各 relay 格式保留，暂传 0（按类默认时长冷却）。
 	_, _, errClass := service.ClassifyHTTPStatus(err.StatusCode, "")
+	// B6-2：把上游/渠道错误归一为机器可读 error.type（key_invalid /
+	// rate_limited / upstream_unavailable），与前端人话映射对应。
+	// 仅在错误码仍是通道无关的通用码（或空）时改写，保留业务已有分类
+	// （如 channel:invalid_key、channel:no_available_key 等渠道域码）。
+	switch errClass {
+	case service.ErrClassAuth:
+		if !types.IsChannelError(err) {
+			err.SetErrorCode(types.ErrorCodeKeyInvalid)
+		}
+	case service.ErrClassRateLimited:
+		err.SetErrorCode(types.ErrorCodeRateLimited)
+	case service.ErrClassServerError, service.ErrClassTimeout:
+		if !types.IsChannelError(err) {
+			err.SetErrorCode(types.ErrorCodeUpstreamUnavailable)
+		}
+	}
+	// 内容安全类错误（提示词被阻断/敏感词命中）归一为 content_filtered。
+	if err.GetErrorCode() == types.ErrorCodePromptBlocked ||
+		err.GetErrorCode() == types.ErrorCodeSensitiveWordsDetected {
+		err.SetErrorCode(types.ErrorCodeContentFiltered)
+	}
 	latency := time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime))
 	if cool, until := service.DecideCooldown(channelError.ChannelId, errClass, 0); cool {
 		service.RecordChannelCooldownMatchWithClass(channelError.ChannelId, errClass)
