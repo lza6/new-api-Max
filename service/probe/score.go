@@ -50,14 +50,16 @@ type ProbeReport struct {
 	Skipped     string       `json:"skipped,omitempty"` // 整轮跳过原因（如不支持 OpenAI 格式）
 }
 
-// defaultCases 默认题库（权重合计 80：模型身份 25/参数 20/缓存 20/一致性 15）。
-// 流完整性 10 与计费一致性 10 依赖流式/多计费路径，v1.1 先以 80 分制归一化。
+// defaultCases 默认题库（权重合计 100：模型身份 25/参数 20/缓存 20/一致性 15/
+// 流完整性 10/计费一致性 10），对齐 casbin-gateway 六维评分。
 func defaultCases() []ProbeCase {
 	return []ProbeCase{
 		ModelIDCase{},
 		CapabilityCase{},
 		CacheCase{},
 		ConsistencyCase{},
+		StreamIntegrityCase{},
+		BillingConsistencyCase{},
 	}
 }
 

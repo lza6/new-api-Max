@@ -38,6 +38,20 @@ import (
 	"github.com/lza6/new-api-Max/common"
 )
 
+// commonMarshal/commonUnmarshal 统一走 common.*（AGENTS.md JSON 规范），
+// 为探测包提供一致的编解码入口。
+func commonMarshal(v any) (string, error) {
+	b, err := common.Marshal(v)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func commonUnmarshal(data []byte, v any) error {
+	return common.Unmarshal(data, v)
+}
+
 // CaseResult 单个用例结果。
 type CaseResult struct {
 	Name     string  `json:"name"`

@@ -34,14 +34,24 @@ func chatBodyJSON(n int, content string, cachedTokens int) string {
 }
 
 // chatHandler 按 n 参数返回对应数量的 choices（能力用例）；其余请求按脚本应答。
+// 支持 stream=true（返回多条 SSE data）与 usage（自洽 10+5=15）。
 func chatHandler(t *testing.T, singleAnswer string, answers []string, cachedTokens int) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// 读 body 提取 n（简化：探测请求都带 JSON body）。
+		// 读 body 提取 n 与 stream（简化：探测请求都带 JSON body）。
 		buf := make([]byte, r.ContentLength)
 		_, _ = r.Body.Read(buf)
 		if countOccurrences(string(buf), `"n":2`) > 0 {
 			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"a"}},{"message":{"content":"b"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+			return
+		}
+		// 流式请求：返回多条 SSE data 块。
+		if countOccurrences(string(buf), `"stream":true`) > 0 {
+			w.Header().Set("Content-Type", "text/event-stream")
+			for _, piece := range []string{`{"choices":[{"delta":{"content":"我"}}]}`, `{"choices":[{"delta":{"content":"是"}}]}`, `{"choices":[{"delta":{"content":"助手"}}]}`} {
+				_, _ = w.Write([]byte("data: " + piece + "\n\n"))
+			}
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
 			return
 		}
 		if len(answers) > 0 {
@@ -191,4 +201,90 @@ func TestTruncateEvidence(t *testing.T) {
 	got := truncateEvidence(string(long))
 	assert.LessOrEqual(t, len(got), MaxEvidenceBytes+16)
 	assert.Contains(t, got, "truncated")
+}
+
+// TestStreamIntegrityCasePass B4-1 用例5：mock 返回多条 SSE → 通过。
+func TestStreamIntegrityCasePass(t *testing.T) {
+	target := newMockUpstream(t, chatHandler(t, "", nil, 0))
+	result := StreamIntegrityCase{}.Run(context.Background(), target)
+	assert.True(t, result.Passed, "流式渠道应返回多 chunks: %s", result.Error)
+	assert.Equal(t, 10.0, result.Score)
+	assert.Contains(t, result.Evidence, "chunks=3")
+}
+
+// TestStreamIntegrityCaseSingleChunkFails B4-1 用例5：只回 1 chunk 视为非真流式。
+func TestStreamIntegrityCaseSingleChunkFails(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/event-stream")
+		_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"only\"}}]}\n\n"))
+		_, _ = w.Write([]byte("data: [DONE]\n\n"))
+	}))
+	t.Cleanup(server.Close)
+	target := &ProbeTarget{BaseURL: server.URL, Key: "sk-x-12345678901234", Model: "m", TimeoutSecs: 5}
+	result := StreamIntegrityCase{}.Run(context.Background(), target)
+	assert.False(t, result.Passed, "单 chunk 不算真流式")
+	assert.Zero(t, result.Score)
+	assert.Contains(t, result.Error, ">=2")
+}
+
+// TestBillingConsistencyCasePass B4-1 用例6：usage 自洽（10+5=15）→ 通过。
+func TestBillingConsistencyCasePass(t *testing.T) {
+	target := newMockUpstream(t, chatHandler(t, "", nil, 0))
+	result := BillingConsistencyCase{}.Run(context.Background(), target)
+	assert.True(t, result.Passed, "usage 自洽应通过: %s", result.Error)
+	assert.Equal(t, 10.0, result.Score)
+	assert.Contains(t, result.Evidence, "prompt=10 completion=5 total=15")
+}
+
+// TestBillingConsistencyCaseInconsistent B4-1 用例6：usage 打架 → 不通过。
+func TestBillingConsistencyCaseInconsistent(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"a"}}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":999}}`))
+	}))
+	t.Cleanup(server.Close)
+	target := &ProbeTarget{BaseURL: server.URL, Key: "sk-x-12345678901234", Model: "m", TimeoutSecs: 5}
+	result := BillingConsistencyCase{}.Run(context.Background(), target)
+	assert.False(t, result.Passed, "usage 不一致应失败")
+	assert.Zero(t, result.Score)
+	assert.Contains(t, result.Error, "inconsistent")
+}
+
+// TestRunProbeGoodChannelGradeA B4-1 验收：良渠道（全用例通过）→ 等级 A。
+func TestRunProbeGoodChannelGradeA(t *testing.T) {
+	target := newMockUpstream(t, chatHandler(t, "", []string{"王勃", "H2O", "x"}, 8))
+	report := RunProbe(context.Background(), target)
+	assert.Equal(t, GradeA, report.Grade)
+	assert.InDelta(t, 100.0, report.TotalWeight, 0.001)
+	assert.Len(t, report.Results, 6, "六维题库")
+	// 劣渠道须在 D/F 档，此处证明良渠道满分可达 A。
+}
+
+// TestRunProbeBadChannelGradeF B4-1 验收：套壳渠道（模型身份错 + 非流式 +
+// usage 打架）→ 等级 F。用恶意 mock 模拟"挂羊头卖狗肉"。
+func TestRunProbeBadChannelGradeF(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		buf := make([]byte, r.ContentLength)
+		_, _ = r.Body.Read(buf)
+		if countOccurrences(string(buf), `"stream":true`) > 0 {
+			// 非真流式：只回单块。
+			w.Header().Set("Content-Type", "text/event-stream")
+			_, _ = w.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"x\"}}]}\n\n"))
+			_, _ = w.Write([]byte("data: [DONE]\n\n"))
+			return
+		}
+		if countOccurrences(string(buf), `"temperature":0`) > 0 {
+			// 一致性：两次返回不同内容（套壳随机）。
+			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"第一次回答A"}}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}`))
+			return
+		}
+		// 模型身份：答非所问；usage：打架。
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"我是另一个模型，答非所问"}}],"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":999}}`))
+	}))
+	t.Cleanup(server.Close)
+	target := &ProbeTarget{BaseURL: server.URL, Key: "sk-x-12345678901234", Model: "m", TimeoutSecs: 10}
+	report := RunProbe(context.Background(), target)
+	assert.Equal(t, GradeF, report.Grade, "套壳渠道应得 F，实际 grade=%s", report.Grade)
+	assert.Less(t, report.Score, 35.0, "F 档要求得分 <35（<35%%），实际 %.1f", report.Score)
 }
