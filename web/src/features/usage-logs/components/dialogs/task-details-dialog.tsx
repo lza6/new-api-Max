@@ -75,7 +75,7 @@ function formatTaskTimestamp(value?: number): string {
 }
 
 /** B5-3 结构化进度条：current/total 分段 + step 名，数值异常时降级为不渲染。 */
-function TaskStructuredProgressRow(props: {
+export function TaskStructuredProgressRow(props: {
   current: number
   total: number
   step?: string
