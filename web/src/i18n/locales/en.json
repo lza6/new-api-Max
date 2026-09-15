@@ -6321,5 +6321,13 @@
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
     "Zoom": "Zoom"
-  }
+  },
+  "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
+  "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",
+  "Amount in {{currency}} given to invited users (= {{formattedQuota}})": "Amount in {{currency}} given to invited users (= {{formattedQuota}})",
+  "Quota consumed before charging users ({{currency}})": "Quota consumed before charging users ({{currency}})",
+  "Minimum amount in {{currency}} awarded for check-in (= {{formattedQuota}})": "Minimum amount in {{currency}} awarded for check-in (= {{formattedQuota}})",
+  "Maximum amount in {{currency}} awarded for check-in (= {{formattedQuota}})": "Maximum amount in {{currency}} awarded for check-in (= {{formattedQuota}})",
+  "e.g. 0.1": "e.g. 0.1",
+  "e.g. 1": "e.g. 1"
 }

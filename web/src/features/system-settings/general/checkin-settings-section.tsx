@@ -33,6 +33,15 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import {
+  getCurrencyDisplay,
+  getCurrencyLabel,
+} from '@/lib/currency'
+import {
+  formatQuota,
+  parseQuotaFromDollars,
+  quotaUnitsToEditableAmount,
+} from '@/lib/format'
 
 import {
   SettingsForm,
@@ -62,18 +71,26 @@ export function CheckinSettingsSection({
 }) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
+  const { meta: currencyMeta } = getCurrencyDisplay()
+  const currencyLabel = getCurrencyLabel()
+  const tokensOnly = currencyMeta.kind === 'tokens'
 
   const form = useForm<Values>({
     resolver: zodResolver(schema) as unknown as Resolver<Values>,
     defaultValues: {
       enabled: defaultValues.enabled,
-      minQuota: defaultValues.minQuota,
-      maxQuota: defaultValues.maxQuota,
+      // 额度奖励按显示货币金额回填（设 1 就是 1 美元/自定义单位）。
+      minQuota: quotaUnitsToEditableAmount(defaultValues.minQuota),
+      maxQuota: quotaUnitsToEditableAmount(defaultValues.maxQuota),
     },
   })
 
   const { isDirty, isSubmitting } = form.formState
   const enabled = form.watch('enabled')
+
+  function formatAwardQuota(value: number): string {
+    return formatQuota(parseQuotaFromDollars(Number.isFinite(value) ? value : 0))
+  }
 
   async function onSubmit(values: Values) {
     const updates: Array<{ key: string; value: string }> = []
@@ -85,17 +102,18 @@ export function CheckinSettingsSection({
       })
     }
 
-    if (values.minQuota !== defaultValues.minQuota) {
+    if (values.minQuota !== quotaUnitsToEditableAmount(defaultValues.minQuota)) {
       updates.push({
         key: 'checkin_setting.min_quota',
-        value: String(values.minQuota),
+        // 显示货币金额换算回内部 quota 单位（设 1 存 1 美元对应额度）。
+        value: String(parseQuotaFromDollars(values.minQuota)),
       })
     }
 
-    if (values.maxQuota !== defaultValues.maxQuota) {
+    if (values.maxQuota !== quotaUnitsToEditableAmount(defaultValues.maxQuota)) {
       updates.push({
         key: 'checkin_setting.max_quota',
-        value: String(values.maxQuota),
+        value: String(parseQuotaFromDollars(values.maxQuota)),
       })
     }
 
@@ -157,12 +175,23 @@ export function CheckinSettingsSection({
                       <Input
                         type='number'
                         min={0}
-                        placeholder={t('1000')}
+                        step={tokensOnly ? '1' : '0.01'}
+                        placeholder={tokensOnly ? t('1000') : t('e.g. 0.1')}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Minimum quota amount awarded for check-in')}
+                      {tokensOnly
+                        ? t('Minimum quota amount awarded for check-in')
+                        : t(
+                            'Minimum amount in {{currency}} awarded for check-in (= {{formattedQuota}})',
+                            {
+                              currency: currencyLabel,
+                              formattedQuota: formatAwardQuota(
+                                Number(field.value) || 0
+                              ),
+                            }
+                          )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -179,12 +208,23 @@ export function CheckinSettingsSection({
                       <Input
                         type='number'
                         min={0}
-                        placeholder={t('10000')}
+                        step={tokensOnly ? '1' : '0.01'}
+                        placeholder={tokensOnly ? t('10000') : t('e.g. 1')}
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      {t('Maximum quota amount awarded for check-in')}
+                      {tokensOnly
+                        ? t('Maximum quota amount awarded for check-in')
+                        : t(
+                            'Maximum amount in {{currency}} awarded for check-in (= {{formattedQuota}})',
+                            {
+                              currency: currencyLabel,
+                              formattedQuota: formatAwardQuota(
+                                Number(field.value) || 0
+                              ),
+                            }
+                          )}
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

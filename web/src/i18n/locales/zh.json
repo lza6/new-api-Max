@@ -6321,5 +6321,13 @@
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
     "Zoom": "缩放"
-  }
+  },
+  "Amount in {{currency}} given to new users (= {{formattedQuota}})": "新用户获得的 {{currency}} 金额（= {{formattedQuota}}）",
+  "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "邀请他人的用户获得的 {{currency}} 金额（= {{formattedQuota}}）",
+  "Amount in {{currency}} given to invited users (= {{formattedQuota}})": "被邀请用户获得的 {{currency}} 金额（= {{formattedQuota}}）",
+  "Quota consumed before charging users ({{currency}})": "向用户扣费前预扣的额度（{{currency}}）",
+  "Minimum amount in {{currency}} awarded for check-in (= {{formattedQuota}})": "签到奖励的最小 {{currency}} 金额（= {{formattedQuota}}）",
+  "Maximum amount in {{currency}} awarded for check-in (= {{formattedQuota}})": "签到奖励的最大 {{currency}} 金额（= {{formattedQuota}}）",
+  "e.g. 0.1": "例如 0.1",
+  "e.g. 1": "例如 1"
 }
