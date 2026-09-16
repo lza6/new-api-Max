@@ -49,6 +49,13 @@ func HasCheckedInToday(userId int) (bool, error) {
 	return count > 0, err
 }
 
+// ResetAllCheckins P1 管理员重置：清空全部签到记录，让所有用户可重新签到。
+// 返回删除的记录数。（仅用于福利性重置/活动，调用方需管理员鉴权。）
+func ResetAllCheckins() (int64, error) {
+	res := DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Delete(&Checkin{})
+	return res.RowsAffected, res.Error
+}
+
 // UserCheckin 执行用户签到
 // MySQL 和 PostgreSQL 使用事务保证原子性
 // SQLite 不支持嵌套事务，使用顺序操作 + 手动回滚

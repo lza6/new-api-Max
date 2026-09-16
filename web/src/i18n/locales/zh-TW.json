@@ -6304,6 +6304,13 @@
     "Queue capacity": "佇列容量",
     "How many requests may wait in line. 0 = no waiting (immediate 429).": "最多可排隊等待的請求數。0 = 不排隊（直接 429）。",
     "Queue wait timeout (seconds)": "排隊等待逾時（秒）",
-    "Requests still queued after this long are rejected with 429.": "排隊超過該時長仍未獲得並發的請求將回傳 429。"
+    "Requests still queued after this long are rejected with 429.": "排隊超過該時長仍未獲得並發的請求將回傳 429。",
+    "Reset all check-in records": "重置所有簽到記錄",
+    "Reset all check-in records? Users can check in again.": "重置所有簽到記錄？使用者將可重新簽到。",
+    "Check-in records reset ({{count}} deleted)": "簽到記錄已重置（刪除 {{count}} 條）",
+    "Failed to reset check-in records": "重置簽到記錄失敗",
+    "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "清空所有使用者的簽到歷史，讓每個人都能重新簽到（例如作為一次性福利）。",
+    "Resetting…": "重置中…",
+    "You are site member #{{id}}": "您是本站第 {{id}} 位開發者"
   }
 }

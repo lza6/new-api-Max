@@ -12,6 +12,20 @@ import (
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
+// ResetAllCheckins P1 管理员重置签到：清空全部签到记录，所有用户可重新签到。
+// 仅管理员/root 可调用（路由层鉴权）。
+func ResetAllCheckins(c *gin.Context) {
+	deleted, err := model.ResetAllCheckins()
+	if err != nil {
+		common.ApiErrorMsg(c, "重置签到失败："+err.Error())
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"deleted": deleted,
+		"message": "签到记录已重置，用户可重新签到",
+	})
+}
+
 // GetCheckinStatus 获取用户签到状态和历史记录
 func GetCheckinStatus(c *gin.Context) {
 	setting := operation_setting.GetCheckinSetting()

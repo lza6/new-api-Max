@@ -17,6 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { RotateCcw } from 'lucide-react'
+import { useState } from 'react'
 import { useForm, type Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -31,6 +33,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -42,6 +45,8 @@ import {
   parseQuotaFromDollars,
   quotaUnitsToEditableAmount,
 } from '@/lib/format'
+import { api } from '@/lib/api'
+import { handleServerError } from '@/lib/handle-server-error'
 
 import {
   SettingsForm,
@@ -87,6 +92,32 @@ export function CheckinSettingsSection({
 
   const { isDirty, isSubmitting } = form.formState
   const enabled = form.watch('enabled')
+
+  // P1 管理员重置所有签到（福利重置）：清空全部签到记录，用户可重新签到。
+  const [resetting, setResetting] = useState(false)
+  const resetAllCheckins = async () => {
+    if (!window.confirm(t('Reset all check-in records? Users can check in again.'))) {
+      return
+    }
+    setResetting(true)
+    try {
+      const res = await api.post('/api/user/checkins/reset')
+      const data = res.data as { success?: boolean; data?: { deleted?: number } }
+      if (data?.success) {
+        toast.success(
+          t('Check-in records reset ({{count}} deleted)', {
+            count: data.data?.deleted ?? 0,
+          })
+        )
+      } else {
+        handleServerError(res, t('Failed to reset check-in records'))
+      }
+    } catch (error) {
+      handleServerError(error, t('Failed to reset check-in records'))
+    } finally {
+      setResetting(false)
+    }
+  }
 
   function formatAwardQuota(value: number): string {
     return formatQuota(parseQuotaFromDollars(Number.isFinite(value) ? value : 0))
@@ -234,6 +265,25 @@ export function CheckinSettingsSection({
           )}
         </SettingsForm>
       </Form>
+
+      {/* P1 管理员重置所有签到（福利） */}
+      <div className='border-border/60 border-t pt-4'>
+        <Button
+          variant='outline'
+          size='sm'
+          onClick={resetAllCheckins}
+          disabled={resetting}
+          className='text-muted-foreground'
+        >
+          <RotateCcw className='size-4' aria-hidden />
+          {resetting ? t('Resetting…') : t('Reset all check-in records')}
+        </Button>
+        <p className='text-muted-foreground/70 mt-2 text-xs'>
+          {t(
+            'Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).'
+          )}
+        </p>
+      </div>
     </SettingsSection>
   )
 }

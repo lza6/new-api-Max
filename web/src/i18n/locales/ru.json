@@ -6304,6 +6304,13 @@
     "Queue capacity": "Емкость очереди",
     "How many requests may wait in line. 0 = no waiting (immediate 429).": "Сколько запросов могут ждать. 0 = без ожидания (сразу 429).",
     "Queue wait timeout (seconds)": "Таймаут ожидания (сек.)",
-    "Requests still queued after this long are rejected with 429.": "Запросы, ожидающие дольше, получают 429."
+    "Requests still queued after this long are rejected with 429.": "Запросы, ожидающие дольше, получают 429.",
+    "Reset all check-in records": "Сбросить все записи посещений",
+    "Reset all check-in records? Users can check in again.": "Сбросить все записи посещений? Пользователи смогут отметиться снова.",
+    "Check-in records reset ({{count}} deleted)": "Записи посещений сброшены ({{count}} удалено)",
+    "Failed to reset check-in records": "Не удалось сбросить записи посещений",
+    "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Очищает историю посещений всех пользователей, чтобы они могли отметиться снова.",
+    "Resetting…": "Сброс…",
+    "You are site member #{{id}}": "Вы — участник сайта №{{id}}"
   }
 }

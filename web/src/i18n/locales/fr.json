@@ -6304,6 +6304,13 @@
     "Queue capacity": "Capacité de file",
     "How many requests may wait in line. 0 = no waiting (immediate 429).": "Combien de requêtes peuvent attendre. 0 = pas d'attente (429 immédiat).",
     "Queue wait timeout (seconds)": "Délai d'attente (secondes)",
-    "Requests still queued after this long are rejected with 429.": "Les requêtes toujours en file après ce délai renvoient 429."
+    "Requests still queued after this long are rejected with 429.": "Les requêtes toujours en file après ce délai renvoient 429.",
+    "Reset all check-in records": "Réinitialiser tous les enregistrements de présence",
+    "Reset all check-in records? Users can check in again.": "Réinitialiser tous les enregistrements ? Les utilisateurs pourront à nouveau se présenter.",
+    "Check-in records reset ({{count}} deleted)": "Enregistrements réinitialisés ({{count}} supprimés)",
+    "Failed to reset check-in records": "Échec de la réinitialisation",
+    "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Efface l'historique de présence de tous les utilisateurs pour qu'ils puissent à nouveau se présenter.",
+    "Resetting…": "Réinitialisation…",
+    "You are site member #{{id}}": "Vous êtes le membre n°{{id}} du site"
   }
 }

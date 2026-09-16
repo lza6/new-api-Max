@@ -6354,7 +6354,14 @@
     "Queue capacity": "队列容量",
     "How many requests may wait in line. 0 = no waiting (immediate 429).": "最多可排队等待的请求数。0 = 不排队（直接 429）。",
     "Queue wait timeout (seconds)": "排队等待超时（秒）",
-    "Requests still queued after this long are rejected with 429.": "排队超过该时长仍未获得并发的请求将返回 429。"
+    "Requests still queued after this long are rejected with 429.": "排队超过该时长仍未获得并发的请求将返回 429。",
+    "Reset all check-in records": "重置所有签到记录",
+    "Reset all check-in records? Users can check in again.": "重置所有签到记录？用户将可重新签到。",
+    "Check-in records reset ({{count}} deleted)": "签到记录已重置（删除 {{count}} 条）",
+    "Failed to reset check-in records": "重置签到记录失败",
+    "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "清空所有用户的签到历史，让每个人都能重新签到（例如作为一次性福利）。",
+    "Resetting…": "重置中…",
+    "You are site member #{{id}}": "您是本站第 {{id}} 位开发者"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "新用户获得的 {{currency}} 金额（= {{formattedQuota}}）",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "邀请他人的用户获得的 {{currency}} 金额（= {{formattedQuota}}）",

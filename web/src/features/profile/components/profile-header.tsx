@@ -137,9 +137,10 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
                 variant='neutral'
                 copyable={false}
               />
+              {/* P2：注册序号鼓励话术（第 N 位开发者/用户）；点击可复制 ID */}
               <StatusBadge
-                label={`${t('User ID')} ${profile.id}`}
-                variant='info'
+                label={t('You are site member #{{id}}', { id: profile.id })}
+                variant='success'
                 copyText={String(profile.id)}
               />
             </div>

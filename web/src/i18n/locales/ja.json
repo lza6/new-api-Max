@@ -6304,6 +6304,13 @@
     "Queue capacity": "キューの容量",
     "How many requests may wait in line. 0 = no waiting (immediate 429).": "待機できるリクエスト数。0 = 待機なし（即429）。",
     "Queue wait timeout (seconds)": "待機タイムアウト（秒）",
-    "Requests still queued after this long are rejected with 429.": "この時間を超えても並列を取得できないリクエストは429になります。"
+    "Requests still queued after this long are rejected with 429.": "この時間を超えても並列を取得できないリクエストは429になります。",
+    "Reset all check-in records": "すべてのチェックイン記録をリセット",
+    "Reset all check-in records? Users can check in again.": "すべてのチェックイン記録をリセットしますか？ユーザーは再度チェックインできます。",
+    "Check-in records reset ({{count}} deleted)": "チェックイン記録をリセット（{{count}} 件削除）",
+    "Failed to reset check-in records": "チェックイン記録のリセットに失敗",
+    "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "全ユーザーのチェックイン履歴を消去し、再度チェックインできるようにします。",
+    "Resetting…": "リセット中…",
+    "You are site member #{{id}}": "あなたはサイトの {{id}} 番目のメンバーです"
   }
 }

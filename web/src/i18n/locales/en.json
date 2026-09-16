@@ -6354,7 +6354,14 @@
     "Queue capacity": "Queue capacity",
     "How many requests may wait in line. 0 = no waiting (immediate 429).": "How many requests may wait in line. 0 = no waiting (immediate 429).",
     "Queue wait timeout (seconds)": "Queue wait timeout (seconds)",
-    "Requests still queued after this long are rejected with 429.": "Requests still queued after this long are rejected with 429."
+    "Requests still queued after this long are rejected with 429.": "Requests still queued after this long are rejected with 429.",
+    "Reset all check-in records": "Reset all check-in records",
+    "Reset all check-in records? Users can check in again.": "Reset all check-in records? Users can check in again.",
+    "Check-in records reset ({{count}} deleted)": "Check-in records reset ({{count}} deleted)",
+    "Failed to reset check-in records": "Failed to reset check-in records",
+    "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).",
+    "Resetting…": "Resetting…",
+    "You are site member #{{id}}": "You are site member #{{id}}"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

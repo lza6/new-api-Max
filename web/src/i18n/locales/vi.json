@@ -6304,6 +6304,13 @@
     "Queue capacity": "Dung lượng hàng đợi",
     "How many requests may wait in line. 0 = no waiting (immediate 429).": "Số yêu cầu được chờ. 0 = không chờ (429 ngay).",
     "Queue wait timeout (seconds)": "Thời gian chờ (giây)",
-    "Requests still queued after this long are rejected with 429.": "Yêu cầu vẫn chờ sau thời gian này sẽ trả về 429."
+    "Requests still queued after this long are rejected with 429.": "Yêu cầu vẫn chờ sau thời gian này sẽ trả về 429.",
+    "Reset all check-in records": "Đặt lại tất cả lịch sử điểm danh",
+    "Reset all check-in records? Users can check in again.": "Đặt lại tất cả lịch sử điểm danh? Người dùng có thể điểm danh lại.",
+    "Check-in records reset ({{count}} deleted)": "Đã đặt lại lịch sử điểm danh ({{count}} đã xóa)",
+    "Failed to reset check-in records": "Đặt lại lịch sử điểm danh thất bại",
+    "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Xóa lịch sử điểm danh của mọi người để họ có thể điểm danh lại.",
+    "Resetting…": "Đang đặt lại…",
+    "You are site member #{{id}}": "Bạn là thành viên thứ {{id}} của trang"
   }
 }
