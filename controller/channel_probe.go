@@ -139,7 +139,27 @@ func (probeScheduledChannelsHandler) NewPayload() any { return nil }
 
 func (probeScheduledChannelsHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
 	summary := runScheduledProbeOnce(ctx)
+	// B4-2 失败重试 1 次：首轮有渠道探测失败（被跳过/得分 F）时立即补跑一轮，
+	// 第二轮无论结果如何都记为成功（防无限重试）。失败原因已留在渠道 probe_result。
+	if n := retryableProbeFailures(summary); n > 0 {
+		common.SysLog(fmt.Sprintf("scheduled probe retry: %d channel(s) failed in first round", n))
+		retry := runScheduledProbeOnce(ctx)
+		summary["first_round_failed"] = n
+		summary["retried"] = true
+		for k, v := range retry {
+			if _, exists := summary[k]; !exists {
+				summary[k] = v
+			}
+		}
+	}
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+// retryableProbeFailures 统计首轮需重试的渠道数：探测被跳过（配置缺失）
+// 或整轮 Grade F（渠道疑似不可用）视为可重试失败。
+func retryableProbeFailures(summary map[string]any) int {
+	failed, _ := summary["failed"].(int)
+	return failed
 }
 
 // runScheduledProbeOnce 对所有「到期」的 OpenAI 兼容渠道各跑一轮探测。
@@ -148,7 +168,7 @@ func runScheduledProbeOnce(ctx context.Context) map[string]any {
 	if err != nil {
 		return map[string]any{"error": err.Error()}
 	}
-	probed, skipped, unsupported := 0, 0, 0
+	probed, skipped, unsupported, failed := 0, 0, 0, 0
 	for _, ch := range channels {
 		if ctx.Err() != nil {
 			break
@@ -167,11 +187,17 @@ func runScheduledProbeOnce(ctx context.Context) map[string]any {
 			_ = model.SaveChannelProbeResult(ch.Id, string(reportJSON))
 		}
 		probed++
+		// B4-2 失败判定：整轮被跳过（无探测模型）或 Grade F（渠道疑似不可用）
+		// 计入 failed，触发调度重试一轮。
+		if report.Skipped != "" || report.Grade == probe.GradeF {
+			failed++
+		}
 	}
 	summary := map[string]any{
 		"probed":      probed,
 		"not_due":     skipped,
 		"unsupported": unsupported,
+		"failed":      failed,
 	}
 	common.SysLog(fmt.Sprintf("scheduled channel probe done: %+v", summary))
 	return summary

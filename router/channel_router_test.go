@@ -48,3 +48,9 @@ func assertChannelRoutePermission(t *testing.T, method string, path string, perm
 	}
 	t.Fatalf("route %s %s not found", method, path)
 }
+
+// TestProbeRoutesUseCorrectPermissions B4-2：探测/结果接口权限校验。
+func TestProbeRoutesUseCorrectPermissions(t *testing.T) {
+	assertChannelRoutePermission(t, http.MethodPost, "/probe/:id", authz.ChannelOperate, controller.ProbeChannel)
+	assertChannelRoutePermission(t, http.MethodGet, "/probe_result/:id", authz.ChannelRead, controller.GetChannelProbeResult)
+}
