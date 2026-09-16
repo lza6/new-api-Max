@@ -71,3 +71,25 @@ grade=F score=25/100
 ```
 
 结论：六维 100 分制 A-F 分级真实可用，良=A、劣=F，符合 B4-1 验收。
+
+## 7. B6-2 五类错误→人话映射（真实 E2E）
+
+后端归一化（真实上游错误 → 稳定 error.type）：
+```
+e-badkey    HTTP 401  type=key_invalid
+e-overquota HTTP 403  type=insufficient_quota   ← 403 单独区分，不误判为坏 key
+e-ratelimit HTTP 429  type=rate_limited
+e-updown    HTTP 502  type=upstream_unavailable
+e-content   HTTP 400  type=content_filtered     ← content_filter 变体归一
+```
+
+前端人话映射（friendly-error-mapping 同源 regex）：
+```
+e-badkey    → "The key is invalid or expired. Please rotate it on the channels page."
+e-overquota → "Insufficient quota. Please top up or redeem a quota card."
+e-ratelimit → "Too many requests. Please try again later."
+e-updown    → "The upstream service is temporarily unavailable. Please try again later."
+e-content   → "The content was blocked by a safety policy."
+```
+结果：5/5 类错误全部命中人话首行。关键修复：getFriendlyErrorMessage 读取
+response.data.error.type 稳定枚举 + 403 超额单独归 insufficient_quota。
