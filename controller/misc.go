@@ -126,6 +126,8 @@ func GetStatus(c *gin.Context) {
 		"user_agreement_enabled":      legalSetting.UserAgreement != "",
 		"privacy_policy_enabled":      legalSetting.PrivacyPolicy != "",
 		"checkin_enabled":             operation_setting.GetCheckinSetting().Enabled,
+		// T6 全局并发桶水位（开关/当前并发/排队数/上限），供前端展示。
+		"global_concurrency": middleware.GetGlobalConcurrencyStats(),
 	}
 
 	// 根据启用状态注入可选内容

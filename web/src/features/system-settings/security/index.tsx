@@ -42,6 +42,10 @@ const defaultSecuritySettings: SecuritySettings = {
   'fetch_setting.allowed_ports': [],
   'fetch_setting.apply_ip_filter_for_domain': false,
   'token_setting.max_user_tokens': 1000,
+  'relay.global_concurrency_enabled': false,
+  'relay.global_concurrency_limit': 0,
+  'relay.global_concurrency_queue': 1000,
+  'relay.global_concurrency_wait_timeout': 30,
 }
 
 export function SecuritySettings() {

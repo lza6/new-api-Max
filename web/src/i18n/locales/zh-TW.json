@@ -6293,6 +6293,17 @@
     "RPM (per minute)": "每分鐘請求數 (RPM)",
     "QPS (per second)": "每秒請求數 (QPS)",
     "Concurrency": "並發數",
-    "Per-key rate limits. Empty means inherit global / group limits.": "單金鑰限速。留空表示繼承全域 / 分組限制。"
+    "Per-key rate limits. Empty means inherit global / group limits.": "單金鑰限速。留空表示繼承全域 / 分組限制。",
+    "Global Concurrency Bucket": "全域並發桶",
+    "Limit how many model requests the whole gateway processes at once. Extra requests wait in a bounded queue instead of being rejected.": "限制整個網關同時處理的模型請求數。超出上限的請求進入有界佇列排隊等待，而不是直接拒絕。",
+    "Current load": "目前負載",
+    "Enable global concurrency bucket": "開啟全域並發桶",
+    "When enabled, the gateway queues excess requests instead of overloading the upstream. Disabled by default.": "開啟後，網關會排隊超出上限的請求，避免壓垮上游。預設關閉。",
+    "Concurrency limit": "並發上限",
+    "Max in-flight requests processed at once. 0 = unlimited (bucket off).": "同時處理中的最大請求數。0 = 不限制（關閉桶）。",
+    "Queue capacity": "佇列容量",
+    "How many requests may wait in line. 0 = no waiting (immediate 429).": "最多可排隊等待的請求數。0 = 不排隊（直接 429）。",
+    "Queue wait timeout (seconds)": "排隊等待逾時（秒）",
+    "Requests still queued after this long are rejected with 429.": "排隊超過該時長仍未獲得並發的請求將回傳 429。"
   }
 }

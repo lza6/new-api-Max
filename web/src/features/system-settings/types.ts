@@ -391,6 +391,11 @@ export type SecuritySettings = {
   'fetch_setting.allowed_ports': number[]
   'fetch_setting.apply_ip_filter_for_domain': boolean
   'token_setting.max_user_tokens': number
+  // T6 全局并发桶（relay 设置块，relay.* 前缀）
+  'relay.global_concurrency_enabled': boolean
+  'relay.global_concurrency_limit': number
+  'relay.global_concurrency_queue': number
+  'relay.global_concurrency_wait_timeout': number
 }
 
 export type UpstreamChannel = {

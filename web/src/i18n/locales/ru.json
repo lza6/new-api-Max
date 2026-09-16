@@ -6293,6 +6293,17 @@
     "RPM (per minute)": "RPM (в минуту)",
     "QPS (per second)": "QPS (в секунду)",
     "Concurrency": "Параллельность",
-    "Per-key rate limits. Empty means inherit global / group limits.": "Ограничения по ключу. Пусто = наследовать глобальные / групповые."
+    "Per-key rate limits. Empty means inherit global / group limits.": "Ограничения по ключу. Пусто = наследовать глобальные / групповые.",
+    "Global Concurrency Bucket": "Глобальный бакет параллельности",
+    "Limit how many model requests the whole gateway processes at once. Extra requests wait in a bounded queue instead of being rejected.": "Ограничивает запросы моделей, обрабатываемые одновременно. Излишки ожидают в ограниченной очереди.",
+    "Current load": "Текущая нагрузка",
+    "Enable global concurrency bucket": "Включить глобальный бакет",
+    "When enabled, the gateway queues excess requests instead of overloading the upstream. Disabled by default.": "При включении избыточные запросы становятся в очередь вместо перегрузки апстрима.",
+    "Concurrency limit": "Лимит параллельности",
+    "Max in-flight requests processed at once. 0 = unlimited (bucket off).": "Макс. одновременно обрабатываемых. 0 = без ограничений.",
+    "Queue capacity": "Емкость очереди",
+    "How many requests may wait in line. 0 = no waiting (immediate 429).": "Сколько запросов могут ждать. 0 = без ожидания (сразу 429).",
+    "Queue wait timeout (seconds)": "Таймаут ожидания (сек.)",
+    "Requests still queued after this long are rejected with 429.": "Запросы, ожидающие дольше, получают 429."
   }
 }

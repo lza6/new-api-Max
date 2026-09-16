@@ -6293,6 +6293,17 @@
     "RPM (per minute)": "RPM (par minute)",
     "QPS (per second)": "QPS (par seconde)",
     "Concurrency": "Concurrence",
-    "Per-key rate limits. Empty means inherit global / group limits.": "Limites par clé. Vide = hériter des limites globales / de groupe."
+    "Per-key rate limits. Empty means inherit global / group limits.": "Limites par clé. Vide = hériter des limites globales / de groupe.",
+    "Global Concurrency Bucket": "Bascule de concurrence globale",
+    "Limit how many model requests the whole gateway processes at once. Extra requests wait in a bounded queue instead of being rejected.": "Limite le nombre de requêtes de modèles traitées simultanément. Les requêtes en excès attendent dans une file bornée.",
+    "Current load": "Charge actuelle",
+    "Enable global concurrency bucket": "Activer le bucket global",
+    "When enabled, the gateway queues excess requests instead of overloading the upstream. Disabled by default.": "Une fois activé, le passarelle met en file les requêtes en excès au lieu de surcharger l'amont.",
+    "Concurrency limit": "Limite de concurrence",
+    "Max in-flight requests processed at once. 0 = unlimited (bucket off).": "Requêtes simultanées max. 0 = illimité (bucket désactivé).",
+    "Queue capacity": "Capacité de file",
+    "How many requests may wait in line. 0 = no waiting (immediate 429).": "Combien de requêtes peuvent attendre. 0 = pas d'attente (429 immédiat).",
+    "Queue wait timeout (seconds)": "Délai d'attente (secondes)",
+    "Requests still queued after this long are rejected with 429.": "Les requêtes toujours en file après ce délai renvoient 429."
   }
 }

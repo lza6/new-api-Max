@@ -6293,6 +6293,17 @@
     "RPM (per minute)": "RPM (mỗi phút)",
     "QPS (per second)": "QPS (mỗi giây)",
     "Concurrency": "Đồng thời",
-    "Per-key rate limits. Empty means inherit global / group limits.": "Giới hạn theo khóa. Để trống = thừa hưởng giới hạn toàn cục / nhóm."
+    "Per-key rate limits. Empty means inherit global / group limits.": "Giới hạn theo khóa. Để trống = thừa hưởng giới hạn toàn cục / nhóm.",
+    "Global Concurrency Bucket": "Bộ giới hạn đồng thời toàn cục",
+    "Limit how many model requests the whole gateway processes at once. Extra requests wait in a bounded queue instead of being rejected.": "Giới hạn số yêu cầu mô hình được xử lý đồng thời. Dư thừa sẽ chờ trong hàng đợi giới hạn.",
+    "Current load": "Tải hiện tại",
+    "Enable global concurrency bucket": "Bật bộ giới hạn đồng thời toàn cục",
+    "When enabled, the gateway queues excess requests instead of overloading the upstream. Disabled by default.": "Khi bật, cổng sẽ xếp hàng đợi yêu cầu dư thừa thay vì làm quá tải thượng nguồn.",
+    "Concurrency limit": "Giới hạn đồng thời",
+    "Max in-flight requests processed at once. 0 = unlimited (bucket off).": "Số yêu cầu xử lý đồng thời tối đa. 0 = không giới hạn.",
+    "Queue capacity": "Dung lượng hàng đợi",
+    "How many requests may wait in line. 0 = no waiting (immediate 429).": "Số yêu cầu được chờ. 0 = không chờ (429 ngay).",
+    "Queue wait timeout (seconds)": "Thời gian chờ (giây)",
+    "Requests still queued after this long are rejected with 429.": "Yêu cầu vẫn chờ sau thời gian này sẽ trả về 429."
   }
 }

@@ -20,6 +20,7 @@ import { RateLimitSection } from '../request-limits/rate-limit-section'
 import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
+import { GlobalConcurrencySection } from '../request-limits/global-concurrency-section'
 import type { SecuritySettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
 
@@ -37,6 +38,20 @@ const SECURITY_SECTIONS = [
           ModelRequestRateLimitDurationMinutes:
             settings.ModelRequestRateLimitDurationMinutes,
           ModelRequestRateLimitGroup: settings.ModelRequestRateLimitGroup,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'global-concurrency',
+    titleKey: 'Global Concurrency Bucket',
+    build: (settings: SecuritySettings) => (
+      <GlobalConcurrencySection
+        defaultValues={{
+          enabled: settings['relay.global_concurrency_enabled'],
+          limit: settings['relay.global_concurrency_limit'],
+          queue: settings['relay.global_concurrency_queue'],
+          waitTimeout: settings['relay.global_concurrency_wait_timeout'],
         }}
       />
     ),

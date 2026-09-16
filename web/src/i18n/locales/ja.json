@@ -6293,6 +6293,17 @@
     "RPM (per minute)": "RPM (毎分)",
     "QPS (per second)": "QPS (毎秒)",
     "Concurrency": "並列数",
-    "Per-key rate limits. Empty means inherit global / group limits.": "キーごとのレート制限。空欄はグローバル / グループの制限を継承。"
+    "Per-key rate limits. Empty means inherit global / group limits.": "キーごとのレート制限。空欄はグローバル / グループの制限を継承。",
+    "Global Concurrency Bucket": "グローバル並列バケット",
+    "Limit how many model requests the whole gateway processes at once. Extra requests wait in a bounded queue instead of being rejected.": "ゲートウェイが同時に処理するモデルリクエスト数を制限します。超過分は有界キューで待機します。",
+    "Current load": "現在の負荷",
+    "Enable global concurrency bucket": "グローバル並列バケットを有効化",
+    "When enabled, the gateway queues excess requests instead of overloading the upstream. Disabled by default.": "有効にすると、超過リクエストは上流を圧迫せずキューで待機します。",
+    "Concurrency limit": "並列上限",
+    "Max in-flight requests processed at once. 0 = unlimited (bucket off).": "同時処理する最大リクエスト数。0 = 無制限（無効）。",
+    "Queue capacity": "キューの容量",
+    "How many requests may wait in line. 0 = no waiting (immediate 429).": "待機できるリクエスト数。0 = 待機なし（即429）。",
+    "Queue wait timeout (seconds)": "待機タイムアウト（秒）",
+    "Requests still queued after this long are rejected with 429.": "この時間を超えても並列を取得できないリクエストは429になります。"
   }
 }
