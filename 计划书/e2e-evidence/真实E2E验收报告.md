@@ -93,3 +93,20 @@ e-content   → "The content was blocked by a safety policy."
 ```
 结果：5/5 类错误全部命中人话首行。关键修复：getFriendlyErrorMessage 读取
 response.data.error.type 稳定枚举 + 403 超额单独归 insufficient_quota。
+
+## 8. B6-2 浏览器真实 UI 验证（Playwright 实机截图×5）
+
+环境：本机网关 + 全新 build 的前端（内含 B6-2 映射），Chrome headless 登录后
+在 Playground 逐模型触发真实错误，sonner toast 首行即人话。
+
+| 模型 | HTTP | error.type | toast 首行（截图） |
+|------|------|-----------|--------------------|
+| e-badkey | 401 | key_invalid | 密钥无效或已过期，请到渠道页轮换。 |
+| e-overquota | 403 | insufficient_quota | 额度不足，请充值或兑换额度卡。 |
+| e-ratelimit | 429 | rate_limited | 请求过于频繁，请稍后再试。 |
+| e-updown | 502 | upstream_unavailable | 上游服务暂不可用，请稍后再试。 |
+| e-content | 400 | content_filtered | 内容被安全策略拦截。 |
+
+结果：**5/5 类错误浏览器 toast 首行均为翻译后人话**（截图见 `b6-2/*.png`）。
+补充：正则表扩 `insufficient balance` / `safety|moderation` 变体，仅 message
+无 error.type 时同样命中；zh-TW/fr/ja/ru/vi 补齐 5 条人话翻译。

@@ -448,16 +448,15 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		if types.IsChannelError(err) {
 			break
 		}
-		// 401/407 = 密钥无效；403 多为超额/权限（上游 message 带 quota 语义时归
-		// insufficient_quota，否则保持原 errorCode，避免把超额误判为坏 key）。
+		// 401/407 = 密钥无效；403 统一归为 insufficient_quota。上游 403 的语义
+		// 几乎都是余额/额度不足（如 "Insufficient balance"），而归为 key_invalid
+		// 会误导用户去换 key；401 才是真正的坏 key。规则保持确定性，不依赖
+		// 上游易变文案，便于前端按 error.type 直接映射人话。
 		switch err.StatusCode {
 		case http.StatusUnauthorized, http.StatusProxyAuthRequired:
 			err.SetErrorCode(types.ErrorCodeKeyInvalid)
 		case http.StatusForbidden:
-			code := string(err.GetErrorCode())
-			if code == "" || strings.Contains(code, "quota") || strings.Contains(code, "insufficient") {
-				err.SetErrorCode(types.ErrorCodeInsufficientQuota)
-			}
+			err.SetErrorCode(types.ErrorCodeInsufficientQuota)
 		}
 	case service.ErrClassRateLimited:
 		err.SetErrorCode(types.ErrorCodeRateLimited)

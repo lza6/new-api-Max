@@ -153,11 +153,11 @@ function messageText(value: unknown): string | undefined {
 // B6-2 错误码→人话映射：按序匹配，命中即用友好文案替换技术性消息首行。
 // 顺序即优先级：额度 → 密钥 → 限流 → 上游 → 内容安全。
 const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = [
-  { pattern: /insufficient[_ ]?quota|quota/i, messageKey: 'Insufficient quota. Please top up or redeem a quota card.' },
+  { pattern: /insufficient[_ ]?(quota|balance|credit)|quota/i, messageKey: 'Insufficient quota. Please top up or redeem a quota card.' },
   { pattern: /key[_ ]?invalid|invalid[_ ]?api[_ ]?key|\b401\b/i, messageKey: 'The key is invalid or expired. Please rotate it on the channels page.' },
   { pattern: /rate[_ ]?limit|\b429\b/i, messageKey: 'Too many requests. Please try again later.' },
   { pattern: /upstream|bad[_ ]?gateway|\b502\b|\b503\b/i, messageKey: 'The upstream service is temporarily unavailable. Please try again later.' },
-  { pattern: /content[_ ]?filter|content[_ ]?policy/i, messageKey: 'The content was blocked by a safety policy.' },
+  { pattern: /content[_ ]?(filter|policy)|safety|moderation|prompt[_ ]?block/i, messageKey: 'The content was blocked by a safety policy.' },
 ]
 
 /**

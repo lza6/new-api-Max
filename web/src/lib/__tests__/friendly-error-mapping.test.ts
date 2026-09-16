@@ -83,4 +83,18 @@ describe('getFriendlyErrorMessage (B6-2)', () => {
       getFriendlyErrorMessage({ response: { data: { message: '401 Unauthorized' } } })
     ).toBe(FRIENDLY_KEYS[1])
   })
+
+  // B6-2 E2E 真实上游文案：只有 message（无 type）时也须命中人话。
+  test('matches raw upstream messages without error.type', () => {
+    const cases: Array<[string, string]> = [
+      ['Insufficient balance', FRIENDLY_KEYS[0]],
+      ['content was filtered by safety system', FRIENDLY_KEYS[4]],
+      ['prompt was blocked by moderation', FRIENDLY_KEYS[4]],
+    ]
+    for (const [message, expected] of cases) {
+      expect(
+        getFriendlyErrorMessage({ response: { data: { error: { message } } } })
+      ).toBe(expected)
+    }
+  })
 })

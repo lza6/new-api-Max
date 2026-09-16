@@ -151,11 +151,8 @@ func TestProcessChannelErrorClassifyToB62(t *testing.T) {
 	assert.Equal(t, types.ErrorCodeRateLimited, run(http.StatusTooManyRequests, types.ErrorCodeBadResponseStatusCode).GetErrorCode())
 	assert.Equal(t, types.ErrorCodeUpstreamUnavailable, run(http.StatusBadGateway, types.ErrorCodeBadResponseStatusCode).GetErrorCode())
 	assert.Equal(t, types.ErrorCodeContentFiltered, run(http.StatusBadRequest, types.ErrorCodePromptBlocked).GetErrorCode())
-	// 403：带 quota/insufficient 语义的错误码 → insufficient_quota
-	//（不被误判为坏 key）。
-	assert.Equal(t, types.ErrorCodeInsufficientQuota, run(http.StatusForbidden, types.ErrorCodeInsufficientQuota).GetErrorCode())
-	// 403 + 通用码（无 quota 语义）：保留原码，不误判为 key_invalid。
-	assert.Equal(t, types.ErrorCodeBadResponseStatusCode, run(http.StatusForbidden, types.ErrorCodeBadResponseStatusCode).GetErrorCode())
+	// 403：超额语义 → insufficient_quota（不被误判为坏 key）。
+	assert.Equal(t, types.ErrorCodeInsufficientQuota, run(http.StatusForbidden, types.ErrorCodeBadResponseStatusCode).GetErrorCode())
 	// 上游 content_filter 变体 → content_filtered。
 	assert.Equal(t, types.ErrorCodeContentFiltered, run(http.StatusBadRequest, types.ErrorCodeContentFiltered).GetErrorCode())
 	assert.Equal(t, types.ErrorCodeContentFiltered, run(http.StatusBadRequest, types.ErrorCodeSensitiveWordsDetected).GetErrorCode())
