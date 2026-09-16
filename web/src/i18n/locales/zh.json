@@ -6320,7 +6320,12 @@
     "Zero retention": "零数据保留",
     "Zhipu": "智谱",
     "Zhipu V4": "智谱 V4",
-    "Zoom": "缩放"
+    "Zoom": "缩放",
+    "Created by admin": "管理员创建",
+    "LinuxDo": "LinuxDo",
+    "OAuth / OIDC": "OAuth / OIDC",
+    "Sign Up Method": "注册方式",
+    "Sign up with password": "密码注册"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "新用户获得的 {{currency}} 金额（= {{formattedQuota}}）",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "邀请他人的用户获得的 {{currency}} 金额（= {{formattedQuota}}）",

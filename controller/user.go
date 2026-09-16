@@ -277,6 +277,7 @@ func Register(c *gin.Context) {
 		DisplayName: user.Username,
 		InviterId:   inviterId,
 		Role:        common.RoleCommonUser, // 明确设置角色为普通用户
+		Source:      model.UserSourcePassword,
 	}
 	if common.EmailVerificationEnabled {
 		cleanUser.Email = user.Email
@@ -992,6 +993,7 @@ func CreateUser(c *gin.Context) {
 		Password:    user.Password,
 		DisplayName: user.DisplayName,
 		Role:        user.Role, // 保持管理员设置的角色
+		Source:      model.UserSourceAdmin,
 	}
 	authzTouched := false
 	if err := model.DB.Transaction(func(tx *gorm.DB) error {

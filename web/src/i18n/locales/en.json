@@ -6320,7 +6320,12 @@
     "Zero retention": "Zero retention",
     "Zhipu": "Zhipu",
     "Zhipu V4": "Zhipu V4",
-    "Zoom": "Zoom"
+    "Zoom": "Zoom",
+    "Created by admin": "Created by admin",
+    "LinuxDo": "LinuxDo",
+    "OAuth / OIDC": "OAuth / OIDC",
+    "Sign Up Method": "Sign Up Method",
+    "Sign up with password": "Sign up with password"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

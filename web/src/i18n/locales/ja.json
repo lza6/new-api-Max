@@ -6270,6 +6270,11 @@
     "Enable Redemption Code Top-Up": "Enable Redemption Code Top-Up",
     "Top-up is currently disabled": "Top-up is currently disabled",
     "Master switch for online payment and subscription top-up channels. When off, users cannot pay online. Redemption codes are controlled by the switch below.": "Master switch for online payment and subscription top-up channels. When off, users cannot pay online. Redemption codes are controlled by the switch below.",
-    "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes.": "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes."
+    "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes.": "Allow users to redeem quota codes. This switch is independent of online top-up. Administrators can always generate codes.",
+    "Created by admin": "管理者により作成",
+    "LinuxDo": "LinuxDo",
+    "OAuth / OIDC": "OAuth / OIDC",
+    "Sign Up Method": "登録方法",
+    "Sign up with password": "パスワード登録"
   }
 }

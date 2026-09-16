@@ -483,6 +483,8 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 	}
 	user.Role = common.RoleCommonUser
 	user.Status = common.UserStatusEnabled
+	// B6-x：记录注册来源（provider slug → User.Source），供用户管理页展示。
+	user.Source = oauthSourceForProvider(provider)
 
 	// Handle affiliate code
 	inviterId := 0
@@ -556,6 +558,33 @@ type OAuthUserDeletedError struct{}
 
 func (e *OAuthUserDeletedError) Error() string {
 	return "user has been deleted"
+}
+
+// oauthSourceForProvider 把 OAuth provider 映射为 User.Source 的稳定取值。
+// 自定义 provider 用其 slug（无法枚举例外），内置 provider 映射到固定枚举。
+func oauthSourceForProvider(p oauth.Provider) string {
+	if g, ok := p.(*oauth.GenericOAuthProvider); ok {
+		if cfg := g.GetConfig(); cfg != nil && cfg.Slug != "" {
+			return cfg.Slug
+		}
+		return model.UserSourceOIDC
+	}
+	switch p.ProviderUserIDColumn() {
+	case "github_id":
+		return model.UserSourceGithub
+	case "discord_id":
+		return model.UserSourceDiscord
+	case "wechat_id":
+		return model.UserSourceWeChat
+	case "telegram_id":
+		return model.UserSourceTelegram
+	case "linux_do_id":
+		return model.UserSourceLinuxDO
+	case "oidc_id":
+		return model.UserSourceOIDC
+	default:
+		return model.UserSourceOIDC
+	}
 }
 
 type OAuthRegistrationDisabledError struct{}

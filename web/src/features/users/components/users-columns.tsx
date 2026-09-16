@@ -43,6 +43,7 @@ import {
 } from '../constants'
 import type { User } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
+import { SourceBadge } from './source-badge'
 import { UserQuotaCell } from './user-quota-cell'
 
 export function useUsersColumns(): ColumnDef<User>[] {
@@ -279,6 +280,20 @@ export function useUsersColumns(): ColumnDef<User>[] {
       ),
       size: 260,
       minSize: 240,
+      meta: { mobileHidden: true },
+    },
+    {
+      accessorKey: 'source',
+      header: t('Sign Up Method'),
+      cell: ({ row }) => {
+        const source = row.original.source
+        if (!source) {
+          return <span className='text-muted-foreground text-sm'>—</span>
+        }
+        return <SourceBadge source={source} />
+      },
+      size: 140,
+      enableSorting: false,
       meta: { mobileHidden: true },
     },
     {
