@@ -439,13 +439,25 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	// 上游 Retry-After 头未在各 relay 格式保留，暂传 0（按类默认时长冷却）。
 	_, _, errClass := service.ClassifyHTTPStatus(err.StatusCode, "")
 	// B6-2：把上游/渠道错误归一为机器可读 error.type（key_invalid /
-	// rate_limited / upstream_unavailable），与前端人话映射对应。
+	// insufficient_quota / rate_limited / upstream_unavailable /
+	// content_filtered），与前端人话映射对应。
 	// 仅在错误码仍是通道无关的通用码（或空）时改写，保留业务已有分类
 	// （如 channel:invalid_key、channel:no_available_key 等渠道域码）。
 	switch errClass {
 	case service.ErrClassAuth:
-		if !types.IsChannelError(err) {
+		if types.IsChannelError(err) {
+			break
+		}
+		// 401/407 = 密钥无效；403 多为超额/权限（上游 message 带 quota 语义时归
+		// insufficient_quota，否则保持原 errorCode，避免把超额误判为坏 key）。
+		switch err.StatusCode {
+		case http.StatusUnauthorized, http.StatusProxyAuthRequired:
 			err.SetErrorCode(types.ErrorCodeKeyInvalid)
+		case http.StatusForbidden:
+			code := string(err.GetErrorCode())
+			if code == "" || strings.Contains(code, "quota") || strings.Contains(code, "insufficient") {
+				err.SetErrorCode(types.ErrorCodeInsufficientQuota)
+			}
 		}
 	case service.ErrClassRateLimited:
 		err.SetErrorCode(types.ErrorCodeRateLimited)
@@ -454,9 +466,12 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 			err.SetErrorCode(types.ErrorCodeUpstreamUnavailable)
 		}
 	}
-	// 内容安全类错误（提示词被阻断/敏感词命中）归一为 content_filtered。
+	// 内容安全类错误（提示词被阻断/敏感词命中/上游 content_filter 类 type）
+	// 归一为 content_filtered。上游可能用 content_filter/content_filtered 等变体。
+	code := string(err.GetErrorCode())
 	if err.GetErrorCode() == types.ErrorCodePromptBlocked ||
-		err.GetErrorCode() == types.ErrorCodeSensitiveWordsDetected {
+		err.GetErrorCode() == types.ErrorCodeSensitiveWordsDetected ||
+		strings.Contains(code, "content_filter") {
 		err.SetErrorCode(types.ErrorCodeContentFiltered)
 	}
 	latency := time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime))
