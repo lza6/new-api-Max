@@ -6361,7 +6361,8 @@
     "Failed to reset check-in records": "Failed to reset check-in records",
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).",
     "Resetting…": "Resetting…",
-    "You are site member #{{id}}": "You are site member #{{id}}"
+    "You are site member #{{id}}": "You are site member #{{id}}",
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically."
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

@@ -376,7 +376,9 @@ export function EmailSettingsSection({
                   />
                 </FormControl>
                 <FormDescription>
-                  {t('Display name and email used in outgoing messages')}
+                  {t(
+                    'Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.'
+                  )}
                 </FormDescription>
                 <FormMessage />
               </FormItem>

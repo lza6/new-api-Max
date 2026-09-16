@@ -6311,6 +6311,7 @@
     "Failed to reset check-in records": "重置簽到記錄失敗",
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "清空所有使用者的簽到歷史，讓每個人都能重新簽到（例如作為一次性福利）。",
     "Resetting…": "重置中…",
-    "You are site member #{{id}}": "您是本站第 {{id}} 位開發者"
+    "You are site member #{{id}}": "您是本站第 {{id}} 位開發者",
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "寄件人顯示名稱和信箱。留空時自動使用上面的 SMTP 帳號信箱（新手推薦留空）。"
   }
 }

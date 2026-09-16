@@ -11,11 +11,16 @@ import (
 )
 
 func generateMessageID() (string, error) {
-	split := strings.Split(SMTPFrom, "@")
-	if len(split) < 2 {
-		return "", fmt.Errorf("invalid SMTP account")
+	from := SMTPFrom
+	if from == "" {
+		// 兼容：SMTPFrom 未单独配置时用账号邮箱做发件人，减少新手配置项。
+		from = SMTPAccount
 	}
-	domain := strings.Split(SMTPFrom, "@")[1]
+	split := strings.Split(from, "@")
+	if len(split) < 2 || split[1] == "" {
+		return "", fmt.Errorf("invalid SMTP account: SMTPFrom / SMTPAccount 需要是完整的邮箱地址（例如 you@example.com）")
+	}
+	domain := strings.Split(from, "@")[1]
 	return fmt.Sprintf("<%d.%s@%s>", time.Now().UnixNano(), GetRandomString(12), domain), nil
 }
 

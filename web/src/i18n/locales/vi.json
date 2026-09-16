@@ -6311,6 +6311,7 @@
     "Failed to reset check-in records": "Đặt lại lịch sử điểm danh thất bại",
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Xóa lịch sử điểm danh của mọi người để họ có thể điểm danh lại.",
     "Resetting…": "Đang đặt lại…",
-    "You are site member #{{id}}": "Bạn là thành viên thứ {{id}} của trang"
+    "You are site member #{{id}}": "Bạn là thành viên thứ {{id}} của trang",
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "Tên và email hiển thị trong thư gửi đi. Để trống sẽ tự dùng tài khoản SMTP."
   }
 }

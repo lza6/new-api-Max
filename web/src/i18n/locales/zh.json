@@ -6361,7 +6361,8 @@
     "Failed to reset check-in records": "重置签到记录失败",
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "清空所有用户的签到历史，让每个人都能重新签到（例如作为一次性福利）。",
     "Resetting…": "重置中…",
-    "You are site member #{{id}}": "您是本站第 {{id}} 位开发者"
+    "You are site member #{{id}}": "您是本站第 {{id}} 位开发者",
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "发件人显示名称和邮箱。留空时自动使用上面的 SMTP 账号邮箱（新手推荐留空）。"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "新用户获得的 {{currency}} 金额（= {{formattedQuota}}）",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "邀请他人的用户获得的 {{currency}} 金额（= {{formattedQuota}}）",

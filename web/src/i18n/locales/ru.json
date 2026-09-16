@@ -6311,6 +6311,7 @@
     "Failed to reset check-in records": "Не удалось сбросить записи посещений",
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Очищает историю посещений всех пользователей, чтобы они могли отметиться снова.",
     "Resetting…": "Сброс…",
-    "You are site member #{{id}}": "Вы — участник сайта №{{id}}"
+    "You are site member #{{id}}": "Вы — участник сайта №{{id}}",
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "Имя и почта исходящих писем. Оставьте пустым, чтобы использовать SMTP-аккаунт."
   }
 }
