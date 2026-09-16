@@ -186,3 +186,21 @@ describe('getProbeResults', () => {
     ).toEqual([])
   })
 })
+
+// B5-2：toHealthSnapshotView 透传 last_cool_class → lastCoolClass。
+test('maps last_cool_class to lastCoolClass for cooling hover reason', () => {
+  const view = toHealthSnapshotView(
+    { '7': { cooling_down: true, cool_until: 1700001000, last_cool_class: 'rate_limited' } } as never,
+    7
+  )
+  expect(view.lastCoolClass).toBe('rate_limited')
+})
+
+// B5-2：缺少 last_cool_class 时 lastCoolClass 为 undefined（老快照兼容）。
+test('leaves lastCoolClass undefined when absent', () => {
+  const view = toHealthSnapshotView(
+    { '8': { cooling_down: true, cool_until: 1700001000 } } as never,
+    8
+  )
+  expect(view.lastCoolClass).toBeUndefined()
+})
