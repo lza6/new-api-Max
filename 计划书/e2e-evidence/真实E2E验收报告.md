@@ -49,3 +49,25 @@ type=2 model=gpt-4o-mini quota=2 prompt=10 completion=5
 ## 5. B6-2 错误归类
 
 - SSRF 拦截错误 → `code:"upstream_unavailable"`（机器可读，前端可人话映射）
+
+## 6. B4-1 渠道验真探测（真实 A-F 分级实证）
+
+触发：`POST /api/channel/probe/{id}`（管理员），真实请求 → 公网 mock 上游。
+
+**良渠道**（正确应答 + 流式多 chunk + usage 自洽 + 缓存）：
+```
+grade=A score=100/100
+  model_identity: true 25   capability: true 20
+  cache: true 20            consistency: true 15
+  stream_integrity: true 10 billing_consistency: true 10
+```
+
+**劣渠道**（答非所问 + 非流式 + usage 打架 + 参数丢弃）：
+```
+grade=F score=25/100
+  model_identity: false 0   capability: false 0  (n=2 → 1 choice)
+  cache: false 10           consistency: true 15
+  stream_integrity: false 0 (单 chunk)  billing_consistency: false 0 (15!=999)
+```
+
+结论：六维 100 分制 A-F 分级真实可用，良=A、劣=F，符合 B4-1 验收。
