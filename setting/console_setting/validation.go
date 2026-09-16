@@ -10,6 +10,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/setting/system_setting"
 )
 
 var (
@@ -141,7 +142,25 @@ func validateApiInfo(apiInfoStr string) error {
 }
 
 func GetApiInfo() []map[string]interface{} {
-	return getJSONList(GetConsoleSetting().ApiInfo)
+	list := getJSONList(GetConsoleSetting().ApiInfo)
+	// T3：未配置任何 API 路由时，按部署地址（system_setting.ServerAddress）
+	// 构造默认条目，避免前端空态"未配置 API 路由"；已配置则原样返回。
+	if len(list) == 0 {
+		base := system_setting.ServerAddress
+		if base == "" {
+			base = "http://localhost:3000"
+		}
+		base = strings.TrimSuffix(base, "/")
+		return []map[string]interface{}{
+			{
+				"url":         base,
+				"route":       "/v1",
+				"description": "OpenAI compatible API base URL",
+				"color":       "blue",
+			},
+		}
+	}
+	return list
 }
 
 func validateAnnouncements(announcementsStr string) error {

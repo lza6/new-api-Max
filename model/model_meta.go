@@ -49,8 +49,11 @@ type Model struct {
 
 	BoundChannels []BoundChannel `json:"bound_channels,omitempty" gorm:"-"`
 	EnableGroups  []string       `json:"enable_groups,omitempty" gorm:"-"`
-	QuotaTypes    []int          `json:"quota_types,omitempty" gorm:"-"`
-	NameRule      int            `json:"name_rule" gorm:"default:0"`
+	// Groups T2 模型分组归类：逗号分隔字符串，说明该模型应归属的分组
+	// （如 "default,free"）。保存时同步到含该模型渠道的 Group 并重建 abilities。
+	Groups     string `json:"groups" gorm:"type:varchar(255);default:'default';column:groups"`
+	QuotaTypes []int  `json:"quota_types,omitempty" gorm:"-"`
+	NameRule   int    `json:"name_rule" gorm:"default:0"`
 
 	MatchedModels []string `json:"matched_models,omitempty" gorm:"-"`
 	MatchedCount  int      `json:"matched_count,omitempty" gorm:"-"`
@@ -265,7 +268,7 @@ func (mi *Model) Update() error {
 		}
 		mi.UpdatedTime = common.GetTimestamp()
 		return tx.Model(&Model{}).Where("id = ?", mi.Id).
-			Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "status", "sync_official", "name_rule", "updated_time").Updates(mi).Error
+			Select("model_name", "description", "icon", "tags", "vendor_id", "endpoints", "status", "sync_official", "name_rule", "groups", "updated_time").Updates(mi).Error
 	})
 }
 

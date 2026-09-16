@@ -45,6 +45,10 @@ export function getApiKeyFormSchema(t: TFunction, maxAutoGroups = 5) {
       auto_groups: z.array(z.string()),
       cross_group_retry: z.boolean().optional(),
       tokenCount: z.number().min(1).optional(),
+      // T5 单密钥限速：非负整数，空 = 不限制。
+      rate_rpm: z.number().int().min(0).optional(),
+      rate_qbs: z.number().int().min(0).optional(),
+      rate_concurrency: z.number().int().min(0).optional(),
     })
     .superRefine((data, ctx) => {
       if (data.group === 'auto') {
@@ -115,6 +119,9 @@ export const API_KEY_FORM_DEFAULT_VALUES: ApiKeyFormValues = {
   auto_groups: [],
   cross_group_retry: true,
   tokenCount: 1,
+  rate_rpm: undefined,
+  rate_qbs: undefined,
+  rate_concurrency: undefined,
 }
 
 export function getApiKeyFormDefaultValues(
@@ -157,7 +164,26 @@ export function transformFormDataToPayload(
         ? data.auto_groups
         : [],
     cross_group_retry: data.group === 'auto' ? !!data.cross_group_retry : false,
+    // T5：rate_limit 字段 → JSON 字符串；全部为空时不写。
+    rate_limit: toRateLimitJson(data.rate_rpm, data.rate_qbs, data.rate_concurrency),
   }
+}
+
+/**
+ * T5：把表单的 rpm/qbs/concurrency 组装为 rate_limit JSON 字符串。
+ * 全为空返回空串（不限制）。
+ */
+export function toRateLimitJson(
+  rpm?: number,
+  qbs?: number,
+  concurrency?: number
+): string {
+  const cfg: Record<string, number> = {}
+  if (rpm && rpm > 0) cfg.rpm = rpm
+  if (qbs && qbs > 0) cfg.qbs = qbs
+  if (concurrency && concurrency > 0) cfg.concurrency = concurrency
+  if (Object.keys(cfg).length === 0) return ''
+  return JSON.stringify(cfg)
 }
 
 /**
@@ -194,5 +220,30 @@ export function transformApiKeyToFormDefaults(
     auto_groups: autoGroups,
     cross_group_retry: !!apiKey.cross_group_retry,
     tokenCount: 1,
+    // T5：从 apiKey.rate_limit JSON 回填表单。
+    ...parseRateLimitForm(apiKey.rate_limit),
+  }
+}
+
+/** T5：把 Token.rate_limit JSON 字符串解析为表单字段（rpm/qbs/concurrency）。 */
+export function parseRateLimitForm(rateLimit?: string | null): {
+  rate_rpm?: number
+  rate_qbs?: number
+  rate_concurrency?: number
+} {
+  if (!rateLimit) return {}
+  try {
+    const cfg = JSON.parse(rateLimit) as {
+      rpm?: number
+      qbs?: number
+      concurrency?: number
+    }
+    return {
+      rate_rpm: cfg.rpm,
+      rate_qbs: cfg.qbs,
+      rate_concurrency: cfg.concurrency,
+    }
+  } catch {
+    return {}
   }
 }

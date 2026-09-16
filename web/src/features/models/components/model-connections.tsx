@@ -16,18 +16,37 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Pencil } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { StaticDataTable } from '@/components/data-table'
 import { EmptyState } from '@/components/empty-state'
 import { GroupBadge } from '@/components/group-badge'
 import { StatusBadge } from '@/components/status-badge'
+import { Button } from '@/components/ui/button'
+import { requireServerSuccess } from '@/lib/server-error-message'
+import { getGroups } from '@/features/users/api'
 
 import type { Model } from '../types'
 import { ModelSquareStatus } from './model-square-status'
+import { ModelGroupsDialog } from './model-groups-dialog'
 
-export function ModelConnections(props: { model: Model }) {
+export function ModelConnections(props: { model: Model; onGroupsSaved?: () => void }) {
   const { t } = useTranslation()
+  const [groupsDialogOpen, setGroupsDialogOpen] = useState(false)
+  const { data: groupsData } = useQuery({
+    queryKey: ['groups'],
+    queryFn: async () => requireServerSuccess(await getGroups()),
+  })
+  const availableGroups = Array.isArray(groupsData?.data)
+    ? (groupsData.data as string[])
+    : []
+  const assignedGroups = props.model.groups
+    ? props.model.groups.split(',').map((g) => g.trim()).filter(Boolean)
+    : (props.model.enable_groups ?? [])
+
   return (
     <div className='min-h-0 flex-1 space-y-6 overflow-auto p-4'>
       <p className='text-muted-foreground text-sm'>
@@ -59,17 +78,33 @@ export function ModelConnections(props: { model: Model }) {
         )}
       </section>
       <section className='space-y-3'>
-        <h3 className='font-medium'>{t('Enable Groups')}</h3>
+        <div className='flex items-center justify-between'>
+          <h3 className='font-medium'>{t('Assigned Groups')}</h3>
+          <Button
+            variant='ghost'
+            size='sm'
+            className='text-muted-foreground h-7 px-2 text-xs'
+            onClick={() => setGroupsDialogOpen(true)}
+          >
+            <Pencil className='size-3.5' aria-hidden />
+            {t('Edit groups')}
+          </Button>
+        </div>
         <div className='flex flex-wrap gap-2'>
-          {props.model.enable_groups?.map((group) => (
+          {assignedGroups.map((group) => (
             <GroupBadge key={group} group={group} />
           ))}
-          {!props.model.enable_groups?.length && (
+          {!assignedGroups.length && (
             <span className='text-muted-foreground text-sm'>
               {t('No enabled groups')}
             </span>
           )}
         </div>
+        <p className='text-muted-foreground/70 text-xs'>
+          {t(
+            'Assign this model to groups (e.g. free for free models, vip for paid models). Saving syncs the groups to channels serving this model and makes it callable under them.'
+          )}
+        </p>
       </section>
       <section className='space-y-3'>
         <h3 className='font-medium'>{t('Supported endpoints')}</h3>
@@ -94,6 +129,15 @@ export function ModelConnections(props: { model: Model }) {
           </div>
         </section>
       )}
+
+      <ModelGroupsDialog
+        open={groupsDialogOpen}
+        onOpenChange={setGroupsDialogOpen}
+        modelName={props.model.model_name}
+        currentGroups={assignedGroups}
+        availableGroups={availableGroups}
+        onSaved={props.onGroupsSaved}
+      />
     </div>
   )
 }

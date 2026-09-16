@@ -29,6 +29,7 @@ import { StaticDataTable } from '@/components/data-table/static/static-data-tabl
 import { StaticRowActions } from '@/components/data-table/static/static-row-actions'
 import { Dialog } from '@/components/dialog'
 import { StatusBadge } from '@/components/status-badge'
+import { useStatus } from '@/hooks/use-status'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -126,6 +127,7 @@ export function ApiInfoSection({ enabled, data }: ApiInfoSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const apiInfoSchema = createApiInfoSchema(t)
+  const { status } = useStatus()
   const parsedApiInfoList = useMemo(() => parseApiInfoList(data), [data])
   const [draftApiInfoList, setDraftApiInfoList] = useState<ApiInfo[] | null>(
     null
@@ -165,8 +167,13 @@ export function ApiInfoSection({ enabled, data }: ApiInfoSectionProps) {
 
   const handleAdd = () => {
     setEditingApiInfo(null)
+    // T3：新增条目默认填当前部署地址，减少手工输入（server_address 优先，
+    // 否则用浏览器 origin）。
+    const serverAddress =
+      (status?.server_address as string | undefined) ??
+      (typeof window !== 'undefined' ? window.location.origin : '')
     form.reset({
-      url: '',
+      url: serverAddress || '',
       route: '',
       description: '',
       color: 'blue',

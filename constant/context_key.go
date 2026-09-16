@@ -15,6 +15,7 @@ const (
 	ContextKeyTokenKey               ContextKey = "token_key"
 	ContextKeyTokenId                ContextKey = "token_id"
 	ContextKeyTokenGroup             ContextKey = "token_group"
+	ContextKeyTokenRateLimit         ContextKey = "token_rate_limit" // T5 单密钥限速 JSON
 	ContextKeyOriginTasks            ContextKey = "origin_tasks"
 	ContextKeyChannelConstraints     ContextKey = "channel_constraints"
 	ContextKeyTokenModelLimitEnabled ContextKey = "token_model_limit_enabled"

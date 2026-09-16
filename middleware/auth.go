@@ -512,6 +512,10 @@ func SetupContextForToken(c *gin.Context, token *model.Token, parts ...string) e
 	}
 	common.SetContextKey(c, constant.ContextKeyTokenGroup, token.Group)
 	common.SetContextKey(c, constant.ContextKeyTokenCrossGroupRetry, token.CrossGroupRetry)
+	// T5：单密钥限速配置进 context，供 TokenRateLimit 中间件读取。
+	if token.RateLimit != "" {
+		common.SetContextKey(c, constant.ContextKeyTokenRateLimit, token.RateLimit)
+	}
 	if token.AutoGroups != "" {
 		autoGroups, err := token.GetAutoGroups()
 		if err != nil {

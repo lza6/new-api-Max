@@ -747,6 +747,90 @@ export function ApiKeysMutateDrawer({
                         </FormItem>
                       )}
                     />
+
+                    {/* T5 单密钥限速：rpm / qbs / concurrency */}
+                    <div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
+                      <FormField
+                        control={form.control}
+                        name='rate_rpm'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('RPM (per minute)')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                min={0}
+                                placeholder='∞'
+                                value={field.value ?? ''}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value === ''
+                                      ? undefined
+                                      : Number(e.target.value)
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name='rate_qbs'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('QPS (per second)')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                min={0}
+                                placeholder='∞'
+                                value={field.value ?? ''}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value === ''
+                                      ? undefined
+                                      : Number(e.target.value)
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name='rate_concurrency'
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('Concurrency')}</FormLabel>
+                            <FormControl>
+                              <Input
+                                type='number'
+                                min={0}
+                                placeholder='∞'
+                                value={field.value ?? ''}
+                                onChange={(e) =>
+                                  field.onChange(
+                                    e.target.value === ''
+                                      ? undefined
+                                      : Number(e.target.value)
+                                  )
+                                }
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                    <p className='text-muted-foreground/70 -mt-1 text-xs'>
+                      {t(
+                        'Per-key rate limits. Empty means inherit global / group limits.'
+                      )}
+                    </p>
                   </div>
                 </CollapsibleContent>
               </SideDrawerSection>

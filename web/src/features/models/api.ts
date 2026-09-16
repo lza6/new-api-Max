@@ -71,6 +71,22 @@ export async function getModel(id: number): Promise<GetModelResponse> {
 }
 
 /**
+ * T2：更新模型的归组归类（写 Model.Groups 并同步到含该模型的渠道 group + 重建
+ * abilities），使该模型在指定分组下真实可用。
+ */
+export async function updateModelGroups(data: {
+  model_name: string
+  groups: string[]
+}): Promise<{
+  success: boolean
+  message?: string
+  data?: { model_name: string; groups: string[]; updated_channels: number }
+}> {
+  const res = await api.post('/api/models/groups', data)
+  return res.data
+}
+
+/**
  * Create new model
  */
 export async function createModel(
