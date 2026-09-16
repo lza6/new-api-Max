@@ -180,6 +180,20 @@ export function getFriendlyErrorMessage(value: unknown): string | null {
       else if (isRecord(data)) {
         if (typeof data.message === 'string') haystacks.push(data.message)
         if (typeof data.code === 'string') haystacks.push(data.code)
+        // B6-2：后端 OpenAI 信封为 {error:{message,type,code}}，type 是
+        // 稳定机器可读枚举（insufficient_quota/key_invalid/rate_limited/
+        // upstream_unavailable/content_filtered），优先读它作为映射来源。
+        if (isRecord(data.error)) {
+          if (typeof data.error.type === 'string') {
+            haystacks.push(data.error.type)
+          }
+          if (typeof data.error.message === 'string') {
+            haystacks.push(data.error.message)
+          }
+          if (typeof data.error.code === 'string') {
+            haystacks.push(data.error.code)
+          }
+        }
       }
     }
   }
