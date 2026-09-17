@@ -1038,6 +1038,17 @@ func TestRecalculate_NegativeDelta(t *testing.T) {
 	// task.Quota updated
 	assert.Equal(t, actualQuota, task.Quota)
 
+	// 差额退款应写入 Task.Data 的 refund 摘要（与 RefundTaskQuota 同一呈现位置）
+	var data map[string]any
+	require.NoError(t, common.Unmarshal(task.Data, &data))
+	refund, ok := data["refund"].(map[string]any)
+	require.True(t, ok)
+	assert.Equal(t, float64(preConsumed-actualQuota), refund["quota"].(float64))
+	assert.Equal(t, "billing_recalculate", refund["reason"])
+	settled, ok := refund["settled_at"].(float64)
+	require.True(t, ok)
+	assert.Greater(t, settled, float64(0))
+
 	// Log type should be Refund
 	log := getLastLog(t)
 	require.NotNil(t, log)

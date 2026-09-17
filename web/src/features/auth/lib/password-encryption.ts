@@ -52,7 +52,10 @@ export async function encryptPassword(
     }
   } catch (error: unknown) {
     clearPasswordEncryptionCache()
-    throw new Error(t('Login failed'), { cause: error })
+    console.error('[auth] password encryption failed', error)
+    throw new Error(t('Password encryption is unavailable. Please try again.'), {
+      cause: error,
+    })
   }
 }
 

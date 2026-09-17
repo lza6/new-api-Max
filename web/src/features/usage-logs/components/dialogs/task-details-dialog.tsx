@@ -125,6 +125,34 @@ function readTaskRefund(data: unknown): { quota: number; reason?: string } | nul
   return { quota, reason: typeof reason === 'string' ? reason : undefined }
 }
 
+/**
+ * 从任务 data 字段读取 unconfirmed 提交标记（B2-2 提交结果不可确认可见性）。
+ * 后端写入 {submit_state, remote_task_id_hint, failed_at, resolution, resolution_at}。
+ */
+function readTaskUnconfirmed(
+  data: unknown
+): {
+  remoteTaskIdHint?: string
+  failedAt?: number
+  resolution?: string
+  resolutionAt?: number
+} | null {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  const record = data as Record<string, unknown>
+  if (record.submit_state !== 'unconfirmed') return null
+  const failedAt = Number(record.failed_at)
+  const resolutionAt = Number(record.resolution_at)
+  const hint = record.remote_task_id_hint
+  const resolution = record.resolution
+  return {
+    remoteTaskIdHint: typeof hint === 'string' ? hint : undefined,
+    failedAt: Number.isFinite(failedAt) && failedAt > 0 ? failedAt : undefined,
+    resolution: typeof resolution === 'string' ? resolution : undefined,
+    resolutionAt:
+      Number.isFinite(resolutionAt) && resolutionAt > 0 ? resolutionAt : undefined,
+  }
+}
+
 interface TaskDetailsDialogProps {
   log: TaskLog
   isAdmin: boolean
@@ -140,6 +168,7 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
   const runtime = access.runtime
   const properties = props.log.properties
   const refund = readTaskRefund(props.log.data)
+  const unconfirmed = readTaskUnconfirmed(props.log.data)
   const structuredProgress = readTaskStructuredProgress(props.log.data)
 
   return (
@@ -242,6 +271,35 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
                 quota: formatLogQuota(refund.quota),
               })}
             />
+          ) : null}
+          {unconfirmed ? (
+            <DetailSection label={t('Unconfirmed')}>
+              <DetailRow
+                label={t('Submission Status')}
+                value={t('The submission result could not be confirmed.')}
+              />
+              {unconfirmed.remoteTaskIdHint ? (
+                <DetailRow
+                  label={t('Remote Task ID Hint')}
+                  value={unconfirmed.remoteTaskIdHint}
+                  mono
+                />
+              ) : null}
+              {unconfirmed.failedAt ? (
+                <DetailRow
+                  label={t('Failed At')}
+                  value={formatTaskTimestamp(unconfirmed.failedAt)}
+                  mono
+                />
+              ) : null}
+              {unconfirmed.resolution ? (
+                <DetailRow
+                  label={t('Resolution')}
+                  value={unconfirmed.resolution}
+                  mono
+                />
+              ) : null}
+            </DetailSection>
           ) : null}
         </DetailSection>
 

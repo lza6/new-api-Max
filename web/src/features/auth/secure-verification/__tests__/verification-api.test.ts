@@ -268,6 +268,16 @@ it.each([true, false])(
   }
 )
 
+it('reports a specific error (not the generic login failure) when password encryption is unavailable', async () => {
+  clearPasswordEncryptionCache()
+  vi.spyOn(api, 'get').mockRejectedValueOnce(
+    new AxiosError('Network Error', 'ERR_NETWORK', undefined, undefined)
+  )
+  await expect(encryptPassword('some-password')).rejects.toThrow(
+    'Password encryption is unavailable. Please try again.'
+  )
+})
+
 it.each(['proof', 'flow'] as const)(
   'never replays a %s request after a 401 response',
   async (kind) => {

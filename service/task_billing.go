@@ -322,6 +322,15 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		logger.LogError(ctx, fmt.Sprintf("差额结算回写 quota 失败 task %s: %s", task.TaskID, err.Error()))
 	}
 
+	// 退款可见性：差额退还同样写入 Task.Data 的 refund 摘要，
+	// 任务详情页据此展示已退回金额（与 RefundTaskQuota 同一呈现位置）。
+	if quotaDelta < 0 {
+		AppendTaskRefundMarker(task, -quotaDelta, "billing_recalculate")
+		if err := task.UpdateDataColumn(); err != nil {
+			logger.LogError(ctx, fmt.Sprintf("差额退款回写 task refund 标记失败 task %s: %s", task.TaskID, err.Error()))
+		}
+	}
+
 	// 提交阶段已经累计过一次请求；结算阶段只调整最终用量。
 	model.UpdateUserUsedQuota(task.UserId, quotaDelta)
 	model.UpdateChannelUsedQuota(task.ChannelId, quotaDelta)
