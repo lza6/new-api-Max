@@ -82,6 +82,7 @@ type webIPState struct {
 }
 
 type webBanCacheEntry struct {
+	banned    bool
 	expiresAt int64
 	checkedAt time.Time
 }
@@ -114,12 +115,16 @@ func webProtectionWindowStart(now time.Time, windowSec int64) int64 {
 
 func (t *webProtectionTracker) isIPBannedCached(ip string, now time.Time) bool {
 	if entry, ok := t.banCache[ip]; ok && now.Sub(entry.checkedAt) < webProtectionBanCacheTTL {
-		if entry.expiresAt == 0 || entry.expiresAt > now.Unix() {
-			return true
+		if entry.banned {
+			if entry.expiresAt == 0 || entry.expiresAt > now.Unix() {
+				return true
+			}
+		} else {
+			return false
 		}
 	}
 	expiresAt, banned := model.IsIPBanned(ip)
-	t.banCache[ip] = webBanCacheEntry{expiresAt: expiresAt, checkedAt: now}
+	t.banCache[ip] = webBanCacheEntry{banned: banned, expiresAt: expiresAt, checkedAt: now}
 	return banned
 }
 
