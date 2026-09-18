@@ -84,6 +84,15 @@ func DeleteBannedIP(id uint) error {
 }
 
 // ListBannedIPs 分页返回封禁列表（新的在前）。
+// DeleteExpiredBannedIPs 删除已过期的封禁记录（幂等）。返回删除条数。
+func DeleteExpiredBannedIPs(now int64) (int64, error) {
+	if now <= 0 {
+		return 0, nil
+	}
+	result := DB.Where("expires_at > 0 AND expires_at <= ?", now).Delete(&BannedIP{})
+	return result.RowsAffected, result.Error
+}
+
 func ListBannedIPs(page, size int) ([]BannedIP, int64, error) {
 	var items []BannedIP
 	var total int64

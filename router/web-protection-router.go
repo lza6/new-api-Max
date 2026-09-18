@@ -13,6 +13,7 @@ func SetWebProtectionRouter(router *gin.Engine) {
 	admin.Use(middleware.AdminAuth())
 	admin.GET("/web-protection/settings", controller.GetWebProtectionSettings)
 	admin.GET("/web-protection/server-stats", controller.GetServerStats)
+	admin.POST("/web-protection/maintenance", controller.RunWebProtectionMaintenanceController)
 
 	admin.PUT("/web-protection/settings", controller.UpdateWebProtectionSettings)
 	admin.GET("/web-request-logs", controller.ListWebRequestLogs)

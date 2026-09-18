@@ -376,6 +376,22 @@ func FlushWebRequestLogs() error {
 	return model.RecordWebRequestLogs(rows)
 }
 
+// RunWebProtectionMaintenance 维护任务：强制落库未刷的日志，清理过期封禁与超期日志（7 天）。
+// 由管理员维护端点或后台任务调用；幂等，失败仅告警不阻断。
+func RunWebProtectionMaintenance() error {
+	if err := FlushWebRequestLogs(); err != nil {
+		return err
+	}
+	now := time.Now().Unix()
+	if _, err := model.DeleteExpiredBannedIPs(now); err != nil {
+		return err
+	}
+	if _, err := model.DeleteWebRequestLogsBefore(now - 7*24*3600); err != nil {
+		return err
+	}
+	return nil
+}
+
 func writeWebProtectionReject(c *gin.Context, retryAfter int64, code, message string) {
 	if retryAfter > 0 {
 		c.Header("Retry-After", strconv.FormatInt(retryAfter, 10))

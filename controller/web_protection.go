@@ -95,6 +95,15 @@ func GetServerStats(c *gin.Context) {
 	common.ApiSuccess(c, data)
 }
 
+// RunWebProtectionMaintenanceController 手动触发维护（flush 日志 + 清理过期封禁/超期日志）。
+func RunWebProtectionMaintenanceController(c *gin.Context) {
+	if err := service.RunWebProtectionMaintenance(); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
 func roundMBps(v float64) float64 {
 	return math.Round(v*100) / 100
 }

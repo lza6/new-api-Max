@@ -23,6 +23,15 @@ func (WebRequestLog) TableName() string {
 }
 
 // RecordWebRequestLogs 批量写入 Web 请求聚合日志。
+// DeleteWebRequestLogsBefore 删除 window_start 早于 cutoff 的聚合日志（幂等，保留策略）。
+func DeleteWebRequestLogsBefore(cutoff int64) (int64, error) {
+	if cutoff <= 0 {
+		return 0, nil
+	}
+	result := DB.Where("window_start < ?", cutoff).Delete(&WebRequestLog{})
+	return result.RowsAffected, result.Error
+}
+
 func RecordWebRequestLogs(rows []WebRequestLog) error {
 	if len(rows) == 0 {
 		return nil
@@ -54,8 +63,12 @@ func AggregateWebRequestLogs(ip, sort, order string, page, size int) ([]WebReque
 	if err := DB.Raw("SELECT COUNT(DISTINCT ip) FROM web_request_logs "+where, args...).Scan(&total).Error; err != nil {
 		return nil, 0, err
 	}
-	if page <= 0 { page = 1 }
-	if size <= 0 || size > 100 { size = 20 }
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 || size > 100 {
+		size = 20
+	}
 	sortCol := "MAX(rate_per_second)"
 	switch sort {
 	case "count":
@@ -64,9 +77,11 @@ func AggregateWebRequestLogs(ip, sort, order string, page, size int) ([]WebReque
 		sortCol = "SUM(bytes_sent)"
 	}
 	orderSQL := "DESC"
-	if order != "desc" { orderSQL = "ASC" }
+	if order != "desc" {
+		orderSQL = "ASC"
+	}
 	selectSQL := "ip, SUM(request_count) AS request_count, MAX(rate_per_second) AS rate_per_second, SUM(bytes_sent) AS bytes_total, MAX(window_start) AS last_request_at"
-	query := "SELECT "+selectSQL+" FROM web_request_logs "+where+" GROUP BY ip ORDER BY "+sortCol+" "+orderSQL+" LIMIT ? OFFSET ?"
+	query := "SELECT " + selectSQL + " FROM web_request_logs " + where + " GROUP BY ip ORDER BY " + sortCol + " " + orderSQL + " LIMIT ? OFFSET ?"
 	bind := append(append([]any{}, args...), size, (page-1)*size)
 	var rows []WebRequestLogAggregateRow
 	if err := DB.Raw(query, bind...).Scan(&rows).Error; err != nil {
@@ -77,8 +92,12 @@ func AggregateWebRequestLogs(ip, sort, order string, page, size int) ([]WebReque
 
 // WebRequestLogDetailByIP 返回指定 IP 的路径明细。
 func WebRequestLogDetailByIP(ip string, page, size int) ([]WebRequestLog, int64, error) {
-	if page <= 0 { page = 1 }
-	if size <= 0 || size > 100 { size = 20 }
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 || size > 100 {
+		size = 20
+	}
 	var rows []WebRequestLog
 	var total int64
 	base := DB.Model(&WebRequestLog{}).Where("ip = ?", ip)
