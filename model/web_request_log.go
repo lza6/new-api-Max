@@ -90,6 +90,31 @@ func AggregateWebRequestLogs(ip, sort, order string, page, size int) ([]WebReque
 	return rows, total, nil
 }
 
+// WebRequestTodayStats 返回今日（自当天 0 点起）请求量与带宽统计（B1-3）。
+// 字段：request_count 总请求数、bytes_sent 出站字节、bytes_received 入站字节。
+type WebRequestTodayStats struct {
+	RequestCount  int64 `json:"request_count"`
+	BytesSent     int64 `json:"bytes_sent"`
+	BytesReceived int64 `json:"bytes_received"`
+}
+
+// TodayWebRequestStats 统计 window_start >= dayStartUnix 的聚合日志。
+// 不同库聚合函数一致（SUM/COALESCE），三库兼容。
+func TodayWebRequestStats(dayStartUnix int64) (WebRequestTodayStats, error) {
+	var stat WebRequestTodayStats
+	if dayStartUnix <= 0 {
+		return stat, nil
+	}
+	err := DB.Raw(
+		`SELECT COALESCE(SUM(request_count), 0) AS request_count,
+		        COALESCE(SUM(bytes_sent), 0) AS bytes_sent,
+		        COALESCE(SUM(bytes_received), 0) AS bytes_received
+		 FROM web_request_logs WHERE window_start >= ?`,
+		dayStartUnix,
+	).Scan(&stat).Error
+	return stat, err
+}
+
 // WebRequestLogDetailByIP 返回指定 IP 的路径明细。
 func WebRequestLogDetailByIP(ip string, page, size int) ([]WebRequestLog, int64, error) {
 	if page <= 0 {

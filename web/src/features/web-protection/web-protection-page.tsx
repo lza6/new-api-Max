@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
 import { handleServerError } from "@/lib/handle-server-error"
 
 import {
@@ -40,6 +41,7 @@ import {
   getWebRequestLogDetail,
   getWebRequestLogs,
   unbanIP,
+  unbanIPsBatch,
   ServerStats,
   updateWebProtectionSettings,
 } from "./api"
@@ -76,6 +78,12 @@ function ServerStatsCard({ t }: { t: (k: string) => string }) {
         <div><p className="text-muted-foreground">{t("Host")}</p><p className="break-all font-mono">{inst?.host?.hostname || "-"}</p></div>
         <div><p className="text-muted-foreground">{t("Runtime")}</p><p>{inst?.runtime?.version || "-"} {inst?.runtime?.goos || ""}/{inst?.runtime?.goarch || ""}</p></div>
         <div><p className="text-muted-foreground">{t("Uptime")}</p><p>{s.uptime_seconds ? formatUptime(s.uptime_seconds) : "-"}</p></div>
+        <div><p className="text-muted-foreground">{t("Active bans")}</p><p className="text-lg font-medium">{s.banned_count ?? 0}</p></div>
+        <div>
+          <p className="text-muted-foreground">{t("Today requests")}</p>
+          <p className="text-lg font-medium">{s.today_request_count ?? 0}</p>
+          <p className="text-muted-foreground">↓ {formatBytes(s.today_bytes_received || 0)} / ↑ {formatBytes(s.today_bytes_sent || 0)}</p>
+        </div>
       </CardContent>
     </Card>
   )
@@ -125,6 +133,16 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
         <div className="flex items-center gap-2">
           <Switch checked={s.enabled} onCheckedChange={(v) => set({ enabled: v })} />
           <Label>{t("Enabled")}</Label>
+        </div>
+        {/* B1-3 两套限流叠加说明：Web 防护（本页）与既有全局 Web 限流 */}
+        <div className="rounded-md border bg-muted/40 p-3 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">{t("Rate limit stacking note title")}</p>
+          <ul className="mt-1 list-disc space-y-0.5 pl-4">
+            <li>{t("Rate limit stacking web note")}</li>
+            <li>{t("Rate limit stacking api note")}</li>
+            <li>{t("Rate limit stacking login note")}</li>
+            <li>{t("Rate limit stacking global note")}</li>
+          </ul>
         </div>
         <div className="flex flex-wrap gap-2">
           {PRESETS.map((p) => (
@@ -228,14 +246,36 @@ function BannedTab({ t }: { t: (k: string) => string }) {
   const [minutes, setMinutes] = useState(1440)
   const [reason, setReason] = useState("admin_ban")
   const [ip, setIp] = useState("")
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const load = async () => {
-    try { const d = await getBannedIPs(1, 50); setRows(d.items || []) } catch (e) { handleServerError(e) }
+    try { const d = await getBannedIPs(1, 50); setRows(d.items || []); setSelected(new Set()) } catch (e) { handleServerError(e) }
   }
   useEffect(() => { void load() }, [])
 
+  const toggleSelect = (target: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(target)) next.delete(target)
+      else next.add(target)
+      return next
+    })
+  }
+  const toggleAll = () => {
+    setSelected((prev) => prev.size === rows.length ? new Set() : new Set(rows.map((r) => r.ip)))
+  }
+
   const doUnban = async (target: string) => {
     try { await unbanIP(target); toast.success(t("IP unbanned")); void load() } catch (e) { handleServerError(e) }
+  }
+  // B1-3 批量解封：勾选多个 IP 一键解封。
+  const doUnbanSelected = async () => {
+    if (selected.size === 0) return
+    try {
+      await unbanIPsBatch([...selected])
+      toast.success(t("IPs unbanned"))
+      void load()
+    } catch (e) { handleServerError(e) }
   }
   const doBan = async () => {
     if (!ip) return
@@ -252,9 +292,19 @@ function BannedTab({ t }: { t: (k: string) => string }) {
           <div><Label>{t("Reason")}</Label><Input value={reason} onChange={(e) => setReason(e.target.value)} className="w-40" /></div>
           <Button type="button" onClick={() => void doBan()}>{t("Ban IP")}</Button>
         </div>
+        <div className="flex items-center justify-between">
+          <label className="flex items-center gap-2 text-sm">
+            <Checkbox checked={rows.length > 0 && selected.size === rows.length} onCheckedChange={() => toggleAll()} />
+            <span>{t("Select all")} ({selected.size}/{rows.length})</span>
+          </label>
+          <Button type="button" size="sm" variant="destructive" disabled={selected.size === 0} onClick={() => void doUnbanSelected()}>
+            {t("Unban selected")}
+          </Button>
+        </div>
         <div className="space-y-2">
           {rows.map((r) => (
             <div key={r.id} className="flex flex-wrap items-center gap-2 rounded-md border p-3 text-sm">
+              <Checkbox checked={selected.has(r.ip)} onCheckedChange={() => toggleSelect(r.ip)} aria-label={r.ip} />
               <span className="font-mono">{r.ip}</span>
               <span className="text-muted-foreground">{r.reason}</span>
               <span className="text-muted-foreground">by {r.banned_by}</span>

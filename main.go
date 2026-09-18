@@ -375,6 +375,7 @@ func InitResources() error {
 	}
 
 	service.StartAuthArtifactCleanup()
+	service.StartWebProtectionMaintenanceLoop()
 
 	return nil
 }

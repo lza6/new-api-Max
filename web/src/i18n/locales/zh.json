@@ -2453,7 +2453,7 @@
     "footer.columns.related.links.oneApi": "One API",
     "footer.columns.related.title": "相关项目",
     "footer.defaultCopyright": "版权所有。",
-    "footer.new\u0061pi.projectAttributionSuffix": "版权所有，由项目贡献者设计与开发。",
+    "footer.newapi.projectAttributionSuffix": "版权所有，由项目贡献者设计与开发。",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "对于 2025 年 5 月 10 日之后添加的渠道，在部署时无需从模型名称中移除 \".\"",
     "For private deployments, format: https://fastgpt.run/api/openapi": "对于私有部署，格式为：https://fastgpt.run/api/openapi",
     "For security, existing access tokens cannot be displayed. Regenerate only when you need a new token.": "出于安全考虑，现有访问令牌无法再次显示。仅在需要新令牌时重新生成。",
@@ -6433,5 +6433,15 @@
   "Current site model": "当前站点模型",
   "Test time": "测试时间",
   "Prompt": "提示词",
-  "Rendered result": "渲染效果"
+  "Rendered result": "渲染效果",
+  "Active bans": "生效封禁",
+  "Today requests": "今日请求",
+  "Select all": "全选",
+  "Unban selected": "批量解封",
+  "IPs unbanned": "已批量解封",
+  "Rate limit stacking note title": "两套限流叠加说明",
+  "Rate limit stacking web note": "Web 防护（本页）对 Web/管理 API 与静态资源（非 /v1）按每-IP 令牌桶限流。建议：前端 60 req/min/IP 滑动窗。",
+  "Rate limit stacking api note": "/v1 模型 API 路由不受 Web 防护限制，本页不限额。",
+  "Rate limit stacking login note": "登录接口另有独立限流（建议 10 req/min/IP），与本页无关。",
+  "Rate limit stacking global note": "既有 GLOBAL_WEB_RATE_LIMIT（环境变量）可能叠加生效；同 IP 会被两套限流同时计数，请预留突发余量避免误伤真实用户。"
 }

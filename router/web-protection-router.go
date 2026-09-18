@@ -21,5 +21,6 @@ func SetWebProtectionRouter(router *gin.Engine) {
 	admin.GET("/banned-ips", controller.ListBannedIPsController)
 	admin.POST("/banned-ips", controller.BanIPController)
 	admin.POST("/banned-ips/unban", controller.UnbanIPController)
+	admin.POST("/banned-ips/unban-batch", controller.UnbanIPsController)
 	admin.DELETE("/banned-ips/:id", controller.DeleteBannedIPController)
 }

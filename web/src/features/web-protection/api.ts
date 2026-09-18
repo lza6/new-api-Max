@@ -83,9 +83,17 @@ export function unbanIP(ip: string) {
   return api.post('/api/admin/banned-ips/unban', { ip });
 }
 
+export function unbanIPsBatch(ips: string[]) {
+  return api.post('/api/admin/banned-ips/unban-batch', { ips });
+}
+
 export interface ServerStats {
   network_in_mbps: number
   network_out_mbps: number
+  banned_count?: number
+  today_request_count?: number
+  today_bytes_sent?: number
+  today_bytes_received?: number
   started_at?: number
   uptime_seconds?: number
   instance?: {

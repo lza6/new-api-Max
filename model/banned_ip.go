@@ -2,6 +2,7 @@ package model
 
 import (
 	"errors"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
@@ -76,6 +77,33 @@ func UnbanIP(ip string) error {
 		return errors.New("unban ip is empty")
 	}
 	return DB.Where("ip = ?", ip).Delete(&BannedIP{}).Error
+}
+
+// UnbanIPs 批量解封多个 IP（B1-3）。空列表直接返回 nil；忽略不存在/已解封的 IP。
+func UnbanIPs(ips []string) error {
+	cleaned := make([]string, 0, len(ips))
+	for _, ip := range ips {
+		ip = strings.TrimSpace(ip)
+		if ip != "" {
+			cleaned = append(cleaned, ip)
+		}
+	}
+	if len(cleaned) == 0 {
+		return nil
+	}
+	return DB.Where("ip IN ?", cleaned).Delete(&BannedIP{}).Error
+}
+
+// CountActiveBannedIPs 返回当前生效封禁数（含永久；过期未清理的按 is-active 语义排除）。
+func CountActiveBannedIPs(now int64) (int64, error) {
+	if now <= 0 {
+		now = time.Now().Unix()
+	}
+	var count int64
+	err := DB.Model(&BannedIP{}).
+		Where("expires_at = 0 OR expires_at > ?", now).
+		Count(&count).Error
+	return count, err
 }
 
 // DeleteBannedIP 按 ID 删除封禁记录。

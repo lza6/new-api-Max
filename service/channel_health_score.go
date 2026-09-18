@@ -135,7 +135,22 @@ func GetChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
 	defer channelHealthMu.RUnlock()
 	snap := ChannelHealthSnapshot{}
 	r, ok := channelHealthTable[channelId]
-	if !ok || r.samples == nil {
+	if !ok {
+		return snap
+	}
+	// B1-2 修复：冷却字段（CoolCount/CoolingDown/LastCoolClass）独立于请求样本
+	// 读取——只记录过冷却、尚无请求样本的渠道也必须在前端展示冷却状态与原因，
+	// 否则健康分 API 对这些渠道返回全零，hover-why 数据源丢失。
+	snap.CoolCount = r.coolCount
+	if r.lastCoolClass != ErrClassOK {
+		snap.LastCoolClass = RelayErrorClassString(r.lastCoolClass)
+	}
+	until := GetChannelCooldownUntil(channelId)
+	snap.CoolingDown = !until.IsZero() && time.Now().Before(until)
+	if snap.CoolingDown {
+		snap.CoolUntil = until.Unix()
+	}
+	if r.samples == nil {
 		return snap
 	}
 	cutoff := time.Now().Add(-channelHealthWindowTTL)
@@ -153,7 +168,6 @@ func GetChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
 		}
 	}
 	snap.SampleCount = total
-	snap.CoolCount = r.coolCount
 	if total > 0 {
 		snap.SuccessRate = float64(successes) / float64(total)
 	}
@@ -163,14 +177,6 @@ func GetChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
 		snap.P95LatencyMs = percentileOf(latencies, 0.95)
 	}
 	snap.Score = computeHealthScore(snap.SuccessRate, snap.P95LatencyMs)
-	until := GetChannelCooldownUntil(channelId)
-	snap.CoolingDown = !until.IsZero() && time.Now().Before(until)
-	if snap.CoolingDown {
-		snap.CoolUntil = until.Unix()
-	}
-	if r.lastCoolClass != ErrClassOK {
-		snap.LastCoolClass = RelayErrorClassString(r.lastCoolClass)
-	}
 	return snap
 }
 

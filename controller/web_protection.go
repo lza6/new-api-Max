@@ -5,6 +5,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
@@ -81,6 +82,19 @@ func GetServerStats(c *gin.Context) {
 		"network_in_mbps":  roundMBps(inMBps),
 		"network_out_mbps": roundMBps(outMBps),
 	}
+	// B1-3：当前生效封禁数 + 今日请求量/带宽（Web 防刷可见性，供状态页展示）。
+	if banned, err := model.CountActiveBannedIPs(0); err == nil {
+		data["banned_count"] = banned
+	} else {
+		data["banned_count"] = 0
+	}
+	if today := startOfTodayUnix(); today > 0 {
+		if stat, err := model.TodayWebRequestStats(today); err == nil {
+			data["today_request_count"] = stat.RequestCount
+			data["today_bytes_sent"] = stat.BytesSent
+			data["today_bytes_received"] = stat.BytesReceived
+		}
+	}
 	if host, err := os.Hostname(); err == nil && host != "" {
 		if inst, err := model.GetSystemInstanceByNode(host); err == nil {
 			var info any
@@ -93,6 +107,13 @@ func GetServerStats(c *gin.Context) {
 		}
 	}
 	common.ApiSuccess(c, data)
+}
+
+// startOfTodayUnix 返回当天 0 点（本地时区）的 unix 秒。
+func startOfTodayUnix() int64 {
+	now := time.Now()
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	return today.Unix()
 }
 
 // RunWebProtectionMaintenanceController 手动触发维护（flush 日志 + 清理过期封禁/超期日志）。
@@ -230,6 +251,26 @@ func UnbanIPController(c *gin.Context) {
 		return
 	}
 	if err := model.UnbanIP(input.IP); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.ApiSuccess(c, nil)
+}
+
+// UnbanIPsController 批量解封 IP（管理员，B1-3）。body: {ips:[...]}
+func UnbanIPsController(c *gin.Context) {
+	var input struct {
+		IPs []string `json:"ips"`
+	}
+	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if len(input.IPs) == 0 {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if err := model.UnbanIPs(input.IPs); err != nil {
 		common.ApiError(c, err)
 		return
 	}
