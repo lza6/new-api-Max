@@ -111,6 +111,11 @@ export function MessageError({
             ? t(FALLBACK_ERROR_CONTENT)
             : errorState.content}
         </p>
+        {errorState.detail && (
+          <p className='text-muted-foreground text-xs'>
+            {t('Original reason')}: {errorState.detail}
+          </p>
+        )}
         {actions}
       </AlertDescription>
     </Alert>

@@ -6368,7 +6368,21 @@
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Efface l'historique de présence de tous les utilisateurs pour qu'ils puissent à nouveau se présenter.",
     "Resetting…": "Réinitialisation…",
     "You are site member #{{id}}": "Vous êtes le membre n°{{id}} du site",
-    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "Nom et e-mail affichés dans les messages sortants. Laissez vide pour utiliser le compte SMTP."
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "Nom et e-mail affichés dans les messages sortants. Laissez vide pour utiliser le compte SMTP.",
+    "Get started in 3 steps": "Commencez en 3 étapes",
+    "Step {{current}} of {{total}}": "Étape {{current}} sur {{total}}",
+    "Create an API Token": "Créer un jeton API",
+    "Generate a key to call models from your own code or tools.": "Générez une clé pour appeler les modèles depuis votre code ou vos outils.",
+    "Go to API keys": "Aller aux clés API",
+    "Browse the model plaza": "Parcourir la place des modèles",
+    "See which models are available and how pricing works.": "Découvrez les modèles disponibles et leur tarification.",
+    "Go to model plaza": "Aller à la place des modèles",
+    "Make your first request": "Effectuez votre première requête",
+    "Open the playground and send your first message.": "Ouvrez le terrain de jeu et envoyez votre premier message.",
+    "Open playground": "Ouvrir le terrain de jeu",
+    "Dismiss onboarding": "Fermer le guide",
+    "Skip for now": "Passer pour l’instant",
+    "Original reason": "Raison d’origine"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",
@@ -6456,5 +6470,8 @@
   "Request timeline": "Request timeline",
   "Copy timeline JSON": "Copy timeline JSON",
   "Copied": "Copied",
-  "Copy JSON": "Copy JSON"
+  "Copy JSON": "Copy JSON",
+  "This channel is cooling down after recent failures. Please try again in a moment.": "Ce canal est en période de refroidissement après des échecs récents. Veuillez réessayer dans un instant.",
+  "Your IP address is temporarily banned due to unusual traffic. Please try again later.": "Votre adresse IP est temporairement bannie en raison d'un trafic inhabituel. Veuillez réessayer plus tard.",
+  "The requested model is not available. Please pick another model.": "Le modèle demandé n'est pas disponible. Veuillez en choisir un autre."
 }

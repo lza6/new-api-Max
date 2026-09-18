@@ -6368,7 +6368,21 @@
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).",
     "Resetting…": "Resetting…",
     "You are site member #{{id}}": "You are site member #{{id}}",
-    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically."
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.",
+    "Get started in 3 steps": "Get started in 3 steps",
+    "Step {{current}} of {{total}}": "Step {{current}} of {{total}}",
+    "Create an API Token": "Create an API Token",
+    "Generate a key to call models from your own code or tools.": "Generate a key to call models from your own code or tools.",
+    "Go to API keys": "Go to API keys",
+    "Browse the model plaza": "Browse the model plaza",
+    "See which models are available and how pricing works.": "See which models are available and how pricing works.",
+    "Go to model plaza": "Go to model plaza",
+    "Make your first request": "Make your first request",
+    "Open the playground and send your first message.": "Open the playground and send your first message.",
+    "Open playground": "Open playground",
+    "Dismiss onboarding": "Dismiss onboarding",
+    "Skip for now": "Skip for now",
+    "Original reason": "Original reason"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",
@@ -6456,5 +6470,8 @@
   "Request timeline": "Request timeline",
   "Copy timeline JSON": "Copy timeline JSON",
   "Copied": "Copied",
-  "Copy JSON": "Copy JSON"
+  "Copy JSON": "Copy JSON",
+  "This channel is cooling down after recent failures. Please try again in a moment.": "This channel is cooling down after recent failures. Please try again in a moment.",
+  "Your IP address is temporarily banned due to unusual traffic. Please try again later.": "Your IP address is temporarily banned due to unusual traffic. Please try again later.",
+  "The requested model is not available. Please pick another model.": "The requested model is not available. Please pick another model."
 }

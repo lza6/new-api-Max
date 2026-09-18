@@ -150,12 +150,18 @@ function messageText(value: unknown): string | undefined {
   return value
 }
 
-// B6-2 错误码→人话映射：按序匹配，命中即用友好文案替换技术性消息首行。
-// 顺序即优先级：额度 → 密钥 → 限流 → 上游 → 内容安全。
+// B6-2/B2-3 错误码→人话映射：按序匹配，命中即用友好文案替换技术性消息首行。
+// 顺序即优先级：额度 → 密钥 → 限流 → 渠道冷却 → IP 封禁 → 模型不可用 → 上游 → 内容安全。
 const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = [
   { pattern: /insufficient[_ ]?(quota|balance|credit)|quota/i, messageKey: 'Insufficient quota. Please top up or redeem a quota card.' },
   { pattern: /key[_ ]?invalid|invalid[_ ]?api[_ ]?key|\b401\b/i, messageKey: 'The key is invalid or expired. Please rotate it on the channels page.' },
   { pattern: /rate[_ ]?limit|\b429\b/i, messageKey: 'Too many requests. Please try again later.' },
+  // B2-3 渠道冷却：上游/渠道进入冷却窗口（cooldown / cooling down）。
+  { pattern: /cooldown|cooling[_ ]?down|is cooling/i, messageKey: 'This channel is cooling down after recent failures. Please try again in a moment.' },
+  // B2-3 IP 封禁：Web 防护自动/手动封禁（type=ip_banned）。
+  { pattern: /ip[_ ]?banned|ip banned|banned[_ ]?ip/i, messageKey: 'Your IP address is temporarily banned due to unusual traffic. Please try again later.' },
+  // B2-3 模型暂不可用：模型未找到 / 无可用模型。
+  { pattern: /model[_ ]?not[_ ]?found|no.*model|model.*unavailable|model.*not.*available/i, messageKey: 'The requested model is not available. Please pick another model.' },
   { pattern: /upstream|bad[_ ]?gateway|\b502\b|\b503\b/i, messageKey: 'The upstream service is temporarily unavailable. Please try again later.' },
   { pattern: /content[_ ]?(filter|policy)|safety|moderation|prompt[_ ]?block/i, messageKey: 'The content was blocked by a safety policy.' },
 ]

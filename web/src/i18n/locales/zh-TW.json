@@ -6368,7 +6368,21 @@
     "Clear all users check-in history so everyone can check in again (e.g. as a one-time bonus).": "清空所有使用者的簽到歷史，讓每個人都能重新簽到（例如作為一次性福利）。",
     "Resetting…": "重置中…",
     "You are site member #{{id}}": "您是本站第 {{id}} 位開發者",
-    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "寄件人顯示名稱和信箱。留空時自動使用上面的 SMTP 帳號信箱（新手推薦留空）。"
+    "Display name and email used in outgoing messages. Leave blank to use the SMTP account automatically.": "寄件人顯示名稱和信箱。留空時自動使用上面的 SMTP 帳號信箱（新手推薦留空）。",
+    "Get started in 3 steps": "三步快速上手",
+    "Step {{current}} of {{total}}": "第 {{current}} / {{total}} 步",
+    "Create an API Token": "建立 API Token",
+    "Generate a key to call models from your own code or tools.": "產生一個金鑰，即可在自己的程式碼或工具中呼叫模型。",
+    "Go to API keys": "前往 API 金鑰",
+    "Browse the model plaza": "瀏覽模型廣場",
+    "See which models are available and how pricing works.": "檢視可用模型與計費方式。",
+    "Go to model plaza": "前往模型廣場",
+    "Make your first request": "發起首次請求",
+    "Open the playground and send your first message.": "開啟測試台，傳送你的第一則訊息。",
+    "Open playground": "開啟測試台",
+    "Dismiss onboarding": "關閉引導",
+    "Skip for now": "暫時跳過",
+    "Original reason": "原始原因"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",
@@ -6456,5 +6470,8 @@
   "Request timeline": "請求時間線",
   "Copy timeline JSON": "複製時間線 JSON",
   "Copied": "已複製",
-  "Copy JSON": "複製 JSON"
+  "Copy JSON": "複製 JSON",
+  "This channel is cooling down after recent failures. Please try again in a moment.": "該渠道因近期失敗正在冷卻，請稍後重試。",
+  "Your IP address is temporarily banned due to unusual traffic. Please try again later.": "您的 IP 因異常流量被暫時封鎖，請稍後再試。",
+  "The requested model is not available. Please pick another model.": "請求的模型暫不可用，請選擇其他模型。"
 }
