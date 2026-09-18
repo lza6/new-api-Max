@@ -37,3 +37,37 @@
 - `web/src/features/usage-logs/types.ts`（readTaskStructuredProgress）
 - `service/task_polling.go`（轮询 Data 合并）
 - `relay/channel/task/jsplugin/adaptor.go`（ParseTaskResult Data 透传）
+
+
+---
+
+# 2026-09-19 新任务：参考项目全量对标（Phase A）
+
+> 本段为当日新任务状态，追加于旧 B5 记录之后，互不覆盖。
+> 完整状态源见 `参考的结果计划指南.md`。
+
+## Task Contract
+- 原始目标：深挖 D:\参考项目（1178 项）全部项目，提炼可借鉴优点；围绕「AI 更懂用户/小白易用/日志全开/用户 skills 沉淀/扩展品类」推动 new-api 演进。
+- 当前阶段：Phase A（ANALYSIS_ONLY）完成 → 等待用户批准 Phase B 批次 1（P0）。
+- 当前授权：只读分析；只允许写 参考的结果计划指南.md 与本追加段。
+- 成功标准：9 节报告完成；1178 项全覆盖；高价值项附证据；路线图 P0/P1/P2；无 P0 遗漏。
+- 停止条件：用户批准具体批次后进入 Phase B。
+
+## Task Graph（摘要）
+| ID | Owner | Goal | Status |
+|----|----|----|----|
+| A0 | 主协调 | 工作区检查 | DONE |
+| A1 | 主协调 | 主项目识别 | DONE |
+| A2-1/2 | 子代理×2 | agents 188 项深扫 | DONE |
+| A2-3 | 主协调 | 其余 990 项全覆盖（清单+README） | DONE |
+| A3-A5 | 主协调 | 筛选/差距/路线图 | DONE |
+| A6 | 主协调 | 交付物落盘 | IN_PROGRESS |
+| A7 | 主协调 | 输出报告等确认 | PENDING |
+| Critic-1 | 独立审查 | 六维审查 | PENDING |
+
+## 待办（Phase B 候选，需用户批准）
+- P0-1 stream_fallover 灰度→默认开
+- P0-2 channel_health_score API 前端接入
+- P0-3 Web 防护可配置化 + 实时服务器状态页
+- P1 费用解释用户版 / trace 时间线 / 插件写审批 / skills 仓库 v1 / 离线评测
+- P2 任务品类扩展 / 模型目录同步 / 记忆层
