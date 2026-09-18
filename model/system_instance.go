@@ -69,6 +69,15 @@ func UpsertSystemInstance(nodeName string, info any, startedAt int64, lastSeenAt
 	}).Create(instance).Error
 }
 
+// GetSystemInstanceByNode 按节点名读取最近一次上报的系统信息。
+func GetSystemInstanceByNode(nodeName string) (*SystemInstance, error) {
+	var instance SystemInstance
+	if err := DB.Where("node_name = ?", nodeName).Order("updated_at desc").First(&instance).Error; err != nil {
+		return nil, err
+	}
+	return &instance, nil
+}
+
 func ListSystemInstances() ([]*SystemInstance, error) {
 	var instances []*SystemInstance
 	err := DB.Order("last_seen_at desc").Find(&instances).Error

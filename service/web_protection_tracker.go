@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -94,6 +95,54 @@ type webProtectionTracker struct {
 	lastFlush   time.Time
 	banCache    map[string]webBanCacheEntry
 	pendingRows []model.WebRequestLog
+}
+
+// 全流量网络吞吐统计（覆盖所有请求，含 /v1；仅计量不限流），
+// 供管理员端实时出入口带宽（MB/s）展示。
+var netMu sync.Mutex
+var netBytesIn, netBytesOut int64
+var netPrevIn, netPrevOut int64
+var netSampleAtMs int64
+
+// RecordNetworkBytes 记录一次请求的进出字节（原子累计）。
+func RecordNetworkBytes(inBytes, outBytes int64) {
+	if inBytes > 0 {
+		atomic.AddInt64(&netBytesIn, inBytes)
+	}
+	if outBytes > 0 {
+		atomic.AddInt64(&netBytesOut, outBytes)
+	}
+}
+
+// GetNetworkThroughput 返回最近采样间隔的平均出入口速率（MB/s）。
+// 调用方应约每秒轮询一次；首调返回 0。
+func GetNetworkThroughput() (inMBps, outMBps float64) {
+	nowMs := time.Now().UnixMilli()
+	netMu.Lock()
+	defer netMu.Unlock()
+	if netSampleAtMs == 0 {
+		netSampleAtMs = nowMs
+		netPrevIn = atomic.LoadInt64(&netBytesIn)
+		netPrevOut = atomic.LoadInt64(&netBytesOut)
+		return 0, 0
+	}
+	elapsed := float64(nowMs-netSampleAtMs) / 1000.0
+	if elapsed <= 0 {
+		return 0, 0
+	}
+	bi := atomic.LoadInt64(&netBytesIn)
+	bo := atomic.LoadInt64(&netBytesOut)
+	inMBps = float64(bi-netPrevIn) / elapsed / (1024 * 1024)
+	outMBps = float64(bo-netPrevOut) / elapsed / (1024 * 1024)
+	if inMBps < 0 {
+		inMBps = 0
+	}
+	if outMBps < 0 {
+		outMBps = 0
+	}
+	netPrevIn, netPrevOut = bi, bo
+	netSampleAtMs = nowMs
+	return inMBps, outMBps
 }
 
 var webProtectionTrackerInstance = &webProtectionTracker{

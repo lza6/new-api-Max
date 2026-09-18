@@ -83,6 +83,26 @@ export function unbanIP(ip: string) {
   return api.post('/api/admin/banned-ips/unban', { ip });
 }
 
+export interface ServerStats {
+  network_in_mbps: number
+  network_out_mbps: number
+  started_at?: number
+  uptime_seconds?: number
+  instance?: {
+    host?: { hostname?: string }
+    runtime?: { version?: string; goos?: string; goarch?: string }
+    resources?: {
+      cpu?: { usage_percent?: number }
+      memory?: { usage_percent?: number }
+      storage?: { total_bytes?: number; used_bytes?: number; free_bytes?: number }
+    }
+  }
+}
+
+export function getServerStats(): Promise<ServerStats> {
+  return api.get("/api/admin/web-protection/server-stats").then((r) => r.data.data)
+}
+
 export function formatBytes(n: number): string {
   if (!Number.isFinite(n) || n < 0) return '0 B';
   const units = ['B', 'KB', 'MB', 'GB', 'TB'];

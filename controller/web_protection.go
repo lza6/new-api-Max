@@ -1,6 +1,8 @@
 package controller
 
 import (
+	"math"
+	"os"
 	"strconv"
 	"strings"
 
@@ -8,6 +10,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/config"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
@@ -71,15 +74,40 @@ func saveWebProtectionConfig() error {
 	return nil
 }
 
+// GetServerStats 返回管理员端服务器实时状态：网络出入口 MB/s（近 1s 采样平均）与本节点规格/负载/磁盘（来自 system_instances 最近上报）。
+func GetServerStats(c *gin.Context) {
+	inMBps, outMBps := service.GetNetworkThroughput()
+	data := gin.H{
+		"network_in_mbps":  roundMBps(inMBps),
+		"network_out_mbps": roundMBps(outMBps),
+	}
+	if host, err := os.Hostname(); err == nil && host != "" {
+		if inst, err := model.GetSystemInstanceByNode(host); err == nil {
+			var info any
+			if common.UnmarshalJsonStr(inst.Info, &info) == nil {
+				data["instance"] = info
+			}
+			data["started_at"] = inst.StartedAt
+			data["last_seen_at"] = inst.LastSeenAt
+			data["uptime_seconds"] = common.GetTimestamp() - inst.StartedAt
+		}
+	}
+	common.ApiSuccess(c, data)
+}
+
+func roundMBps(v float64) float64 {
+	return math.Round(v*100) / 100
+}
+
 // WebRequestLogItem 日志聚合行（按 IP 汇总）。
 type WebRequestLogItem struct {
-	IP             string  `json:"ip"`
-	RequestCount   int64   `json:"request_count"`
-	RatePerSecond  float64 `json:"rate_per_second"`
-	BytesTotal     int64   `json:"bytes_total"`
-	LastRequestAt  int64   `json:"last_request_at"`
-	Banned         bool    `json:"banned"`
-	BanExpiresAt   int64   `json:"ban_expires_at"`
+	IP            string  `json:"ip"`
+	RequestCount  int64   `json:"request_count"`
+	RatePerSecond float64 `json:"rate_per_second"`
+	BytesTotal    int64   `json:"bytes_total"`
+	LastRequestAt int64   `json:"last_request_at"`
+	Banned        bool    `json:"banned"`
+	BanExpiresAt  int64   `json:"ban_expires_at"`
 }
 
 // ListWebRequestLogs 按 IP 聚合返回 Web 请求日志（管理员）。
@@ -87,8 +115,12 @@ type WebRequestLogItem struct {
 func ListWebRequestLogs(c *gin.Context) {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
-	if page <= 0 { page = 1 }
-	if size <= 0 || size > 100 { size = 20 }
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 || size > 100 {
+		size = 20
+	}
 	ip := strings.TrimSpace(c.Query("ip"))
 	sort := c.DefaultQuery("sort", "rate")
 	order := strings.ToLower(c.DefaultQuery("order", "desc"))
@@ -124,8 +156,12 @@ func ListWebRequestLogDetail(c *gin.Context) {
 	}
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	size, _ := strconv.Atoi(c.DefaultQuery("size", "20"))
-	if page <= 0 { page = 1 }
-	if size <= 0 || size > 100 { size = 20 }
+	if page <= 0 {
+		page = 1
+	}
+	if size <= 0 || size > 100 {
+		size = 20
+	}
 	rows, total, err := model.WebRequestLogDetailByIP(ip, page, size)
 	if err != nil {
 		common.ApiError(c, err)
@@ -173,7 +209,9 @@ func BanIPController(c *gin.Context) {
 
 // UnbanIPController 解封 IP（管理员）。body: {ip}
 func UnbanIPController(c *gin.Context) {
-	var input struct { IP string `json:"ip"` }
+	var input struct {
+		IP string `json:"ip"`
+	}
 	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return

@@ -6414,5 +6414,14 @@
   "Reason": "原因",
   "Permanent": "永久",
   "Unban": "解封",
-  "No banned IPs": "暂无封禁"
+  "No banned IPs": "暂无封禁",
+  "Server realtime status": "服务器实时状态",
+  "Network out": "出站流量",
+  "Network in": "入站流量",
+  "Uptime": "运行时长",
+  "Host": "主机",
+  "Runtime": "运行环境",
+  "CPU": "CPU",
+  "Memory": "内存",
+  "Disk": "磁盘"
 }

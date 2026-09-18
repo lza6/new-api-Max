@@ -35,10 +35,12 @@ import {
   banIP,
   formatBytes,
   getBannedIPs,
+  getServerStats,
   getWebProtectionSettings,
   getWebRequestLogDetail,
   getWebRequestLogs,
   unbanIP,
+  ServerStats,
   updateWebProtectionSettings,
 } from "./api"
 
@@ -47,6 +49,44 @@ const PRESETS = [
   { id: "standard", label: "Standard (5/s, burst 40)", perSec: 5, burst: 40 },
   { id: "strict", label: "Strict (2/s, burst 20)", perSec: 2, burst: 20 },
 ]
+
+function ServerStatsCard({ t }: { t: (k: string) => string }) {
+  const [s, setS] = useState<ServerStats | null>(null)
+  useEffect(() => {
+    let alive = true
+    const load = () => { getServerStats().then((d) => { if (alive) setS(d) }).catch(() => undefined) }
+    load()
+    const timer = setInterval(load, 1500)
+    return () => { alive = false; clearInterval(timer) }
+  }, [])
+  if (!s) return null
+  const inst = s.instance
+  const res = inst?.resources
+  const cpu = res?.cpu?.usage_percent
+  const mem = res?.memory?.usage_percent
+  const st = res?.storage
+  return (
+    <Card>
+      <CardHeader><CardTitle>{t("Server realtime status")}</CardTitle></CardHeader>
+      <CardContent className="grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+        <div><p className="text-muted-foreground">{t("Network out")}</p><p className="text-2xl font-semibold">{s.network_out_mbps.toFixed(2)} MB/s</p><p className="text-muted-foreground">{t("Network in")} {s.network_in_mbps.toFixed(2)} MB/s</p></div>
+        <div><p className="text-muted-foreground">{t("CPU")}</p><p className="text-lg font-medium">{cpu != null ? cpu.toFixed(1) + "%" : "-"}</p></div>
+        <div><p className="text-muted-foreground">{t("Memory")}</p><p className="text-lg font-medium">{mem != null ? mem.toFixed(1) + "%" : "-"}</p></div>
+        <div><p className="text-muted-foreground">{t("Disk")}</p><p className="text-lg font-medium">{st ? formatBytes(st.used_bytes || 0) + " / " + formatBytes(st.total_bytes || 0) : "-"}</p></div>
+        <div><p className="text-muted-foreground">{t("Host")}</p><p className="break-all font-mono">{inst?.host?.hostname || "-"}</p></div>
+        <div><p className="text-muted-foreground">{t("Runtime")}</p><p>{inst?.runtime?.version || "-"} {inst?.runtime?.goos || ""}/{inst?.runtime?.goarch || ""}</p></div>
+        <div><p className="text-muted-foreground">{t("Uptime")}</p><p>{s.uptime_seconds ? formatUptime(s.uptime_seconds) : "-"}</p></div>
+      </CardContent>
+    </Card>
+  )
+}
+
+function formatUptime(sec: number): string {
+  const d = Math.floor(sec / 86400)
+  const h = Math.floor((sec % 86400) / 3600)
+  const m = Math.floor((sec % 3600) / 60)
+  return (d > 0 ? d + "d " : "") + h + "h " + m + "m"
+}
 
 function SettingsTab({ t }: { t: (k: string) => string }) {
   const [s, setS] = useState<WebProtectionSettings | null>(null)
@@ -238,6 +278,7 @@ export function WebProtectionPage() {
   )
   return (
     <div className="space-y-4 p-4 sm:p-6">
+      <ServerStatsCard t={t} />
       <div className="flex flex-wrap items-center gap-2">
         {tabBtn("settings", "Web Protection")}
         {tabBtn("logs", "Web request logs")}

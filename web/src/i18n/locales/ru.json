@@ -6414,5 +6414,14 @@
   "Reason": "Reason",
   "Permanent": "Permanent",
   "Unban": "Unban",
-  "No banned IPs": "No banned IPs"
+  "No banned IPs": "No banned IPs",
+  "Server realtime status": "Server realtime status",
+  "Network out": "Network out",
+  "Network in": "Network in",
+  "Uptime": "Uptime",
+  "Host": "Host",
+  "Runtime": "Runtime",
+  "CPU": "CPU",
+  "Memory": "Memory",
+  "Disk": "Disk"
 }
