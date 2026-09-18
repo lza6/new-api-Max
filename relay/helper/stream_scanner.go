@@ -48,6 +48,40 @@ func NewStreamScanner(reader io.Reader) *bufio.Scanner {
 	return scanner
 }
 
+// isUsefulStreamData 判断一个 SSE data 块是否包含“有效”增量（content 或
+// tool_call），语义对齐 free-router usefulDelta：仅 reasoning/reasoning_content
+// 视为无效（空壳流）。非 OpenAI 兼容结构（Claude/Gemini/Dify 等）保守返回
+// true，避免误伤其它格式渠道。fallover 关闭时本函数不参与决策。
+func isUsefulStreamData(data string) bool {
+	var payload struct {
+		Choices []struct {
+			Delta *struct {
+				Content   any   `json:"content"`
+				ToolCalls []any `json:"tool_calls"`
+			} `json:"delta"`
+		} `json:"choices"`
+	}
+	if err := common.Unmarshal([]byte(data), &payload); err != nil {
+		// 无法解析 → 保守放行（保持旧透传行为）。
+		return true
+	}
+	if len(payload.Choices) == 0 || payload.Choices[0].Delta == nil {
+		// 非 OpenAI 兼容结构 → 保守放行。
+		return true
+	}
+	delta := payload.Choices[0].Delta
+	if len(delta.ToolCalls) > 0 {
+		return true
+	}
+	switch v := delta.Content.(type) {
+	case string:
+		return strings.TrimSpace(v) != ""
+	case []any:
+		return len(v) > 0
+	}
+	return false
+}
+
 func copyCodexSSEHeaders(c *gin.Context, resp *http.Response) {
 	if c == nil || c.Writer == nil || resp == nil {
 		return
@@ -93,12 +127,22 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	var bufferWriter *FirstPacketBufferWriter
 	var firstTokenTimer *time.Timer
 	firstTokenTimedOut := false
+	// B1-1 修复：保存原始 writer，函数返回前恢复。否则渠道重试链上
+	// 第二次调用会嵌套包装上一次未 commit 的 bufferWriter，导致提交数据
+	// 写进旧缓冲而无法透传到客户端（真实 bug：三渠道 fallover 场景验证暴露）。
+	originalWriter := c.Writer
 	if fallover {
 		bufferWriter = NewFirstPacketBufferWriter(c.Writer)
 		c.Writer = bufferWriter
 		info.DisablePing = true
 		firstTokenTimer = time.NewTimer(time.Duration(relay_setting.GetStreamFirstTokenTimeout()) * time.Second)
 		defer firstTokenTimer.Stop()
+		// 成功路径：buffer 已 commit 写穿到 originalWriter，恢复后 dataHandler
+		// 直接写原始 writer（等价直通）；失败路径：缓冲丢弃，客户端零字节，
+		// 重试链干净地换下一候选。
+		defer func() {
+			c.Writer = originalWriter
+		}()
 	}
 	commitBuffer := func() {
 		if bufferWriter != nil {
@@ -108,6 +152,9 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			firstTokenTimer.Stop()
 		}
 	}
+	// B1-1 空壳流标记：fallover 开启时，若流正常结束但从未遇到有效
+	// content/tool_call（缓冲从未 commit），判定本次渠道失败交还重试链。
+	emptyStream := false
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -289,10 +336,16 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 				continue
 			}
 			if !strings.HasPrefix(data, "[DONE]") {
-				info.SetFirstResponseTime()
-				info.ReceivedResponseCount++
-				// B3-2：首个有效 data 块到达 → 一次性放行缓冲，进入直通。
-				commitBuffer()
+				if !fallover || isUsefulStreamData(data) {
+					// B3-2/B1-1：首个“有效”data 块（含 content/tool_call）到达
+					// → 一次性放行缓冲，进入直通。仅 reasoning 的空壳流不提交。
+					info.SetFirstResponseTime()
+					info.ReceivedResponseCount++
+					commitBuffer()
+				} else {
+					// B1-1：reasoning-only 增量 → 不提交，继续缓冲等待有效内容。
+					logger.LogDebug(c, "stream first packet is reasoning-only, keep buffering")
+				}
 
 				select {
 				case dataChan <- data:
@@ -304,6 +357,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			} else {
 				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonDone, nil)
 				logger.LogDebug(c, "received [DONE], stopping scanner")
+				// B1-1：流结束但缓冲从未 commit（全程仅 reasoning/空）→ 空壳流。
+				if fallover && bufferWriter != nil && !bufferWriter.Committed() {
+					emptyStream = true
+				}
 				return
 			}
 		}
@@ -315,6 +372,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			}
 		}
 		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonEOF, nil)
+		// B1-1：流 EOF 结束但缓冲从未 commit（全程仅 reasoning/空）→ 空壳流。
+		if fallover && bufferWriter != nil && !bufferWriter.Committed() {
+			emptyStream = true
+		}
 	})
 
 	// B3-2 首包超时 channel：fallover 关闭/禁用超时时为 nil（select 永不命中）。
@@ -346,6 +407,18 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			fmt.Errorf("upstream stream first-token timeout after %ds", relay_setting.GetStreamFirstTokenTimeout()),
 			types.ErrorCodeDoRequestFailed,
 			types.ErrOptionWithHideErrMsg("upstream stream timeout"),
+		)
+		return fatalErr
+	}
+
+	// B1-1 空壳流：流已正常结束但从未遇到有效 content/tool_call（仅 reasoning
+	// 或空响应体）。free-router 语义：reasoning only or empty stream → 换下一候选。
+	if emptyStream {
+		logger.LogWarn(c, "stream empty or reasoning-only (no content/tool_call), failover to next channel")
+		fatalErr = types.NewError(
+			fmt.Errorf("upstream stream empty or reasoning-only (no content/tool_call)"),
+			types.ErrorCodeDoRequestFailed,
+			types.ErrOptionWithHideErrMsg("upstream stream empty"),
 		)
 		return fatalErr
 	}
