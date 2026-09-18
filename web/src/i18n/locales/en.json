@@ -6446,5 +6446,15 @@
   "Rate limit stacking global note": "The existing GLOBAL_WEB_RATE_LIMIT (env) may additionally apply; both may stack on the same IP - keep burst headroom to avoid false bans for real users.",
   "Fee Explanation": "Fee Explanation",
   "Observed facts": "Observed facts",
-  "System inference": "System inference"
+  "System inference": "System inference",
+  "Inbound": "Inbound",
+  "Auth": "Auth",
+  "Channel selection": "Channel selection",
+  "Upstream call": "Upstream call",
+  "First token": "First token",
+  "Complete": "Complete",
+  "Request timeline": "Request timeline",
+  "Copy timeline JSON": "Copy timeline JSON",
+  "Copied": "Copied",
+  "Copy JSON": "Copy JSON"
 }

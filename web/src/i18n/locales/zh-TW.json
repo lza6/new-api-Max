@@ -6446,5 +6446,15 @@
   "Rate limit stacking global note": "既有 GLOBAL_WEB_RATE_LIMIT（環境變數）可能疊加生效；同一 IP 會被兩套限流同時計數，請預留突發餘量避免誤傷真實使用者。",
   "Fee Explanation": "費用說明",
   "Observed facts": "觀察到的事實",
-  "System inference": "系統推斷"
+  "System inference": "系統推斷",
+  "Inbound": "入站",
+  "Auth": "鑑權",
+  "Channel selection": "渠道選擇",
+  "Upstream call": "上游呼叫",
+  "First token": "首包",
+  "Complete": "完成",
+  "Request timeline": "請求時間線",
+  "Copy timeline JSON": "複製時間線 JSON",
+  "Copied": "已複製",
+  "Copy JSON": "複製 JSON"
 }

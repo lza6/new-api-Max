@@ -1,0 +1,185 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+
+// B2-2 请求级 trace 时间线（黑匣子打开）。
+// 零额外计算：阶段全部由 consume log 已有字段推导——
+//   - 入站/鉴权：created_at - use_time（请求开始），鉴权在入站后立即完成
+//   - 渠道选择：admin_info.use_channel（重试链）/ channel_affinity（健康分依据）
+//   - 上游调用/首包：other.frt（首包耗时 ms）
+//   - 完成/失败：log.use_time（总耗时 s）+ stream_status（end_reason/end_error）
+// 老日志缺字段时逐阶段优雅降级（不报错，只展示可推导的节点）。
+
+export type TimelinePhaseStatus = 'done' | 'failed' | 'skipped' | 'info'
+
+export interface TimelinePhase {
+  /** 稳定阶段标识（i18n 键后缀用），如 'inbound' | 'auth' | 'channel' | 'upstream' | 'first_token' | 'complete' */
+  key: string
+  /** 阶段状态 */
+  status: TimelinePhaseStatus
+  /** 相对请求开始的偏移毫秒（0 = 入站） */
+  offsetMs: number
+  /** 该阶段自身的耗时毫秒（与前一段的差） */
+  durationMs?: number
+  /** 补充说明（渠道链、错误原因等），可空 */
+  detail?: string
+  /** 补充说明的原始值（如 end_error），用于 JSON 导出 */
+  detailRaw?: string
+}
+
+export interface RequestTimeline {
+  /** 是否成功（stream_status.done / 无失败标记） */
+  ok: boolean
+  /** 失败原因（失败时） */
+  failReason?: string
+  /** 阶段列表（至少入站；老日志缺字段时只保留可推导节点） */
+  phases: TimelinePhase[]
+}
+
+export interface TimelineSource {
+  created_at: number
+  use_time: number
+  frt?: number | null
+  use_channel?: number[]
+  channel_affinity?: {
+    rule_name?: string
+    selected_group?: string
+    using_group?: string
+    key_hint?: string
+  }
+  stream_status?: {
+    status?: string
+    end_reason?: string
+    end_error?: string
+    error_count?: number
+  }
+  request_path?: string
+}
+
+/** 从 consume log 构造请求时间线。老日志缺字段时优雅降级。 */
+export function buildRequestTimeline(src: TimelineSource): RequestTimeline {
+  const totalMs = Math.max(0, Math.round((src.use_time || 0) * 1000))
+  const frtMs = src.frt != null && src.frt > 0 ? Math.round(src.frt) : undefined
+
+  const stream = src.stream_status
+  const failed =
+    !!stream &&
+    (stream.status === 'error' ||
+      stream.status === 'failed' ||
+      !!stream.end_error ||
+      (typeof stream.error_count === 'number' && stream.error_count > 0))
+  const failReason = stream?.end_error || stream?.end_reason || undefined
+
+  const phases: TimelinePhase[] = [
+    {
+      key: 'inbound',
+      status: 'done',
+      offsetMs: 0,
+      detail: src.request_path,
+      detailRaw: src.request_path,
+    },
+    {
+      key: 'auth',
+      status: 'done',
+      offsetMs: 0,
+    },
+  ]
+
+  // 渠道选择（admin 重试链 / 健康分依据）。
+  const chain = src.use_channel
+  const affinity = src.channel_affinity
+  if (chain && chain.length > 0) {
+    phases.push({
+      key: 'channel',
+      status: 'done',
+      offsetMs: 0,
+      detail: chain.join(' -> '),
+      detailRaw: chain.join(' -> '),
+    })
+  } else if (affinity?.rule_name || affinity?.using_group) {
+    phases.push({
+      key: 'channel',
+      status: 'info',
+      offsetMs: 0,
+      detail: [affinity.rule_name, affinity.using_group]
+        .filter(Boolean)
+        .join(' · '),
+      detailRaw: JSON.stringify(affinity),
+    })
+  }
+
+  // 上游调用 + 首包。
+  phases.push({
+    key: 'upstream',
+    status: frtMs != null ? 'done' : 'skipped',
+    offsetMs: 0,
+  })
+  if (frtMs != null) {
+    phases.push({
+      key: 'first_token',
+      status: 'done',
+      offsetMs: frtMs,
+      durationMs: frtMs,
+    })
+  }
+
+  // 完成/失败。
+  phases.push({
+    key: 'complete',
+    status: failed ? 'failed' : 'done',
+    offsetMs: totalMs,
+    durationMs: Math.max(0, totalMs - (frtMs ?? 0)),
+    detail: failReason,
+    detailRaw: failReason,
+  })
+
+  return {
+    ok: !failed,
+    failReason,
+    phases,
+  }
+}
+
+/** 导出 JSON（类 hermes-trace receipts）：稳定结构，供审计粘贴。 */
+export function exportTimelineJson(
+  src: TimelineSource,
+  timeline: RequestTimeline
+): string {
+  return JSON.stringify(
+    {
+      schema: 'new-api.request-timeline.v1',
+      ok: timeline.ok,
+      fail_reason: timeline.failReason ?? null,
+      phases: timeline.phases.map((p) => ({
+        phase: p.key,
+        status: p.status,
+        offset_ms: p.offsetMs,
+        duration_ms: p.durationMs ?? null,
+        detail: p.detailRaw ?? null,
+      })),
+      source: {
+        created_at: src.created_at,
+        use_time_ms: Math.round((src.use_time || 0) * 1000),
+        frt_ms: src.frt != null && src.frt > 0 ? Math.round(src.frt) : null,
+        request_path: src.request_path ?? null,
+      },
+    },
+    null,
+    2
+  )
+}

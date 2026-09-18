@@ -86,6 +86,8 @@ import {
 } from '../../lib/utils'
 import { USAGE_BILLING_PATH, type LogOtherData } from '../../types'
 import { PluginAuthorLink } from '../plugin-author-link'
+import { buildRequestTimeline, exportTimelineJson } from '../../lib/request-timeline'
+import { RequestTimelineCard } from './request-timeline-card'
 import { DetailRow, DetailSection } from './log-detail-layout'
 
 // Maps a channel-update changed-field token (as recorded by the backend audit)
@@ -527,6 +529,26 @@ export function DetailsDialog(props: DetailsDialogProps) {
   const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
   const other = parseLogOther(props.log.other)
   const typeConfig = getLogTypeConfig(props.log.type)
+  // B2-2 请求时间线：复用 consume log 字段（created_at/use_time/frt/use_channel/
+  // channel_affinity/stream_status），零额外计算；老日志缺字段时优雅降级。
+  const timeline = buildRequestTimeline({
+    created_at: props.log.created_at,
+    use_time: props.log.use_time,
+    frt: other?.frt,
+    use_channel: other?.admin_info?.use_channel,
+    channel_affinity: other?.admin_info?.channel_affinity,
+    stream_status: other?.stream_status,
+    request_path: other?.request_path,
+  })
+  const timelineJson = exportTimelineJson(
+    {
+      created_at: props.log.created_at,
+      use_time: props.log.use_time,
+      frt: other?.frt,
+      request_path: other?.request_path,
+    },
+    timeline
+  )
 
   const isViolation = isViolationFeeLog(other)
   const isRefund = props.log.type === 6
@@ -1197,6 +1219,16 @@ export function DetailsDialog(props: DetailsDialogProps) {
 
         {/* Fee explanation (B5-1)：老日志无 explain 字段时优雅降级不渲染 */}
         {other?.explain && <ExplainBreakdown other={other} />}
+
+        {/* Request timeline (B2-2)：黑匣子打开——阶段时间线 + JSON 导出 */}
+        {isDisplayableType(props.log.type) && other && (
+          <RequestTimelineCard
+            timeline={timeline}
+            exportJson={timelineJson}
+            copied={copiedText === timelineJson}
+            onCopy={() => void copyToClipboard(timelineJson)}
+          />
+        )}
 
         {/* Tiered pricing breakdown (when billing_mode is tiered_expr) */}
         {isTieredBilling && other?.expr_b64 && (
