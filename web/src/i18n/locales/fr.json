@@ -6443,5 +6443,8 @@
   "Rate limit stacking web note": "Web protection (this page) applies a per-IP token bucket to Web/admin API and static assets (non-/v1). Suggested: 60 req/min/IP sliding window.",
   "Rate limit stacking api note": "/v1 model API routes are exempt from Web protection and are not limited here.",
   "Rate limit stacking login note": "Login endpoints have their own rate limit (suggested 10/min/IP) regardless of this page.",
-  "Rate limit stacking global note": "The existing GLOBAL_WEB_RATE_LIMIT (env) may additionally apply; both may stack on the same IP - keep burst headroom to avoid false bans for real users."
+  "Rate limit stacking global note": "The existing GLOBAL_WEB_RATE_LIMIT (env) may additionally apply; both may stack on the same IP - keep burst headroom to avoid false bans for real users.",
+  "Fee Explanation": "Fee Explanation",
+  "Observed facts": "Observed facts",
+  "System inference": "System inference"
 }

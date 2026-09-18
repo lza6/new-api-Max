@@ -242,3 +242,47 @@ func TestLogFormattingPreservesLargeIntegerLexemes(t *testing.T) {
 		assert.Equal(t, unprivileged, adminLogs[0].Other)
 	})
 }
+
+// TestFormatUserLogsKeepsExplainB2 B2-1：非 admin 用户视图必须保留
+// other.explain（费用解释卡数据源），同时剥离 admin_info/敏感渠道字段。
+func TestFormatUserLogsKeepsExplainB2(t *testing.T) {
+	other := common.MapToJsonStr(map[string]any{
+		"model_price": 0.01,
+		"explain": map[string]any{
+			"facts": []map[string]any{
+				{"label": "prompt_tokens", "value": 1234},
+				{"label": "completion_tokens", "value": 567},
+				{"label": "tier_matched", "value": "0-4k"},
+				{"label": "channels_considered", "value": 3},
+			},
+			"inferences": []map[string]any{
+				{"text": "命中阶梯价 0-4k 档", "kind": "pricing"},
+			},
+		},
+		"admin_info": map[string]any{
+			"use_channel":  []any{20},
+			"upstream_url": "https://upstream.example.com/v1",
+		},
+	})
+	logs := []*Log{{Other: other}}
+
+	formatUserLogs(logs, 0)
+
+	parsed, err := common.StrToMap(logs[0].Other)
+	require.NoError(t, err)
+	// 用户可见：explain 保留（费用解释卡数据源）。
+	rawExplain, ok := parsed["explain"]
+	require.True(t, ok, "explain 必须在用户视图保留（费用解释卡数据源）")
+	explain, ok := rawExplain.(map[string]any)
+	require.True(t, ok)
+	require.NotNil(t, explain["facts"])
+	require.NotNil(t, explain["inferences"])
+	// 用户不可见：admin_info（含上游 URL/渠道明细）整体剥离。
+	_, hasAdmin := parsed["admin_info"]
+	require.False(t, hasAdmin, "admin_info（含上游 URL/渠道明细）必须对用户剥离")
+	// 敏感顶层字段剥离。
+	for _, key := range []string{"channel_id", "channel_name", "channel_type", "reject_reason"} {
+		_, exists := parsed[key]
+		require.False(t, exists, "敏感字段 %s 必须对用户剥离", key)
+	}
+}
