@@ -105,5 +105,10 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Model Effect Test'), href: '/model-test' })
   }
 
+  // Tool Integration Presets (B5-5): one-click config presets for Claude Code / Cursor / OpenCode / Codex / Cline.
+  if (modules?.toolSetup !== false) {
+    links.push({ title: t('Tool Integration'), href: '/tool-setup' })
+  }
+
   return links
 }

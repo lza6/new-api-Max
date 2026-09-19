@@ -14,6 +14,7 @@ import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as ModelTestRouteImport } from './routes/model-test'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as ToolSetupRouteImport } from './routes/tool-setup'
 import { Route as UserAgreementRouteImport } from './routes/user-agreement'
 import { Route as authForgotPasswordRouteImport } from './routes/(auth)/forgot-password'
 import { Route as authOauthRouteImport } from './routes/(auth)/oauth'
@@ -95,6 +96,11 @@ const ModelTestRoute = ModelTestRouteImport.update({
 const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
   id: '/privacy-policy',
   path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ToolSetupRoute = ToolSetupRouteImport.update({
+  id: '/tool-setup',
+  path: '/tool-setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const UserAgreementRoute = UserAgreementRouteImport.update({
@@ -432,6 +438,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/model-test': typeof ModelTestRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/tool-setup': typeof ToolSetupRoute
   '/user-agreement': typeof UserAgreementRoute
   '/system-settings': typeof AuthenticatedSystemSettingsRouteRouteWithChildren
   '/forgot-password': typeof authForgotPasswordRoute
@@ -496,6 +503,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/model-test': typeof ModelTestRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/tool-setup': typeof ToolSetupRoute
   '/user-agreement': typeof UserAgreementRoute
   '/forgot-password': typeof authForgotPasswordRoute
   '/oauth': typeof authOauthRoute
@@ -562,6 +570,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/model-test': typeof ModelTestRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/tool-setup': typeof ToolSetupRoute
   '/user-agreement': typeof UserAgreementRoute
   '/_authenticated/system-settings': typeof AuthenticatedSystemSettingsRouteRouteWithChildren
   '/(auth)/forgot-password': typeof authForgotPasswordRoute
@@ -628,6 +637,7 @@ export interface FileRouteTypes {
     | '/'
     | '/model-test'
     | '/privacy-policy'
+    | '/tool-setup'
     | '/user-agreement'
     | '/system-settings'
     | '/forgot-password'
@@ -692,6 +702,7 @@ export interface FileRouteTypes {
     | '/'
     | '/model-test'
     | '/privacy-policy'
+    | '/tool-setup'
     | '/user-agreement'
     | '/forgot-password'
     | '/oauth'
@@ -757,6 +768,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/model-test'
     | '/privacy-policy'
+    | '/tool-setup'
     | '/user-agreement'
     | '/_authenticated/system-settings'
     | '/(auth)/forgot-password'
@@ -824,6 +836,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   ModelTestRoute: typeof ModelTestRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  ToolSetupRoute: typeof ToolSetupRoute
   UserAgreementRoute: typeof UserAgreementRoute
   errors401Route: typeof errors401Route
   errors403Route: typeof errors403Route
@@ -873,6 +886,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy-policy'
       fullPath: '/privacy-policy'
       preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/tool-setup': {
+      id: '/tool-setup'
+      path: '/tool-setup'
+      fullPath: '/tool-setup'
+      preLoaderRoute: typeof ToolSetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/user-agreement': {
@@ -1439,6 +1459,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   ModelTestRoute: ModelTestRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
+  ToolSetupRoute: ToolSetupRoute,
   UserAgreementRoute: UserAgreementRoute,
   errors401Route: errors401Route,
   errors403Route: errors403Route,
