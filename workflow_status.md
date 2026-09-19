@@ -340,3 +340,43 @@
 - 6 线程并发打 stat 时 active_connections 峰值=10（并发计数实时生效）
 - /api/status/test http_stats 同时暴露 active_connections + completed_last_minute
 - 证据：计划书/e2e-evidence/prod-v1.2.35-live-metrics.json
+
+# ============================================================
+# 2026-09-20 追加段：终局闭环总审计工作流（Spec-Kit 驱动）
+# ============================================================
+
+## 规范资产（.specify/）
+- Constitution: .specify/memory/constitution.md（生产优先/计费安全/安全基线/三库兼容/性能/前端体验/保守改动）
+- Spec: .specify/specs/001-final-audit-and-closure/spec.md（backlog 状态矩阵 + 审计需求 R1-R8 + Open Questions）
+- Plan/Tasks: 同目录 plan.md / tasks.md（Phase A 盘点 → B P0/P1 修复 → C 补位 → D 文档 → E 交付）
+
+## 工作流编排
+- Phase A：4 个并行只读审计子代理（closure-matrix / sql-db / contract-errors / resilience-observability）
+- 证据与发现落 计划书/audit/；验证账本 计划书/audit-ledger.md（防重复跑同一测试）
+- 每节点验收：代码定位 + 证据 + 状态，禁止无证据宣称完成
+
+## 验证账本（audit-ledger）初始记录
+- [x] 慢查询/索引：尚未系统跑过（Phase A2 首跑，记录 replace 后续引用）
+- [x] 契约抽查：尚未系统跑（Phase A3 首跑）
+- [x] 压测：v1.2.34 已做 60 对延迟基准（计划书/e2e-evidence/paired-latency-bench-async-flush-v1.2.34.json）——勿重复全量，改重点复核
+- [x] 并发+完成指标：本地 E2E + 线上 7/7（concurrency-live-metrics-e2e.json / prod-v1.2.35-live-metrics.json）——已闭环
+
+# 2026-09-20 追加段：Phase A 终局审计结果 + Phase B/C 修复实录
+
+## Phase A 结果（4 节点只读审计，全部完成）
+- A1 功能闭环矩阵（计划书/audit/closure-matrix.md）：15 节点 = DONE 13 / PARTIAL 1（B5-4 无定时调度与 /v1/pricing 路由）/ MISSING 1（B5-3 通用 webhook 子系统）/ BROKEN 0
+- A2 SQL/DB（计划书/audit/sql-db.md）：13 条（P1×4：GetLogsTraffic 全量拉取、logs 缺 (type,created_at,id)、用户日志缺 (user_id,type,created_at)、task_events 无保留策略；P2×9）
+- A3 契约/错误人话（计划书/audit/contract-errors.md）：1 处低危 drift（task/mj self 视图 channel_id 后端不读）+ 错误映射硬缺口 3（get_channel_failed/channel 域保留码/pre_consume_token_quota_failed）+ cooldown 正则死模式
+- A4 稳定/可观测（计划书/audit/resilience-observability.md）：限流/并发桶/SSRF/429 退避/健康检查到位；缺口=熔断器(P2)、/metrics 导出(P2)、TRUSTED_PROXIES 显式化(P2)
+- 验证账本已更新（计划书/audit-ledger.md），防重复跑同一测试
+
+## 修复实录（Phase B/C）
+- B4(改)/S4 签到设置 Invalid input：默认值兜底(undefined→0) + max<min 人话校验 + i18n；commit abef34e83；vitest 3/3
+- S1 会话上限：确认生产 SessionLimitEnabled=false（默认关），admin 开关在 Security 设置（login-session-limit-section），无需改码
+- F2/F3/F4（SQL P1）：logs 复合索引 (type,created_at,id)+(user_id,type,created_at)、task_events created_at 索引 + 7 天保留策略（TASK_EVENT_RETENTION_DAYS，主节点每小时批删）；task_events 清理测试通过；三库验证待跑
+- A3 修复：buildBaseParams channel_id 仅 admin 传递；错误映射补 get_channel_failed/channel 域/pre_consume 三类人话 + i18n 7 语言；映射测试 5/5
+
+## 待办（下轮）
+- 三库（SQLite/MySQL/PG）迁移与索引验证（AGENTS 强约束）
+- 交付 v1.2.36：主题 commit → push → tag → Release → 生产部署 + 线上验收
+- B5-3 webhook / B5-4 定时同步 属架构新增，等用户优先级确认
