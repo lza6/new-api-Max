@@ -6522,5 +6522,6 @@
   "Cline intro": "Провайдер OpenAI Compatible в настройках Cline.",
   "Model mapping": "Маппинг моделей",
   "Model mapping intro": "Шлюз маппит модель сайта с тем же именем во всех протоколах:",
-  "Model mapping note": "Сторонний маппинг не нужен: один и тот же ID модели работает для OpenAI, Anthropic и Codex."
+  "Model mapping note": "Сторонний маппинг не нужен: один и тот же ID модели работает для OpenAI, Anthropic и Codex.",
+  "Export JSON": "Экспорт JSON"
 }

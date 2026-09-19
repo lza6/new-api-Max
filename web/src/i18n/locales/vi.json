@@ -6522,5 +6522,6 @@
   "Cline intro": "Provider OpenAI Compatible trong cài đặt Cline.",
   "Model mapping": "Ánh xạ mô hình",
   "Model mapping intro": "Cổng ánh xạ mô hình của trang với cùng tên trên mọi giao thức:",
-  "Model mapping note": "Không cần ánh xạ bên thứ ba: cùng một ID mô hình hoạt động cho OpenAI, Anthropic và Codex."
+  "Model mapping note": "Không cần ánh xạ bên thứ ba: cùng một ID mô hình hoạt động cho OpenAI, Anthropic và Codex.",
+  "Export JSON": "Xuất JSON"
 }

@@ -6522,5 +6522,6 @@
   "Cline intro": "Provider OpenAI Compatible dans les paramètres Cline.",
   "Model mapping": "Mappage des modèles",
   "Model mapping intro": "La passerelle mappe le modèle du site sous le même nom dans tous les protocoles :",
-  "Model mapping note": "Aucun mappage tiers requis : le même ID de modèle fonctionne pour OpenAI, Anthropic et Codex."
+  "Model mapping note": "Aucun mappage tiers requis : le même ID de modèle fonctionne pour OpenAI, Anthropic et Codex.",
+  "Export JSON": "Exporter JSON"
 }

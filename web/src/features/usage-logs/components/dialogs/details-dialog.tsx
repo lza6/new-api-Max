@@ -559,6 +559,42 @@ export function DetailsDialog(props: DetailsDialogProps) {
     timeline
   )
 
+  // 8.3 日志透明化：JSON 导出——把本条日志完整结构化（含请求时间线）下载为 JSON。
+  const handleExportJson = () => {
+    const payload = {
+      id: props.log.id,
+      created_at: props.log.created_at,
+      type: props.log.type,
+      user_id: props.log.user_id,
+      username: props.log.username,
+      model_name: props.log.model_name,
+      channel: props.log.channel,
+      channel_name: props.log.channel_name,
+      token_name: props.log.token_name,
+      quota: props.log.quota,
+      prompt_tokens: props.log.prompt_tokens,
+      completion_tokens: props.log.completion_tokens,
+      use_time: props.log.use_time,
+      is_stream: props.log.is_stream,
+      group: props.log.group,
+      ip: props.log.ip,
+      request_id: props.log.request_id,
+      upstream_request_id: props.log.upstream_request_id,
+      content: props.log.content,
+      other: props.log.other,
+      timeline: timelineJson,
+    }
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `log-${props.log.request_id || String(props.log.id)}.json`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   const isViolation = isViolationFeeLog(other)
   const isRefund = props.log.type === 6
   const isConsume = props.log.type === 2
@@ -709,6 +745,15 @@ export function DetailsDialog(props: DetailsDialogProps) {
             size='sm'
             copyable={false}
           />
+          <Button
+            variant='outline'
+            size='sm'
+            className='ml-auto'
+            onClick={handleExportJson}
+            aria-label={t('Export JSON')}
+          >
+            {t('Export JSON')}
+          </Button>
         </>
       }
       description={t('View the complete details for this log entry')}

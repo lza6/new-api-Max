@@ -6522,5 +6522,6 @@
   "Cline intro": "Cline 設定の OpenAI Compatible プロバイダー。",
   "Model mapping": "モデルマッピング",
   "Model mapping intro": "ゲートウェイは全プロトコルでサイトのモデルを同名にマッピングします：",
-  "Model mapping note": "サードパーティのマッピング不要：OpenAI / Anthropic / Codex で同じモデルIDが使えます。"
+  "Model mapping note": "サードパーティのマッピング不要：OpenAI / Anthropic / Codex で同じモデルIDが使えます。",
+  "Export JSON": "JSONをエクスポート"
 }
