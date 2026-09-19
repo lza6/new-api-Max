@@ -239,3 +239,15 @@
 - 前端流量卡（今日/7日/30日 + 实时）与 RPM 口径核对（下轮）
 - 异步 consume-log flusher（10ms 目标核心，L3 授权后实施）
 - 上游 429/4xx 状态码透传（无重试预算时避免 500）
+---
+
+# 2026-09-20 追加段：T4 前端流量卡（不覆盖上述记录）
+
+## 变更（web）
+- usage-logs/api.ts：getLogsTraffic(days)（GET /api/log/traffic）
+- common-logs-stats.tsx：管理端头部新增 今日/7日/30日 MB 徽章（TrafficBadges，by_day 求和，60s staleTime）
+- i18n：en.json 新增 Traffic today/7d/30d，bun run i18n:sync 无漂移
+
+## 验证
+- i18n:sync exit 0；tsgo -b exit 0；rsbuild build exit 0
+- Boundary：UI 实际渲染需部署后浏览器验证（后端字节统计已真实 E2E 通过）

@@ -31,6 +31,32 @@ import type {
   UserInfo,
 } from './types'
 
+export interface LogsTrafficDaily {
+	date: string
+	requests: number
+	bytes: number
+	mb: number
+}
+
+export interface LogsTrafficData {
+	days: number
+	total_requests: number
+	total_bytes: number
+	total_mb: number
+	by_day: LogsTrafficDaily[]
+}
+
+export async function getLogsTraffic(days: number): Promise<{
+	success: boolean
+	data?: LogsTrafficData
+}> {
+	const res = await api.get<{ success: boolean; data?: LogsTrafficData }>(
+		'/api/log/traffic',
+		{ params: { days } }
+	)
+	return res.data
+}
+
 // ============================================================================
 // Generic API Helpers
 // ============================================================================

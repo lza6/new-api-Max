@@ -25,7 +25,7 @@ import { formatLogQuota } from '@/lib/format'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
-import { getLogStats, getUserLogStats } from '../api'
+import { getLogStats, getLogsTraffic, getUserLogStats } from '../api'
 import { DEFAULT_LOG_STATS } from '../constants'
 import { buildApiParams } from '../lib/utils'
 import { useLogsViewScope, useUsageLogsContext } from './usage-logs-provider'
@@ -48,11 +48,36 @@ function StatBadge(props: {
   )
 }
 
+function TrafficBadges(props: { byDay: Array<{ date: string; mb: number }> }) {
+  const { t } = useTranslation()
+  const todayStr = new Date().toLocaleDateString('en-CA')
+  const sorted = [...props.byDay].sort((a, b) => b.date.localeCompare(a.date))
+  const sum = (rows: Array<{ date: string; mb: number }>) =>
+    rows.reduce((acc, row) => acc + row.mb, 0)
+  const today = sum(sorted.filter((row) => row.date === todayStr))
+  const week = sum(sorted.slice(0, 7))
+  const month = sum(sorted)
+  return (
+    <>
+      <StatBadge label={t('Traffic today')} value={`${today.toFixed(2)} MB`} accent='bg-emerald-500/70' />
+      <StatBadge label={t('Traffic 7d')} value={`${week.toFixed(2)} MB`} accent='bg-emerald-500/50' />
+      <StatBadge label={t('Traffic 30d')} value={`${month.toFixed(2)} MB`} accent='bg-emerald-500/30' />
+    </>
+  )
+}
+
 export function CommonLogsStats() {
   const { t } = useTranslation()
   const { isAdminView: isAdmin } = useLogsViewScope()
   const searchParams = route.useSearch()
   const { sensitiveVisible } = useUsageLogsContext()
+  const { data: traffic } = useQuery({
+    queryKey: ['logs-traffic', isAdmin],
+    queryFn: async () =>
+      isAdmin ? requireServerSuccess(await getLogsTraffic(30)) : null,
+    enabled: isAdmin,
+    staleTime: 60_000,
+  })
 
   const { data: stats, isLoading } = useQuery({
     queryKey: ['usage-logs-stats', isAdmin, searchParams],
@@ -98,6 +123,9 @@ export function CommonLogsStats() {
         value={stats?.rpm || 0}
         accent='bg-rose-500/65'
       />
+      {isAdmin && traffic?.data ? (
+        <TrafficBadges byDay={traffic.data.by_day || []} />
+      ) : null}
       <StatBadge
         label={t('TPM')}
         value={stats?.tpm || 0}

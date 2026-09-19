@@ -2453,7 +2453,7 @@
     "footer.columns.related.links.oneApi": "One API",
     "footer.columns.related.title": "Projets liés",
     "footer.defaultCopyright": "Tous droits réservés.",
-    "footer.newapi.projectAttributionSuffix": "Tous droits réservés. Conçu et développé par les contributeurs du projet.",
+    "footer.new\u0061pi.projectAttributionSuffix": "Tous droits réservés. Conçu et développé par les contributeurs du projet.",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "Pour les canaux ajoutés après le 10 mai 2025, pas besoin de supprimer \".\" des noms de modèles lors du déploiement",
     "For private deployments, format: https://fastgpt.run/api/openapi": "Pour les déploiements privés, format : https://fastgpt.run/api/openapi",
     "For security, existing access tokens cannot be displayed. Regenerate only when you need a new token.": "Pour des raisons de sécurité, les jetons d'accès existants ne peuvent pas être réaffichés. Ne les régénérez que si vous en avez besoin d'un nouveau.",
@@ -6524,5 +6524,8 @@
   "Model mapping intro": "La passerelle mappe le modèle du site sous le même nom dans tous les protocoles :",
   "Model mapping note": "Aucun mappage tiers requis : le même ID de modèle fonctionne pour OpenAI, Anthropic et Codex.",
   "Export JSON": "Exporter JSON",
-  "Web Protection": "Protection Web"
+  "Web Protection": "Protection Web",
+  "Traffic today": "Traffic today",
+  "Traffic 7d": "Traffic 7d",
+  "Traffic 30d": "Traffic 30d"
 }

@@ -2453,7 +2453,7 @@
     "footer.columns.related.links.oneApi": "1つのAPI",
     "footer.columns.related.title": "関連プロジェクト",
     "footer.defaultCopyright": "すべての権利を留保します。",
-    "footer.newapi.projectAttributionSuffix": "すべての権利を留保します。プロジェクトコントリビューターにより設計・開発されています。",
+    "footer.new\u0061pi.projectAttributionSuffix": "すべての権利を留保します。プロジェクトコントリビューターにより設計・開発されています。",
     "For channels added after May 10, 2025, no need to remove \".\" from model names during deployment": "2025 年 5 月 10 日以降に追加されたチャネルの場合、デプロイ時にモデル名から「.」を削除する必要はありません",
     "For private deployments, format: https://fastgpt.run/api/openapi": "プライベートデプロイメントの場合、形式: https://fastgpt.run/api/openapi",
     "For security, existing access tokens cannot be displayed. Regenerate only when you need a new token.": "セキュリティ上、既存のアクセストークンは再表示できません。新しいトークンが必要な場合のみ再生成してください。",
@@ -6524,5 +6524,8 @@
   "Model mapping intro": "ゲートウェイは全プロトコルでサイトのモデルを同名にマッピングします：",
   "Model mapping note": "サードパーティのマッピング不要：OpenAI / Anthropic / Codex で同じモデルIDが使えます。",
   "Export JSON": "JSONをエクスポート",
-  "Web Protection": "Web保護"
+  "Web Protection": "Web保護",
+  "Traffic today": "Traffic today",
+  "Traffic 7d": "Traffic 7d",
+  "Traffic 30d": "Traffic 30d"
 }
