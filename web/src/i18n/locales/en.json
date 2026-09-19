@@ -6382,7 +6382,13 @@
     "Open playground": "Open playground",
     "Dismiss onboarding": "Dismiss onboarding",
     "Skip for now": "Skip for now",
-    "Original reason": "Original reason"
+    "Original reason": "Original reason",
+    "Login Session Limit": "Login Session Limit",
+    "Login session limit description": "Limit how many active login sessions one account can hold. Defaults to off so normal users are never locked out; enable it only if you need to cap session counts.",
+    "Enable login session limit": "Enable login session limit",
+    "Login session limit switch description": "When off, logins are never rejected because an account has too many active sessions or created too many sessions recently.",
+    "Save login session limit": "Save login session limit",
+    "Public archive of the current model emitted output.": "Public archive of the current model emitted output."
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

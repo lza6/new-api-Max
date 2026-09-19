@@ -21,6 +21,7 @@ import { SensitiveWordsSection } from '../request-limits/sensitive-words-section
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
 import { GlobalConcurrencySection } from '../request-limits/global-concurrency-section'
+import { LoginSessionLimitSection } from './login-session-limit-section'
 import type { SecuritySettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
 
@@ -90,6 +91,15 @@ const SECURITY_SECTIONS = [
           'fetch_setting.apply_ip_filter_for_domain':
             settings['fetch_setting.apply_ip_filter_for_domain'],
         }}
+      />
+    ),
+  },
+  {
+    id: 'login-session-limit',
+    titleKey: 'Login Session Limit',
+    build: (settings: SecuritySettings) => (
+      <LoginSessionLimitSection
+        defaultValues={{ enabled: settings.SessionLimitEnabled }}
       />
     ),
   },

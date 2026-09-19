@@ -6382,7 +6382,13 @@
     "Open playground": "Открыть площадку",
     "Dismiss onboarding": "Закрыть руководство",
     "Skip for now": "Пропустить",
-    "Original reason": "Исходная причина"
+    "Original reason": "Исходная причина",
+    "Login Session Limit": "Лимит сеансов входа",
+    "Login session limit description": "Ограничьте количество активных сеансов входа для одной учётной записи. По умолчанию выключено, чтобы обычные пользователи не блокировались; включайте только при необходимости.",
+    "Enable login session limit": "Включить лимит сеансов входа",
+    "Login session limit switch description": "Когда выключено, вход никогда не отклоняется из-за слишком большого числа активных сеансов или слишком частого их создания.",
+    "Save login session limit": "Сохранить лимит сеансов входа",
+    "Public archive of the current model emitted output.": "Публичный архив реального вывода текущей модели."
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

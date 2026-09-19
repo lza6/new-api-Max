@@ -6382,7 +6382,13 @@
     "Open playground": "プレイグラウンドを開く",
     "Dismiss onboarding": "ガイドを閉じる",
     "Skip for now": "後でスキップ",
-    "Original reason": "元の理由"
+    "Original reason": "元の理由",
+    "Login Session Limit": "ログインセッション制限",
+    "Login session limit description": "1つのアカウントが保持できるアクティブなログインセッション数を制限します。デフォルトはオフで、通常ユーザーがロックアウトされることはありません。セッション数を制限したい場合のみ有効にしてください。",
+    "Enable login session limit": "ログインセッション制限を有効化",
+    "Login session limit switch description": "オフの場合、アカウントのアクティブセッションが多すぎる、または直近でセッションを多く作成したためにログインが拒否されることはありません。",
+    "Save login session limit": "ログインセッション制限を保存",
+    "Public archive of the current model emitted output.": "現在のモデルの実際の出力を公開するアーカイブページ。"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

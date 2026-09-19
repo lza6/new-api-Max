@@ -53,6 +53,12 @@ var (
 	UserSessionHourlyAlertThreshold  = DefaultUserSessionHourlyAlertThreshold
 )
 
+// SessionLimitEnabled gates the per-user active/issuance login session limits.
+// Defaults to false (limits disabled); administrators can enable it from the
+// Security settings page. When disabled, logins never fail with
+// ErrUserSessionLimit / ErrUserSessionIssuanceLimit.
+var SessionLimitEnabled = false
+
 var OptionMap map[string]string
 var OptionMapRWMutex sync.RWMutex
 

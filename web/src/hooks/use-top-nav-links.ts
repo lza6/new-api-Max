@@ -100,5 +100,10 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('About'), href: '/about' })
   }
 
+  // Model Effect Test: public archive of the current model's real output.
+  if (modules?.modelTest !== false) {
+    links.push({ title: t('Model Effect Test'), href: '/model-test' })
+  }
+
   return links
 }

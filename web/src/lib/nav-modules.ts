@@ -31,6 +31,7 @@ export type HeaderNavModules = {
   rankings: ModuleAccess
   docs: boolean
   about: boolean
+  modelTest: boolean
   [key: string]: boolean | ModuleAccess
 }
 
@@ -41,6 +42,7 @@ const DEFAULT_HEADER_NAV_MODULES: HeaderNavModules = {
   rankings: { enabled: true, requireAuth: false },
   docs: true,
   about: true,
+  modelTest: true,
 }
 
 const DEFAULTS: Record<HeaderNavModule, ModuleAccess> = {

@@ -6382,7 +6382,13 @@
     "Open playground": "Ouvrir le terrain de jeu",
     "Dismiss onboarding": "Fermer le guide",
     "Skip for now": "Passer pour l’instant",
-    "Original reason": "Raison d’origine"
+    "Original reason": "Raison d’origine",
+    "Login Session Limit": "Limite de sessions de connexion",
+    "Login session limit description": "Limitez le nombre de sessions de connexion actives qu'un compte peut avoir. Désactivé par défaut pour ne jamais bloquer les utilisateurs ; activez uniquement si vous devez plafonner le nombre de sessions.",
+    "Enable login session limit": "Activer la limite de sessions de connexion",
+    "Login session limit switch description": "Lorsqu'elle est désactivée, une connexion n'est jamais refusée parce qu'un compte a trop de sessions actives ou en a créé trop récemment.",
+    "Save login session limit": "Enregistrer la limite de sessions de connexion",
+    "Public archive of the current model emitted output.": "Archive publique de la sortie réelle du modèle actuel."
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

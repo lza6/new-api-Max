@@ -6382,7 +6382,13 @@
     "Open playground": "打开调试台",
     "Dismiss onboarding": "关闭引导",
     "Skip for now": "暂时跳过",
-    "Original reason": "原始原因"
+    "Original reason": "原始原因",
+    "Login Session Limit": "登录会话限制",
+    "Login session limit description": "限制单个账号可同时持有的活跃登录会话数量。默认关闭，普通用户不会被锁在外面；仅在需要控制会话数量时开启。",
+    "Enable login session limit": "启用登录会话限制",
+    "Login session limit switch description": "关闭时，登录不会因为账号活跃会话过多或近期创建会话过多而被拒绝。",
+    "Save login session limit": "保存登录会话限制",
+    "Public archive of the current model emitted output.": "当前模型真实输出效果的公开存档页。"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "新用户获得的 {{currency}} 金额（= {{formattedQuota}}）",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "邀请他人的用户获得的 {{currency}} 金额（= {{formattedQuota}}）",

@@ -6382,7 +6382,13 @@
     "Open playground": "開啟測試台",
     "Dismiss onboarding": "關閉引導",
     "Skip for now": "暫時跳過",
-    "Original reason": "原始原因"
+    "Original reason": "原始原因",
+    "Login Session Limit": "登入工作階段限制",
+    "Login session limit description": "限制單一帳戶可同時持有的活躍登入工作階段數量。預設關閉，一般用戶不會被鎖在外面；僅在需要控制工作階段數量時開啟。",
+    "Enable login session limit": "啟用登入工作階段限制",
+    "Login session limit switch description": "關閉時，登入不會因為帳戶活躍工作階段過多或近期建立工作階段過多而被拒絕。",
+    "Save login session limit": "儲存登入工作階段限制",
+    "Public archive of the current model emitted output.": "目前模型真實輸出效果的公開存檔頁。"
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

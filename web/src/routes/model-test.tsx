@@ -25,6 +25,7 @@ export const Route = createFileRoute("/model-test")({
   component: ModelTestPage,
 })
 
+const SITE_MODEL = "deepseek-v4-flash"
 const TEST_TIME = "2026-09-18 02:28:15"
 const TEST_PROMPT =
   "创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试。"
@@ -45,7 +46,7 @@ function ModelTestPage() {
         </CardContent>
       </Card>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card><CardHeader><CardTitle className="text-base">{t("Model")}</CardTitle></CardHeader><CardContent className="text-sm">{t("Current site model")}</CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">{t("Model")}</CardTitle></CardHeader><CardContent className="text-sm">{t("Current site model")}: <span className="font-mono">{SITE_MODEL}</span></CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">{t("Test time")}</CardTitle></CardHeader><CardContent className="font-mono text-sm">{TEST_TIME}</CardContent></Card>
         <Card><CardHeader><CardTitle className="text-base">{t("Prompt")}</CardTitle></CardHeader><CardContent className="break-all font-mono text-xs">{TEST_PROMPT}</CardContent></Card>
       </div>

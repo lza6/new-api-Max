@@ -6382,7 +6382,13 @@
     "Open playground": "Mở playground",
     "Dismiss onboarding": "Đóng hướng dẫn",
     "Skip for now": "Bỏ qua",
-    "Original reason": "Lý do gốc"
+    "Original reason": "Lý do gốc",
+    "Login Session Limit": "Giới hạn phiên đăng nhập",
+    "Login session limit description": "Giới hạn số phiên đăng nhập đang hoạt động của một tài khoản. Mặc định tắt để người dùng bình thường không bị khóa; chỉ bật khi cần giới hạn số phiên.",
+    "Enable login session limit": "Bật giới hạn phiên đăng nhập",
+    "Login session limit switch description": "Khi tắt, đăng nhập không bao giờ bị từ chối vì tài khoản có quá nhiều phiên hoạt động hoặc tạo quá nhiều phiên gần đây.",
+    "Save login session limit": "Lưu giới hạn phiên đăng nhập",
+    "Public archive of the current model emitted output.": "Trang lưu trữ công khai đầu ra thực tế của mô hình hiện tại."
   },
   "Amount in {{currency}} given to new users (= {{formattedQuota}})": "Amount in {{currency}} given to new users (= {{formattedQuota}})",
   "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})": "Amount in {{currency}} given to users who invite others (= {{formattedQuota}})",

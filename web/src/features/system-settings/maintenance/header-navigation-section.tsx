@@ -57,6 +57,7 @@ const headerNavSchema = z.object({
   rankingsRequireAuth: z.boolean(),
   docs: z.boolean(),
   about: z.boolean(),
+  modelTest: z.boolean(),
 })
 
 type HeaderNavFormValues = z.infer<typeof headerNavSchema>
@@ -95,6 +96,10 @@ const toFormValues = (config: HeaderNavModulesConfig): HeaderNavFormValues => ({
     config.about === undefined
       ? HEADER_NAV_DEFAULT.about
       : Boolean(config.about),
+  modelTest:
+    config.modelTest === undefined
+      ? HEADER_NAV_DEFAULT.modelTest
+      : Boolean(config.modelTest),
 })
 
 export function HeaderNavigationSection({
@@ -121,6 +126,7 @@ export function HeaderNavigationSection({
       console: values.console,
       docs: values.docs,
       about: values.about,
+      modelTest: values.modelTest,
       pricing: {
         ...(config.pricing ?? HEADER_NAV_DEFAULT.pricing),
         enabled: values.pricingEnabled,
@@ -172,6 +178,11 @@ export function HeaderNavigationSection({
       key: 'about',
       title: t('About'),
       description: t('Static page describing the platform.'),
+    },
+    {
+      key: 'modelTest',
+      title: t('Model Effect Test'),
+      description: t('Public archive of the current model emitted output.'),
     },
   ]
 

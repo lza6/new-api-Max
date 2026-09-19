@@ -62,6 +62,16 @@ func setupAuthSessionTestDB(t *testing.T) *model.User {
 	return user
 }
 
+// enableSessionLimitForTest turns on the login session limits for tests that
+// assert ErrUserSessionLimit / ErrUserSessionIssuanceLimit behavior. The
+// production default keeps limits disabled (common.SessionLimitEnabled=false).
+func enableSessionLimitForTest(t *testing.T) {
+	t.Helper()
+	previous := common.SessionLimitEnabled
+	common.SessionLimitEnabled = true
+	t.Cleanup(func() { common.SessionLimitEnabled = previous })
+}
+
 func useIndependentAuthSessionRedis(t *testing.T) (*miniredis.Miniredis, *redis.Client, *miniredis.Miniredis, *redis.Client) {
 	t.Helper()
 	previousRedisEnabled := common.RedisEnabled
@@ -98,6 +108,7 @@ func cachedLoginSessionKey(t *testing.T, server *miniredis.Miniredis) string {
 func TestCreateLoginSessionEnforcesActiveLimitAcrossAuthVersions(t *testing.T) {
 	useTestSessionSecret(t)
 	user := setupAuthSessionTestDB(t)
+	enableSessionLimitForTest(t)
 	common.UserSessionActiveLimit = 50
 	common.UserSessionIssuanceLimit = 100
 	now := time.Now().Unix()
@@ -135,6 +146,7 @@ func TestCreateLoginSessionEnforcesActiveLimitAcrossAuthVersions(t *testing.T) {
 func TestCreateLoginSessionEnforcesIssuanceLimitAcrossAllStatuses(t *testing.T) {
 	useTestSessionSecret(t)
 	user := setupAuthSessionTestDB(t)
+	enableSessionLimitForTest(t)
 	common.UserSessionActiveLimit = 10
 	common.UserSessionIssuanceLimit = 3
 	common.UserSessionIssuanceWindowSeconds = 60
@@ -171,6 +183,7 @@ func TestCreateLoginSessionEnforcesIssuanceLimitAcrossAllStatuses(t *testing.T) 
 func TestPasswordResetDoesNotClearSessionIssuanceHistory(t *testing.T) {
 	useTestSessionSecret(t)
 	user := setupAuthSessionTestDB(t)
+	enableSessionLimitForTest(t)
 	common.UserSessionActiveLimit = 50
 	common.UserSessionIssuanceLimit = 1
 	email := "session-reset@example.com"
@@ -187,6 +200,7 @@ func TestPasswordResetDoesNotClearSessionIssuanceHistory(t *testing.T) {
 func TestCreateLoginSessionFailsClosedWhenLimitCountFails(t *testing.T) {
 	useTestSessionSecret(t)
 	user := setupAuthSessionTestDB(t)
+	enableSessionLimitForTest(t)
 	forcedErr := errors.New("forced session count failure")
 	callbackName := "test:fail_user_session_limit_count"
 	callbackRegistered := true
@@ -428,4 +442,34 @@ func TestUserAuthVersionInvalidatesExistingSession(t *testing.T) {
 	assert.ErrorIs(t, err, ErrLoginSessionRevoked)
 	_, err = CreateLoginSessionAtAuthVersion(user.Id, identity.UserAuthVersion, "2fa", "127.0.0.1", "test-agent")
 	assert.ErrorIs(t, err, ErrLoginSessionRevoked, "a pending 2FA flow must not survive an auth-version change")
+}
+
+func TestCreateLoginSessionAllowsOverLimitWhenLimitsDisabled(t *testing.T) {
+	useTestSessionSecret(t)
+	user := setupAuthSessionTestDB(t)
+	// Production default: SessionLimitEnabled is false, so neither the active
+	// nor the issuance limit may block a login even when the user already has
+	// more active sessions than the (unused) DefaultUserSessionActiveLimit.
+	require.False(t, common.SessionLimitEnabled)
+
+	now := time.Now().Unix()
+	rows := make([]model.UserSession, 0, common.DefaultUserSessionActiveLimit+5)
+	for i := range common.DefaultUserSessionActiveLimit + 5 {
+		rows = append(rows, model.UserSession{
+			SID:             fmt.Sprintf("over-limit-%02d", i),
+			UserID:          user.Id,
+			Version:         1,
+			UserAuthVersion: user.AuthVersion,
+			Status:          model.UserSessionStatusActive,
+			RefreshHash:     fmt.Sprintf("hash-%02d", i),
+			LoginMethod:     "password",
+			CreatedAt:       now - int64(i),
+			LastActiveAt:    now - int64(i),
+			ExpiresAt:       now + 3600,
+		})
+	}
+	require.NoError(t, model.DB.Create(&rows).Error)
+
+	_, err := CreateLoginSession(user.Id, "password", "127.0.0.1", "test-agent")
+	require.NoError(t, err, "logins must not be blocked while the session limit is disabled")
 }
