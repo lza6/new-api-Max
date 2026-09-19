@@ -24,7 +24,11 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useStatus } from '@/hooks/use-status'
 
-import { HeroTerminalDemo } from '../hero-terminal-demo'
+import { lazy, Suspense } from 'react'
+
+const HeroTerminalDemo = lazy(() =>
+  import('../hero-terminal-demo').then((m) => ({ default: m.HeroTerminalDemo }))
+)
 
 interface HeroProps {
   className?: string
@@ -237,7 +241,9 @@ export function Hero(props: HeroProps) {
           className='landing-animate-fade-up flex w-full justify-center opacity-0 lg:col-span-6'
           style={{ animationDelay: '320ms' }}
         >
-          <HeroTerminalDemo className='mt-8 lg:mt-0' />
+          <Suspense fallback={<div className='mt-8 h-64 w-full rounded-lg border bg-muted/40 lg:mt-0' />}>
+            <HeroTerminalDemo className='mt-8 lg:mt-0' />
+          </Suspense>
         </div>
       </div>
     </section>
