@@ -31,6 +31,7 @@ import { resolveTaskDetailAccess } from '../../lib/task-details'
 import { readTaskStructuredProgress, type TaskLog } from '../../types'
 import { getFriendlyErrorMessage } from '@/lib/server-error-message'
 import { PluginAuthorLink } from '../plugin-author-link'
+import { TaskEventStream } from '../task-event-stream'
 
 function DetailRow(props: {
   label: React.ReactNode
@@ -302,6 +303,8 @@ export function TaskDetailsDialog(props: TaskDetailsDialogProps) {
             </DetailSection>
           ) : null}
         </DetailSection>
+
+        <TaskEventStream taskId={props.log.task_id} />
 
         {props.isAdmin ? (
           <DetailSection

@@ -555,6 +555,8 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	// {event_type,current,total,step}，合并写入 Task.Data.progress（保留
 	// 已存在的 refund/resolution 等字段）；纯字符串/解析失败则维持原样。
 	applyStructuredTaskProgress(task, taskResult)
+	// B4-1: 任务事件流 —— 进度事件（结构化→step_ratio；纯字符串变化→progress）。
+	recordTaskProgressEvents(ctx, task, taskResult, snap.Progress)
 	if len(taskResult.PluginState) > 0 {
 		task.PrivateData.PluginState = taskResult.PluginState
 	}
@@ -569,12 +571,21 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 	switch parsedStatus {
 	case model.TaskStatusSubmitted:
 		task.Progress = taskcommon.ProgressSubmitted
+		if snap.Status != parsedStatus {
+			RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventQueued, TaskEventPayloadStatus{TaskID: task.TaskID, Status: string(parsedStatus), Progress: task.Progress})
+		}
 	case model.TaskStatusQueued:
 		task.Progress = taskcommon.ProgressQueued
+		if snap.Status != parsedStatus {
+			RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventQueued, TaskEventPayloadStatus{TaskID: task.TaskID, Status: string(parsedStatus), Progress: task.Progress})
+		}
 	case model.TaskStatusInProgress:
 		task.Progress = taskcommon.ProgressInProgress
 		if task.StartTime == 0 {
 			task.StartTime = now
+		}
+		if snap.Status != model.TaskStatusInProgress {
+			RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventClaimed, TaskEventPayloadStatus{TaskID: task.TaskID, Status: string(parsedStatus), Progress: task.Progress})
 		}
 	case model.TaskStatusSuccess:
 		task.Progress = taskcommon.ProgressComplete
@@ -592,6 +603,9 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 			task.PrivateData.ResultURL = taskcommon.BuildProxyURL(task.TaskID)
 		}
 		shouldFinalizeBilling = true
+		if snap.Status != parsedStatus {
+			RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventSucceeded, TaskEventPayloadStatus{TaskID: task.TaskID, Status: string(parsedStatus), Progress: task.Progress})
+		}
 	case model.TaskStatusFailure:
 		logger.LogJson(ctx, fmt.Sprintf("Task %s failed", taskId), task)
 		task.Status = model.TaskStatusFailure
@@ -603,6 +617,9 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 		logger.LogInfo(ctx, fmt.Sprintf("Task %s failed: %s", task.TaskID, task.FailReason))
 		taskResult.Progress = taskcommon.ProgressComplete
 		shouldFinalizeBilling = true
+		if snap.Status != parsedStatus {
+			RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventFailed, TaskEventPayloadStatus{TaskID: task.TaskID, Status: string(parsedStatus), Reason: task.FailReason})
+		}
 	}
 	if taskResult.Progress != "" {
 		task.Progress = taskResult.Progress
@@ -805,6 +822,35 @@ func structuredTaskProgress(raw string) (map[string]any, bool) {
 		"total":      total,
 		"step":       step,
 	}, true
+}
+
+// recordTaskProgressEvents 按 B4-1 契约发 progress/step_ratio 事件（best-effort）：
+// 结构化 "current/total step" 进度发 step_ratio（含 event_type/current/total/step）；
+// 纯字符串进度与上一轮不同时发 progress（含进度值）。失败不影响轮询主流程。
+func recordTaskProgressEvents(ctx context.Context, task *model.Task, result *relaycommon.TaskInfo, prevProgress string) {
+	if result == nil || result.Progress == "" {
+		return
+	}
+	if tr, ok := structuredTaskProgress(result.Progress); ok {
+		cur, _ := tr["current"].(int)
+		total, _ := tr["total"].(int)
+		eventType, _ := tr["event_type"].(string)
+		step, _ := tr["step"].(string)
+		RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventStepRatio, TaskEventPayloadProgress{
+			TaskID:    task.TaskID,
+			EventType: eventType,
+			Current:   cur,
+			Total:     total,
+			Step:      step,
+		})
+		return
+	}
+	if result.Progress != prevProgress {
+		RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventProgress, TaskEventPayloadProgress{
+			TaskID:   task.TaskID,
+			Progress: result.Progress,
+		})
+	}
 }
 
 func pollFailureReason(class string, statusCode int, detail string) string {

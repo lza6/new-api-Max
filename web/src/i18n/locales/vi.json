@@ -6482,5 +6482,21 @@
     "Channel {{channel}} has a high error rate ({{rate}}%)": "Kênh {{channel}} có tỷ lệ lỗi cao ({{rate}}%)",
     "The last 7 days account for {{percent}}% of your 30-day usage": "7 ngày gần nhất chiếm {{percent}}% lượng dùng 30 ngày",
     "No recent usage in the last 30 days": "Không có sử dụng trong 30 ngày qua"
-  }
+  },
+  "Task Event Stream": "Dòng sự kiện tác vụ",
+  "Stream ended": "Đã kết thúc luồng",
+  "Stream error": "Lỗi luồng",
+  "Unable to connect to event stream": "Không thể kết nối luồng sự kiện",
+  "Waiting for task events": "Đang chờ sự kiện tác vụ",
+  "Event.submitted": "Đã gửi",
+  "Event.queued": "Đã xếp hàng",
+  "Event.claimed": "Đã tiếp nhận",
+  "Event.progress": "Tiến độ",
+  "Event.step_ratio": "Tiến độ bước",
+  "Event.succeeded": "Thành công",
+  "Event.failed": "Thất bại",
+  "Event.refunded": "Đã hoàn tiền",
+  "Event.unconfirmed": "Chưa xác nhận",
+  "Connecting": "Đang kết nối",
+  "Live": "Trực tiếp"
 }

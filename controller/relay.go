@@ -869,13 +869,28 @@ func executeTaskSubmissionWith(
 		}
 	}
 	diagnostics.insertStart(task)
-	if insertErr := task.InsertWithContext(c.Request.Context()); insertErr != nil {
-		common.SysError("insert task error: " + insertErr.Error())
-		taskErr = service.TaskErrorWrapperLocal(errors.New("failed to persist task"), "task_insert_failed", http.StatusInternalServerError)
-		diagnostics.failed("insert", "database_error", taskErr, false)
-		return nil, taskErr
-	}
 	durable = true
+
+	// B4-1: 任务事件流 —— 提交成功（durable barrier 后）发出 submitted 事件；
+	// 立即返回终态时补充 succeeded/failed 事件。best-effort，失败不影响主流程。
+	service.RecordTaskEvent(c.Request.Context(), task.ID, task.TaskID, task.UserId, service.TaskEventSubmitted, service.TaskEventPayloadSubmitted{
+		TaskID:   task.TaskID,
+		Platform: string(task.Platform),
+		Action:   task.Action,
+	})
+	if task.Status == model.TaskStatusSuccess {
+		service.RecordTaskEvent(c.Request.Context(), task.ID, task.TaskID, task.UserId, service.TaskEventSucceeded, service.TaskEventPayloadStatus{
+			TaskID:   task.TaskID,
+			Status:   string(task.Status),
+			Progress: task.Progress,
+		})
+	} else if task.Status == model.TaskStatusFailure {
+		service.RecordTaskEvent(c.Request.Context(), task.ID, task.TaskID, task.UserId, service.TaskEventFailed, service.TaskEventPayloadStatus{
+			TaskID: task.TaskID,
+			Status: string(task.Status),
+			Reason: task.FailReason,
+		})
+	}
 	stage = "settle"
 	diagnostics.durable(task)
 	diagnostics.settleStart(task, result.Quota)
@@ -991,6 +1006,14 @@ func persistUnconfirmedTask(c *gin.Context, relayInfo *relaycommon.RelayInfo, in
 		common.SysError("persist unconfirmed task error: " + insertErr.Error())
 		return false
 	}
+
+	// B4-1: 任务事件流 —— unconfirmed 任务行落库后发出 unconfirmed 事件
+	// （远端可能已创建付费任务，前端据此展示"提交不可确认"）。
+	service.RecordTaskEvent(c.Request.Context(), task.ID, task.TaskID, task.UserId, service.TaskEventUnconfirmed, service.TaskEventPayloadUnconfirmed{
+		TaskID:           task.TaskID,
+		RemoteTaskIDHint: info.RemoteTaskIDHint,
+		FailedAt:         info.FailedAt,
+	})
 	return true
 }
 

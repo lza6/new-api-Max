@@ -6482,5 +6482,21 @@
     "Channel {{channel}} has a high error rate ({{rate}}%)": "渠道 {{channel}} 错误率偏高（{{rate}}%），建议检查上游配置",
     "The last 7 days account for {{percent}}% of your 30-day usage": "近 7 天消耗占 30 天总量的 {{percent}}%，留意余额",
     "No recent usage in the last 30 days": "近 30 天暂无调用记录"
-  }
+  },
+  "Task Event Stream": "任务事件流",
+  "Stream ended": "事件流已结束",
+  "Stream error": "事件流错误",
+  "Unable to connect to event stream": "无法连接事件流",
+  "Waiting for task events": "等待任务事件",
+  "Event.submitted": "已提交",
+  "Event.queued": "已排队",
+  "Event.claimed": "已受理",
+  "Event.progress": "进度",
+  "Event.step_ratio": "步骤进度",
+  "Event.succeeded": "已完成",
+  "Event.failed": "已失败",
+  "Event.refunded": "已退款",
+  "Event.unconfirmed": "待确认",
+  "Connecting": "连接中",
+  "Live": "实时"
 }

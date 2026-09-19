@@ -256,6 +256,13 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 	// 6. 退款可见性：把退款金额/原因写进 Task.Data 的 refund 字段，
 	// 任务详情页据此展示"本次失败已退回"（与失败原因同一处呈现）。
 	AppendTaskRefundMarker(task, quota, reason)
+
+	// 7. B4-1: 任务事件流 —— refunded 事件（best-effort）。
+	RecordTaskEvent(ctx, task.ID, task.TaskID, task.UserId, TaskEventRefunded, TaskEventPayloadRefunded{
+		TaskID: task.TaskID,
+		Quota:  quota,
+		Reason: reason,
+	})
 	if err := task.UpdateDataColumn(); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("退款成功但回写 task refund 标记失败 task %s: %s", task.TaskID, err.Error()))
 	}

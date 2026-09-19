@@ -6482,5 +6482,21 @@
     "Channel {{channel}} has a high error rate ({{rate}}%)": "Канал {{channel}} имеет высокую долю ошибок ({{rate}}%)",
     "The last 7 days account for {{percent}}% of your 30-day usage": "Последние 7 дней дают {{percent}}% использования за 30 дней",
     "No recent usage in the last 30 days": "Нет использования за последние 30 дней"
-  }
+  },
+  "Task Event Stream": "Поток событий задачи",
+  "Stream ended": "Поток завершён",
+  "Stream error": "Ошибка потока",
+  "Unable to connect to event stream": "Не удалось подключиться к потоку событий",
+  "Waiting for task events": "Ожидание событий задачи",
+  "Event.submitted": "Отправлено",
+  "Event.queued": "В очереди",
+  "Event.claimed": "Принято",
+  "Event.progress": "Прогресс",
+  "Event.step_ratio": "Шаговый прогресс",
+  "Event.succeeded": "Успешно",
+  "Event.failed": "Неудача",
+  "Event.refunded": "Возвращено",
+  "Event.unconfirmed": "Не подтверждено",
+  "Connecting": "Подключение",
+  "Live": "В реальном времени"
 }

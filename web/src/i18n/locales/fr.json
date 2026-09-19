@@ -6482,5 +6482,21 @@
     "Channel {{channel}} has a high error rate ({{rate}}%)": "Le canal {{channel}} a un taux d'erreur élevé ({{rate}}%)",
     "The last 7 days account for {{percent}}% of your 30-day usage": "Les 7 derniers jours représentent {{percent}}% de votre usage sur 30 jours",
     "No recent usage in the last 30 days": "Aucune utilisation récente sur 30 jours"
-  }
+  },
+  "Task Event Stream": "Flux d'événements de la tâche",
+  "Stream ended": "Flux terminé",
+  "Stream error": "Erreur du flux",
+  "Unable to connect to event stream": "Impossible de se connecter au flux d'événements",
+  "Waiting for task events": "En attente d'événements de tâche",
+  "Event.submitted": "Soumis",
+  "Event.queued": "En file d'attente",
+  "Event.claimed": "Pris en charge",
+  "Event.progress": "Progression",
+  "Event.step_ratio": "Progression par étapes",
+  "Event.succeeded": "Réussi",
+  "Event.failed": "Échoué",
+  "Event.refunded": "Remboursé",
+  "Event.unconfirmed": "Non confirmé",
+  "Connecting": "Connexion",
+  "Live": "En direct"
 }

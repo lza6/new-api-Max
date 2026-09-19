@@ -6482,5 +6482,21 @@
     "Channel {{channel}} has a high error rate ({{rate}}%)": "チャネル {{channel}} のエラー率が高い（{{rate}}%）",
     "The last 7 days account for {{percent}}% of your 30-day usage": "直近7日間が30日間利用の {{percent}}% を占めています",
     "No recent usage in the last 30 days": "直近30日間に利用がありません"
-  }
+  },
+  "Task Event Stream": "タスクイベントストリーム",
+  "Stream ended": "ストリーム終了",
+  "Stream error": "ストリームエラー",
+  "Unable to connect to event stream": "イベントストリームに接続できません",
+  "Waiting for task events": "タスクイベントを待機中",
+  "Event.submitted": "送信済み",
+  "Event.queued": "キュー済み",
+  "Event.claimed": "処理開始",
+  "Event.progress": "進捗",
+  "Event.step_ratio": "ステップ進捗",
+  "Event.succeeded": "成功",
+  "Event.failed": "失敗",
+  "Event.refunded": "返金済み",
+  "Event.unconfirmed": "未確認",
+  "Connecting": "接続中",
+  "Live": "ライブ"
 }
