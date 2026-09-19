@@ -20,6 +20,7 @@ import { describe, expect, test } from 'vitest'
 
 import {
   getProbeResults,
+  coolClassLabelKey,
   gradeToVariant,
   hasHealthData,
   parseProbeHistory,
@@ -203,4 +204,22 @@ test('leaves lastCoolClass undefined when absent', () => {
     8
   )
   expect(view.lastCoolClass).toBeUndefined()
+})
+
+describe('coolClassLabelKey', () => {
+  test('maps known cooldown classes to their cool-class.* keys', () => {
+    expect(coolClassLabelKey('auth')).toBe('cool-class.auth')
+    expect(coolClassLabelKey('rate_limited')).toBe('cool-class.rate_limited')
+    expect(coolClassLabelKey('server_error')).toBe('cool-class.server_error')
+    expect(coolClassLabelKey('timeout')).toBe('cool-class.timeout')
+    expect(coolClassLabelKey('bad_request')).toBe('cool-class.bad_request')
+    expect(coolClassLabelKey('capability')).toBe('cool-class.capability')
+  })
+
+  test('falls back to the generic key for missing/ok/unknown classes', () => {
+    expect(coolClassLabelKey(undefined)).toBe('cool-class.unknown')
+    expect(coolClassLabelKey('ok')).toBe('cool-class.unknown')
+    expect(coolClassLabelKey('unknown')).toBe('cool-class.unknown')
+    expect(coolClassLabelKey('')).toBe('cool-class.unknown')
+  })
 })

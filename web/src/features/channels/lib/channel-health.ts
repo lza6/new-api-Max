@@ -123,6 +123,19 @@ export function hasHealthData(snapshot: ChannelHealthSnapshotView): boolean {
   return snapshot.score > 0 || snapshot.sampleCount > 0
 }
 
+/**
+ * Cooldown error class id -> i18n key under cool-class.* (B5-2 hover reason).
+ * Unknown/empty/ok map to the generic key so the tooltip never shows a raw
+ * identifier; known classes (auth/rate_limited/server_error/timeout/...)
+ * resolve to their dedicated human labels.
+ */
+export function coolClassLabelKey(coolClass: string | undefined): string {
+  if (coolClass && coolClass !== 'ok') {
+    return `cool-class.${coolClass}`
+  }
+  return 'cool-class.unknown'
+}
+
 export type ProbeGradeVariant =
   | 'success'
   | 'warning'

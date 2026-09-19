@@ -46,6 +46,7 @@ import { useAuthStore } from '@/stores/auth-store'
 
 import { getChannelHealthScores } from '../api'
 import {
+  coolClassLabelKey,
   formatRelativeTime,
   getProbeResults,
   gradeToVariant,
@@ -123,7 +124,7 @@ function ProbeEvidence(props: { evidence: string }) {
   )
 }
 
-function HealthPopoverContent(props: {
+export function HealthPopoverContent(props: {
   report: ProbeReport
   snapshot: ChannelHealthSnapshotView
 }) {
@@ -196,9 +197,16 @@ function HealthPopoverContent(props: {
           value={String(snapshot.coolCount)}
         />
         {snapshot.coolingDown && snapshot.coolUntil > 0 && (
-          <p className='text-warning text-xs'>
-            {t('Cooling down')} · {formatRelativeTime(snapshot.coolUntil, locale)}
-          </p>
+          <div className='space-y-1'>
+            <p className='text-warning text-xs'>
+              {t('Cooling down')} · {formatRelativeTime(snapshot.coolUntil, locale)}
+            </p>
+            {snapshot.lastCoolClass ? (
+              <p className='text-muted-foreground text-xs'>
+                {t('Reason:')} {t(coolClassLabelKey(snapshot.lastCoolClass))}
+              </p>
+            ) : null}
+          </div>
         )}
       </div>
     </div>
