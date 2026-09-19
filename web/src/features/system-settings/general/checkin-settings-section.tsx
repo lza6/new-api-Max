@@ -59,8 +59,10 @@ import { useUpdateOption } from '../hooks/use-update-option'
 
 const schema = z.object({
   enabled: z.boolean(),
-  minQuota: z.coerce.number().int().min(0),
-  maxQuota: z.coerce.number().int().min(0),
+  // 表单字段是显示货币金额（如 ¥0.5 = 0.5），必须允许小数；
+  // 内部 quota 的整数换算在 parseQuotaFromDollars 内完成。
+  minQuota: z.coerce.number().min(0),
+  maxQuota: z.coerce.number().min(0),
 })
 
 type Values = z.infer<typeof schema>
