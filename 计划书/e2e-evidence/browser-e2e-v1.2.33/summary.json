@@ -1,0 +1,46 @@
+{
+  "ok": 7,
+  "fail": 1,
+  "results": [
+    {
+      "name": "landing loads",
+      "pass": true,
+      "extra": "h1=统一 API 网关，服务于海量 AI 模型"
+    },
+    {
+      "name": "hero terminal lazy rendered",
+      "pass": true,
+      "extra": "bodyLen=1223"
+    },
+    {
+      "name": "checkin page inputs found",
+      "pass": true,
+      "extra": "inputs=2"
+    },
+    {
+      "name": "no Invalid input after save",
+      "pass": true,
+      "extra": ""
+    },
+    {
+      "name": "settings persisted hint (updated toast)",
+      "pass": false,
+      "extra": ""
+    },
+    {
+      "name": "backfill min=0.5",
+      "pass": true,
+      "extra": "min=0.5"
+    },
+    {
+      "name": "backfill max=0.8",
+      "pass": true,
+      "extra": "max=0.8"
+    },
+    {
+      "name": "no console errors",
+      "pass": true,
+      "extra": ""
+    }
+  ]
+}

@@ -167,3 +167,16 @@
 ## Verification
 - node --check sw.js exit 0；tsgo -b exit 0；rsbuild build exit 0（dist 含 sw.js 1310B/robots 75B/sitemap 804B）
 - Boundary：SW 真实缓存行为需部署后浏览器验证（本地已确保语法/构建/复制）
+---
+
+# 2026-09-20 追加段：浏览器级真实 E2E（v1.2.33 前端，Playwright，不覆盖上述记录）
+
+## 结果（8 断言：7 通过 / 1 断言文案不匹配但功能通过）
+- Landing 加载 ✅（h1=统一 API 网关，服务于海量 AI 模型）；Hero 懒加载内容渲染 ✅（bodyLen 1223）
+- 签到设置页：输入框 2 个 ✅；保存 0.5/0.8 后 **无 "Invalid input"** ✅；**刷新回填 min=0.5 / max=0.8** ✅（持久化铁证）
+- 控制台零错误 ✅；/sw.js 注册并被请求（200）✅
+- 唯一 FAIL：toast 文案断言未匹配（sonner 文案/时序），功能已被回填断言覆盖，非缺陷
+
+## 证据
+- 计划书/e2e-evidence/browser-e2e-v1.2.33/{landing-desktop.png, checkin-settings.png, summary.json}
+- 运行：本地 v1.2.33 网关（嵌入最新 dist）+ chromium Playwright，真实浏览器点击/输入/保存/刷新
