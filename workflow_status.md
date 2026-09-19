@@ -307,3 +307,22 @@
 - 观察：管理端 API 创建 token 返回 success 但未落库（待查，可能与 admin token 权限/审计相关，非本批阻断）。
 - CI 队列积压待观察（GHCR v1.2.34 镜像未出；本地镜像已在生产运行）。
 - watchtower 仅跟 `latest`，不影响本地镜像（钉住 tag 安全）。
+# 2026-09-20 追加段：管理端日志页实时指标（当前并发 + 近1分钟完成）
+
+## Changes
+- middleware/stats.go：新增 61 格按秒分桶滑动窗口 completedWindow（互斥锁，零额外计算），请求结束记录完成数；
+  StatsInfo 增加 completed_last_minute；GetStats 返回并发+完成两值。
+- controller/log.go GetLogsStat（admin-only）：data 增加 concurrent_requests / completed_last_minute。
+- web：usage-logs 头部 admin 视图新增两个 StatBadge（Concurrent now / Completed last minute），admin 查询 5s 轮询实时刷新。
+- i18n：修复上轮 traffic 3 键误放 root 命名空间（实测 zh 下 t() 返回英文）→ 迁入 translation 并补 7 语言翻译；新增 2 键全语言翻译；i18n:sync 无漂移。
+- 测试：middleware/stats_test.go（滑动窗口 + 中间件并发增减）；common-logs-stats.test.tsx（admin 渲染/非 admin 隐藏）。
+
+## 验证
+- go build ./... OK；go test ./middleware/ 相关用例 OK（含并发 2 请求增减）。
+- web：tsgo -b OK；vitest 新组件测试 2/2；rsbuild build OK。
+- 本地 E2E（mock 上游 + 本地 SQLite + 5 路并发流式请求）：峰值并发 concurrent_requests=5、完成后 completed_last_minute=5、回落 0；
+  /api/status/test 亦暴露两字段。证据：计划书/e2e-evidence/concurrency-live-metrics-e2e.json
+  （注：relay 500 为 SSRF 防护拒绝本地 loopback 上游的预期行为，与指标计数无关；指标按 HTTP 全量请求计数）。
+
+## 存量（非本次引入，基线复现）
+- usage-logs 4 个测试文件在 HEAD 基线即失败（viewer.test.tsx 19 例 audit 渲染断言 + 3 个 filter 测试），与本批改动无关。

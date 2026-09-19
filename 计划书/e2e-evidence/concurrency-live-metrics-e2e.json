@@ -1,0 +1,45 @@
+{
+ "baseline": {
+  "completed_last_minute": 5,
+  "concurrent_requests": 0,
+  "quota": 0,
+  "rpm": 0,
+  "tpm": 0
+ },
+ "peak_concurrent_while_inflight": 5,
+ "relay_results": {
+  "0": [
+   "http",
+   500,
+   "{\"error\":{\"message\":\"upstream address rejected (request id: 20260919204405238072400fd097e04HYb3jyLn)\",\"type\":\"new_api_er"
+  ],
+  "2": [
+   "http",
+   500,
+   "{\"error\":{\"message\":\"upstream address rejected (request id: 20260919204405242643900fd097e04RjgnMWf0)\",\"type\":\"new_api_er"
+  ],
+  "1": [
+   "http",
+   500,
+   "{\"error\":{\"message\":\"upstream address rejected (request id: 20260919204405242003700fd097e04gWzODpAG)\",\"type\":\"new_api_er"
+  ],
+  "3": [
+   "http",
+   500,
+   "{\"error\":{\"message\":\"upstream address rejected (request id: 20260919204405250431000fd097e04HdwuZMvV)\",\"type\":\"new_api_er"
+  ],
+  "4": [
+   "http",
+   500,
+   "{\"error\":{\"message\":\"upstream address rejected (request id: 20260919204405254343700fd097e04HwdXfMp3)\",\"type\":\"new_api_er"
+  ]
+ },
+ "after_complete": {
+  "completed_last_minute": 10,
+  "concurrent_requests": 0,
+  "quota": 0,
+  "rpm": 0,
+  "tpm": 0
+ },
+ "pass": true
+}
