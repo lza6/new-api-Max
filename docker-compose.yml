@@ -36,6 +36,8 @@ services:
       - ERROR_LOG_ENABLED=true # 是否启用错误日志记录 (Whether to enable error log recording)
       - BATCH_UPDATE_ENABLED=true  # 是否启用批量更新 (Whether to enable batch update)
       - NODE_NAME=new-api-node-1  # 节点名称，用于审计日志中标识节点身份；多节点/容器部署时建议设置 (Node name used in audit logs; recommended when running multiple instances or in containers)
+      - MEMORY_CACHE_ENABLED=true  # 内存缓存渠道/模型选择：避免每次请求回源 DB，显著降低首字延迟 (Latency-critical; pair with SYNC_FREQUENCY)
+      - SYNC_FREQUENCY=60  # 渠道/模型缓存同步频率（秒）；关闭 MEMORY_CACHE_ENABLED 时可注释 (Channel cache sync frequency in seconds)
 #      - STREAMING_TIMEOUT=300  # 流模式无响应超时时间，单位秒，默认120秒，如果出现空补全可以尝试改为更大值 （Streaming timeout in seconds, default is 120s. Increase if experiencing empty completions）
 #      - RELAY_IDLE_CONN_TIMEOUT=90  # Relay HTTP 客户端空闲连接超时时间，单位秒，默认跟随 Go 标准库，设置为0表示不限制 (Relay HTTP client idle keep-alive timeout in seconds, defaults to Go standard library; set 0 to disable)
 #      - SESSION_SECRET=random_string  # 多机部署时设置，必须修改这个随机字符串！！ （multi-node deployment, set this to a random string!!!!!!!）
@@ -47,7 +49,6 @@ services:
 #      - USER_SESSION_ISSUANCE_WINDOW_SECONDS=86400  # 不得大于 revoked 保留期 (must not exceed revoked retention)
 #      - USER_SESSION_REVOKED_RETENTION_DAYS=7
 #      - USER_SESSION_HOURLY_ALERT_THRESHOLD=5000  # 仅告警，不做全局拒绝 (alert only; never globally rejects login)
-#      - SYNC_FREQUENCY=60  # Uncomment if regular database syncing is needed
 #      - GOOGLE_ANALYTICS_ID=G-XXXXXXXXXX  # Google Analytics 的测量 ID (Google Analytics Measurement ID)
 #      - UMAMI_WEBSITE_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx  # Umami 网站 ID (Umami Website ID)
 #      - UMAMI_SCRIPT_URL=https://analytics.umami.is/script.js  # Umami 脚本 URL，默认为官方地址 (Umami Script URL, defaults to official URL)
