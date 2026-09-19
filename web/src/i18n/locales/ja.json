@@ -6486,7 +6486,8 @@
     "Completed last minute": "直近1分の完了",
     "Traffic today": "今日のトラフィック",
     "Traffic 7d": "7日間のトラフィック",
-    "Traffic 30d": "30日間のトラフィック"
+    "Traffic 30d": "30日間のトラフィック",
+    "Check-in max must be at least the minimum": "最大額は最小額以上にしてください"
   },
   "Task Event Stream": "タスクイベントストリーム",
   "Stream ended": "ストリーム終了",

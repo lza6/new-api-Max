@@ -82,6 +82,18 @@ afterEach(() => {
   useSystemConfigStore.getState().setConfig(previousConfig)
 })
 
+function renderSectionWith(values: { enabled: boolean; minQuota: number; maxQuota: number }): void {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  render(
+    <QueryClientProvider client={queryClient}>
+      <CheckinSettingsSection defaultValues={values} />
+    </QueryClientProvider>
+  )
+  queryClients.push(queryClient)
+}
+
 function renderSection(): void {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -136,5 +148,48 @@ describe('CheckinSettingsSection', () => {
       })
     )
     expect(screen.queryByText(/Invalid input/)).not.toBeInTheDocument()
+  })
+
+  test('does not show Invalid input when check-in options are undefined (fresh admin)', async () => {
+    renderSectionWith({
+      enabled: true,
+      minQuota: undefined as unknown as number,
+      maxQuota: undefined as unknown as number,
+    })
+
+    const minInput = screen.getByLabelText(
+      'Minimum check-in quota'
+    ) as HTMLInputElement
+    const maxInput = screen.getByLabelText(
+      'Maximum check-in quota'
+    ) as HTMLInputElement
+    expect(minInput.value).toBe('0')
+    expect(maxInput.value).toBe('0')
+    expect(screen.queryByText(/Invalid input/)).not.toBeInTheDocument()
+  })
+
+  test('rejects max < min with a friendly message and does not save', async () => {
+    const user = userEvent.setup()
+    renderSection()
+
+    const minInput = screen.getByLabelText(
+      'Minimum check-in quota'
+    ) as HTMLInputElement
+    const maxInput = screen.getByLabelText(
+      'Maximum check-in quota'
+    ) as HTMLInputElement
+    await user.clear(minInput)
+    await user.type(minInput, '1.5')
+    await user.clear(maxInput)
+    await user.type(maxInput, '0.8')
+
+    await user.click(
+      screen.getByRole('button', { name: 'Save check-in settings' })
+    )
+
+    expect(
+      screen.getByText('Check-in max must be at least the minimum')
+    ).toBeInTheDocument()
+    expect(api.put).not.toHaveBeenCalled()
   })
 })

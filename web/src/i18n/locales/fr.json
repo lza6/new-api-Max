@@ -6486,7 +6486,8 @@
     "Completed last minute": "Terminés (1 min)",
     "Traffic today": "Trafic aujourd'hui",
     "Traffic 7d": "Trafic 7 j",
-    "Traffic 30d": "Trafic 30 j"
+    "Traffic 30d": "Trafic 30 j",
+    "Check-in max must be at least the minimum": "Le montant maximum doit être supérieur ou égal au minimum"
   },
   "Task Event Stream": "Flux d'événements de la tâche",
   "Stream ended": "Flux terminé",

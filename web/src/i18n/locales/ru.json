@@ -6486,7 +6486,8 @@
     "Completed last minute": "Завершено за 1 мин",
     "Traffic today": "Трафик сегодня",
     "Traffic 7d": "Трафик за 7 дней",
-    "Traffic 30d": "Трафик за 30 дней"
+    "Traffic 30d": "Трафик за 30 дней",
+    "Check-in max must be at least the minimum": "Максимальная сумма должна быть не меньше минимальной"
   },
   "Task Event Stream": "Поток событий задачи",
   "Stream ended": "Поток завершён",

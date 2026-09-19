@@ -6486,7 +6486,8 @@
     "Completed last minute": "近1分钟完成",
     "Traffic today": "今日流量",
     "Traffic 7d": "近7日流量",
-    "Traffic 30d": "近30日流量"
+    "Traffic 30d": "近30日流量",
+    "Check-in max must be at least the minimum": "签到最大额度不能小于最小额度"
   },
   "Task Event Stream": "任务事件流",
   "Stream ended": "事件流已结束",

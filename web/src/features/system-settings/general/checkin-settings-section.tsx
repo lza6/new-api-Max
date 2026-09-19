@@ -57,15 +57,20 @@ import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
 
-const schema = z.object({
-  enabled: z.boolean(),
-  // 表单字段是显示货币金额（如 ¥0.5 = 0.5），必须允许小数；
-  // 内部 quota 的整数换算在 parseQuotaFromDollars 内完成。
-  minQuota: z.coerce.number().min(0),
-  maxQuota: z.coerce.number().min(0),
-})
+/**
+ * 将选项里的额度单位安全转成可编辑显示金额：undefined/非数字视为 0，
+ * 避免把 NaN 传进表单触发 Zod "Invalid input"。
+ */
+function safeEditableAmount(value: number | undefined): number {
+  const n = Number(value)
+  return quotaUnitsToEditableAmount(Number.isFinite(n) ? n : 0)
+}
 
-type Values = z.infer<typeof schema>
+type Values = {
+  enabled: boolean
+  minQuota: number
+  maxQuota: number
+}
 
 export function CheckinSettingsSection({
   defaultValues,
@@ -82,13 +87,32 @@ export function CheckinSettingsSection({
   const currencyLabel = getCurrencyLabel()
   const tokensOnly = currencyMeta.kind === 'tokens'
 
+  // 字段为显示货币金额（如 ¥0.5 = 0.5），必须允许小数；
+  // 内部 quota 的整数换算在 parseQuotaFromDollars 内完成。
+  // 选项缺失/未定义时兜底为 0，避免 NaN 触发 "Invalid input"。
+  const schema = z
+    .object({
+      enabled: z.boolean(),
+      minQuota: z.coerce.number().min(0),
+      maxQuota: z.coerce.number().min(0),
+    })
+    .superRefine((values, ctx) => {
+      if (values.maxQuota < values.minQuota) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['maxQuota'],
+          message: t('Check-in max must be at least the minimum'),
+        })
+      }
+    })
+
   const form = useForm<Values>({
     resolver: zodResolver(schema) as unknown as Resolver<Values>,
     defaultValues: {
       enabled: defaultValues.enabled,
       // 额度奖励按显示货币金额回填（设 1 就是 1 美元/自定义单位）。
-      minQuota: quotaUnitsToEditableAmount(defaultValues.minQuota),
-      maxQuota: quotaUnitsToEditableAmount(defaultValues.maxQuota),
+      minQuota: safeEditableAmount(defaultValues.minQuota),
+      maxQuota: safeEditableAmount(defaultValues.maxQuota),
     },
   })
 
