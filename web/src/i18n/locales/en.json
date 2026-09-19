@@ -6523,5 +6523,6 @@
   "Model mapping": "Model mapping",
   "Model mapping intro": "The gateway maps the site model to the same name across protocols, so the model id stays identical everywhere:",
   "Model mapping note": "No third-party mapping required: the gateway accepts the same model id for OpenAI, Anthropic and Codex protocols and routes it to the upstream channel.",
-  "Export JSON": "Export JSON"
+  "Export JSON": "Export JSON",
+  "Web Protection": "Web Protection"
 }

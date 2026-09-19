@@ -6523,5 +6523,6 @@
   "Model mapping": "Маппинг моделей",
   "Model mapping intro": "Шлюз маппит модель сайта с тем же именем во всех протоколах:",
   "Model mapping note": "Сторонний маппинг не нужен: один и тот же ID модели работает для OpenAI, Anthropic и Codex.",
-  "Export JSON": "Экспорт JSON"
+  "Export JSON": "Экспорт JSON",
+  "Web Protection": "Веб-защита"
 }

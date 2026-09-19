@@ -6523,5 +6523,6 @@
   "Model mapping": "Mappage des modèles",
   "Model mapping intro": "La passerelle mappe le modèle du site sous le même nom dans tous les protocoles :",
   "Model mapping note": "Aucun mappage tiers requis : le même ID de modèle fonctionne pour OpenAI, Anthropic et Codex.",
-  "Export JSON": "Exporter JSON"
+  "Export JSON": "Exporter JSON",
+  "Web Protection": "Protection Web"
 }

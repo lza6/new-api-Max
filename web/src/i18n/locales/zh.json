@@ -6523,5 +6523,6 @@
   "Model mapping": "模型映射",
   "Model mapping intro": "网关在各类协议下把站内模型映射为同名，模型 ID 处处一致：",
   "Model mapping note": "无需第三方映射：OpenAI / Anthropic / Codex 协议接受同一模型 ID，并路由到对应上游渠道。",
-  "Export JSON": "导出 JSON"
+  "Export JSON": "导出 JSON",
+  "Web Protection": "Web 防护"
 }

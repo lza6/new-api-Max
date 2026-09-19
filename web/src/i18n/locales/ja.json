@@ -6523,5 +6523,6 @@
   "Model mapping": "モデルマッピング",
   "Model mapping intro": "ゲートウェイは全プロトコルでサイトのモデルを同名にマッピングします：",
   "Model mapping note": "サードパーティのマッピング不要：OpenAI / Anthropic / Codex で同じモデルIDが使えます。",
-  "Export JSON": "JSONをエクスポート"
+  "Export JSON": "JSONをエクスポート",
+  "Web Protection": "Web保護"
 }
