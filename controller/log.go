@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/middleware"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
 
@@ -117,13 +118,16 @@ func GetLogsStat(c *gin.Context) {
 		return
 	}
 	//tokenNum := model.SumUsedToken(logType, startTimestamp, endTimestamp, modelName, username, "")
+	httpStats := middleware.GetStats()
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
 		"data": gin.H{
-			"quota": stat.Quota,
-			"rpm":   stat.Rpm,
-			"tpm":   stat.Tpm,
+			"quota":                 stat.Quota,
+			"rpm":                   stat.Rpm,
+			"tpm":                   stat.Tpm,
+			"concurrent_requests":   httpStats.ActiveConnections,
+			"completed_last_minute": httpStats.CompletedLastMinute,
 		},
 	})
 	return
