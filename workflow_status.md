@@ -388,3 +388,16 @@
 - MySQL 8（服务器临时容器 mysql:8）：同三索引存在、旧索引不存在、双次运行无错误
 - 容器已清理（--rm + trap）
 - 修复：logs 复合索引 (type,created_at,id)+(user_id,type,created_at)、task_events created_at 索引 + 7 天保留策略（TASK_EVENT_RETENTION_DAYS，主节点每小时批删）
+
+# 2026-09-20 追加段：生产部署 v1.2.36 + 线上验收
+
+## 部署
+- 服务器 /opt/new-api-src checkout v1.2.36（41af5a0f2）→ docker build new-api:local-v1.2.36 → compose 换镜像（备份 .bak-pre-v1236）→ 重建 healthy
+- 生产 PG 存量库：新索引落库（idx_log_type_created_id / idx_log_user_type_created / idx_task_events_created_at），并清理冗余旧索引 idx_created_at_type（GORM 移除 tag 不自动 drop；回滚命令 CREATE INDEX idx_created_at_type ON logs(created_at,type)）
+- 启动日志无 FATAL/ERROR/panic
+
+## 线上验收（HTTPS 6/6）
+- X-New-Api-Version: v1.2.36；/api/log/stat 返回 concurrent_requests=7、completed_last_minute=35（真实流量）
+- 6 线程并发时 active_connections 峰值=9；checkin_setting 三个 option 正常
+- 证据：计划书/e2e-evidence/prod-v1.2.36-acceptance.json
+- 回滚：cp /opt/new-api/docker-compose.yml.bak-pre-v1236 /opt/new-api/docker-compose.yml && cd /opt/new-api && docker compose up -d new-api
