@@ -614,7 +614,9 @@ func AutomaticallyUpdateChannels(frequency int) {
 	for {
 		time.Sleep(time.Duration(frequency) * time.Minute)
 		common.SysLog("updating all channels")
-		_ = updateAllChannelsBalance()
+		if balanceErr := updateAllChannelsBalance(); balanceErr != nil {
+			common.SysError("failed to update all channels balance: " + balanceErr.Error())
+		}
 		common.SysLog("channels update done")
 	}
 }

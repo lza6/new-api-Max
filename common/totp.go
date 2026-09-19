@@ -65,11 +65,17 @@ func generateRandomBackupCode() (string, error) {
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	code := make([]byte, BackupCodeLength)
 
+	randomBytes := make([]byte, 1)
 	for i := range code {
-		randomBytes := make([]byte, 1)
-		_, err := rand.Read(randomBytes)
-		if err != nil {
-			return "", err
+		for {
+			if _, err := rand.Read(randomBytes); err != nil {
+				return "", err
+			}
+			// Rejection sampling: charset length (36) does not divide 256, so
+			// discard values in [0, 256) that would bias the distribution.
+			if int(randomBytes[0]) < 256-(256%len(charset)) {
+				break
+			}
 		}
 		code[i] = charset[int(randomBytes[0])%len(charset)]
 	}
