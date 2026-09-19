@@ -71,3 +71,62 @@
 - P0-3 Web 防护可配置化 + 实时服务器状态页
 - P1 费用解释用户版 / trace 时间线 / 插件写审批 / skills 仓库 v1 / 离线评测
 - P2 任务品类扩展 / 模型目录同步 / 记忆层
+
+---
+
+# 2026-09-20 追加段：Go 全面评审 P1 修复批（不覆盖上述记录）
+
+## Task Contract
+- 目标：落地 `计划书/GO-全面代码评审报告.md` 的 P1 修复项；行为保持（支付/任务路径仅加日志不改控制流）。
+- 当前状态：本地实现完成，验证通过；**提交/推送/发布待用户确认**（生产契约审批边界）。
+
+## Nodes
+| ID | Name | Status | Acceptance | Files | Verification |
+|----|----|----|----|----|----|
+| N1 | 默认 root 口令日志去敏 | PASSED | 日志不再打印口令 | model/main.go | gofmt/vet ok |
+| N2 | zhipu/mistral stub panic→error | PASSED | ConvertClaudeRequest 返回 error 不 panic | relay/channel/zhipu/adaptor.go, mistral/adaptor.go | go test ./relay/channel/ PASS |
+| N3 | TOTP 备用码 rejection sampling | PASSED | 格式/字符集回归测试通过 | common/totp.go, common/totp_test.go | go test ./common/ PASS |
+| N4 | 支付/任务/余额吞错加日志（不改行为） | PASSED | 编译通过，行为不变 | controller/subscription_payment_epay.go, channel-billing.go, codex_usage.go, relay/relay_task.go | go vet + go build PASS |
+
+## Verification Evidence
+- `go vet ./common/... ./relay/... ./controller/... ./model/...` → exit 0
+- `go test ./common/ -run "Backup|TOTP"` → PASS (0.03s)
+- `go test ./relay/channel/ -run "UnimplementedClaude"` → PASS (mistral+zhipu)
+- `go build ./relay/... ./controller/... ./common/... ./model/...` → exit 0
+- 新增测试文件：common/totp_test.go、relay/channel/adaptor_stub_test.go
+
+## Next
+- 待用户确认后：主题提交 + 推送分支 + （与代码批一起打 tag 发版）。
+---
+
+# 2026-09-20 追加段：签到奖励设置 "Invalid input" Bug 修复（不覆盖上述记录）
+
+## Root Cause
+- `web/src/features/system-settings/general/checkin-settings-section.tsx` schema 对 min/max 用了 `z.coerce.number().int()`，但字段值是**显示货币金额**（如 ¥0.5 = 0.5 小数）→ 小数必被 `.int()` 拒绝 → zod 默认报 "Invalid input"。
+
+## Fix
+- schema 改为 `z.coerce.number().min(0)`（允许小数）；整数 quota 换算由 `parseQuotaFromDollars` 完成（0.5 → 250000、0.8 → 400000 @ quotaPerUnit=500000）。
+
+## Verification
+- 新增回归测试 `web/src/features/system-settings/general/__tests__/checkin-settings-section.test.tsx`：小数 0.5/0.8 提交成功，换算值正确（min_quota=250000/max_quota=400000），无 "Invalid input"。
+- `bunx vitest run .../checkin-settings-section.test.tsx` → 1 passed (19.9s)
+- `bun run typecheck`（tsgo -b）→ exit 0
+
+## Status
+- 本地修复完成、测试通过；提交/推送/发布待用户确认（生产契约审批边界）。
+---
+
+# 2026-09-20 追加段：首字延迟对标 sub2api（不覆盖上述记录）
+
+## 结论
+- 主病灶：`MEMORY_CACHE_ENABLED` 默认 false → 渠道/模型选择每请求回源 DB（channel_cache.go:124）。
+- sub2api 可借鉴：HTTP 客户端池化（我们已有）、用量/配额异步 flusher（我们为同步预扣，L3 待审批）、热路径轻量化。
+
+## 落地（仓库内）
+- docker-compose.yml：新增 MEMORY_CACHE_ENABLED=true + SYNC_FREQUENCY=60（含注释）。
+- 文档：`计划书/首字延迟对标sub2api与落地.md`（对标表 + 根因排序 + 服务器验证方法）。
+- 校验：pyyaml 解析 OK（本地无 docker CLI）。
+
+## 待用户确认
+- 服务器应用 compose 并重启 new-api（生产变更）；验证方法见文档 §6。
+- 预扣费异步化（对标 flusher）为 L3 计费改造，需方案审批后另起批次。
