@@ -315,9 +315,12 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := createLog(log)
-	if err != nil {
-		logger.LogError(c, "failed to record log: "+err.Error())
+	if common.LogFlushEnabled {
+		enqueueAsyncLog(log)
+	} else {
+		if err := createLog(log); err != nil {
+			logger.LogError(c, "failed to record log: "+err.Error())
+		}
 	}
 }
 
@@ -385,9 +388,12 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,
 	}
-	err := createLog(log)
-	if err != nil {
-		logger.LogError(c, "failed to record log: "+err.Error())
+	if common.LogFlushEnabled {
+		enqueueAsyncLog(log)
+	} else {
+		if err := createLog(log); err != nil {
+			logger.LogError(c, "failed to record log: "+err.Error())
+		}
 	}
 	if common.DataExportEnabled {
 		LogQuotaData(QuotaDataLogParams{
@@ -760,4 +766,3 @@ func GetConsumeLogByID(id int64, userID int, isAdmin bool) (*Log, bool, error) {
 	}
 	return &log, true, nil
 }
-

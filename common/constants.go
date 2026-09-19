@@ -188,6 +188,15 @@ var Relay429RetryDelayMs int
 // Relay429MaxRetries 429 退避最多次数（默认 2；受整体 RetryTimes 约束）。
 var Relay429MaxRetries int
 
+// LogFlushEnabled 消费日志异步批量落库开关（默认关=同步，保持行为不变；生产开启以降延迟）。
+var LogFlushEnabled bool
+
+// LogFlushIntervalMs 异步落库间隔（毫秒，默认 1000）。
+var LogFlushIntervalMs int
+
+// LogFlushBatch 异步落库批大小（默认 500）。
+var LogFlushBatch int
+
 var GeminiSafetySetting string
 
 // https://docs.cohere.com/docs/safety-modes Type; NONE/CONTEXTUAL/STRICT

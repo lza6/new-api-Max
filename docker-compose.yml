@@ -38,6 +38,12 @@ services:
       - NODE_NAME=new-api-node-1  # 节点名称，用于审计日志中标识节点身份；多节点/容器部署时建议设置 (Node name used in audit logs; recommended when running multiple instances or in containers)
       - MEMORY_CACHE_ENABLED=true  # 内存缓存渠道/模型选择：避免每次请求回源 DB，显著降低首字延迟 (Latency-critical; pair with SYNC_FREQUENCY)
       - SYNC_FREQUENCY=60  # 渠道/模型缓存同步频率（秒）；关闭 MEMORY_CACHE_ENABLED 时可注释 (Channel cache sync frequency in seconds)
+      - LOG_FLUSH_ENABLED=true  # 消费/错误日志异步批量落库（降首字延迟，丢失最近批） (Async log flush to cut latency; crash loses at most one batch, billing stays synchronous)
+      - LOG_FLUSH_INTERVAL=1000  # 异步落库间隔（毫秒）
+      - LOG_FLUSH_BATCH=500  # 异步落库批大小
+      - SQL_MAX_OPEN_CONNS=64  # 连接池上限（原默认1000过度，降争用）
+      - SQL_MAX_IDLE_CONNS=16
+      - SQL_MAX_LIFETIME=300
 #      - STREAMING_TIMEOUT=300  # 流模式无响应超时时间，单位秒，默认120秒，如果出现空补全可以尝试改为更大值 （Streaming timeout in seconds, default is 120s. Increase if experiencing empty completions）
 #      - RELAY_IDLE_CONN_TIMEOUT=90  # Relay HTTP 客户端空闲连接超时时间，单位秒，默认跟随 Go 标准库，设置为0表示不限制 (Relay HTTP client idle keep-alive timeout in seconds, defaults to Go standard library; set 0 to disable)
 #      - SESSION_SECRET=random_string  # 多机部署时设置，必须修改这个随机字符串！！ （multi-node deployment, set this to a random string!!!!!!!）

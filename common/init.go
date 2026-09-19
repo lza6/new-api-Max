@@ -116,6 +116,9 @@ func InitEnv() {
 	RelayMaxIdleConnsPerHost = GetEnvOrDefault("RELAY_MAX_IDLE_CONNS_PER_HOST", 100)
 	Relay429RetryDelayMs = GetEnvOrDefault("RELAY_429_RETRY_DELAY", 1000)
 	Relay429MaxRetries = GetEnvOrDefault("RELAY_429_MAX_RETRIES", 2)
+	LogFlushEnabled = os.Getenv("LOG_FLUSH_ENABLED") == "true"
+	LogFlushIntervalMs = GetEnvOrDefault("LOG_FLUSH_INTERVAL", 1000)
+	LogFlushBatch = GetEnvOrDefault("LOG_FLUSH_BATCH", 500)
 
 	// Initialize string variables with GetEnvOrDefaultString
 	GeminiSafetySetting = GetEnvOrDefaultString("GEMINI_SAFETY_SETTING", "BLOCK_NONE")

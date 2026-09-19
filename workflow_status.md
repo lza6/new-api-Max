@@ -269,3 +269,25 @@
 
 ## 证据
 - `计划书/e2e-evidence/paired-latency-bench-v1.2.34.json`（含 60 对逐请求明细前 12 条 + 并发分布）
+---
+
+# 2026-09-20 追加段：异步 consume-log flusher + 连接池收敛（实施+实测，不覆盖上述记录）
+
+## Changes
+- model/consume_log_flusher.go：消费/错误日志异步批量落库（队列4096，满则同步背压；后台按 LOG_FLUSH_INTERVAL/BATCH 批量 INSERT；Stop/Flush 供测试与优雅退出）
+- model/log.go：RecordConsumeLog/RecordErrorLog 在 LOG_FLUSH_ENABLED=true 时异步入队（默认 false=同步，零行为变化）
+- main.go：StartConsumeLogFlusher 启动
+- 连接池默认收敛：SQL_MAX_OPEN_CONNS 1000→64 / IDLE 100→16 / LIFETIME 60→300（主库+日志库）
+- docker-compose.yml：LOG_FLUSH_ENABLED=true/INTERVAL/BATCH + 池 env
+- 单测：model/consume_log_flusher_test.go（3条入队→Flush→计数3）；model 全套 25s 通过（默认关无回归）
+
+## 实测（成对基准 N=60，异步 vs 基线同步）
+| 场景 | 基线 gw p50 | 异步后 gw p50 | 改善 |
+|---|---|---|---|
+| 顺序 overhead p50 | 27.6 ms | 18.8 ms | -32% |
+| 并发20 gw p50 | 172.2 ms | 115.1 ms | -33% |
+| 并发50 gw p50 / p95 | 240.4 / 645.1 ms | 118.9 / 140.6 ms | -50% / -78% |
+- 证据：计划书/e2e-evidence/paired-latency-bench-async-flush-v1.2.34.json
+
+## 剩余（10ms 目标）
+- 单并发 overhead 仍 ~19ms：剩余热路径同步 DB 读取（RecordConsumeLog 内 GetUserSetting 用户设置读、结算 quota 更新）。后续：用户设置缓存 + 结算批量异步（L3）+ Redis 令牌缓存（生产已有）。
