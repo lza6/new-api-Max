@@ -205,6 +205,8 @@ export interface LogOtherData {
   group_ratio?: number
   user_group_ratio?: number
   cache_ratio?: number
+  // B5-2: 微美元影子价（仅统计口径，不参与计费）
+  api_equivalent_usd?: number
   cache_creation_ratio?: number
   cache_creation_ratio_5m?: number
   cache_creation_ratio_1h?: number

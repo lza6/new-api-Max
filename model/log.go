@@ -345,6 +345,12 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
+	// B5-2: 微美元影子价（仅统计口径，不改变 quota 计费；未收录定价的模型不写字段）。
+	if params.Other != nil {
+		if usd, known := ComputeApiEquivalentUsd(params.ModelName, params.PromptTokens, params.CompletionTokens); known {
+			params.Other.SetPublic("api_equivalent_usd", usd)
+		}
+	}
 	otherStr := params.Other.JSONString()
 	// 判断是否需要记录 IP
 	needRecordIp := false
@@ -737,3 +743,21 @@ func DeleteOldLogBatch(ctx context.Context, targetTimestamp int64, limit int) (i
 	}
 	return result.RowsAffected, nil
 }
+
+// GetConsumeLogByID 按 id 查消费日志。普通用户仅可查本人记录，管理员不限；
+// 记录不存在或越权返回 (nil, false, nil)。供 B5-2 费用明细 API 使用。
+func GetConsumeLogByID(id int64, userID int, isAdmin bool) (*Log, bool, error) {
+	var log Log
+	query := LOG_DB.Where("id = ? AND type = ?", id, LogTypeConsume)
+	if !isAdmin {
+		query = query.Where("user_id = ?", userID)
+	}
+	if err := query.First(&log).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	return &log, true, nil
+}
+

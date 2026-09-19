@@ -6498,5 +6498,6 @@
   "Event.refunded": "Refunded",
   "Event.unconfirmed": "Unconfirmed",
   "Connecting": "Connecting",
-  "Live": "Live"
+  "Live": "Live",
+  "API Equivalent USD": "API Equivalent USD"
 }

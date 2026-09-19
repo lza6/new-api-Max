@@ -235,6 +235,15 @@ function BillingBreakdown(props: {
     })
   }
 
+  // B5-2: 微美元影子价（仅统计口径，不参与计费）——other.api_equivalent_usd 为微美元。
+  const shadowUsdMicros = other.api_equivalent_usd
+  if (typeof shadowUsdMicros === 'number' && shadowUsdMicros > 0) {
+    rows.push({
+      label: t('API Equivalent USD'),
+      value: `${(shadowUsdMicros / 1e6).toFixed(6)} USD`,
+    })
+  }
+
   if (!isTieredExpr && isClaude && hasAnyCacheTokens(other)) {
     if (other.cache_ratio != null && other.cache_ratio !== 1) {
       rows.push({
