@@ -182,6 +182,12 @@ var RelayResponseHeaderTimeout int // unit is second
 var RelayMaxIdleConns int
 var RelayMaxIdleConnsPerHost int
 
+// Relay429RetryDelayMs 429 有界退避等待毫秒数（默认 1000 = 1s）。
+var Relay429RetryDelayMs int
+
+// Relay429MaxRetries 429 退避最多次数（默认 2；受整体 RetryTimes 约束）。
+var Relay429MaxRetries int
+
 var GeminiSafetySetting string
 
 // https://docs.cohere.com/docs/safety-modes Type; NONE/CONTEXTUAL/STRICT

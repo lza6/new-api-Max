@@ -116,6 +116,12 @@ func ClassifyHTTPStatus(status int, retryAfter string) (retryable bool, needCool
 	}
 }
 
+// ShouldBackoff429 429 有界退避判定：状态为 429 且已用退避次数未达上限。
+// max429Retries < 0 表示不启用退避（兼容旧行为）。
+func ShouldBackoff429(status int, used429Retries int, max429Retries int) bool {
+	return status == http.StatusTooManyRequests && max429Retries > 0 && used429Retries < max429Retries
+}
+
 // RetryAfterCooldown 解析 HTTP Retry-After 头为冷却时长。
 // 支持两种标准格式：秒数（"120"）与 HTTP-date。
 // 非法值、0 和已过期的 date 返回 0；超过 cap 时钳制到 cap。

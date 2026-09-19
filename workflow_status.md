@@ -202,3 +202,19 @@
 
 ## 证据
 - `计划书/e2e-evidence/latency-bench-v1.2.33.json`
+---
+
+# 2026-09-20 追加段：429 有界退避重试（实施+真实E2E，不覆盖上述记录）
+
+## 变更（Go）
+- common/constants.go + init.go：Relay429RetryDelayMs（env RELAY_429_RETRY_DELAY，默认1000ms）、Relay429MaxRetries（env RELAY_429_MAX_RETRIES，默认2）
+- service/relay_error_class.go：ShouldBackoff429(status, used, max) 纯函数
+- controller/relay.go：重试循环内 429 → select 等待（尊重 ctx 取消）→ 重试，留日志
+- 单元测试：service/relay_error_class_test.go TestShouldBackoff429（5 用例）
+
+## 真实 E2E（本地，429→等待1s→200）
+- mock 首次 429、二次 200；网关日志：`429 backoff 1s before retry (attempt 1/2)` → 200 done，总 1.07s
+- 证据：`计划书/e2e-evidence/429-backoff-e2e.json`；consume log use_channel ["5","8","8"] frt=1055ms
+
+## 待办（下轮）
+- 流量字节统计（T4）；异步 consume-log flusher（10ms 目标核心，L3 需授权）；上游 429/4xx 状态码透传复核（无重试预算时避免以 500 返回）

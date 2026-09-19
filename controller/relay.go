@@ -192,6 +192,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
+	used429Retries := 0
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
 		relayInfo.RetryIndex = retryParam.GetRetry()
@@ -244,6 +245,17 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		if !shouldRetry(c, newAPIError, common.RetryTimes-retryParam.GetRetry()) {
 			break
+		}
+
+		// 429 有界退避：排队等待后重试（默认 1s，env 可调；最多 max 次，受整体重试预算约束）。
+		if service.ShouldBackoff429(newAPIError.StatusCode, used429Retries, common.Relay429MaxRetries) {
+			used429Retries++
+			delay := time.Duration(common.Relay429RetryDelayMs) * time.Millisecond
+			logger.LogInfo(c, fmt.Sprintf("429 backoff %s before retry (attempt %d/%d)", delay, used429Retries, common.Relay429MaxRetries))
+			select {
+			case <-time.After(delay):
+			case <-c.Request.Context().Done():
+			}
 		}
 	}
 

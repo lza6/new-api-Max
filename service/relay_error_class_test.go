@@ -82,3 +82,24 @@ func TestRetryAfterCooldownHTTPDate(t *testing.T) {
 	past := time.Now().Add(-time.Hour).UTC().Format(http.TimeFormat)
 	assert.Zero(t, RetryAfterCooldown(past, time.Minute), "expired date must yield zero")
 }
+
+func TestShouldBackoff429(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		used   int
+		max    int
+		want   bool
+	}{
+		{"429 under limit", 429, 0, 2, true},
+		{"429 at limit", 429, 2, 2, false},
+		{"429 max zero disables", 429, 0, 0, false},
+		{"429 max negative disables", 429, 0, -1, false},
+		{"non-429 no backoff", 500, 0, 2, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, ShouldBackoff429(tc.status, tc.used, tc.max))
+		})
+	}
+}
