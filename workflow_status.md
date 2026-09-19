@@ -291,3 +291,19 @@
 
 ## 剩余（10ms 目标）
 - 单并发 overhead 仍 ~19ms：剩余热路径同步 DB 读取（RecordConsumeLog 内 GetUserSetting 用户设置读、结算 quota 更新）。后续：用户设置缓存 + 结算批量异步（L3）+ Redis 令牌缓存（生产已有）。
+---
+
+# 2026-09-20 追加段：生产部署 v1.2.34 + 线上 E2E 验收（不覆盖上述记录）
+
+## 部署
+- CI 镜像队列卡死（11h+），绕行：服务器本地 docker build v1.2.34 tag → new-api:local-v1.2.34；compose 换镜像+注入性能 env（内存缓存/异步日志/连接池/429 退避）；容器 Up healthy。
+- 备份与回滚已就绪（.bak-pre-v1234 / latest-pre-v1234-backup 镜像标签）。
+
+## 线上 E2E
+- version=v1.2.34；真实上游流式 200+DONE，首字 2.46s/总 2.69s（上游自身 2-22s，网关透传正常）→ PASS。
+- 证据：计划书/e2e-evidence/live-prod-v1.2.34-e2e.md
+
+## 遗留（诚实）
+- 观察：管理端 API 创建 token 返回 success 但未落库（待查，可能与 admin token 权限/审计相关，非本批阻断）。
+- CI 队列积压待观察（GHCR v1.2.34 镜像未出；本地镜像已在生产运行）。
+- watchtower 仅跟 `latest`，不影响本地镜像（钉住 tag 安全）。
