@@ -180,3 +180,25 @@
 ## 证据
 - 计划书/e2e-evidence/browser-e2e-v1.2.33/{landing-desktop.png, checkin-settings.png, summary.json}
 - 运行：本地 v1.2.33 网关（嵌入最新 dist）+ chromium Playwright，真实浏览器点击/输入/保存/刷新
+---
+
+# 2026-09-20 追加段：参考项目深度对标 v2（不覆盖上述记录）
+
+## 做了什么
+- 全量脚本扫描 D:\参考项目（1179 目录）→ inventory JSON（计划书/scout_reports/refscan-v2-inventory.json）
+- 同品类网关对标（auth2api/aisix/doorman/chatgpt2api/9router-Max/sub2api）+ 扩展方向集群（可观测/记忆/skills/电商/视频/编排）
+- 产出：计划书/参考项目深度对标与优化设计_v2.md（差距分析 + 4 波设计 + 决策清单）
+
+## 边界
+- 子代理工具本轮不可用，主控单代理直审（脚本全量 ≠ 抽样）
+- 分析阶段，未改任何代码；待用户确认决策清单后按波次实施
+---
+
+# 2026-09-20 追加段：并发延迟根因诊断（实证，不覆盖上述记录）
+
+## 结论
+- 基准实证：网关附加延迟 并发1=14ms p50 / 并发20=158ms / 并发50=66-289ms；根因=热路径同步 INSERT logs（SQLite 写锁，241ms SLOW SQL），非透传问题。
+- 修复设计（异步 consume-log flusher / 429 等1s有界重试 / 流量字节统计+前端卡 / 连接池收敛）已写入 `计划书/并发延迟与10ms目标根因诊断.md`，待用户授权实施。
+
+## 证据
+- `计划书/e2e-evidence/latency-bench-v1.2.33.json`
