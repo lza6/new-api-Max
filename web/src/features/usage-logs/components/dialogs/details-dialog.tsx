@@ -64,6 +64,10 @@ import { formatLogQuota, formatTokens, formatUseTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { AuditDetailFields } from '../../audit/components/audit-detail-fields'
+import {
+  buildLogExportPayload,
+  logExportFilename,
+} from '../../lib/log-export'
 import type { UsageLog } from '../../data/schema'
 import {
   parseLogOther,
@@ -561,36 +565,14 @@ export function DetailsDialog(props: DetailsDialogProps) {
 
   // 8.3 日志透明化：JSON 导出——把本条日志完整结构化（含请求时间线）下载为 JSON。
   const handleExportJson = () => {
-    const payload = {
-      id: props.log.id,
-      created_at: props.log.created_at,
-      type: props.log.type,
-      user_id: props.log.user_id,
-      username: props.log.username,
-      model_name: props.log.model_name,
-      channel: props.log.channel,
-      channel_name: props.log.channel_name,
-      token_name: props.log.token_name,
-      quota: props.log.quota,
-      prompt_tokens: props.log.prompt_tokens,
-      completion_tokens: props.log.completion_tokens,
-      use_time: props.log.use_time,
-      is_stream: props.log.is_stream,
-      group: props.log.group,
-      ip: props.log.ip,
-      request_id: props.log.request_id,
-      upstream_request_id: props.log.upstream_request_id,
-      content: props.log.content,
-      other: props.log.other,
-      timeline: timelineJson,
-    }
+    const payload = buildLogExportPayload(props.log, timelineJson)
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: 'application/json',
     })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = `log-${props.log.request_id || String(props.log.id)}.json`
+    link.download = logExportFilename(props.log.request_id, props.log.id)
     link.click()
     URL.revokeObjectURL(url)
   }
