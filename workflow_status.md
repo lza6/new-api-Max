@@ -218,3 +218,24 @@
 
 ## 待办（下轮）
 - 流量字节统计（T4）；异步 consume-log flusher（10ms 目标核心，L3 需授权）；上游 429/4xx 状态码透传复核（无重试预算时避免以 500 返回）
+---
+
+# 2026-09-20 追加段：T4 流量字节统计（实施+真实E2E，不覆盖上述记录）
+
+## 变更
+- relay/common/relay_info.go：RequestBytes/ResponseBytes 字段
+- controller/counting_writer.go：gin ResponseWriter 包装，实时累加响应字节到 relayInfo（解决 handler 内记录时序）
+- controller/relay.go：请求体字节（ReplayableBody.Size）+ 响应字节（counting writer）
+- service/log_info_generate.go：appendTrafficBytes → other.request_bytes/response_bytes
+- service/log_traffic.go：AggregateTrafficByDay 按日聚合（纯函数）
+- controller/log.go + router：GET /api/log/traffic?days=1|7|30（管理端）
+- 单测：service/log_traffic_test.go（含空输入短路）
+
+## 真实 E2E（本地）
+- 流式请求后：consume log other.request_bytes=112 / response_bytes=1048；端点 /api/log/traffic?days=1 → 201 请求 / 1272 B / by_day 今日行
+- 证据：计划书/e2e-evidence/traffic-stats-e2e.json
+
+## 待办
+- 前端流量卡（今日/7日/30日 + 实时）与 RPM 口径核对（下轮）
+- 异步 consume-log flusher（10ms 目标核心，L3 授权后实施）
+- 上游 429/4xx 状态码透传（无重试预算时避免 500）

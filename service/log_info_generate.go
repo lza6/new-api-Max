@@ -124,8 +124,21 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendFinalRequestFormat(relayInfo, other)
 	appendBillingInfo(relayInfo, other)
 	appendParamOverrideInfo(relayInfo, other)
+	appendTrafficBytes(relayInfo, other)
 	appendStreamStatus(relayInfo, other)
 	return other
+}
+
+func appendTrafficBytes(relayInfo *relaycommon.RelayInfo, other *model.LogOther) {
+	if relayInfo == nil || other == nil {
+		return
+	}
+	if relayInfo.RequestBytes > 0 {
+		other.SetPublic("request_bytes", relayInfo.RequestBytes)
+	}
+	if relayInfo.ResponseBytes > 0 {
+		other.SetPublic("response_bytes", relayInfo.ResponseBytes)
+	}
 }
 
 func appendParamOverrideInfo(relayInfo *relaycommon.RelayInfo, other *model.LogOther) {

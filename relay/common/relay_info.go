@@ -187,6 +187,9 @@ type RelayInfo struct {
 	FinalRequestRelayFormat types.RelayFormat
 
 	StreamStatus *StreamStatus
+	// RequestBytes/ResponseBytes 每请求流量统计（字节数，写入 consume log other）。
+	RequestBytes  int64
+	ResponseBytes int64
 
 	// convOptions caches the converter settings snapshot (see ConvOptions).
 	convOptions *convmeta.Options

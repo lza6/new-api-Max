@@ -193,6 +193,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
 	used429Retries := 0
+	countingW := &countingResponseWriter{ResponseWriter: c.Writer, bytes: &relayInfo.ResponseBytes}
+	c.Writer = countingW
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
 		relayInfo.RetryIndex = retryParam.GetRetry()
@@ -219,6 +221,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			break
 		}
 		c.Request.Body = io.NopCloser(bodyStorage)
+		if replayable, ok := bodyStorage.(common.ReplayableBody); ok {
+			relayInfo.RequestBytes = replayable.Size()
+		}
 
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
@@ -761,6 +766,9 @@ func executeTaskSubmissionWith(
 			break
 		}
 		c.Request.Body = io.NopCloser(bodyStorage)
+		if replayable, ok := bodyStorage.(common.ReplayableBody); ok {
+			relayInfo.RequestBytes = replayable.Size()
+		}
 
 		stage = "submit"
 		// 上一 attempt 的 unconfirmed 标记不带入本轮：新渠道/新请求可能得到

@@ -3,9 +3,11 @@ package controller
 import (
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -153,4 +155,36 @@ func GetLogsSelfStat(c *gin.Context) {
 		},
 	})
 	return
+}
+
+// GetLogsTraffic 管理端流量统计：按日聚合每请求 request_bytes+response_bytes。
+// GET /api/log/traffic?days=1|7|30
+func GetLogsTraffic(c *gin.Context) {
+	days := 1
+	if v := c.Query("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = min(n, 90)
+		}
+	}
+	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+	var rows []service.TrafficRecord
+	if err := model.LOG_DB.Model(&model.Log{}).
+		Select("created_at", "other").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
+		Scan(&rows).Error; err != nil {
+		common.ApiErrorMsg(c, "failed to query traffic: "+err.Error())
+		return
+	}
+	byDay := service.AggregateTrafficByDay(rows, time.Local)
+	var total int64
+	for i := range byDay {
+		total += byDay[i].Bytes
+	}
+	common.ApiSuccess(c, gin.H{
+		"days":           days,
+		"total_requests": len(rows),
+		"total_bytes":    total,
+		"total_mb":       float64(total) / (1024 * 1024),
+		"by_day":         byDay,
+	})
 }
