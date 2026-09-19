@@ -141,3 +141,16 @@
 
 ## 结论
 - 网关流式透传零缓冲；首字额外开销毫秒级（本地）。生产端 1.5-2s 放大来源为 MEMORY_CACHE 未开的 DB 回源 + 2C CPU 争抢 + 上游波动，已由 compose 落地（MEMORY_CACHE_ENABLED=true）定向修复，待生产部署后实测复核。
+---
+
+# 2026-09-20 追加段：前端性能批1（v1.2.33 代码批起步，不覆盖上述记录）
+
+## Changes
+- web/rsbuild.config.ts：新增 vendor-charts / vendor-shiki / vendor-editor / vendor-icon-libs 异步 cacheGroup（priority 10, enforce）
+- web/src/main.tsx：defaultPreloadStaleTime 0 → 30_000（预载数据 30s 内复用，减少导航重复请求）
+- web/index.html：theme-color 双模（light/dark media 自适应）
+
+## Verification
+- bun run typecheck（tsgo -b）exit 0
+- bun run build exit 0；产出 vendor-charts(2306KB) / vendor-editor(499KB) / vendor-icon-libs(56KB)
+- 诚实边界：index.js 4.3MB 未变（重库可缓存化，入口瘦身属批2 Hero/编辑器懒加载）；vendor-shiki 未独立产出（shiki 为同步导入，属批2）

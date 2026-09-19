@@ -29,6 +29,34 @@ export default defineConfig(({ envMode }) => {
     splitChunks: {
       preset: 'default',
       cacheGroups: {
+        'vendor-charts': {
+          test: /node_modules[\\/](@visactor|recharts)[\\/]/,
+          name: 'vendor-charts',
+          chunks: 'async',
+          priority: 10,
+          enforce: true,
+        },
+        'vendor-shiki': {
+          test: /node_modules[\\/](shiki|@shikijs)[\\/]/,
+          name: 'vendor-shiki',
+          chunks: 'async',
+          priority: 10,
+          enforce: true,
+        },
+        'vendor-editor': {
+          test: /node_modules[\\/](@codemirror|@lezer)[\\/]/,
+          name: 'vendor-editor',
+          chunks: 'async',
+          priority: 10,
+          enforce: true,
+        },
+        'vendor-icon-libs': {
+          test: /node_modules[\\/](@hugeicons|lucide-react)[\\/]/,
+          name: 'vendor-icon-libs',
+          chunks: 'async',
+          priority: 10,
+          enforce: true,
+        },
         'vendor-react': {
           test: /node_modules[\\/](react|react-dom)[\\/]/,
           name: 'vendor-react',
