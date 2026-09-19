@@ -99,6 +99,7 @@ export function CommonLogsStats() {
         : DEFAULT_LOG_STATS
     },
     placeholderData: (previousData) => previousData,
+    refetchInterval: isAdmin ? 5_000 : false,
   })
 
   if (isLoading) {
@@ -123,6 +124,20 @@ export function CommonLogsStats() {
         value={stats?.rpm || 0}
         accent='bg-rose-500/65'
       />
+      {isAdmin ? (
+        <>
+          <StatBadge
+            label={t('Concurrent now')}
+            value={stats?.concurrent_requests ?? 0}
+            accent='bg-violet-500/70'
+          />
+          <StatBadge
+            label={t('Completed last minute')}
+            value={stats?.completed_last_minute ?? 0}
+            accent='bg-amber-500/60'
+          />
+        </>
+      ) : null}
       {isAdmin && traffic?.data ? (
         <TrafficBadges byDay={traffic.data.by_day || []} />
       ) : null}

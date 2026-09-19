@@ -6481,7 +6481,12 @@
     "{{share}}% of your usage is concentrated on {{model}}": "{{share}}% lượng dùng tập trung ở mô hình {{model}}",
     "Channel {{channel}} has a high error rate ({{rate}}%)": "Kênh {{channel}} có tỷ lệ lỗi cao ({{rate}}%)",
     "The last 7 days account for {{percent}}% of your 30-day usage": "7 ngày gần nhất chiếm {{percent}}% lượng dùng 30 ngày",
-    "No recent usage in the last 30 days": "Không có sử dụng trong 30 ngày qua"
+    "No recent usage in the last 30 days": "Không có sử dụng trong 30 ngày qua",
+    "Concurrent now": "Đang xử lý (hiện tại)",
+    "Completed last minute": "Hoàn tất trong 1 phút",
+    "Traffic today": "Lưu lượng hôm nay",
+    "Traffic 7d": "Lưu lượng 7 ngày",
+    "Traffic 30d": "Lưu lượng 30 ngày"
   },
   "Task Event Stream": "Dòng sự kiện tác vụ",
   "Stream ended": "Đã kết thúc luồng",
@@ -6524,8 +6529,5 @@
   "Model mapping intro": "Cổng ánh xạ mô hình của trang với cùng tên trên mọi giao thức:",
   "Model mapping note": "Không cần ánh xạ bên thứ ba: cùng một ID mô hình hoạt động cho OpenAI, Anthropic và Codex.",
   "Export JSON": "Xuất JSON",
-  "Web Protection": "Bảo vệ Web",
-  "Traffic today": "Traffic today",
-  "Traffic 7d": "Traffic 7d",
-  "Traffic 30d": "Traffic 30d"
+  "Web Protection": "Bảo vệ Web"
 }

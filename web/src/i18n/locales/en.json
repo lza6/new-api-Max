@@ -6481,7 +6481,12 @@
     "{{share}}% of your usage is concentrated on {{model}}": "{{share}}% of your usage is concentrated on {{model}}",
     "Channel {{channel}} has a high error rate ({{rate}}%)": "Channel {{channel}} has a high error rate ({{rate}}%)",
     "The last 7 days account for {{percent}}% of your 30-day usage": "The last 7 days account for {{percent}}% of your 30-day usage",
-    "No recent usage in the last 30 days": "No recent usage in the last 30 days"
+    "No recent usage in the last 30 days": "No recent usage in the last 30 days",
+    "Concurrent now": "Concurrent now",
+    "Completed last minute": "Completed last minute",
+    "Traffic today": "Traffic today",
+    "Traffic 7d": "Traffic 7d",
+    "Traffic 30d": "Traffic 30d"
   },
   "Task Event Stream": "Task Event Stream",
   "Stream ended": "Stream ended",
@@ -6524,8 +6529,5 @@
   "Model mapping intro": "The gateway maps the site model to the same name across protocols, so the model id stays identical everywhere:",
   "Model mapping note": "No third-party mapping required: the gateway accepts the same model id for OpenAI, Anthropic and Codex protocols and routes it to the upstream channel.",
   "Export JSON": "Export JSON",
-  "Web Protection": "Web Protection",
-  "Traffic today": "Traffic today",
-  "Traffic 7d": "Traffic 7d",
-  "Traffic 30d": "Traffic 30d"
+  "Web Protection": "Web Protection"
 }

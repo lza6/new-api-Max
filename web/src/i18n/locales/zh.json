@@ -6481,7 +6481,12 @@
     "{{share}}% of your usage is concentrated on {{model}}": "你 {{share}}% 的用量集中在模型 {{model}}",
     "Channel {{channel}} has a high error rate ({{rate}}%)": "渠道 {{channel}} 错误率偏高（{{rate}}%），建议检查上游配置",
     "The last 7 days account for {{percent}}% of your 30-day usage": "近 7 天消耗占 30 天总量的 {{percent}}%，留意余额",
-    "No recent usage in the last 30 days": "近 30 天暂无调用记录"
+    "No recent usage in the last 30 days": "近 30 天暂无调用记录",
+    "Concurrent now": "当前并发",
+    "Completed last minute": "近1分钟完成",
+    "Traffic today": "今日流量",
+    "Traffic 7d": "近7日流量",
+    "Traffic 30d": "近30日流量"
   },
   "Task Event Stream": "任务事件流",
   "Stream ended": "事件流已结束",
@@ -6524,8 +6529,5 @@
   "Model mapping intro": "网关在各类协议下把站内模型映射为同名，模型 ID 处处一致：",
   "Model mapping note": "无需第三方映射：OpenAI / Anthropic / Codex 协议接受同一模型 ID，并路由到对应上游渠道。",
   "Export JSON": "导出 JSON",
-  "Web Protection": "Web 防护",
-  "Traffic today": "Traffic today",
-  "Traffic 7d": "Traffic 7d",
-  "Traffic 30d": "Traffic 30d"
+  "Web Protection": "Web 防护"
 }

@@ -6481,7 +6481,12 @@
     "{{share}}% of your usage is concentrated on {{model}}": "{{share}}% de votre usage est concentré sur {{model}}",
     "Channel {{channel}} has a high error rate ({{rate}}%)": "Le canal {{channel}} a un taux d'erreur élevé ({{rate}}%)",
     "The last 7 days account for {{percent}}% of your 30-day usage": "Les 7 derniers jours représentent {{percent}}% de votre usage sur 30 jours",
-    "No recent usage in the last 30 days": "Aucune utilisation récente sur 30 jours"
+    "No recent usage in the last 30 days": "Aucune utilisation récente sur 30 jours",
+    "Concurrent now": "En cours (maintenant)",
+    "Completed last minute": "Terminés (1 min)",
+    "Traffic today": "Trafic aujourd'hui",
+    "Traffic 7d": "Trafic 7 j",
+    "Traffic 30d": "Trafic 30 j"
   },
   "Task Event Stream": "Flux d'événements de la tâche",
   "Stream ended": "Flux terminé",
@@ -6524,8 +6529,5 @@
   "Model mapping intro": "La passerelle mappe le modèle du site sous le même nom dans tous les protocoles :",
   "Model mapping note": "Aucun mappage tiers requis : le même ID de modèle fonctionne pour OpenAI, Anthropic et Codex.",
   "Export JSON": "Exporter JSON",
-  "Web Protection": "Protection Web",
-  "Traffic today": "Traffic today",
-  "Traffic 7d": "Traffic 7d",
-  "Traffic 30d": "Traffic 30d"
+  "Web Protection": "Protection Web"
 }

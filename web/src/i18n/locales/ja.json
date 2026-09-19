@@ -6481,7 +6481,12 @@
     "{{share}}% of your usage is concentrated on {{model}}": "利用の {{share}}% がモデル {{model}} に集中しています",
     "Channel {{channel}} has a high error rate ({{rate}}%)": "チャネル {{channel}} のエラー率が高い（{{rate}}%）",
     "The last 7 days account for {{percent}}% of your 30-day usage": "直近7日間が30日間利用の {{percent}}% を占めています",
-    "No recent usage in the last 30 days": "直近30日間に利用がありません"
+    "No recent usage in the last 30 days": "直近30日間に利用がありません",
+    "Concurrent now": "現在の同時実行",
+    "Completed last minute": "直近1分の完了",
+    "Traffic today": "今日のトラフィック",
+    "Traffic 7d": "7日間のトラフィック",
+    "Traffic 30d": "30日間のトラフィック"
   },
   "Task Event Stream": "タスクイベントストリーム",
   "Stream ended": "ストリーム終了",
@@ -6524,8 +6529,5 @@
   "Model mapping intro": "ゲートウェイは全プロトコルでサイトのモデルを同名にマッピングします：",
   "Model mapping note": "サードパーティのマッピング不要：OpenAI / Anthropic / Codex で同じモデルIDが使えます。",
   "Export JSON": "JSONをエクスポート",
-  "Web Protection": "Web保護",
-  "Traffic today": "Traffic today",
-  "Traffic 7d": "Traffic 7d",
-  "Traffic 30d": "Traffic 30d"
+  "Web Protection": "Web保護"
 }

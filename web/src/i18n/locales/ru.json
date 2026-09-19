@@ -6481,7 +6481,12 @@
     "{{share}}% of your usage is concentrated on {{model}}": "{{share}}% использования приходится на модель {{model}}",
     "Channel {{channel}} has a high error rate ({{rate}}%)": "Канал {{channel}} имеет высокую долю ошибок ({{rate}}%)",
     "The last 7 days account for {{percent}}% of your 30-day usage": "Последние 7 дней дают {{percent}}% использования за 30 дней",
-    "No recent usage in the last 30 days": "Нет использования за последние 30 дней"
+    "No recent usage in the last 30 days": "Нет использования за последние 30 дней",
+    "Concurrent now": "Сейчас в обработке",
+    "Completed last minute": "Завершено за 1 мин",
+    "Traffic today": "Трафик сегодня",
+    "Traffic 7d": "Трафик за 7 дней",
+    "Traffic 30d": "Трафик за 30 дней"
   },
   "Task Event Stream": "Поток событий задачи",
   "Stream ended": "Поток завершён",
@@ -6524,8 +6529,5 @@
   "Model mapping intro": "Шлюз маппит модель сайта с тем же именем во всех протоколах:",
   "Model mapping note": "Сторонний маппинг не нужен: один и тот же ID модели работает для OpenAI, Anthropic и Codex.",
   "Export JSON": "Экспорт JSON",
-  "Web Protection": "Веб-защита",
-  "Traffic today": "Traffic today",
-  "Traffic 7d": "Traffic 7d",
-  "Traffic 30d": "Traffic 30d"
+  "Web Protection": "Веб-защита"
 }

@@ -34,6 +34,8 @@ export const DEFAULT_LOG_STATS: LogStatistics = {
   quota: 0,
   rpm: 0,
   tpm: 0,
+  concurrent_requests: 0,
+  completed_last_minute: 0,
 }
 
 /**

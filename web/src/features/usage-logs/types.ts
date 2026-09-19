@@ -283,6 +283,10 @@ export interface LogStatistics {
   quota: number
   rpm: number
   tpm: number
+  /** 网关当前并发（in-flight 请求数，来自 StatsMiddleware） */
+  concurrent_requests?: number
+  /** 近 1 分钟已完成请求数（来自 StatsMiddleware） */
+  completed_last_minute?: number
 }
 
 // ============================================================================
