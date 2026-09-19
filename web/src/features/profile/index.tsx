@@ -16,6 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Link } from '@tanstack/react-router'
+import { useTranslation } from 'react-i18next'
+import { BarChart3 } from 'lucide-react'
+
 import { Main } from '@/components/layout'
 import {
   CardStaggerContainer,
@@ -23,6 +27,15 @@ import {
 } from '@/components/page-transition'
 import { useStatus } from '@/hooks/use-status'
 import { useAuthStore } from '@/stores/auth-store'
+
+import { buttonVariants } from '@/components/ui/button'
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 
 import { CheckinCalendarCard } from './components/checkin-calendar-card'
 import { LanguagePreferencesCard } from './components/language-preferences-card'
@@ -32,6 +45,7 @@ import { SidebarModulesCard } from './components/sidebar-modules-card'
 import { useProfile } from './hooks'
 
 export function Profile() {
+  const { t } = useTranslation()
   const { profile, loading, refreshProfile } = useProfile()
   const { status } = useStatus()
   const permissions = useAuthStore((s) => s.auth.user?.permissions)
@@ -49,6 +63,28 @@ export function Profile() {
         <CardStaggerContainer className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-6'>
           <CardStaggerItem>
             <ProfileHeader profile={profile} loading={loading} />
+          </CardStaggerItem>
+
+          <CardStaggerItem>
+            <Card data-card-hover='false' className='gap-0'>
+              <CardHeader className='flex flex-row items-center justify-between gap-3 pb-3'>
+                <div className='space-y-1'>
+                  <CardTitle className='flex items-center gap-2'>
+                    <BarChart3 className='text-muted-foreground h-4 w-4' aria-hidden='true' />
+                    {t('Usage Insights')}
+                  </CardTitle>
+                  <CardDescription>
+                    {t('Usage insights entry description')}
+                  </CardDescription>
+                </div>
+                <Link
+                  to='/profile/insights'
+                  className={cn(buttonVariants({ size: 'sm' }))}
+                >
+                  {t('View insights')}
+                </Link>
+              </CardHeader>
+            </Card>
           </CardStaggerItem>
 
           <CardStaggerItem>
