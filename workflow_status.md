@@ -326,3 +326,17 @@
 
 ## 存量（非本次引入，基线复现）
 - usage-logs 4 个测试文件在 HEAD 基线即失败（viewer.test.tsx 19 例 audit 渲染断言 + 3 个 filter 测试），与本批改动无关。
+
+# 2026-09-20 追加段：生产部署 v1.2.35 + 线上验收（实时指标）
+
+## 部署
+- 服务器 /opt/new-api-src git fetch + checkout v1.2.35（e0928334a）；docker build → new-api:local-v1.2.35（225MB）
+- compose 镜像 local-v1.2.34 → local-v1.2.35（备份 docker-compose.yml.bak-pre-v1235）；up -d 重建；healthy
+- 回滚：cp docker-compose.yml.bak-pre-v1235 docker-compose.yml && docker compose up -d new-api（v1.2.34 镜像仍在）
+
+## 线上验收（HTTPS 真实请求）
+- X-New-Api-Version: v1.2.35
+- /api/log/stat 返回 concurrent_requests=7、completed_last_minute=35（真实流量基线）
+- 6 线程并发打 stat 时 active_connections 峰值=10（并发计数实时生效）
+- /api/status/test http_stats 同时暴露 active_connections + completed_last_minute
+- 证据：计划书/e2e-evidence/prod-v1.2.35-live-metrics.json
