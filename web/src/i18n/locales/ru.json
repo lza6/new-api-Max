@@ -6487,7 +6487,9 @@
     "Traffic today": "Трафик сегодня",
     "Traffic 7d": "Трафик за 7 дней",
     "Traffic 30d": "Трафик за 30 дней",
-    "Check-in max must be at least the minimum": "Максимальная сумма должна быть не меньше минимальной"
+    "Check-in max must be at least the minimum": "Максимальная сумма должна быть не меньше минимальной",
+    "No available channel for this model right now. Please try again in a moment or choose another model.": "Сейчас нет доступного канала для этой модели. Попробуйте ещё раз чуть позже или выберите другую модель.",
+    "The channel connection has an issue. Contact the administrator or try again later.": "Проблема с подключением канала. Обратитесь к администратору или попробуйте позже."
   },
   "Task Event Stream": "Поток событий задачи",
   "Stream ended": "Поток завершён",

@@ -130,6 +130,7 @@ export function buildBaseParams(config: {
   pageSize: number
   searchParams: Record<string, unknown>
   useMilliseconds?: boolean
+  isAdmin?: boolean
 }): {
   p: number
   page_size: number
@@ -137,12 +138,13 @@ export function buildBaseParams(config: {
   start_timestamp?: number
   end_timestamp?: number
 } {
-  const { page, pageSize, searchParams, useMilliseconds = false } = config
+  const { page, pageSize, searchParams, useMilliseconds = false, isAdmin = false } = config
 
   return {
     p: page,
     page_size: pageSize,
-    ...(searchParams.channel
+    // channel 过滤仅在管理端生效：后端 self 接口不读 channel_id（契约对齐）。
+    ...(isAdmin && searchParams.channel
       ? {
           channel_id: String(searchParams.channel),
         }
@@ -263,6 +265,7 @@ export async function fetchLogsByCategory(
     pageSize,
     searchParams,
     useMilliseconds: logCategory === 'drawing',
+    isAdmin,
   })
 
   const paramsWithFilter = {

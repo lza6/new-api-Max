@@ -6487,7 +6487,9 @@
     "Traffic today": "Traffic today",
     "Traffic 7d": "Traffic 7d",
     "Traffic 30d": "Traffic 30d",
-    "Check-in max must be at least the minimum": "Check-in max must be at least the minimum"
+    "Check-in max must be at least the minimum": "Check-in max must be at least the minimum",
+    "No available channel for this model right now. Please try again in a moment or choose another model.": "No available channel for this model right now. Please try again in a moment or choose another model.",
+    "The channel connection has an issue. Contact the administrator or try again later.": "The channel connection has an issue. Contact the administrator or try again later."
   },
   "Task Event Stream": "Task Event Stream",
   "Stream ended": "Stream ended",

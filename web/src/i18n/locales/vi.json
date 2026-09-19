@@ -6487,7 +6487,9 @@
     "Traffic today": "Lưu lượng hôm nay",
     "Traffic 7d": "Lưu lượng 7 ngày",
     "Traffic 30d": "Lưu lượng 30 ngày",
-    "Check-in max must be at least the minimum": "Số dư tối đa phải lớn hơn hoặc bằng số dư tối thiểu"
+    "Check-in max must be at least the minimum": "Số dư tối đa phải lớn hơn hoặc bằng số dư tối thiểu",
+    "No available channel for this model right now. Please try again in a moment or choose another model.": "Hiện chưa có kênh khả dụng cho mô hình này. Vui lòng thử lại sau hoặc chọn mô hình khác.",
+    "The channel connection has an issue. Contact the administrator or try again later.": "Kênh gặp sự cố kết nối. Vui lòng liên hệ quản trị viên hoặc thử lại sau."
   },
   "Task Event Stream": "Dòng sự kiện tác vụ",
   "Stream ended": "Đã kết thúc luồng",

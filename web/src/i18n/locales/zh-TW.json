@@ -6487,7 +6487,9 @@
     "Traffic today": "今日流量",
     "Traffic 7d": "近7日流量",
     "Traffic 30d": "近30日流量",
-    "Check-in max must be at least the minimum": "簽到最大額度不能小於最小額度"
+    "Check-in max must be at least the minimum": "簽到最大額度不能小於最小額度",
+    "No available channel for this model right now. Please try again in a moment or choose another model.": "目前沒有可用渠道。請稍後再試，或換一個模型。",
+    "The channel connection has an issue. Contact the administrator or try again later.": "渠道連線出現問題。請聯絡管理員，或稍後重試。"
   },
   "Task Event Stream": "任務事件流",
   "Stream ended": "事件流已結束",

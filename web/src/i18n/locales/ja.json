@@ -6487,7 +6487,9 @@
     "Traffic today": "今日のトラフィック",
     "Traffic 7d": "7日間のトラフィック",
     "Traffic 30d": "30日間のトラフィック",
-    "Check-in max must be at least the minimum": "最大額は最小額以上にしてください"
+    "Check-in max must be at least the minimum": "最大額は最小額以上にしてください",
+    "No available channel for this model right now. Please try again in a moment or choose another model.": "現在このモデルで利用可能なチャネルがありません。しばらくしてから再試行するか、別のモデルを選択してください。",
+    "The channel connection has an issue. Contact the administrator or try again later.": "チャネル接続に問題が発生しました。管理者に連絡するか、後で再試行してください。"
   },
   "Task Event Stream": "タスクイベントストリーム",
   "Stream ended": "ストリーム終了",

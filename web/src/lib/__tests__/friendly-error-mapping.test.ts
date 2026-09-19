@@ -98,3 +98,27 @@ describe('getFriendlyErrorMessage (B6-2)', () => {
     }
   })
 })
+
+  // G1-G3：无可用渠道 / channel 域保留码 / 内部计费技术码 → 人话（B2-3 收口）。
+  test('maps channel availability, channel-domain and internal quota codes', () => {
+    const cases: Array<[unknown, string]> = [
+      [
+        {
+          type: 'get_channel_failed',
+          message: '分组 default 下模型 deepseek-v4-flash 的可用渠道不存在（retry）',
+        },
+        'No available channel for this model right now. Please try again in a moment or choose another model.',
+      ],
+      [
+        { type: 'channel:invalid_key', message: 'channel invalid key' },
+        'The channel connection has an issue. Contact the administrator or try again later.',
+      ],
+      [
+        { type: 'pre_consume_token_quota_failed', message: 'pre_consume_token_quota_failed' },
+        'Insufficient quota. Please top up or redeem a quota card.',
+      ],
+    ]
+    for (const [err, expected] of cases) {
+      expect(getFriendlyErrorMessage(apiError(err))).toBe(expected)
+    }
+  })

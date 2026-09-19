@@ -6487,7 +6487,9 @@
     "Traffic today": "Trafic aujourd'hui",
     "Traffic 7d": "Trafic 7 j",
     "Traffic 30d": "Trafic 30 j",
-    "Check-in max must be at least the minimum": "Le montant maximum doit être supérieur ou égal au minimum"
+    "Check-in max must be at least the minimum": "Le montant maximum doit être supérieur ou égal au minimum",
+    "No available channel for this model right now. Please try again in a moment or choose another model.": "Aucun canal disponible pour ce modèle pour le moment. Veuillez réessayer dans un instant ou choisir un autre modèle.",
+    "The channel connection has an issue. Contact the administrator or try again later.": "Le canal rencontre un problème de connexion. Contactez l’administrateur ou réessayez plus tard."
   },
   "Task Event Stream": "Flux d'événements de la tâche",
   "Stream ended": "Flux terminé",
