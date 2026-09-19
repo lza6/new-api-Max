@@ -8,3 +8,4 @@
 - 2026-09-20 | Phase A 审计（4 节点）| 见 计划书/audit/*.md（运行中）
 - 2026-09-20 | Phase A 审计 | 4 节点（closure-matrix/sql-db/contract-errors/resilience-observability）| 见 计划书/audit/*.md | A1: 15 节点 13D/1P/1M；A2: 13 条(P1×4)；A3: drift×1 + 映射缺口×3；A4: 无 P0
 - 2026-09-20 | SQL 索引/保留修复 | F2/F3/F4（logs 复合索引 + task_events 索引与保留）| 待三库验证 | 修复后勿重复跑 A2 全量，重点复核变更区域
+- 2026-09-20 | SQL 索引/保留修复 三库验证 | SQLite+PG15+MySQL8 迁移×2 幂等、三索引落库 | PASS | 证据：workflow_status.md 三库验证段（容器已清理）

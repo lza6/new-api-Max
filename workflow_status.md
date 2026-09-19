@@ -380,3 +380,11 @@
 - 三库（SQLite/MySQL/PG）迁移与索引验证（AGENTS 强约束）
 - 交付 v1.2.36：主题 commit → push → tag → Release → 生产部署 + 线上验收
 - B5-3 webhook / B5-4 定时同步 属架构新增，等用户优先级确认
+
+# 2026-09-20 追加段：三库验证通过 + v1.2.36 交付
+## 三库验证（AGENTS 强约束，实证）
+- SQLite（本地 scratch 库）：idx_log_type_created_id / idx_log_user_type_created / idx_task_events_created_at 落库；旧 idx_created_at_type 移除；二次启动幂等
+- PostgreSQL 15（服务器临时容器 postgres:15）：同三索引存在、旧索引不存在、双次运行无 FATAL/ERROR
+- MySQL 8（服务器临时容器 mysql:8）：同三索引存在、旧索引不存在、双次运行无错误
+- 容器已清理（--rm + trap）
+- 修复：logs 复合索引 (type,created_at,id)+(user_id,type,created_at)、task_events created_at 索引 + 7 天保留策略（TASK_EVENT_RETENTION_DAYS，主节点每小时批删）
