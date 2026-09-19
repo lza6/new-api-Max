@@ -41,7 +41,7 @@ type TaskEvent struct {
 	TaskID         string          `json:"task_id" gorm:"type:varchar(191);index"` // 公开/第三方任务 id，便于排查
 	UserId         int             `json:"user_id" gorm:"index"`
 	Type           string          `json:"type" gorm:"type:varchar(30)"`
-	CreatedAt      int64           `json:"created_at"`
+	CreatedAt      int64           `json:"created_at" gorm:"index:idx_task_events_created_at"`
 	Data           json.RawMessage `json:"data" gorm:"type:json"`
 }
 
@@ -92,4 +92,28 @@ func LastTaskEventSeq(internalTaskID int64) (int64, error) {
 		return 0, err
 	}
 	return ev.ID, nil
+}
+
+// CountOldTaskEvents 返回 created_at 早于 beforeUnix 的旧事件数量。
+func CountOldTaskEvents(ctx context.Context, beforeUnix int64) (int64, error) {
+	var total int64
+	if err := DB.WithContext(ctx).Model(&TaskEvent{}).Where("created_at < ?", beforeUnix).Count(&total).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
+// DeleteOldTaskEventsBatch 分批删除 created_at 早于 beforeUnix 的旧事件（限制单批数量，避免长事务）。
+func DeleteOldTaskEventsBatch(ctx context.Context, beforeUnix int64, limit int) (int64, error) {
+	if limit <= 0 {
+		limit = 1000
+	}
+	if ctx.Err() != nil {
+		return 0, ctx.Err()
+	}
+	result := DB.WithContext(ctx).Where("created_at < ?", beforeUnix).Limit(limit).Delete(&TaskEvent{})
+	if result.Error != nil {
+		return 0, result.Error
+	}
+	return result.RowsAffected, nil
 }

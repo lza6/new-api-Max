@@ -375,6 +375,7 @@ func InitResources() error {
 	}
 
 	service.StartAuthArtifactCleanup()
+	service.StartTaskEventCleanup()
 	model.StartConsumeLogFlusher()
 	service.StartWebProtectionMaintenanceLoop()
 

@@ -21,6 +21,7 @@ package service
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
@@ -112,4 +113,24 @@ func TestRecordTaskEventNilDataBecomesEmptyObject(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, "{}", string(events[0].Data))
+}
+
+// 保留策略：只删除 created_at 早于阈值的旧事件，新事件不受影响。
+func TestDeleteOldTaskEventsBatch(t *testing.T) {
+	setupTaskEventDB(t)
+	ctx := context.Background()
+	now := time.Now().Unix()
+	_, err := model.InsertTaskEvent(&model.TaskEvent{InternalTaskID: 1, TaskID: "new-a", UserId: 1, Type: TaskEventSubmitted, CreatedAt: now})
+	require.NoError(t, err)
+	_, err = model.InsertTaskEvent(&model.TaskEvent{InternalTaskID: 1, TaskID: "old-b", UserId: 1, Type: TaskEventQueued, CreatedAt: now - 8*86400})
+	require.NoError(t, err)
+
+	deleted, err := model.DeleteOldTaskEventsBatch(ctx, now-7*86400, 100)
+	require.NoError(t, err)
+	require.Equal(t, int64(1), deleted)
+
+	remain, err := model.ListTaskEventsAfter(1, 0, 100)
+	require.NoError(t, err)
+	require.Len(t, remain, 1)
+	assert.Equal(t, "new-a", remain[0].TaskID)
 }
