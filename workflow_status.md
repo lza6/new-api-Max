@@ -154,3 +154,16 @@
 - bun run typecheck（tsgo -b）exit 0
 - bun run build exit 0；产出 vendor-charts(2306KB) / vendor-editor(499KB) / vendor-icon-libs(56KB)
 - 诚实边界：index.js 4.3MB 未变（重库可缓存化，入口瘦身属批2 Hero/编辑器懒加载）；vendor-shiki 未独立产出（shiki 为同步导入，属批2）
+---
+
+# 2026-09-20 追加段：前端性能批2（SW + Hero 懒加载 + SEO 基础，不覆盖上述记录）
+
+## Changes
+- hero.tsx：HeroTerminalDemo 改 React.lazy + Suspense（fallback 灰块）
+- main.tsx：生产注册 /sw.js（仅缓存哈希静态资源，API/鉴权/导航不缓存）
+- public/: sw.js + robots.txt + sitemap.xml
+- 修正：shiki 仅类型导入（无运行时体积），无需拆分
+
+## Verification
+- node --check sw.js exit 0；tsgo -b exit 0；rsbuild build exit 0（dist 含 sw.js 1310B/robots 75B/sitemap 804B）
+- Boundary：SW 真实缓存行为需部署后浏览器验证（本地已确保语法/构建/复制）
