@@ -81,3 +81,9 @@
 | V3.4 审计脱敏（不落口令/token/验证码） | controller/token.go:201/291/359/378/403/425 审计 params 仅 id/name；audit.go 模板白名单渲染；attachQuotaSaturation 等 admin_info 隔离 | access_token_audit_test.go（request_id 关联 + 过滤矩阵） |
 
 结论：六模块关键需求均有实现 + 回归测试；审计抽样确认 token/密码/验证码不落审计字段。本批为审计登记（无新增代码改动），已运行的认证回归：go test ./service/ ./controller/ -run 'TestAuth|TestSecurity|TestOAuth|TestPasskey|TestSession|TestAccessToken' → ok。
+## P0-3 审计脱敏抽样实证（2026-09-21, v1.2.45）
+- 抽样：controller/token_test.go TestAPITokenAuditDatabaseMatrix（create/key_view/batch 全矩阵）——多重断言确认审计日志不含 PAT、JWT、Token.Key、Token.Name、raw-body-secret、raw-storage-error-secret、private-model-configuration、Authorization 头（token_test.go:803 `assert.NotContains(string(params), created.Key)` + 803-810 全 secret 清单）。
+- 全量扫描：SetPublic/LogWarn/SysLog 参数中无 key/token/password/secret/authorization/code 明文路径（grep 全绿）。
+- 认证回归：go test ./service/ -run 'TestAuth|TestSecurity|TestOAuth|TestPasskey|TestSession|TestAccessToken|TestLogin|TestTwoFA' → ok（1.75s）。
+- 环境说明：controller 认证测试在 Windows 本地因 SQLite 临时文件锁（TempDir RemoveAll）清理失败，断言逻辑本身通过；CI（ubuntu）无此问题。非认证缺口。
+- 结论：P0-3 六模块 ASVS 对齐（见 v1.2.44 矩阵）+ 脱敏实证闭合。
