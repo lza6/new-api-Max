@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -487,6 +488,16 @@ func keepUpstreamRedirectResponse(_ *http.Request, _ []*http.Request) error {
 	return http.ErrUseLastResponse
 }
 
+// isRequestTimeout 判断上游请求是否因超时失败（http.Client.Timeout / context
+// deadline / net.Error.Timeout）。超时应映射为 504 Gateway Timeout，而不是笼统 500。
+func isRequestTimeout(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var ne net.Error
+	return errors.As(err, &ne) && ne.Timeout()
+}
+
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	// B1-2 SSRF 二次解析：在即将发起上游请求时再次校验目标地址（防 DNS
 	// rebinding「保存合法、使用时解析到内网」窗口）。结果按 host 缓存 5 分钟。
@@ -541,6 +552,11 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	resp, err := relayClient.Do(req)
 	if err != nil {
 		logger.LogError(c, "do request failed: "+err.Error())
+		if isRequestTimeout(err) {
+			// 上游总超时（如 RELAY_TIMEOUT）：映射 504，语义准确、可观测可辨。
+			return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeDoRequestFailed, http.StatusGatewayTimeout,
+				types.ErrOptionWithHideErrMsg("upstream request timed out"))
+		}
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}
 	if resp == nil {

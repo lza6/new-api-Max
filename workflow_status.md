@@ -420,3 +420,16 @@
 ## 验收
 - X-New-Api-Version v1.2.37；token E2E 4/5（清理 307 尾斜杠已用 DB 兜底，属已知 P2）
 - 4xx 透传正确（网关 400 自校验 / 上游 400 原样返回）
+
+# 2026-09-20 追加段：500 错误根因（RELAY_TIMEOUT 超时）+ 加固 v1.2.38
+
+## 线上错误实证（近 6h，type=5，1521 条）
+- 500「upstream error: do request failed」102 条，use_time 几乎全为 300/600s = RELAY_TIMEOUT=300(5分钟) 总超时掐断慢 prefill → 与用户「跑5分钟报500」吻合
+- 429 三类（Too many pending 652 / user 并发超限 418 / 上游限流 69）与 502(118) 均来自上游透传（单渠道 yunshuzhilian 超卖放大）
+- 400 engine unavailable(110)/MaxTokens 超限(9)/content 策略 等为上游参数/引擎问题
+
+## 加固（v1.2.38）
+- relay/channel/api_request.go：上游请求超时（http.Client.Timeout/context deadline/net.Error.Timeout）→ 504 Gateway Timeout（原 500），
+  语义准确、错误日志可辨；isRequestTimeout 单测通过；relay/channel 全量测试绿
+- 生产 compose：RELAY_TIMEOUT 300 → 900（允许 15 分钟慢 prefill 完成，显著降低超时 500）
+- 429/502 根治 = 为 deepseek-v4-flash 增加活跃渠道 + 健康分路由（待用户加渠道）

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -590,4 +591,18 @@ func TestUpstreamGetBody_HTTP2CannotRetryWithoutGetBody(t *testing.T) {
 	assert.Equal(t, 1, srv.streamCount)
 	require.Len(t, srv.attemptBodies, 1)
 	assert.Equal(t, payload, srv.attemptBodies[0])
+}
+
+type timeoutNetErr struct{ error }
+
+func (timeoutNetErr) Timeout() bool   { return true }
+func (timeoutNetErr) Temporary() bool { return true }
+
+// 超时识别：context deadline / http.Client.Timeout 包装的 url.Error / net.Error.Timeout。
+func TestIsRequestTimeout(t *testing.T) {
+	assert.True(t, isRequestTimeout(context.DeadlineExceeded))
+	assert.True(t, isRequestTimeout(&url.Error{Op: "Post", URL: "http://upstream", Err: context.DeadlineExceeded}))
+	assert.True(t, isRequestTimeout(timeoutNetErr{fmt.Errorf("took too long")}))
+	assert.False(t, isRequestTimeout(fmt.Errorf("boom")))
+	assert.False(t, isRequestTimeout(context.Canceled))
 }
