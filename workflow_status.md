@@ -401,3 +401,22 @@
 - 6 线程并发时 active_connections 峰值=9；checkin_setting 三个 option 正常
 - 证据：计划书/e2e-evidence/prod-v1.2.36-acceptance.json
 - 回滚：cp /opt/new-api/docker-compose.yml.bak-pre-v1236 /opt/new-api/docker-compose.yml && cd /opt/new-api && docker compose up -d new-api
+
+# 2026-09-20 追加段：v1.2.37（token 创建修复 + 首字延迟实证）生产部署与验收
+
+## 线上侦查结论（首字慢）
+- frt p50=26.9s/p95=52s；use_time p50=34s；每请求 25-51万 token；deepseek-v4-flash 仅 1 活跃渠道
+- 服务器端成对基准：网关 vs 直连附加 ≈0~300ms → 首字慢=上游慢+超大 prefill（证据 计划书/audit/first-token-latency-prod.md）
+
+## token 创建修复（根因闭环）
+- POST /api/token/ 响应加入 data{id,key}；未显式额度默认无限；401 区分“额度用尽”
+- 生产验证：创建→返回 id+key→key 直接用返回 200→清理 ✓（此前新 token 必 401 死胎）
+
+## 部署
+- v1.2.37 服务器构建 local-v1.2.37、compose 换镜像（备份 .bak-pre-v1237）重建 healthy
+- Release: https://github.com/lza6/new-api-Max/releases/tag/v1.2.37
+- 回滚：cp /opt/new-api/docker-compose.yml.bak-pre-v1237 docker-compose.yml && cd /opt/new-api && docker compose up -d new-api
+
+## 验收
+- X-New-Api-Version v1.2.37；token E2E 4/5（清理 307 尾斜杠已用 DB 兜底，属已知 P2）
+- 4xx 透传正确（网关 400 自校验 / 上游 400 原样返回）
