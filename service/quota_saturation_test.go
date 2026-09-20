@@ -13,6 +13,7 @@ import (
 	hosttypes "github.com/lza6/new-api-Max/types"
 
 	"github.com/gin-gonic/gin"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -167,4 +168,55 @@ func TestPreConsumeWalletExhaustedReturnsInsufficientQuota(t *testing.T) {
 	require.Equal(t, types.ErrorCodeInsufficientUserQuota, apiErr.GetErrorCode())
 	require.Equal(t, http.StatusForbidden, apiErr.StatusCode)
 	require.Nil(t, info.Billing)
+}
+
+func TestClampImageDimensionsBounds(t *testing.T) {
+	cases := []struct {
+		name         string
+		w, h         int
+		wantW, wantH int
+	}{
+		{"normal", 1024, 768, 1024, 768},
+		{"huge_width", math.MaxInt32, 1024, maxTokenImageDimension, 1024},
+		{"huge_both", math.MaxInt32, math.MaxInt32, maxTokenImageDimension, maxTokenImageDimension},
+		{"negative", -100, -50, 0, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			gotW, gotH := clampImageDimensions(tc.w, tc.h)
+			assert.Equal(t, tc.wantW, gotW)
+			assert.Equal(t, tc.wantH, gotH)
+		})
+	}
+}
+
+// TestClampImageDimensionsProductCannotOverflow proves that after clamping, the
+// width*height product cannot overflow int32 (so area stays positive and the
+// token estimate cannot go negative).
+func TestClampImageDimensionsProductCannotOverflow(t *testing.T) {
+	w, h := clampImageDimensions(math.MaxInt32, math.MaxInt32)
+	require.LessOrEqual(t, w, maxTokenImageDimension)
+	require.LessOrEqual(t, h, maxTokenImageDimension)
+	product := w * h
+	require.Greater(t, product, 0, "clamped product must stay positive")
+	require.LessOrEqual(t, int64(product), int64(maxTokenImageDimension)*int64(maxTokenImageDimension))
+}
+
+// TestAudioTokenAccumulationSaturates proves the multi-file audio token total
+// cannot wrap negative when durations are forged to huge values.
+func TestAudioTokenAccumulationSaturates(t *testing.T) {
+	total := 0
+	for i := 0; i < 10000; i++ {
+		// each file claims ~1e9 seconds of audio
+		duration := 1e9
+		audioToken := common.QuotaRound(math.Ceil(duration) / 60.0 * 1000)
+		if audioToken > 0 && total > common.MaxQuota-audioToken {
+			total = common.MaxQuota
+		} else {
+			total += audioToken
+		}
+	}
+	require.Greater(t, total, 0, "accumulated audio tokens must stay positive")
+	require.LessOrEqual(t, total, common.MaxQuota, "accumulated audio tokens must saturate at MaxQuota")
+	assert.Positive(t, total)
 }

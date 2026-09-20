@@ -77,6 +77,8 @@ func TestProcessChannelErrorUsesSnapshotWithoutLeakingChannelMetadata(t *testing
 	storedOther, err := common.StrToMap(stored.Other)
 	require.NoError(t, err)
 	assert.Equal(t, float64(http.StatusBadGateway), storedOther["status_code"])
+	// P0-4 错误归因：502 → server_error 稳定短标识落日志，前端可直接人话映射。
+	assert.Equal(t, "server_error", storedOther["error_class"])
 	for _, key := range []string{"channel_id", "channel_name", "channel_type"} {
 		assert.NotContains(t, storedOther, key)
 	}

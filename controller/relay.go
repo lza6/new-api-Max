@@ -518,6 +518,10 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		other.SetPublic("error_type", err.GetErrorType())
 		other.SetPublic("error_code", err.GetErrorCode())
 		other.SetPublic("status_code", err.StatusCode)
+		// P0-4 错误归因：把正交化的错误类（auth/rate_limited/server_error/
+		// timeout/bad_request/capability/ok）落到错误日志，前端可直接人话映射，
+		// 排障不再需要人工比对状态码。
+		other.SetPublic("error_class", service.RelayErrorClassString(errClass))
 		service.AppendRelayLogAdminInfo(c, relayInfo, other)
 		service.AppendTaskPluginContextAuditInfo(c, other)
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)

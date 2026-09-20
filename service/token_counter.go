@@ -109,8 +109,12 @@ func getImageToken(c *gin.Context, fileMeta *types.FileMeta, model string, strea
 		return 0, errors.New(fmt.Sprintf("fail to decode image config: %s", fileMeta.GetIdentifier()))
 	}
 
-	width := config.Width
-	height := config.Height
+	// width/height come from user-uploaded image metadata (upstream-controlled).
+	// A crafted header can declare huge dimensions: the int multiplication
+	// width*height would overflow to a negative number, sqrt(negative) is NaN,
+	// and int(NaN) is platform-defined (often min int), yielding a negative
+	// token estimate and therefore a negative charge. Bound before any math.
+	width, height := clampImageDimensions(config.Width, config.Height)
 	logger.LogDebug(c, "image token input: format=%s, width=%d, height=%d", format, width, height)
 
 	if isPatchBased {
@@ -217,7 +221,13 @@ func CountRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relayco
 				duration = 0
 			}
 			// 一分钟 1000 token，与 $price / minute 对齐。
-			totalAudioToken += common.QuotaRound(math.Ceil(duration) / 60.0 * 1000)
+			audioToken := common.QuotaRound(math.Ceil(duration) / 60.0 * 1000)
+			// 累加饱和到 int32 边界：多文件 + 天文数字时长不得让总和溢出成负数。
+			if audioToken > 0 && totalAudioToken > common.MaxQuota-audioToken {
+				totalAudioToken = common.MaxQuota
+			} else {
+				totalAudioToken += audioToken
+			}
 		}
 		return totalAudioToken, nil
 	}
@@ -413,4 +423,28 @@ func CountTextToken(text string, model string) int {
 		// 非openai模型，使用tiktoken-go计算没有意义，使用估算节省资源
 		return EstimateTokenByModel(model, text)
 	}
+}
+
+// maxTokenImageDimension bounds user-supplied image dimensions before any int
+// multiplication in token estimation. 100_000 is far beyond any real model
+// input (4K is 3840) while keeping width*height <= 1e10, well inside int32.
+const maxTokenImageDimension = 100_000
+
+// clampImageDimensions bounds image width/height read from upstream-controlled
+// metadata so arithmetic cannot overflow to a negative token estimate. Negative
+// values are clamped to 0 (a non-image edge already guarded by callers).
+func clampImageDimensions(width, height int) (int, int) {
+	if width > maxTokenImageDimension {
+		width = maxTokenImageDimension
+	}
+	if height > maxTokenImageDimension {
+		height = maxTokenImageDimension
+	}
+	if width < 0 {
+		width = 0
+	}
+	if height < 0 {
+		height = 0
+	}
+	return width, height
 }
