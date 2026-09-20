@@ -8,6 +8,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
 )
 
 // GetAllCombos 分页列出组合。
@@ -34,6 +35,7 @@ func CreateCombo(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	_ = service.RefreshComboSnapshot() // P2-1 无锁快照失效刷新
 	recordManageAudit(c, "combo.create", map[string]any{"name": combo.Name, "strategy": combo.Strategy})
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": combo})
 }
@@ -49,6 +51,7 @@ func UpdateCombo(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	_ = service.RefreshComboSnapshot() // P2-1 无锁快照失效刷新
 	recordManageAudit(c, "combo.update", map[string]any{"name": combo.Name})
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "", "data": combo})
 }

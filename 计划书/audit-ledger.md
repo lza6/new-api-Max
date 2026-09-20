@@ -87,3 +87,8 @@
 - 认证回归：go test ./service/ -run 'TestAuth|TestSecurity|TestOAuth|TestPasskey|TestSession|TestAccessToken|TestLogin|TestTwoFA' → ok（1.75s）。
 - 环境说明：controller 认证测试在 Windows 本地因 SQLite 临时文件锁（TempDir RemoveAll）清理失败，断言逻辑本身通过；CI（ubuntu）无此问题。非认证缺口。
 - 结论：P0-3 六模块 ASVS 对齐（见 v1.2.44 矩阵）+ 脱敏实证闭合。
+## P2-1 无锁配置快照（2026-09-21, v1.2.46）
+- 目标：渠道组合（ChannelCombo）路由热点每请求直查 DB → 无锁快照。
+- 实现：service/combo_snapshot.go（atomic.Pointer 不可变索引：构建全量 map → Store 原子发布；读零锁；重建串行化 + 失败保留旧快照）；ResolveComboForModel 快照优先 + DB 回退；controller/channel_combo.go Create/Update/Delete 后 RefreshComboSnapshot 失效刷新。
+- 测试：combo_snapshot_test.go（构建/解析语义 + 并发读在原子替换期间一致性），go test ./service/ -run TestComboSnapshot -race → ok（无 race）。
+- 命令：go build ./...；go test ./service/ -race → ok；三库 conformance 不受影响（纯内存快照，无 DB 语义变更）。

@@ -50,9 +50,14 @@ type ComboCandidate struct {
 }
 
 // ResolveComboForModel 按请求模型名解析启用组合（nil = 非组合）。
+// 优先走无锁快照（P2-1），避免组合路由热点下的每请求读放大；快照缺失
+// （启动早期尚未刷新）时回退数据库查询，保证首次语义不回归。
 func ResolveComboForModel(modelName string) *model.ChannelCombo {
 	if modelName == "" {
 		return nil
+	}
+	if combo := ResolveComboSnapshot(modelName); combo != nil {
+		return combo
 	}
 	combo, err := model.GetEnabledComboByName(modelName)
 	if err != nil || combo == nil {
