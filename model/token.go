@@ -268,7 +268,7 @@ func ValidateUserToken(key string) (token *Token, err error) {
 					common.SysLog("failed to update token status" + err.Error())
 				}
 			}
-			return token, ErrTokenInvalid
+			return token, ErrTokenQuotaExhausted
 		}
 		return token, nil
 	}

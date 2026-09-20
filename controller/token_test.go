@@ -892,3 +892,37 @@ func verifyAPITokenAudit(t *testing.T) {
 		assert.EqualValues(t, 1, count)
 	})
 }
+
+// 修复回归：POST /api/token/ 必须返回 id+key（否则 API 集成方拿不到密钥），
+// 且未显式指定额度/无限时不创建 0 额度死胎 token（与前端默认一致）。
+func TestAddTokenReturnsKeyAndDefaultsUnlimited(t *testing.T) {
+	db := setupTokenControllerTestDB(t)
+
+	// 1) 显式无限额度 → 响应返回 id + key
+	ctx, rec := newAuthenticatedContext(t, http.MethodPost, "/api/token/",
+		map[string]any{"name": "create-returns-key", "unlimited_quota": true}, 1)
+	AddToken(ctx)
+	require.Equal(t, http.StatusOK, rec.Code)
+	var resp tokenAPIResponse
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &resp))
+	require.True(t, resp.Success)
+	var data struct {
+		ID  int    `json:"id"`
+		Key string `json:"key"`
+	}
+	require.NoError(t, json.Unmarshal(resp.Data, &data))
+	assert.Greater(t, data.ID, 0)
+	assert.Len(t, data.Key, 48)
+	// 按返回的 key 能在库里查到 → 不是“未落库”
+	var stored model.Token
+	require.NoError(t, db.Where("key = ?", data.Key).First(&stored).Error)
+	assert.Equal(t, "create-returns-key", stored.Name)
+
+	// 2) 未指定额度/无限 → 默认无限，避免 0 额度死胎
+	ctx2, _ := newAuthenticatedContext(t, http.MethodPost, "/api/token/",
+		map[string]any{"name": "create-defaults-unlimited"}, 1)
+	AddToken(ctx2)
+	var stored2 model.Token
+	require.NoError(t, db.Where("name = ?", "create-defaults-unlimited").First(&stored2).Error)
+	assert.True(t, stored2.UnlimitedQuota, "no explicit quota should default to unlimited (UI parity)")
+}

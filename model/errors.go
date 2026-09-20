@@ -20,6 +20,8 @@ var (
 var (
 	ErrTokenNotProvided = errors.New("token not provided")
 	ErrTokenInvalid     = errors.New("token invalid")
+	// ErrTokenQuotaExhausted 令牌存在但额度已用尽（与无效令牌区分，便于给出明确提示）。
+	ErrTokenQuotaExhausted = errors.New("token quota exhausted")
 )
 
 // Redemption errors

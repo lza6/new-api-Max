@@ -329,6 +329,12 @@ func AddToken(c *gin.Context) {
 		common.SysLog("failed to generate token key: " + err.Error())
 		return
 	}
+	// 与前端创建表单默认一致（unlimited_quota=true）：未显式指定额度/无限时，
+	// 不创建 0 额度死胎 token（0 额度且非无限必然 401 无法使用）。
+	if !token.UnlimitedQuota && token.RemainQuota <= 0 {
+		common.SysLog(fmt.Sprintf("token created with unlimited quota (no explicit quota): user=%d name=%q", c.GetInt("id"), token.Name))
+		token.UnlimitedQuota = true
+	}
 	cleanToken := model.Token{
 		UserId:             c.GetInt("id"),
 		Name:               token.Name,
@@ -352,9 +358,11 @@ func AddToken(c *gin.Context) {
 	}
 	params["id"] = cleanToken.Id
 	common.SetContextKey(c, constant.ContextKeyTokenAuditSucceeded, true)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "",
+	// 创建成功必须把 id 与 key 返回给调用方：否则 API 集成方拿不到密钥，
+	// 只能看到 success=true（“创建 token 未落库”类误报的根因）。
+	common.ApiSuccess(c, gin.H{
+		"id":  cleanToken.Id,
+		"key": key,
 	})
 }
 

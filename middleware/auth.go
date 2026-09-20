@@ -427,6 +427,10 @@ func TokenAuth() func(c *gin.Context) {
 				common.SysLog("TokenAuth ValidateUserToken database error: " + err.Error())
 				abortWithOpenAiMessage(c, http.StatusInternalServerError,
 					common.TranslateMessage(c, i18n.MsgDatabaseError))
+			} else if errors.Is(err, model.ErrTokenQuotaExhausted) {
+				// 令牌存在但额度已用尽：给出明确提示，避免误报“无效令牌”。
+				abortWithOpenAiMessage(c, http.StatusUnauthorized,
+					"令牌额度已用尽，请为令牌充值额度或更换令牌（token quota exhausted）")
 			} else {
 				abortWithOpenAiMessage(c, http.StatusUnauthorized,
 					common.TranslateMessage(c, i18n.MsgTokenInvalid))
