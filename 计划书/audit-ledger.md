@@ -41,3 +41,8 @@
 - 本批补齐：P1-3 权限越权回归测试（指南验收标准要求、此前缺失）：
   - controller/task_event_test.go 新增 TestStreamTaskEventsOtherUserDenied（非属主 → 404，不泄露事件数据）与 TestStreamTaskEventsOwnerAllowed（属主 → 200 + done）
   - 命令：go test ./controller/ -run 'TestStreamTaskEvents' -v -count=1 → 5/5 PASS
+## P2-2 事件子系统最小核心（2026-09-21, v1.2.42）
+- 新增 service/event_bus.go（内存版通用事件总线）：注册式处理器路由 + 事件 ID 幂等去重 + 失败退避重试 + 状态机（pending/success/failed/dead）+ panic 隔离 + 关闭语义 + 同步/异步分发 + 统计计数。纯增量新文件，不触碰现有代码与三库方言；后续支付 webhook/通知归一可在 Dispatch 内接持久化。
+- 测试：service/event_bus_test.go 6 组（投递+幂等、重试至 dead、瞬态失败恢复、无处理器/panic 隔离、关闭拒绝、异步+自动 ID 幂等），全过。
+- 命令：go test ./service/ -run 'TestEventBus' -v -count=1 → 6/6 PASS；go vet/build/gofmt 干净；三库 conformance 24/24（P0-1 防回退）。
+- 范围说明：P2-2 完整版（支付 webhook 接入 + 双向状态机持久化 + 事件幂等表）与 P2-1（无锁快照）/P2-3（jsplugin 沙箱）/P2-4（平台生态）为独立大项，未在本次实现，待后续批次。

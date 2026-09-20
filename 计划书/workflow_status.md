@@ -32,7 +32,7 @@
 | P0-2 计费安全收口 | ✅ DONE (v1.2.40) | 见 git log | `计划书/audit-ledger.md` + `service/token_counter.go` + `quota_saturation_test.go` |
 | P0-3 认证安全审计 | ✅ DONE (v1.2.40，审计结论：既有实现已满足关键 ASVS) | 见 git log | `计划书/audit-ledger.md` |
 | P0-4 日志透明化（错误归因落日志） | ✅ DONE (v1.2.40) | 见 git log | `计划书/audit-ledger.md` + `controller/relay.go` + `relay_error_log_test.go` |
-| P1-1 用户画像层 | ✅ 已落地（v1.2.26 B3-1，盘点确认） | 见 audit-ledger | service/user_profile/ + controller/user_profile.go |`r`n| P1-2 Redis 批量落库 | ✅ 已满足（内存批缓冲路径） | 见 audit-ledger | model/consume_log_flusher.go |`r`n| P1-3 SSE 断线续传 | ✅ 已落地 + 本批补齐权限测试 | 见 audit-ledger | controller/task_event.go + task_event_test.go |`r`n| P1-4 渠道健康+组合路由 | ✅ 已落地 | 见 audit-ledger | channel_health_score.go + channel_combo_route.go |`r`n| P1-P2 其余批次 | ⏳ 待办 | - | - |
+| P1-1 用户画像层 | ✅ 已落地（v1.2.26 B3-1，盘点确认） | 见 audit-ledger | service/user_profile/ + controller/user_profile.go |`r`n| P1-2 Redis 批量落库 | ✅ 已满足（内存批缓冲路径） | 见 audit-ledger | model/consume_log_flusher.go |`r`n| P1-3 SSE 断线续传 | ✅ 已落地 + 本批补齐权限测试 | 见 audit-ledger | controller/task_event.go + task_event_test.go |`r`n| P1-4 渠道健康+组合路由 | ✅ 已落地 | 见 audit-ledger | channel_health_score.go + channel_combo_route.go |`r`n| P2-2 事件子系统（最小核心） | ✅ DONE (v1.2.42) | 见 audit-ledger | service/event_bus.go + event_bus_test.go |`r`n| P2-1 无锁快照 / P2-3 jsplugin 沙箱 / P2-4 平台生态 | ⏳ 待办（大项独立批次） | - | - |
 
 ## 五、下一步（最小可行）
 1. 推荐下一批：P0-2 计费安全收口 或 P0-4 日志透明化。
