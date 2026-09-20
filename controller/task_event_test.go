@@ -21,11 +21,14 @@ package controller
 import (
 	"bytes"
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -121,4 +124,49 @@ func TestStreamTaskEventsCancelStops(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("streamTaskEvents did not stop after context cancel")
 	}
+}
+
+// TestStreamTaskEventsOtherUserDenied：越权访问他人任务的事件流必须被拒。
+// GetByTaskId 按 user_id + task_id 定位，非属主查不到任务 → 404，不泄露
+// 任何事件数据（验收标准：权限越权访问被拒）。
+func TestStreamTaskEventsOtherUserDenied(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupTaskEventSSEDB(t)
+	task := &model.Task{TaskID: "t-private", UserId: 1, Status: model.TaskStatusSuccess}
+	require.NoError(t, task.Insert())
+	seedTaskEvent(t, "t-private", 1, task.ID, "submitted")
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/task/t-private/events", nil)
+	ctx.Params = gin.Params{{Key: "task_id", Value: "t-private"}}
+	ctx.Set("id", 999) // 非属主
+	ctx.Set("username", "intruder")
+
+	TaskEventsSSE(ctx)
+
+	require.Equal(t, http.StatusNotFound, recorder.Code)
+	require.NotContains(t, recorder.Body.String(), "submitted")
+	require.NotContains(t, recorder.Body.String(), "event: ")
+}
+
+// TestStreamTaskEventsOwnerAllowed：属主本人可读事件流（成功路径闭环）。
+func TestStreamTaskEventsOwnerAllowed(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	setupTaskEventSSEDB(t)
+	task := &model.Task{TaskID: "t-owner", UserId: 7, Status: model.TaskStatusSuccess}
+	require.NoError(t, task.Insert())
+	seedTaskEvent(t, "t-owner", 7, task.ID, "succeeded")
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/api/task/t-owner/events?since=0", nil)
+	ctx.Params = gin.Params{{Key: "task_id", Value: "t-owner"}}
+	ctx.Set("id", 7)
+
+	TaskEventsSSE(ctx)
+
+	require.Equal(t, http.StatusOK, recorder.Code)
+	require.Contains(t, recorder.Body.String(), "event: done")
+	require.Contains(t, recorder.Body.String(), "succeeded")
 }

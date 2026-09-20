@@ -32,3 +32,12 @@
 - 修复：controller/relay.go 错误日志增加 other.error_class（RelayErrorClassString：auth/rate_limited/server_error/timeout/bad_request/capability/ok），前端可直接人话映射，排障不再人工比对状态码。
 - 测试：controller/relay_error_log_test.go 502 → server_error 落日志断言，全过。
 - 命令：go test ./controller/ -run 'TestProcessChannelError' -count=1 → ok
+## P1 批次盘点 + P1-3 权限闭环（2026-09-21, v1.2.41）
+- 盘点结论（真实代码核验）：
+  - P1-1 用户画像层（规则版）：✅ 已落地（service/user_profile/profile.go 14KB：Weibull 衰减/进程缓存+Redis 缓存/失效；profile_test.go 空态/聚合/衰减/缓存 4 组测试；controller/user_profile.go + 路由 /api/user/profile/insights；前端 profile-insights feature）
+  - P1-2 Redis 队列批量落库：✅ 已满足（model/consume_log_flusher.go 内存批缓冲：4096 队列 + 周期 flush + 满时同步背压不丢；指南允许「内存批缓冲」路径）
+  - P1-3 任务事件流 SSE 断线续传：✅ 已落地（model/task_event.go seq 单调自增 + ListTaskEventsAfter(sinceSeq)/LastTaskEventSeq；controller/task_event.go TaskEventsSSE + since 续传 + heartbeat + done；前端 task-event-stream.ts/tsx ReadableStream + since=lastSeq 续传）
+  - P1-4 渠道健康度+组合路由：✅ 已落地（service/channel_health_score.go + channel_combo_route.go + 系列测试）
+- 本批补齐：P1-3 权限越权回归测试（指南验收标准要求、此前缺失）：
+  - controller/task_event_test.go 新增 TestStreamTaskEventsOtherUserDenied（非属主 → 404，不泄露事件数据）与 TestStreamTaskEventsOwnerAllowed（属主 → 200 + done）
+  - 命令：go test ./controller/ -run 'TestStreamTaskEvents' -v -count=1 → 5/5 PASS
