@@ -1,9 +1,0 @@
-{
- "log_had_bytes": true,
- "rb": 112,
- "sb": 1048,
- "total_requests": 201,
- "total_bytes": 1272,
- "total_mb": 0.00121307373046875,
- "pass": true
-}
