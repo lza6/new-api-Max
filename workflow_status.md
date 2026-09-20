@@ -433,3 +433,15 @@
   语义准确、错误日志可辨；isRequestTimeout 单测通过；relay/channel 全量测试绿
 - 生产 compose：RELAY_TIMEOUT 300 → 900（允许 15 分钟慢 prefill 完成，显著降低超时 500）
 - 429/502 根治 = 为 deepseek-v4-flash 增加活跃渠道 + 健康分路由（待用户加渠道）
+
+# 2026-09-20 追加段：v1.2.38 生产部署与验收
+
+## 部署
+- 服务器 checkout v1.2.38 → docker build local-v1.2.38 → compose 换镜像 + RELAY_TIMEOUT 300→900（备份 .bak-pre-v1238）→ 重建 healthy
+- 确认：docker exec new-api env RELAY_TIMEOUT=900；X-New-Api-Version v1.2.38；启动无 FATAL/panic
+- Release: https://github.com/lza6/new-api-Max/releases/tag/v1.2.38
+- 回滚：cp /opt/new-api/docker-compose.yml.bak-pre-v1238 /opt/new-api/docker-compose.yml && cd /opt/new-api && docker compose up -d new-api
+
+## 效果预期
+- 超时类 500 显著下降：慢 prefill 可跑到 15 分钟；真正超时上报 504（可观测、不与真实 500 混淆）
+- 429/502 仍为上游单渠道超卖所致 → 需增加 deepseek 活跃渠道（用户侧）
