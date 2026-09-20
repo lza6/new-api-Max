@@ -109,3 +109,76 @@ jobs:
 
       - name: Test
         run: bun run test
+  db-conformance:
+    name: Three-database conformance (SQLite + MySQL + PostgreSQL)
+    if: github.event.action != 'closed' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GOWORK: 'off'
+      TEST_MYSQL_DSN: 'root@tcp(127.0.0.1:3306)/newapi_conformance_test?charset=utf8mb4&parseTime=true&loc=Local'
+      TEST_POSTGRES_DSN: 'postgres://postgres@127.0.0.1:5432/newapi_conformance_test'
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: 'yes'
+          MYSQL_DATABASE: newapi_conformance_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot --silent"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+          POSTGRES_DB: newapi_conformance_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -h 127.0.0.1"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ github.event.pull_request.base.repo.full_name }}
+          ref: ${{ github.event.action == 'closed' && github.event.pull_request.base.ref || github.ref }}
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: |
+            go.sum
+            relaykit/go.sum
+
+      - name: Create frontend embed placeholder
+        run: |
+          mkdir -p web/dist
+          touch web/dist/index.html
+
+      - name: Wait for MySQL and PostgreSQL
+        run: |
+          for i in $(seq 1 30); do
+            if mysqladmin ping -h 127.0.0.1 -uroot --silent 2>/dev/null && pg_isready -U postgres -h 127.0.0.1 -q 2>/dev/null; then
+              echo "both databases ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "databases did not become ready in time"
+          exit 1
+
+      - name: Create conformance database (MySQL utf8mb4)
+        run: |
+          mysql -h 127.0.0.1 -uroot -e "CREATE DATABASE IF NOT EXISTS newapi_conformance_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+
+      - name: Run three-database conformance tests
+        run: go test ./model/ -run "TestDBConformance" -v -count=1
