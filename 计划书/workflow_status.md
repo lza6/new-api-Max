@@ -29,9 +29,9 @@
 | 批次 | 状态 | 提交 | 证据 |
 |---|---|---|---|
 | P0-1 三库 conformance 契约测试套件 | ✅ DONE (v1.2.39) | 见 git log | `计划书/audit-ledger.md` + `model/db_conformance_test.go` + CI `db-conformance` job |
-| P0-2 计费安全收口 | ⏳ 待办 | - | - |
-| P0-3 认证安全审计 | ⏳ 待办 | - | - |
-| P0-4 日志透明化 | ⏳ 待办 | - | - |
+| P0-2 计费安全收口 | ✅ DONE (v1.2.40) | 见 git log | `计划书/audit-ledger.md` + `service/token_counter.go` + `quota_saturation_test.go` |
+| P0-3 认证安全审计 | ✅ DONE (v1.2.40，审计结论：既有实现已满足关键 ASVS) | 见 git log | `计划书/audit-ledger.md` |
+| P0-4 日志透明化（错误归因落日志） | ✅ DONE (v1.2.40) | 见 git log | `计划书/audit-ledger.md` + `controller/relay.go` + `relay_error_log_test.go` |
 | P1-P2 其余批次 | ⏳ 待办 | - | - |
 
 ## 五、下一步（最小可行）
