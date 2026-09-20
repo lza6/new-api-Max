@@ -9,7 +9,7 @@
 |---|---|---|---|
 | N0 识别 | 主项目定位（Agent 网关：渠道聚合/计费/任务/日志透明/skills 沉淀/横向扩展） | ✅ DONE | AGENTS.md + 本指南 §1 |
 | N1 全量盘点 | 参考根 1191 顶层目录；1177 项 README 首段索引 | ✅ DONE | `.deploy/refscan/all_projects_readme.tsv` |
-| N2-N17 并行扫描 | 子代理 6 批（agents-a/b、api_gateway、skills、docs_rag、media）+ 主代理 11 批（image/ecommerce/mcp/automation/dev_tools/security/web_frontend/unclassified×4） | ✅ DONE | `.deploy/refscan/reports/report_<batch>.md`（17 份，257KB） |
+| N2-N18 并行扫描 | 子代理 6 批（agents-a/b、api_gateway、skills、docs_rag、media）+ 主代理 11 批（image/ecommerce/mcp/automation/dev_tools/security/web_frontend/unclassified×4） | ✅ DONE | `.deploy/refscan/reports/report_<batch>.md`（18 份，263KB，含 missing-13 补扫） |
 | N18 优点提炼 | 每批 Top5 + 共性亮点 + 扩展洞察 | ✅ DONE | 各 report_*.md §3/§4 |
 | N19 差距分析 | 主项目 vs 参考最佳（10 项差距矩阵） | ✅ DONE | 本指南 §4 |
 | N20 方案设计 | 六大可迁移方向 + 优先级 + 依赖关系 | ✅ DONE | 本指南 §3/§5 |
