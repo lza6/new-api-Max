@@ -172,10 +172,15 @@ func validateMultipartTaskRequest(c *gin.Context, info *RelayInfo, action string
 		Metadata: make(map[string]any),
 	}
 
+	// P0-2 bound 收口：multipart seconds 必须可解析为整数，解析失败按 400
+	// 拒绝，而不是静默归 0 —— 否则时长计费乘数会缺失（少收费），且与
+	// JSON 路径的行为不一致。
 	if durationStr := formData.Get("seconds"); durationStr != "" {
-		if duration, err := strconv.Atoi(durationStr); err == nil {
-			req.Duration = duration
+		duration, err := strconv.Atoi(durationStr)
+		if err != nil {
+			return req, fmt.Errorf("invalid seconds: %w", err)
 		}
+		req.Duration = duration
 	}
 
 	if images := formData["images"]; len(images) > 0 {

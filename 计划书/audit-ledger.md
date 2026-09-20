@@ -46,3 +46,21 @@
 - 测试：service/event_bus_test.go 6 组（投递+幂等、重试至 dead、瞬态失败恢复、无处理器/panic 隔离、关闭拒绝、异步+自动 ID 幂等），全过。
 - 命令：go test ./service/ -run 'TestEventBus' -v -count=1 → 6/6 PASS；go vet/build/gofmt 干净；三库 conformance 24/24（P0-1 防回退）。
 - 范围说明：P2-2 完整版（支付 webhook 接入 + 双向状态机持久化 + 事件幂等表）与 P2-1（无锁快照）/P2-3（jsplugin 沙箱）/P2-4（平台生态）为独立大项，未在本次实现，待后续批次。
+## P0-2 计费安全收口：三清单闭合（2026-09-21, v1.2.43）
+### 清单一：未 bound 的用户可控计费乘数（闭合）
+| 乘数 | 校验点 | 状态 |
+|---|---|---|
+| 图片 n | relay/helper/valid_request.go:199-200, 249-250（`dto.MaxImageN`，超值 400）；multipart n `strconv.Atoi` + bound（valid_request.go:196-203） | ✅ bound |
+| 图片 n 溢出 uint64（18446744073686646784） | valid_request.go 解析为 uint 后与 MaxImageN 比较，溢出值 > max → 400 | ✅ 拒绝（openai_image_request_test.go:97-101） |
+| 视频 seconds/duration | relay/common/relay_utils.go:148-157 `validateTaskDurationBounds`（`MaxTaskDurationSeconds=3600`，负数/超值 400） | ✅ bound |
+| multipart seconds 字符串 | relay/common/relay_utils.go:175-183 本批修复：解析失败返回 err（原静默归 0 → 时长乘数缺失少收费），`validateMultipartTaskRequest` 层 400 | ✅ 本批修复 |
+| max_tokens 族 | valid_request.go:124-127 `maxTokensLimit=MaxInt32/2`；Responses/Text/Gemini 各格式调用（145/301/326/379） | ✅ bound |
+| 分辨率/质量比 | `AddOtherRatio` 经 isValidOtherRatio 拒绝非正/NaN/Inf（types/price_data.go:35-45） | ✅ 防护 |
+| Extra["parameters"] 绕过 | relay/channel/ali/image.go:29-63：从 Extra 解析 Parameters 后同款 bound（N 校验 + AddOtherRatio） | ✅ 收口 |
+### 清单二：未走 quota_math 的转换（闭合）
+- 全量 rg：计费路径均已走 `QuotaFromFloat/QuotaRound/QuotaFromDecimal`（含 *Checked）。剩余裸转换点均非计费或已饱和：channel_health_score.go:208（分位数索引）、common/utils.go:155（显示格式化）、token_counter.go:158-168（尺寸中间量，前批已 clamp 上限 100_000）、topup.go IntPart（后接 WalletQuotaFromDecimalStrict）。
+### 清单三：clamp 未记录（闭合）
+- attachQuotaSaturation（service/log_info_generate.go:36）已接入 5 处：text_quota.go:556、quota.go:243/376、task_billing.go:70；任务路径 noteTaskQuotaClamp（relay_task.go:427）→ RecalculateTaskQuota → attachQuotaSaturationToOther（task_billing.go:359）。
+### 回归（本批）
+- relay/common/relay_utils_test.go 新增 TestMultipartSecondsMalformedRejected（1e30/abc 拒绝、正常 8 解析）；既有 TestTaskDurationBounds/TestGetAndValidOpenAIImageRequestNBounds/TestQuota* 全绿。
+- 命令：go build ./...；go test relay/common relay/helper service common（相关组）→ ok；三库 conformance 24/24。

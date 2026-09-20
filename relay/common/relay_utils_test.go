@@ -1,6 +1,8 @@
 package common
 
 import (
+	"bytes"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -137,6 +139,49 @@ func TestTaskDurationBounds(t *testing.T) {
 			} else {
 				require.Nil(t, taskErr)
 			}
+		})
+	}
+}
+
+// TestMultipartSecondsMalformedRejected：multipart 表单的 seconds 字段
+// 必须可解析为整数。非数字/科学计数法此前会被静默归 0，导致时长计费乘数
+// 缺失（少收费）；现在解析失败即报错，与 JSON 路径一致（P0-2 收口）。
+// 直接单测 validateMultipartTaskRequest，避免 ValidateBasicTaskRequest 对
+// multipart 的二次 JSON 解析（既有行为，与本次修复无关）。
+func TestMultipartSecondsMalformedRejected(t *testing.T) {
+	cases := []struct {
+		name       string
+		seconds    string
+		wantErr    bool
+		wantParsed int
+	}{
+		{name: "scientific notation rejected", seconds: "1e30", wantErr: true},
+		{name: "non-numeric rejected", seconds: "abc", wantErr: true},
+		{name: "normal seconds parsed", seconds: "8", wantParsed: 8},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body bytes.Buffer
+			writer := multipart.NewWriter(&body)
+			require.NoError(t, writer.WriteField("model", "sora-2"))
+			require.NoError(t, writer.WriteField("prompt", "a cat"))
+			if tc.seconds != "" {
+				require.NoError(t, writer.WriteField("seconds", tc.seconds))
+			}
+			require.NoError(t, writer.Close())
+
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/video/generations", &body)
+			c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+
+			info := &RelayInfo{TaskRelayInfo: &TaskRelayInfo{}}
+			req, err := validateMultipartTaskRequest(c, info, constant.TaskActionTextToVideo)
+			if tc.wantErr {
+				require.Error(t, err, "expected rejection for seconds=%q", tc.seconds)
+				return
+			}
+			require.NoError(t, err, "expected acceptance for seconds=%q", tc.seconds)
+			require.Equal(t, tc.wantParsed, req.Duration)
 		})
 	}
 }
