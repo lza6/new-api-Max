@@ -64,3 +64,20 @@
 ### 回归（本批）
 - relay/common/relay_utils_test.go 新增 TestMultipartSecondsMalformedRejected（1e30/abc 拒绝、正常 8 解析）；既有 TestTaskDurationBounds/TestGetAndValidOpenAIImageRequestNBounds/TestQuota* 全绿。
 - 命令：go build ./...；go test relay/common relay/helper service common（相关组）→ ok；三库 conformance 24/24。
+## P0-3 认证安全审计：OWASP ASVS 对齐矩阵（2026-09-21, v1.2.44）
+> 基准：OWASP ASVS 5.0（Authentication V2 / Session Management V3）。逐模块核验实现 + 证据 + 回归测试。
+
+| ASVS 需求（ID） | 实现/证据 | 回归测试 |
+|---|---|---|
+| V2.1 口令存储（Argon2id/bcrypt 强哈希） | common/account_password.go:44 HashAccountPassword（Argon2id 双格式读取过渡） | security_account_test.go TestSecurityAccountPasswordRequiresCurrentPassword |
+| V2.2 防枚举/防爆破、验证码单次+过期 | service/login_verification.go（LoginChallenge TTL 5min + AuthFlow 状态机）；service/security_verification.go | auth_flow_test.go TestSecurityLoginCodeCompletesOnce / TestSecurityLoginRejectsChangedOrExpiredAuthorization |
+| V2.3 MFA/TOTP + 恢复码单次 | common/totp.go（TOTP + BackupCode 4×8 位）；model/twofa.go:228 is_used 单次消费；service/twofa.go 设置/完成闭环 | common/totp_test.go；auth_flow_test.go TestSecurityLoginAllPrimaryTransportsRequireAdditionalVerification |
+| V2.4 WebAuthn/Passkey | controller/passkey.go（注册完成需流审批 + User Verification） | passkey_test.go TestPasskeyRegisterFinishRejectsUnapprovedFlowWithoutConsumingIt；auth_flow_test.go TestSecurityLoginPasskeyDoesNotRequireAdditionalTwoFA / ConcurrentCompletionCreatesOneSession |
+| V2.5 OAuth/OIDC state/nonce/redirect/code 单次 | oauth/generic.go:99 redirect_uri + state；oauth/telegram.go:116 redirect 严格校验；auth_flow.go OAuth code 绑定会话+单次消费 | auth_flow_test.go TestGenerateOAuthCodeBindsFlowToAuthenticatedSession / TestOAuthLoginConsumesFlowOnlyAfterProviderIdentity |
+| V2.6 重认证（敏感操作） | controller/secure_verification.go（当前密码/因子证明）；security_account.go 账号删除需 ScopedProof | security_account_test.go TestSecurityAccountDeletionRequiresScopedProof / RechecksTransactionAndConsumesFailedProof |
+| V3.1 会话轮换/登出全端失效/并发上限 | service/auth_session.go（createLoginSession 版本化 + 并发/签发上限 UserSessionActiveLimit/IssuanceLimit + AdvanceCurrentSessionSecurity 换版 + RefreshLoginSession 轮换） | auth_session_test.go TestCreateLoginSessionEnforcesActiveLimitAcrossAuthVersions / TestUserAuthVersionInvalidatesExistingSession / TestLoginSessionCreateRefreshAndRevoke |
+| V3.2 刷新令牌轮换+replay 窗口+复用即吊销 | service/auth_session.go:250-285（deriveNextRefreshSecret + RotateUserSessionRefresh + RefreshReplayWindow + ErrUserSessionRefreshReuse→Revoke） | auth_session_test.go（refresh/reuse 族） |
+| V3.3 Cookie 属性 Secure/HttpOnly/SameSite | service/auth_session.go:318-363（HttpOnly + SameSiteStrict + Secure 由 SessionCookieSecure 控制）；common/session_cookie.go InitSessionCookieSettings（SECURE=true 强制 https TRUSTED_URL） | middleware/auth_origin_test.go（secure/origin 矩阵） |
+| V3.4 审计脱敏（不落口令/token/验证码） | controller/token.go:201/291/359/378/403/425 审计 params 仅 id/name；audit.go 模板白名单渲染；attachQuotaSaturation 等 admin_info 隔离 | access_token_audit_test.go（request_id 关联 + 过滤矩阵） |
+
+结论：六模块关键需求均有实现 + 回归测试；审计抽样确认 token/密码/验证码不落审计字段。本批为审计登记（无新增代码改动），已运行的认证回归：go test ./service/ ./controller/ -run 'TestAuth|TestSecurity|TestOAuth|TestPasskey|TestSession|TestAccessToken' → ok。
