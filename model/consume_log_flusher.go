@@ -2,7 +2,9 @@ package model
 
 import (
 	"context"
+	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -13,15 +15,34 @@ import (
 // 权衡：进程崩溃最多丢失一个批次的日志（WAL 保证已提交数据；计费流水保持同步不动）。
 var (
 	consumeLogQueue    = make(chan *Log, 4096)
-	consumeFlushOnce   sync.Once
+	consumeFlushMu     sync.Mutex
 	consumeFlushCancel context.CancelFunc
 	consumeFlushWG     sync.WaitGroup
+	// P1-2 指标：队列深度/批量/失败（读端 GetConsumeLogFlusherMetrics）。
+	consumeFlushMetrics consumeLogFlusherMetrics
 )
+
+// consumeLogFlusherMetrics 批量落库运行指标（原子，供 perf_metrics/管理台）。
+type consumeLogFlusherMetrics struct {
+	QueueDepth    atomic.Int64 // 当前队列长度
+	LastBatchSize atomic.Int64 // 最近一次批量写入行数
+	Failures      atomic.Int64 // 批量写入失败次数（重试后仍失败）
+	Retries       atomic.Int64 // 批量写入失败后重试次数
+}
+
+// GetConsumeLogFlusherMetrics 返回批量落库指标快照。
+func GetConsumeLogFlusherMetrics() (queueDepth, lastBatchSize, failures, retries int64) {
+	return consumeFlushMetrics.QueueDepth.Load(),
+		consumeFlushMetrics.LastBatchSize.Load(),
+		consumeFlushMetrics.Failures.Load(),
+		consumeFlushMetrics.Retries.Load()
+}
 
 // enqueueAsyncLog 异步入队；队列满时降级为同步写（背压，不丢数据）。
 func enqueueAsyncLog(log *Log) {
 	select {
 	case consumeLogQueue <- log:
+		consumeFlushMetrics.QueueDepth.Store(int64(len(consumeLogQueue)))
 	default:
 		if err := createLog(log); err != nil {
 			common.SysError("failed to record log (queue full fallback): " + err.Error())
@@ -30,13 +51,17 @@ func enqueueAsyncLog(log *Log) {
 }
 
 // StartConsumeLogFlusher 启动后台批量落库 worker（进程内单例，幂等）。
+// 停止后可再次启动（测试/优雅退出后重启场景）；并发启动只生效一次。
 func StartConsumeLogFlusher() {
-	consumeFlushOnce.Do(func() {
-		ctx, cancel := context.WithCancel(context.Background())
-		consumeFlushCancel = cancel
-		consumeFlushWG.Add(1)
-		go consumeLogFlusherLoop(ctx)
-	})
+	consumeFlushMu.Lock()
+	defer consumeFlushMu.Unlock()
+	if consumeFlushCancel != nil {
+		return // 已在运行
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	consumeFlushCancel = cancel
+	consumeFlushWG.Add(1)
+	go consumeLogFlusherLoop(ctx)
 }
 
 func consumeLogFlusherLoop(ctx context.Context) {
@@ -58,9 +83,17 @@ func consumeLogFlusherLoop(ctx context.Context) {
 		}
 		batch := pending
 		pending = nil
+		// P1-2：批量写失败先整批重试一次（瞬时错误如连接抖动），仍失败
+		// 则记指标并告警，绝不 panic/crash（尽力而为，进程保活优先）。
 		if err := LOG_DB.CreateInBatches(batch, 200).Error; err != nil {
-			common.SysError("failed to batch insert logs: " + err.Error())
+			consumeFlushMetrics.Retries.Add(1)
+			if retryErr := LOG_DB.CreateInBatches(batch, 200).Error; retryErr != nil {
+				consumeFlushMetrics.Failures.Add(1)
+				common.SysError("failed to batch insert logs (after retry): " + retryErr.Error() + "; dropped=" + strconv.Itoa(len(batch)))
+				return
+			}
 		}
+		consumeFlushMetrics.LastBatchSize.Store(int64(len(batch)))
 	}
 	for {
 		select {
@@ -69,6 +102,7 @@ func consumeLogFlusherLoop(ctx context.Context) {
 			return
 		case log := <-consumeLogQueue:
 			pending = append(pending, log)
+			consumeFlushMetrics.QueueDepth.Store(int64(len(consumeLogQueue)))
 			if len(pending) >= batchSize {
 				flush()
 			}
@@ -78,8 +112,21 @@ func consumeLogFlusherLoop(ctx context.Context) {
 	}
 }
 
-// FlushConsumeLogs 同步排空队列（测试/运维/优雅退出用；仅统计已入队的日志）。
+// FlushConsumeLogs 同步排空队列（测试/运维/优雅退出用）。
+// 先暂停后台 worker，避免与批量 pending 竞争导致部分日志滞留到下一 tick；
+// 排空期间入队的新日志也一并落库（循环到队列空）。
 func FlushConsumeLogs() {
+	// 暂停 worker（若在运行），排空后由调用方决定是否重启。
+	consumeFlushMu.Lock()
+	cancel := consumeFlushCancel
+	consumeFlushMu.Unlock()
+	if cancel != nil {
+		cancel()
+		consumeFlushWG.Wait()
+		consumeFlushMu.Lock()
+		consumeFlushCancel = nil
+		consumeFlushMu.Unlock()
+	}
 	for {
 		select {
 		case log := <-consumeLogQueue:
@@ -93,11 +140,17 @@ func FlushConsumeLogs() {
 }
 
 // StopConsumeLogFlusher 停止后台 worker 并排空（供测试/优雅退出调用）。
+// 与 Start 配对（mutex 保护），停止后可安全重启。
 func StopConsumeLogFlusher() {
-	if consumeFlushCancel != nil {
-		consumeFlushCancel()
+	consumeFlushMu.Lock()
+	cancel := consumeFlushCancel
+	consumeFlushMu.Unlock()
+	if cancel != nil {
+		cancel()
 		consumeFlushWG.Wait()
+		consumeFlushMu.Lock()
 		consumeFlushCancel = nil
+		consumeFlushMu.Unlock()
 	}
 	FlushConsumeLogs()
 }

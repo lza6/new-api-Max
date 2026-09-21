@@ -92,3 +92,7 @@
 - 实现：service/combo_snapshot.go（atomic.Pointer 不可变索引：构建全量 map → Store 原子发布；读零锁；重建串行化 + 失败保留旧快照）；ResolveComboForModel 快照优先 + DB 回退；controller/channel_combo.go Create/Update/Delete 后 RefreshComboSnapshot 失效刷新。
 - 测试：combo_snapshot_test.go（构建/解析语义 + 并发读在原子替换期间一致性），go test ./service/ -run TestComboSnapshot -race → ok（无 race）。
 - 命令：go build ./...；go test ./service/ -race → ok；三库 conformance 不受影响（纯内存快照，无 DB 语义变更）。
+## P1-2 批量落库收口（2026-09-21, v1.2.47）
+- 盘点：consume_log_flusher.go 已是真批量（CreateInBatches 200）。真实缺口：失败整批丢弃无重试、无指标暴露、Stop 后不可重启（sync.Once 单例）。
+- 修复：① flush 失败整批重试一次，仍失败记指标+SysError 绝不崩；② 新增 GetConsumeLogFlusherMetrics（队列深度/最近批大小/失败/重试，原子）；③ Stop/Start 改 mutex 门控可重启；④ FlushConsumeLogs 排空前先停 worker（消除与 pending 的竞争，测试语义正确）。
+- 测试：TestConsumeLogFlusherBatchAndMetrics（50 条批量落库+指标断言）与 TestConsumeLogFlusherQueueFullFallback（4100 条满载降级同步不丢）→ ok；model 全量 → ok；三库 conformance 24/24。
