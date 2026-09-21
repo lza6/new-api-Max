@@ -214,3 +214,9 @@
 ## 三十四、订阅卡显示并发/RPM + 微信定制提示（v1.2.79，2026-09-22）
 - wallet/subscription-plans-card：benefits 增加 并发/s + RPM + 微信Tf00798高并发定制 两行
 - i18n 7 语言；typecheck 绿
+
+## 三十五、生产热更新 v1.2.79（2026-09-22，真实执行+线上验收）
+- checkout v1.2.79(ccbba4c5e，含 77/78/79) + build local-v1.2.79 + tag 切换 + up -d
+- 容器 healthy；/api/status 200
+- 已上线：余额兑换不受充值开关限制(78)、限速设置表单(77)、订阅卡并发/RPM+微信提示(79)
+- 回滚：compose 备份 + 换回旧 tag + up -d
