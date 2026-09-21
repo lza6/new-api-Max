@@ -225,3 +225,9 @@
 - 根因：/api/site/stats、/api/model/stats 挂了登录型限流 SearchRateLimit → 匿名请求 401 → 前端误判"会话过期"
 - 修复：两个公共只读聚合接口移除 SearchRateLimit（保持无认证）
 - 线上证据：model/stats 连续 401（82.41.50.93）；pricing 200
+
+## 三十七、生产热更新 v1.2.80（2026-09-22，真实执行+线上验收）
+- checkout v1.2.80(8cd311842) + build local-v1.2.80 + tag 切换 + up -d
+- 容器 healthy；STATUS_HTTP=200；MODEL_STATS_HTTP=200（匿名可访问，会话过期误报已修复）
+- 说明：首次部署会话被中断，应急重新 up -d 后确认 healthy（服务器脚本本身已完成构建与切换）
+- 回滚：compose 备份 + 换回旧 tag + up -d
