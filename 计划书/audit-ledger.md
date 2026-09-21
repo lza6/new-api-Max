@@ -111,3 +111,8 @@
 - ② 故障注入（验收）：TestConsumeLogFlusherClosedDBNoCrash —— 关闭 DB 后批写/重试/逐行回退全败，指标告警不崩；批失败语义升级为「重试一次 → 逐行回退（坏行丢弃告警、好行保住=计费日志不丢）」。
 - ③ 三库批量回归（验收）：conformance 24/24（SQLite/MySQL9.6/PG16.14 真实实例，AutoMigrate 幂等三库）；model 全量 ok。
 - 命令：go test ./model/ -run TestConsumeLogFlusher → 4/4 PASS；三库 conformance → PASS=24 FAIL=0。
+## P1-3 SSE 最终验收（2026-09-21, v1.2.51）
+- 后端续传语义核验：parseTaskEventSince 支持 query `since` + 标准 `Last-Event-ID` 头双通道（controller/task_event.go:150-161）；seq 单调自增、id 即 seq、断线重连不重不丢。
+- 前端（ReadableStream）核验：lastSeq 增量续传 + MAX_RETRY 3 + error 兜底终态；非 EventSource 路径因需携带 Authorization header（设计约束）。
+- 测试矩阵：后端 TestStreamTaskEvents 6/6（含 500 条无缺无重、权限 404、取消停止）；前端 vitest SSE 4 文件 19/19 PASS；三库 conformance 24/24（上轮）。
+- 结论：P1-3 批次四项方案（seq 续传/前端重连/状态机事件闭环/权限）全部落地并验收。
