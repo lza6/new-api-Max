@@ -116,3 +116,8 @@
 - user-subscriptions 弹窗新增 Tier Override 列：并发/RPM 覆盖输入 + 保存（接 PATCH /tier，成功 toast + 刷新 + onSuccess）
 - i18n 7 语言同步；typecheck 绿
 - 至此订阅前端 C7 代码全部落地（后端 v1.2.66+67 已就绪）
+
+## 十七、终局审计（v1.2.70 后，2026-09-22）
+- 三库 conformance：SQLite PASS；MySQL/PG 因无 DSN/实例 SKIP（硬证据已留）
+- 独立审查线程（只读）：计划书/审查-2026-09-22-v1.2.62-70.md —— 无阻塞缺陷；1 项 P1 性能建议（热路径订阅查询合并/负缓存）+ 2 项 P2 语义/兼容说明
+- HTML 报告补充 v1.2.68-70 版本线与审查链接
