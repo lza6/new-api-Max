@@ -47,7 +47,9 @@ func TestComboWeightedPick(t *testing.T) {
 		{ChannelID: 1, Model: "m1", Weight: 90}, {ChannelID: 2, Model: "m2", Weight: 10},
 	})
 	seen := map[int]bool{}
-	for range 20 {
+	// 200 次抽样：10% 权重候选至少出现一次的理论失败率从 ~12%（20 次）
+	// 降至 ~7e-10，消除随机抽样导致的间歇性误报。
+	for range 200 {
 		cand, err := ComboNextCandidate(combo)
 		require.NoError(t, err)
 		seen[cand.ChannelID] = true

@@ -129,3 +129,19 @@
 - 测试：`web/src/components/ui/__tests__/button-touch-target.test.tsx`（5 用例）+ `web/src/features/usage-logs/components/__tests__/task-artifacts.test.tsx`（2 用例，点击→弹窗打开）→ 3 文件 12/12 PASS（含 combobox 原 5 用例在 20s 超时下全过）。
 - 命令：bun run typecheck → PASS；bun run build → PASS；bunx oxlint（改动文件）→ 0/0。全局 lint 既有 4 error 为未改动文件（sync-i18n.mjs/logo.tsx/rankings/sw.js），另批次清理。
 - 范围说明：375px 无横向溢出 + 对比度 axe/Lighthouse 扫描需真实浏览器仪器，本环境未伪造结果，列入剩余建议。
+
+## P2-2 事件子系统完整版：持久化幂等 + epay webhook 接入（2026-09-21, v1.2.56）
+- 新增模型 `model/event_delivery.go`：event_id + handler 联合唯一（三库），状态机 pending/success/failed/dead 与 EventBus 对齐；已加入 migrateDB AutoMigrate + conformance 模型集。
+- 事件总线增强 `service/event_bus.go`：可选 `EventDeliveryStore` 持久化钩子——Publish 先落幂等记录（OnConflict DoNothing + RowsAffected 判定，跨重启/跨实例去重），状态变更（成功/失败/dead/重试次数）同步落库；新增 RetryCount/LastDispatchMs + Metrics() 观测快照。
+- 存储实现 `service/event_delivery_store.go`：GORM 实现，每次调用读取 model.DB（测试可替换），三库通用。
+- epay 接入 `service/epay_events.go` + `controller/topup.go`：易支付充值回调验签后归一为事件投递（ID=`epay-topup:`+trade_no）；成功→已处理；重复→总线幂等（success→alreadyDone）；记录存在但非成功→账本级兜底 `model.RechargeEpay`（行锁+状态校验）；首次失败→返回 fail 由网关重推。maxRetries=0 保持 webhook 请求内不重试语义。
+- 验收测试：
+  - `service/epay_events_test.go`：真实 SQLite 账本——推送一次入账、重放 alreadyDone 不二次入账、delivery 记录 success；首次失败→补单→重放兜底入账→三次重放不再入账（2/2 PASS）。
+  - `model/event_delivery_test.go`：唯一约束 + OnConflict DoNothing + 状态更新（3/3 PASS）。
+  - `service/event_bus_persist_test.go`：持久化幂等去重 + failed/dead 状态同步 + 指标（3/3 PASS）。
+  - 三库 conformance：`TestDBConformanceEventDeliveryDedup` 新增 + EventDelivery 纳入幂等集 → **PASS=28 FAIL=0 SKIP=0**（SQLite/MySQL9.6/PG16.14 真实实例）。
+- 附带修复两个 P1-4 遗留 flaky 测试（与 P2-2 无关但阻塞 service 全量）：
+  - `TestComboWeightedPick`：加权随机 20 次抽样理论失败率 ~12% → 200 次（~7e-10）。
+  - 渠道亲和 usage-cache 测试夹具：`time.Now().UnixNano()` 在 Windows 上连续调用撞值导致缓存键复用（Total 累加）→ 原子计数器生成唯一键。
+- 命令：go build ./... → 0；go vet ./model/ ./service/ ./controller/ → 0；go test ./service/ ×3 全过（flaky 已除）；go test ./model/ → ok；relaykit GOWORK=off go build → 0；三库 conformance → PASS=28 FAIL=0 SKIP=0。
+- 范围说明：订阅 epay（subscription_payment_epay.go）暂未归一（独立订单状态机），列入后续；本批只覆盖充值主路径。

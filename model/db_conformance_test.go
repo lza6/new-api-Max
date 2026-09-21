@@ -25,6 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // conformanceOpenDB opens the dialect database and registers a cleanup that
@@ -121,7 +122,7 @@ func conformanceModels() []any {
 		&SubscriptionPreConsumeRecord{}, &CustomOAuthProvider{},
 		&UserOAuthBinding{}, &PerfMetric{}, &SystemInstance{},
 		&SystemTask{}, &SystemTaskLock{}, &CasbinRule{}, &AuthzRole{},
-		&BannedIP{}, &WebRequestLog{}, &SubscriptionPlan{},
+		&BannedIP{}, &WebRequestLog{}, &SubscriptionPlan{}, &EventDelivery{},
 	}
 }
 
@@ -173,6 +174,56 @@ func TestDBConformanceLogsIndexes(t *testing.T) {
 			}
 			assert.True(t, db.Migrator().HasIndex("task_events", "idx_task_events_created_at"),
 				"expected retention index on task_events (%s)", dialect.name)
+		})
+	}
+}
+
+// TestDBConformanceEventDeliveryDedup proves the (event_id, handler) unique
+// dedup contract on every dialect: the first insert lands, a duplicate is
+// silently skipped (OnConflict DoNothing, RowsAffected=0) and state updates
+// round-trip — the exact semantics the event bus relies on for replay.
+func TestDBConformanceEventDeliveryDedup(t *testing.T) {
+	for _, dialect := range conformanceDialects(t) {
+		t.Run(dialect.name, func(t *testing.T) {
+			db, _ := dialect.openDB(t)
+			require.NoError(t, db.AutoMigrate(&EventDelivery{}))
+
+			first := &EventDelivery{
+				EventID:   "evt-conformance",
+				Handler:   "epay.topup",
+				EventType: "epay.topup.success",
+				State:     "pending",
+				CreatedAt: 1,
+				UpdatedAt: 1,
+			}
+			result := db.Clauses(clause.OnConflict{DoNothing: true}).Create(first)
+			require.NoError(t, result.Error)
+			require.Equal(t, int64(1), result.RowsAffected)
+
+			dup := &EventDelivery{
+				EventID:   "evt-conformance",
+				Handler:   "epay.topup",
+				EventType: "epay.topup.success",
+				State:     "success",
+				CreatedAt: 2,
+				UpdatedAt: 2,
+			}
+			result = db.Clauses(clause.OnConflict{DoNothing: true}).Create(dup)
+			require.NoError(t, result.Error)
+			assert.Zero(t, result.RowsAffected, "duplicate (event_id, handler) must be skipped (%s)", dialect.name)
+
+			require.NoError(t, db.Model(&EventDelivery{}).
+				Where("event_id = ? AND handler = ?", "evt-conformance", "epay.topup").
+				Updates(map[string]any{"state": "success", "attempts": 1}).Error)
+
+			var loaded EventDelivery
+			require.NoError(t, db.Where("event_id = ?", "evt-conformance").First(&loaded).Error)
+			assert.Equal(t, "success", loaded.State)
+			assert.Equal(t, 1, loaded.Attempts)
+
+			var count int64
+			require.NoError(t, db.Model(&EventDelivery{}).Count(&count).Error)
+			assert.Equal(t, int64(1), count, "replay must not add rows (%s)", dialect.name)
 		})
 	}
 }

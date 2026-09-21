@@ -375,6 +375,7 @@ func migrateDB() error {
 		&AuthzRole{},
 		&BannedIP{},
 		&WebRequestLog{},
+		&EventDelivery{},
 	)
 	if err != nil {
 		return err

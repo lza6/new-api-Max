@@ -53,6 +53,26 @@ type Event struct {
 // EventHandleFunc 事件处理器；返回 error 表示处理失败需重试。
 type EventHandleFunc func(ctx context.Context, ev Event) error
 
+// EventDeliveryRecord 持久化幂等记录（event_id + handler 联合唯一）。
+type EventDeliveryRecord struct {
+	EventID   string
+	Handler   string
+	EventType string
+	State     EventState
+	Attempts  int
+	LastError string
+}
+
+// EventDeliveryStore 持久化投递记录的可选存储。实现方负责跨库可移植的
+// 「不存在才插入」（如 GORM clause.OnConflict{DoNothing:true} + RowsAffected）。
+type EventDeliveryStore interface {
+	// CreateDelivery 幂等创建投递记录；created=false 表示 (event_id, handler)
+	// 已存在（重复投递）。
+	CreateDelivery(ctx context.Context, rec EventDeliveryRecord) (created bool, err error)
+	// UpdateDeliveryState 更新投递状态（成功/失败/终态）。
+	UpdateDeliveryState(ctx context.Context, eventID, handler string, state EventState, attempts int, lastError string) error
+}
+
 // eventRecord 单条事件的运行状态。
 type eventRecord struct {
 	state     EventState
@@ -70,10 +90,23 @@ type EventBus struct {
 
 	maxRetries int
 	baseDelay  time.Duration
+	// 可选持久化存储：接入后 Publish 先落幂等记录，状态变更同步到存储。
+	store EventDeliveryStore
 	// 统计（供 perf_metrics / 日志透明化）
 	DeliveredCount int64
+	RetryCount     int64
 	FailedCount    int64
 	DeadCount      int64
+	LastDispatchMs int64
+}
+
+// EventBusMetrics 事件总线观测快照（耗时/成功/失败/重试）。
+type EventBusMetrics struct {
+	DeliveredCount int64
+	RetryCount     int64
+	FailedCount    int64
+	DeadCount      int64
+	LastDispatchMs int64
 }
 
 // NewEventBus 创建一个事件总线。maxRetries 为单事件最大重试次数（0 表示
@@ -90,6 +123,27 @@ func NewEventBus(maxRetries int, baseDelay time.Duration) *EventBus {
 		events:     make(map[string]*eventRecord),
 		maxRetries: maxRetries,
 		baseDelay:  baseDelay,
+	}
+}
+
+// SetDeliveryStore 挂载持久化存储。可在任意时刻设置；设置后新 Publish 的
+// 事件会先落幂等记录，重复 (event_id, handler) 被拒绝。
+func (b *EventBus) SetDeliveryStore(store EventDeliveryStore) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.store = store
+}
+
+// Metrics 返回观测快照（带锁读取，调用频率低）。
+func (b *EventBus) Metrics() EventBusMetrics {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return EventBusMetrics{
+		DeliveredCount: b.DeliveredCount,
+		RetryCount:     b.RetryCount,
+		FailedCount:    b.FailedCount,
+		DeadCount:      b.DeadCount,
+		LastDispatchMs: b.LastDispatchMs,
 	}
 }
 
@@ -129,6 +183,28 @@ func (b *EventBus) Publish(ctx context.Context, ev Event) error {
 		b.mu.Unlock()
 		return ErrEventBusDup
 	}
+	store := b.store
+	b.mu.Unlock()
+
+	// 持久化幂等：同一 (event_id, handler) 已存在（含之前失败/成功）则拒绝，
+	// 保证跨重启/跨实例也只处理一次。
+	if store != nil {
+		created, err := store.CreateDelivery(ctx, EventDeliveryRecord{
+			EventID:   ev.ID,
+			Handler:   ev.Type,
+			EventType: ev.Type,
+			State:     EventStatePending,
+		})
+		if err != nil {
+			common.SysError(fmt.Sprintf("event_bus: persist delivery id=%s type=%s failed: %v", ev.ID, ev.Type, err))
+			return err
+		}
+		if !created {
+			return ErrEventBusDup
+		}
+	}
+
+	b.mu.Lock()
 	b.events[ev.ID] = &eventRecord{state: EventStatePending}
 	b.mu.Unlock()
 	return b.dispatch(ctx, ev)
@@ -147,6 +223,7 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 		return ErrEventBusNoHandler
 	}
 
+	started := time.Now()
 	for {
 		err := safeHandle(ctx, h, ev)
 		b.mu.Lock()
@@ -154,8 +231,14 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 		b.mu.Unlock()
 		if err == nil {
 			b.finish(ev.ID, EventStateSuccess, nil)
+			attempts := 0
+			if rec != nil {
+				attempts = rec.attempts
+			}
+			b.persistState(ctx, ev, EventStateSuccess, attempts, nil)
 			b.mu.Lock()
 			b.DeliveredCount++
+			b.LastDispatchMs = time.Since(started).Milliseconds()
 			b.mu.Unlock()
 			return nil
 		}
@@ -171,9 +254,11 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 		if next.attempts > b.maxRetries {
 			next.state = EventStateDead
 			b.mu.Unlock()
+			b.persistState(ctx, ev, EventStateDead, next.attempts, err)
 			b.mu.Lock()
 			b.FailedCount++
 			b.DeadCount++
+			b.LastDispatchMs = time.Since(started).Milliseconds()
 			b.mu.Unlock()
 			return err
 		}
@@ -185,6 +270,12 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 		next.lastErr = err
 		next.nextRetry = time.Now().Add(delay)
 		b.mu.Unlock()
+		b.persistState(ctx, ev, EventStateFailed, next.attempts, err)
+
+		b.mu.Lock()
+		b.RetryCount++
+		b.LastDispatchMs = time.Since(started).Milliseconds()
+		b.mu.Unlock()
 
 		common.SysError(fmt.Sprintf("event_bus: event %s type=%s attempt=%d failed: %v; retry in %s", ev.ID, ev.Type, next.attempts, err, delay))
 		select {
@@ -192,6 +283,23 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 			return ctx.Err()
 		case <-time.After(delay):
 		}
+	}
+}
+
+// persistState 将投递状态同步到持久化存储（可选；失败仅告警不改判终态）。
+func (b *EventBus) persistState(ctx context.Context, ev Event, state EventState, attempts int, lastErr error) {
+	b.mu.RLock()
+	store := b.store
+	b.mu.RUnlock()
+	if store == nil {
+		return
+	}
+	errText := ""
+	if lastErr != nil {
+		errText = lastErr.Error()
+	}
+	if err := store.UpdateDeliveryState(ctx, ev.ID, ev.Type, state, attempts, errText); err != nil {
+		common.SysError(fmt.Sprintf("event_bus: update delivery id=%s type=%s state=%s failed: %v", ev.ID, ev.Type, state, err))
 	}
 }
 
