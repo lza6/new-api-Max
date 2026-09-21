@@ -22,6 +22,7 @@ import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
 import { GlobalConcurrencySection } from '../request-limits/global-concurrency-section'
 import { UserRateLimitSection } from '../request-limits/user-rate-limit-section'
+import { RateLimitOverridesSection } from '../request-limits/rate-limit-overrides-section'
 import { LoginSessionLimitSection } from './login-session-limit-section'
 import type { SecuritySettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
@@ -72,6 +73,11 @@ const SECURITY_SECTIONS = [
         }}
       />
     ),
+  },
+  {
+    id: 'rate-limit-overrides',
+    titleKey: 'Rate Limit Overrides',
+    build: () => <RateLimitOverridesSection />,
   },
   {
     id: 'sensitive-words',
