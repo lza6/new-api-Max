@@ -236,3 +236,34 @@
 - CreateUserSubscriptionFromPlanTx：同套餐 active 订阅购买 → 到期时间顺延一个周期（锁行），不新建多行、不计入购买上限；无限额度卡不追加额度，有额度卡追加
 - 回归测试：续费后 EndTime=原+1周期、行数仍 1；model 全绿
 - 待办：兑换码兑换订阅、E2E 真实验证、日志筛选 UI、模型流量排行榜(G/T)
+
+## 三十九、模型流量排行榜（v1.2.82，2026-09-22）
+- service/log_traffic.go：TrafficBytesRecord 增 ModelName；AggregateBandwidthByModel 按模型聚合、带宽降序、limit 截断（含单测）
+- controller.GetModelBandwidthLeaderboard → GET /api/log/bandwidth/model-leaderboard（AdminAuth），输出 requests/bytes/bytes_text（common.FormatBytes→B/KB/MB/GB/TB）
+- 前端：CommonLogsStats 管理视图新增 BandwidthLeaderboardDialog（每日 + 模型 Top10，formatTraffic 显示 G/T；i18n en/zh/zh-TW）
+- 验证：typecheck 绿、service 全绿、common-logs-stats 测试全绿
+
+## 四十、兑换码兑换订阅（v1.2.83，2026-09-22）
+- model.Redemption 增 PlanId（0=额度码；>0=订阅码）；Redeem 返回 RedeemResult{quota,plan_id,plan_name}
+- 订阅码兑换：校验套餐存在且启用 → CreateUserSubscriptionFromPlanTx(tx,userId,plan,"redemption")（复用续费顺延），不增加钱包额度；Insert/Update 校验
+- controller：AddRedemption/UpdateRedemption 支持 plan_id；TopUp 返回兑换结果对象
+- 前端：钱包兑换成功提示（订阅开通 vs 额度）；后台兑换码表单「关联订阅套餐 ID」+ 表格「订阅套餐」列
+- 回归：TestRedeemPlanSubscription（开通+不扣额度+码置used+重复兑换不重复建订阅）；redemption 组全绿；对全部兑换测试断言适配 RedeemResult
+
+## 四十一、生产热更新 v1.2.82 + v1.2.83（2026-09-22，真实执行+线上验收）
+- v1.2.82(7660a6572)：backup compose .bak.20260922-054358 → build local-v1.2.82 → up -d；healthy；/api/status 200；model-leaderboard 路由 401（已注册）
+- v1.2.83(d2500a34f)：backup compose .bak.20260922-061620 → build local-v1.2.83 → up -d；healthy；VERSION=v1.2.83；/api/status 200
+- 线上当前 = v1.2.83（含订阅全链、CNY 1:1、续费顺延、兑换码→订阅、模型流量排行、基础限速 3/s+120rpm）
+- 回滚：compose 备份 .bak.<TS> → sed 换回旧 tag → up -d
+
+## 四十二、E2E 真实账号验证（v1.2.83 线上，2026-09-22）
+- 环境：freeapi.tingfengai.art（Caddy 反代 127.0.0.1:3000）；PostgreSQL newapi；本机 HTTPS 出站被断 → 直连 http://103.233.252.213:3000 验收
+- E2E 账号：e2e_tingfeng（id=910，普通用户，bcrypt 密码独立生成，quota=0）
+- 订阅码兑换：POST /api/user/topup → data={"quota":0,"plan_id":1,"plan_name":"天卡无限"}（额度不增加）
+- 续费顺延：两次兑换不同码 → user_subscriptions 仅 1 行 active，end_time 由 +1 天顺延为 +2 天（start=1790030345, end=1790203145）
+- 真实调用：/v1/chat/completions model=deepseek-v4-flash → 200（channel 20 稳定渠道）
+- 并发 3/s：同秒 3 个 → [200,200,200]；第 4 个 → 429「基础并发请求已达上限（每秒 3 次）」
+- RPM：基础每分钟 120 次 → 超限 429「基础请求速率已达上限（每分钟 120 次）」（120-8 余量后 58 个 429，计数吻合）
+- 费用类型：消费日志 other.billing_source="subscription"（=按订阅计费，非钱包）；用户 quota 仍 0 未扣
+- 日志按用户筛选：后端 /api/log/search username 可用；前端 admin filter bar 已有 username 输入框（common-logs-filter-bar.tsx）
+- 复现脚本：.codex/e2e-scratch/e2e-sub-live.mjs（APIKEY 直测 / CODE 兑换两种模式）
