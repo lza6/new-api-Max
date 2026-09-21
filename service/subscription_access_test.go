@@ -86,3 +86,23 @@ func TestCheckSubscriptionModelAccessMatrix(t *testing.T) {
 	require.True(t, allowed)
 	require.Empty(t, reason)
 }
+
+func TestNoSubscriptionNegativeCacheAvoidsDB(t *testing.T) {
+	seedSubscriptionAccessDB(t)
+	// 真实 DB：用户 62001 无订阅 → 首次解析应缓存"无订阅"。
+	allowed, _, err := CheckSubscriptionModelAccess(62001, "deepseek-v4-flash")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.True(t, HasCachedNoSubscription(62001))
+
+	// 置 DB 为 nil 后二次调用仍放行（缓存命中，未触 DB）——证明热路径免 DB 读。
+	previous := model.DB
+	model.DB = nil
+	allowed, _, err = CheckSubscriptionModelAccess(62001, "deepseek-v4-flash")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	model.DB = previous
+
+	// 订阅用户不缓存（保持实时正确）。
+	require.False(t, HasCachedNoSubscription(61001))
+}

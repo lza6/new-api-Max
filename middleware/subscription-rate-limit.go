@@ -9,6 +9,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
 
 	"github.com/gin-gonic/gin"
 )
@@ -62,12 +63,18 @@ func resolveSubscriptionTier(userId int) (concurrencyLimit, rpmLimit int, hasSub
 	if userId <= 0 {
 		return 0, 0, false
 	}
+	if service.HasCachedNoSubscription(userId) {
+		return 0, 0, false
+	}
 	// DB 不可用（启动/关闭窗口或测试环境）时 fail-open：不拦截请求，保证可用性。
 	if model.DB == nil {
 		return 0, 0, false
 	}
 	subs, err := model.GetAllActiveUserSubscriptions(userId)
 	if err != nil || len(subs) == 0 {
+		if err == nil {
+			service.CacheNoSubscription(userId)
+		}
 		return 0, 0, false
 	}
 	sub := subs[0].Subscription
