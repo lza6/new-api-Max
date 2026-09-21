@@ -188,3 +188,9 @@
   - **带理由豁免（保守、可审计）**：`.replaceAll` 全局正则（去 /g 会运行时抛 TypeError——已实测）；hero-terminal 动画帧/骨架屏/静态列表的索引键（append-only 稳定列表，index 即稳定身份）；param-override-editor-dialog 3 处超大渲染树模式切换（提取会产生大段间接层，逐行 disable 注释说明）。
 - 验收（真实运行）：`bun run lint` → **0 error**（245→0）；`bun run typecheck` → 0；`bun run build` → 0（总 JS 59232 kB，与清理前几乎一致=无语义膨胀）；spot vitest（plugins-table/task-artifacts）13/13。
 - 提交：检查点 `beeb5f59b`（批量 528 文件）+ 尾部 `1bc01edcb`（20 文件）→ v1.2.60；风险控制：所有语义敏感转换（spread/replaceAll/at/useCallback）逐一 typecheck 验证，prefer-at 等已知破坏项手工处理。
+
+## 质量基线·controller 测试基线调查（2026-09-21, v1.2.61 记录）
+- 现象：`TestServeTaskPluginProtocolDisconnectBeforeDurableBarrierPersistsAndSettlesWithoutRefund` 单测即红（task_events/users 表缺失）；controller 全包 ~10min 超时（干净树同样复现=环境基线）。
+- 根因（本次实证定位）：该测试将 `model.DB` 换为临时 SQLite（仅 Channel+Task 表）并注册 Cleanup 还原；结算路径的**后台异步 goroutine（gopool）在测试结束、model.DB 已还原到全局默认库后仍继续写库** → async-teardown 竞态：写入落到无对应表的全局 DB，产生 "no such table" 并污染下次用例。给 setup 补表（TaskEvent/User）不解决（写入发生在还原后）。
+- 结论与处置：属 controller 测试基础设施既有缺陷（无 TestMain 统一初始化全 schema DB；异步观察/结算无 teardown 排空）。**独立测试基建批次**：新增 controller `main_test.go`（TestMain 初始化持久化全模型 SQLite + RedisEnabled=false）+ 各协议测试 teardown 排空后台 goroutine。本批完成根因确认与方案，未贸然改动 40+ 测试文件结构。
+- 与 lint 全清（v1.2.60，245→0）衔接：`bun run lint` 0、`bun run typecheck` 0、`bun run build` 0、spot vitest 13/13。
