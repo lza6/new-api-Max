@@ -20,18 +20,26 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import {
+  getModelTestMeta,
+  MODEL_TEST_META,
+} from "@/features/pricing/lib/model-test-meta"
 
 export const Route = createFileRoute("/model-test")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    model: typeof search.model === "string" ? search.model : undefined,
+  }),
   component: ModelTestPage,
 })
 
-const SITE_MODEL = "deepseek-v4-flash"
-const TEST_TIME = "2026-09-18 02:28:15"
-const TEST_PROMPT =
-  "创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试。"
+const DEFAULT_MODEL = "deepseek-v4-flash"
 
 function ModelTestPage() {
   const { t } = useTranslation()
+  const { model } = Route.useSearch()
+  const meta = getModelTestMeta(model) ?? MODEL_TEST_META[DEFAULT_MODEL]
+  const displayModel = model || DEFAULT_MODEL
+  const hasMeta = Boolean(getModelTestMeta(model))
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 p-4 sm:p-6">
       <div className="space-y-1">
@@ -46,21 +54,29 @@ function ModelTestPage() {
         </CardContent>
       </Card>
       <div className="grid gap-3 sm:grid-cols-3">
-        <Card><CardHeader><CardTitle className="text-base">{t("Model")}</CardTitle></CardHeader><CardContent className="text-sm">{t("Current site model")}: <span className="font-mono">{SITE_MODEL}</span></CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-base">{t("Test time")}</CardTitle></CardHeader><CardContent className="font-mono text-sm">{TEST_TIME}</CardContent></Card>
-        <Card><CardHeader><CardTitle className="text-base">{t("Prompt")}</CardTitle></CardHeader><CardContent className="break-all font-mono text-xs">{TEST_PROMPT}</CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">{t("Model")}</CardTitle></CardHeader><CardContent className="text-sm">{t("Current site model")}: <span className="font-mono">{displayModel}</span></CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">{t("Test time")}</CardTitle></CardHeader><CardContent className="font-mono text-sm">{meta.testedAt}</CardContent></Card>
+        <Card><CardHeader><CardTitle className="text-base">{t("Prompt")}</CardTitle></CardHeader><CardContent className="break-all font-mono text-xs">{meta.prompt}</CardContent></Card>
       </div>
-      <Card>
-        <CardHeader><CardTitle>{t("Rendered result")}</CardTitle></CardHeader>
-        <CardContent>
-          <iframe
-            title="pelican-bike-svg"
-            src="/model-test.html"
-            className="min-h-[520px] w-full rounded-lg border"
-            sandbox="allow-scripts"
-          />
-        </CardContent>
-      </Card>
+      {hasMeta ? (
+        <Card>
+          <CardHeader><CardTitle>{t("Rendered result")}</CardTitle></CardHeader>
+          <CardContent>
+            <iframe
+              title="model-effect-test"
+              src={meta.asset}
+              className="min-h-[520px] w-full rounded-lg border"
+              sandbox="allow-scripts"
+            />
+          </CardContent>
+        </Card>
+      ) : (
+        <Card>
+          <CardContent className="py-8 text-center text-sm">
+            {t("No published effect test for this model yet")}
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

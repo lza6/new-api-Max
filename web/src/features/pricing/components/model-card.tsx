@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { ChevronRight } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+import { ChevronRight, FlaskConical } from 'lucide-react'
 import { memo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -39,11 +40,16 @@ import { parseTags } from '../lib/filters'
 import { isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import { taskPriceLabel } from '../lib/task-price-display'
-import type { PricingModel, PriceType, TokenUnit } from '../types'
+import { getModelTestMeta } from '../lib/model-test-meta'
+import type {
+  ModelStat,
+  PricingModel,
+  PriceType,
+  TokenUnit,
+} from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
 import { formatNumber } from '@/lib/format'
-import type { ModelStat } from '../types'
 
 export interface ModelCardProps {
   model: PricingModel
@@ -59,6 +65,7 @@ export interface ModelCardProps {
 
 export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const { t, i18n } = useTranslation()
+  const navigate = useNavigate()
   const tokenUnit = props.tokenUnit ?? DEFAULT_TOKEN_UNIT
   const priceRate = props.priceRate ?? 1
   const usdExchangeRate = props.usdExchangeRate ?? 1
@@ -71,6 +78,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   const modelIconKey = props.model.icon || props.model.vendor_icon
   const modelIcon = modelIconKey ? getLobeIcon(modelIconKey, 28) : null
   const initial = props.model.model_name?.charAt(0).toUpperCase() || '?'
+  const testMeta = getModelTestMeta(props.model.model_name)
   const isDynamicPricing =
     props.model.billing_mode === 'tiered_expr' &&
     Boolean(props.model.billing_expr)
@@ -377,6 +385,23 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
         ) : null}
       </CardContent>
       <CardFooter className='mt-auto border-0 bg-transparent pt-0'>
+        {testMeta ? (
+          <Button
+            variant='ghost'
+            size='sm'
+            className='text-muted-foreground hover:text-foreground gap-1.5 self-start px-2 text-xs'
+            onClick={() =>
+              navigate({
+                to: '/model-test',
+                search: { model: props.model.model_name },
+              })
+            }
+          >
+            <FlaskConical aria-hidden className='size-3.5' />
+            {t('Effect test')}
+            <span className='font-mono'>{testMeta.testedAt}</span>
+          </Button>
+        ) : null}
         <ModelPerfBadge
           perf={props.perf}
           className='border-border/60 border-t pt-2'
