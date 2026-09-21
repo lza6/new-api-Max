@@ -6532,5 +6532,12 @@
   "Model mapping intro": "网关在各类协议下把站内模型映射为同名，模型 ID 处处一致：",
   "Model mapping note": "无需第三方映射：OpenAI / Anthropic / Codex 协议接受同一模型 ID，并路由到对应上游渠道。",
   "Export JSON": "导出 JSON",
-  "Web Protection": "Web 防护"
+  "Web Protection": "Web 防护",
+  "Approve": "批准",
+  "Reject": "拒绝",
+  "Pending approval": "待审批",
+  "Plugin approved": "插件已批准",
+  "Plugin approval rejected": "插件审批已拒绝",
+  "Reject plugin version?": "拒绝该插件版本？",
+  "Rejecting this version keeps it inactive and blocks its source hash from running until approved.": "拒绝后该版本保持停用，其源代码哈希在获得批准前无法执行。"
 }

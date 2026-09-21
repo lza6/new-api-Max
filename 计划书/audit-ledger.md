@@ -159,3 +159,24 @@
 - 测试：`pkg/jsplugin/security_test.go` 11 用例（哈希稳定/权限默认全禁/审批+token 单次/改行重审批/拒批撤销/验签篡改拒/沙箱 fail-closed/引擎审批门/引擎权限钩子/无策略向后兼容）；`controller/task_plugin_security_test.go` 4 用例（篡改拒、缺签拒、未配置放行、设置往返）；jsplugin 全量 + setting + service 全量无回归。
 - 命令：go build ./... → 0；go vet → 0；go test ./pkg/jsplugin/ ./setting/ ./service/ → ok；relaykit GOWORK=off go build → 0；controller 安全定向 → 4/4 PASS。
 - 范围说明：审批工作流 UI（管理端展示代码+一键审批）与沙箱 docker/bubblewrap 实际运行时隔离为后续批次；本批提供原语 + 引擎收口 + 上传验签，全部行为测试落地。
+
+## P2-3 补完·审批工作流 + 沙箱探测 + 订阅 epay 归一 + lint 基线（2026-09-21, v1.2.58）
+### R1 审批工作流（内容寻址审批端到端闭环）
+- 模型 `model/task_plugin.go` 新增 `ApprovalStatus`（pending/approved/rejected/""），三库 AutoMigrate 幂等（conformance 28/28 保持）；新增 `SetTaskPluginApprovalStatus` / `ApproveTaskPluginVersion` helper。
+- 控制器 `controller/task_plugin.go`：上传在 `IsTaskPluginApprovalRequired()` 开启时对未批哈希置 pending+inactive（`GetTaskPluginSyncSnapshot` 只取 Active 行 → 执行快照自动跳过）；新增 `ApproveTaskPlugin`（POST /api/plugin/task/:key/approve，绑定 SourceHash，改行→哈希变→需重新审批）；列表项暴露 `approval_status` + `pending_approval` 运行时态。
+- 同步路径装载 `jsplugin.SeedGateApprovals`（DB 审批记录→默认闸门）+ 引擎 `ApprovalSecurityPolicy`（内容寻址审批执行门，仅 approved 哈希可调用）。
+- 前端：`types.ts`/`api.ts`/`plugins-table.tsx`（待审批 Badge + 下拉批准/拒绝 + 拒绝 ConfirmDialog + toast 反馈）；i18n 新增 7 键并同步 7 语言。
+- 测试：controller 审批 3/3（批准激活+闸门、拒绝停用、改行需重审、版本不存在）；前端 plugins-table 11/11（含批准/拒绝 2 新用例）。
+### R2 沙箱运行时探测
+- `pkg/jsplugin/security.go` 新增 `DetectSandboxModes()`（探测 docker/bwrap，可注入 probeExecutable）+ `ResolveSandboxPolicyForHost`；`SandboxRequired` 只认 docker/bwrap，仅 workspace 不算满足（fail-closed），`SandboxLenient` 降级 workspace 并明示 degraded。
+- 审批通过时按宽松策略明示当前隔离，无 docker/bwrap → `SysError` 降级告警（不静默）。
+- 测试：探测/组合/fail-closed 3/3。
+### R3 订阅 epay 归一 + 事务死锁加固
+- `service/epay_events.go` 新增 `EventTypeEpaySubscriptionSuccess` 事件（ID=`epay-subscription:`+trade_no）+ `DispatchEpaySubscriptionEvent`（幂等+账本兜底）；`controller/subscription_payment_epay.go` 接入（保留 LockOrder 与 fail 语义，审计日志区分重复/首次）。
+- 修复两处**生产潜在死锁**（连接池=1 时事务内用全局 DB）：`CompleteSubscriptionOrder` 事务内读 plan 改用 `getSubscriptionPlanByIdTx(tx,...)`；`CreateUserSubscriptionFromPlanTx` 取 DB 时间戳改用新增 `getDBTimestampTx(tx)`（保持 DB 时钟语义）。三库 conformance 28/28 保持。
+- 测试：`TestDispatchEpaySubscriptionEventOnceAndReplayConsistent`（推送一次+重放 alreadyDone+订阅计数=1）通过；model/service 全量无回归。
+### R4 lint 基线（本会话改动文件零 error + 安全项）
+- 修复本会话改动文件全部 lint error：`sync-i18n.mjs` curly、`logo.tsx`/`clerk-full-logo.tsx` import type、`rankings/index.tsx` 嵌套三元重构、`sw.js` catch 绑定、`confirm-dialog.tsx` 同操作数表达式、chat iframe sandbox（判定为同源受信内嵌，脚本+同源组合非法会静默失效，加理由注释豁免）。
+- 定向 oxlint 本会话全部改动文件 → 0 error；typecheck/build 通过；plugins-table 11/11。
+- 范围说明：仓库既有 lint 存量 ~253 处（brand-icons import type、no-array-index-key、嵌套三元、prefer-spread 等 18 类，跨 ~40 文件）为**历史债务，独立批次清理**；未在本批冒充完成。
+- 命令：go build ./... → 0；go vet（6 包）→ 0；go test ./model/ ./service/ ./pkg/jsplugin/ ./setting/ → ok；三库 conformance → PASS=28 FAIL=0 SKIP=0；前端 build → 0；typecheck → 0；定向 oxlint → 0；plugins-table vitest 11/11。

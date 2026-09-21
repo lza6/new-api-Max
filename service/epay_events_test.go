@@ -101,3 +101,62 @@ func TestDispatchEpayTopupEventRecoversAfterFailedDelivery(t *testing.T) {
 	assert.True(t, alreadyDone)
 	assert.Equal(t, 2*500000, quotaOfUser(t, user.Id))
 }
+
+// seedSubscriptionOrderForTest 创建一笔待完成的订阅订单（service 测试库）。
+func seedSubscriptionOrderForTest(t *testing.T, userID int, planID int, tradeNo string) {
+	t.Helper()
+	plan := &model.SubscriptionPlan{
+		Id:            planID,
+		Title:         "Guard Plan",
+		PriceAmount:   9.99,
+		Currency:      "USD",
+		DurationUnit:  model.SubscriptionDurationMonth,
+		DurationValue: 1,
+		Enabled:       true,
+		TotalAmount:   1000,
+	}
+	require.NoError(t, model.DB.Create(plan).Error)
+	order := &model.SubscriptionOrder{
+		UserId:          userID,
+		PlanId:          planID,
+		Money:           9.99,
+		TradeNo:         tradeNo,
+		PaymentMethod:   model.PaymentProviderEpay,
+		PaymentProvider: model.PaymentProviderEpay,
+		Status:          common.TopUpStatusPending,
+		CreateTime:      common.GetTimestamp(),
+	}
+	require.NoError(t, order.Insert())
+}
+
+// TestDispatchEpaySubscriptionEventOnceAndReplayConsistent 验收：真实订阅
+// webhook 推送一次、重放一次，账本一致（只完成一次订阅）。
+func TestDispatchEpaySubscriptionEventOnceAndReplayConsistent(t *testing.T) {
+	truncate(t)
+
+	user := &model.User{
+		Id:       903,
+		Username: "epay-sub-once",
+		Quota:    0,
+		Status:   common.UserStatusEnabled,
+	}
+	require.NoError(t, model.DB.Create(user).Error)
+	seedSubscriptionOrderForTest(t, user.Id, 31, "EPAYSUB-ONCE")
+
+	alreadyDone, err := DispatchEpaySubscriptionEvent(context.Background(), "EPAYSUB-ONCE", `{"out_trade_no":"EPAYSUB-ONCE"}`, "alipay")
+	require.NoError(t, err)
+	assert.False(t, alreadyDone)
+
+	// 重放：总线幂等命中 success → alreadyDone=true，订阅不重复。
+	alreadyDone, err = DispatchEpaySubscriptionEvent(context.Background(), "EPAYSUB-ONCE", `{"out_trade_no":"EPAYSUB-ONCE"}`, "alipay")
+	require.NoError(t, err)
+	assert.True(t, alreadyDone)
+
+	var order model.SubscriptionOrder
+	require.NoError(t, model.DB.Where("trade_no = ?", "EPAYSUB-ONCE").First(&order).Error)
+	assert.Equal(t, common.TopUpStatusSuccess, order.Status)
+
+	var count int64
+	require.NoError(t, model.DB.Model(&model.UserSubscription{}).Where("user_id = ?", user.Id).Count(&count).Error)
+	assert.Equal(t, int64(1), count, "订阅必须只生效一次")
+}

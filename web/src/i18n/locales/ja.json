@@ -6532,5 +6532,12 @@
   "Model mapping intro": "ゲートウェイは全プロトコルでサイトのモデルを同名にマッピングします：",
   "Model mapping note": "サードパーティのマッピング不要：OpenAI / Anthropic / Codex で同じモデルIDが使えます。",
   "Export JSON": "JSONをエクスポート",
-  "Web Protection": "Web保護"
+  "Web Protection": "Web保護",
+  "Approve": "Approve",
+  "Reject": "Reject",
+  "Pending approval": "Pending approval",
+  "Plugin approved": "Plugin approved",
+  "Plugin approval rejected": "Plugin approval rejected",
+  "Reject plugin version?": "Reject plugin version?",
+  "Rejecting this version keeps it inactive and blocks its source hash from running until approved.": "Rejecting this version keeps it inactive and blocks its source hash from running until approved."
 }

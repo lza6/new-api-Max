@@ -24,6 +24,8 @@ import (
 const (
 	// EventTypeEpayTopupSuccess 易支付充值成功事件类型。
 	EventTypeEpayTopupSuccess = "epay.topup.success"
+	// EventTypeEpaySubscriptionSuccess 易支付订阅成功事件类型。
+	EventTypeEpaySubscriptionSuccess = "epay.subscription.success"
 )
 
 var (
@@ -33,6 +35,7 @@ var (
 func init() {
 	paymentEventBus.SetDeliveryStore(NewEventDeliveryStore())
 	paymentEventBus.Register(EventTypeEpayTopupSuccess, handleEpayTopupSuccess)
+	paymentEventBus.Register(EventTypeEpaySubscriptionSuccess, handleEpaySubscriptionSuccess)
 }
 
 // epayTopupPayload 充值事件载荷（仅非敏感字段，不落密钥/签名）。
@@ -61,6 +64,59 @@ func decodeEpayTopupPayload(raw any) (epayTopupPayload, error) {
 		return epayTopupPayload{}, err
 	}
 	return payload, nil
+}
+
+// epaySubscriptionPayload 订阅支付事件载荷（trade_no + 回调原文 JSON，对账用）。
+type epaySubscriptionPayload struct {
+	TradeNo      string `json:"trade_no"`
+	VerifyInfo   string `json:"verify_info"`
+	ActualMethod string `json:"actual_payment_method,omitempty"`
+}
+
+func handleEpaySubscriptionSuccess(ctx context.Context, ev Event) error {
+	payload, err := decodeEpaySubscriptionPayload(ev.Payload)
+	if err != nil {
+		return err
+	}
+	return model.CompleteSubscriptionOrder(payload.TradeNo, payload.VerifyInfo, model.PaymentProviderEpay, payload.ActualMethod)
+}
+
+func decodeEpaySubscriptionPayload(raw any) (epaySubscriptionPayload, error) {
+	data, err := common.Marshal(raw)
+	if err != nil {
+		return epaySubscriptionPayload{}, err
+	}
+	var payload epaySubscriptionPayload
+	if err := common.Unmarshal(data, &payload); err != nil {
+		return epaySubscriptionPayload{}, err
+	}
+	return payload, nil
+}
+
+// DispatchEpaySubscriptionEvent 把易支付订阅回调归一为事件投递。
+// alreadyDone=true 表示该 trade_no 已完成（幂等命中）。
+func DispatchEpaySubscriptionEvent(ctx context.Context, tradeNo, verifyInfoJSON, actualMethod string) (bool, error) {
+	ev := Event{
+		ID:   "epay-subscription:" + tradeNo,
+		Type: EventTypeEpaySubscriptionSuccess,
+		Payload: epaySubscriptionPayload{
+			TradeNo:      tradeNo,
+			VerifyInfo:   verifyInfoJSON,
+			ActualMethod: actualMethod,
+		},
+	}
+	err := paymentEventBus.Publish(ctx, ev)
+	if err == nil {
+		return false, nil
+	}
+	if errors.Is(err, ErrEventBusDup) {
+		if state, ok := paymentEventBus.State(ev.ID); ok && state == EventStateSuccess {
+			return true, nil
+		}
+		// 已投递但非成功：账本级幂等兜底（CompleteSubscriptionOrder 状态校验）。
+		return false, model.CompleteSubscriptionOrder(tradeNo, verifyInfoJSON, model.PaymentProviderEpay, actualMethod)
+	}
+	return false, err
 }
 
 // DispatchEpayTopupEvent 把易支付充值回调归一为事件投递。

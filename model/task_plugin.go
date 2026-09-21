@@ -48,11 +48,15 @@ type TaskPlugin struct {
 	// 512 KiB icon cap and makes GORM emit mediumtext on MySQL (a bare TEXT
 	// column there holds only 64 KiB), varchar(524288) on PostgreSQL, and text
 	// on SQLite.
-	Icon      string `json:"-" gorm:"size:524288"`
-	Enabled   bool   `json:"enabled" gorm:"not null"`
-	Active    bool   `json:"active" gorm:"not null;index"`
-	CreatedAt int64  `json:"created_at" gorm:"not null"`
-	Remark    string `json:"remark" gorm:"type:text"`
+	Icon    string `json:"-" gorm:"size:524288"`
+	Enabled bool   `json:"enabled" gorm:"not null"`
+	Active  bool   `json:"active" gorm:"not null;index"`
+	// ApprovalStatus 审批状态（P2-3 内容寻址审批）：""（未启用审批/历史插件，
+	// 视为已获批）、pending（待审）、approved（已批）、rejected（已拒）。
+	// 启用审批后，仅 approved 的版本会 Active=true 进入执行快照。
+	ApprovalStatus string `json:"approval_status" gorm:"size:16;index"`
+	CreatedAt      int64  `json:"created_at" gorm:"not null"`
+	Remark         string `json:"remark" gorm:"type:text"`
 }
 
 // HasIcon reports whether this version ships a logo.
@@ -108,6 +112,31 @@ func ListTaskPlugins() ([]TaskPlugin, error) {
 		Order(clause.OrderByColumn{Column: clause.Column{Name: "id"}, Desc: true}).
 		Find(&plugins).Error
 	return plugins, err
+}
+
+// SetTaskPluginApprovalStatus 更新某版本插件的审批状态与激活位。
+// approved → Active=true（进入执行快照）；pending/rejected → Active=false。
+// 仅当 targetActive 显式给出时覆盖 Active（审批动作调用方控制）。
+func SetTaskPluginApprovalStatus(key, version, status string, active bool) error {
+	return DB.Model(&TaskPlugin{}).
+		Where(&TaskPlugin{Key: key, Version: version}).
+		Updates(map[string]any{
+			"approval_status": status,
+			"active":          active,
+			"enabled":         active,
+		}).Error
+}
+
+// ApproveTaskPluginVersion 审批/拒绝插件版本：approved→激活，其余→停用。
+func ApproveTaskPluginVersion(key, version string, approve bool) (*TaskPlugin, error) {
+	status := "rejected"
+	if approve {
+		status = "approved"
+	}
+	if err := SetTaskPluginApprovalStatus(key, version, status, approve); err != nil {
+		return nil, err
+	}
+	return GetTaskPluginVersion(key, version)
 }
 
 func GetTaskPluginVersion(key, version string) (*TaskPlugin, error) {

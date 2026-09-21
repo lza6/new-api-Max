@@ -244,3 +244,94 @@ test.each(['factory', 'override_over_factory'] as const)(
     }
   }
 )
+
+function renderPendingApprovalTable() {
+  localStorage.setItem('task-plugins-view-mode', 'table')
+  const item: TaskPluginListItem = {
+    meta: {
+      key: 'example',
+      name: 'Example',
+      version: '1.0.0',
+      apiVersion: 1,
+      author: { name: 'Example' },
+      models: [],
+      fetchMode: 'per_task',
+    },
+    source: 'override',
+    enabled: false,
+    active: false,
+    source_hash: 'hash-a',
+    remark: '',
+    runtime_status: 'pending_approval',
+    approval_status: 'pending',
+    channel_count: 0,
+    in_flight_count: 0,
+  }
+  const client = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false, staleTime: Infinity },
+      mutations: { retry: false },
+    },
+  })
+  clients.push(client)
+  client.setQueryData(['task-plugins'], [item])
+  render(
+    <QueryClientProvider client={client}>
+      <PluginsTable onDetails={() => undefined} onUpload={() => undefined} />
+    </QueryClientProvider>
+  )
+}
+
+test('table view: pending approval row can be approved from the actions menu', async () => {
+  const user = userEvent.setup()
+  const post = vi
+    .spyOn(api, 'post')
+    .mockResolvedValue({ data: { success: true, data: null } })
+  renderPendingApprovalTable()
+
+  expect(await screen.findByText('Pending approval')).toBeInTheDocument()
+  await user.click(screen.getAllByRole('button', { name: 'Open menu' })[0])
+  const approve = await screen.findByRole('menuitem', { name: 'Approve' })
+  await user.click(approve)
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledExactlyOnceWith(
+      '/api/plugin/task/example/approve',
+      { version: '1.0.0', approve: true },
+      expect.any(Object)
+    )
+  )
+})
+
+test('table view: rejecting a pending approval requires confirmation before calling the API', async () => {
+  const user = userEvent.setup()
+  const post = vi
+    .spyOn(api, 'post')
+    .mockResolvedValue({ data: { success: true, data: null } })
+  renderPendingApprovalTable()
+
+  await user.click(screen.getAllByRole('button', { name: 'Open menu' })[0])
+  await user.click(await screen.findByRole('menuitem', { name: 'Reject' }))
+  const dialog = await screen.findByRole('alertdialog', {
+    name: 'Reject plugin version?',
+  })
+  await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+  await waitFor(() =>
+    expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument()
+  )
+  expect(post).not.toHaveBeenCalled()
+
+  await user.click(screen.getAllByRole('button', { name: 'Open menu' })[0])
+  await user.click(await screen.findByRole('menuitem', { name: 'Reject' }))
+  await user.click(
+    within(
+      await screen.findByRole('alertdialog', { name: 'Reject plugin version?' })
+    ).getByRole('button', { name: 'Reject' })
+  )
+  await waitFor(() =>
+    expect(post).toHaveBeenCalledExactlyOnceWith(
+      '/api/plugin/task/example/approve',
+      { version: '1.0.0', approve: false },
+      expect.any(Object)
+    )
+  )
+})

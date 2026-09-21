@@ -154,12 +154,18 @@ function ChatRouteComponent() {
   }
 
   return (
-    <iframe
-      src={iframeSrc}
-      key={iframeSrc}
-      className='h-full w-full border-0'
-      allow='camera; microphone'
-      title={`Chat preset: ${preset.name}`}
-    />
+    <>
+      {/* First-party same-origin chat embed: it needs scripts + same-origin
+          auth cookies; a sandbox with both flags is invalid and silently
+          ignored by browsers, so it is intentionally omitted. */}
+      {/* eslint-disable-next-line react/iframe-missing-sandbox */}
+      <iframe
+        src={iframeSrc}
+        key={iframeSrc}
+        className='h-full w-full border-0'
+        allow='camera; microphone'
+        title={`Chat preset: ${preset.name}`}
+      />
+    </>
   )
 }

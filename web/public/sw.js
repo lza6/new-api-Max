@@ -35,7 +35,7 @@ self.addEventListener('fetch', (event) => {
         const copy = res.clone()
         await cache.put(request, copy)
         return res
-      } catch (err) {
+      } catch {
         return hit || Response.error()
       }
     })()

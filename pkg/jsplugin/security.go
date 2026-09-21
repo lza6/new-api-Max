@@ -18,6 +18,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os/exec"
 	"strings"
 	"sync"
 )
@@ -310,6 +311,77 @@ func (g *ExecutionGate) Revoke(pluginKey string) {
 }
 
 // ---------------------------------------------------------------------------
+// 沙箱运行时探测（R2）：探测当前主机可用的隔离原语
+// ---------------------------------------------------------------------------
+
+// probeExecutable 可注入的探测函数（测试替换用），默认 exec.LookPath。
+var probeExecutable = exec.LookPath
+
+// DetectSandboxModes 探测当前主机可用的隔离：
+//   - docker：docker CLI 在 PATH；
+//   - bubblewrap：bwrap CLI 在 PATH；
+//   - workspace：始终追加（当前工作目录隔离，由调用方判定是否可接受）。
+//
+// 探测不启动任何容器，纯二进制存在性检查。
+func DetectSandboxModes() []SandboxMode {
+	modes := make([]SandboxMode, 0, 3)
+	if _, err := probeExecutable("docker"); err == nil {
+		modes = append(modes, SandboxModeDocker)
+	}
+	if _, err := probeExecutable("bwrap"); err == nil {
+		modes = append(modes, SandboxModeBubblewrap)
+	}
+	modes = append(modes, SandboxModeWorkspace)
+	return modes
+}
+
+// ResolveSandboxPolicyForHost 是 DetectSandboxModes + ResolveSandboxPolicy 的
+// 组合入口，供宿主在授予插件执行能力时决策并明示降级。
+func ResolveSandboxPolicyForHost(require SandboxRequirement) (SandboxMode, bool, error) {
+	return ResolveSandboxPolicy(require, DetectSandboxModes())
+}
+
+// ---------------------------------------------------------------------------
+// 默认审批闸门 + 种子（供宿主在启动/同步时装载持久化审批记录）
+// ---------------------------------------------------------------------------
+
+// ApprovalSeed 一次性装载的审批记录（来自持久化存储）。
+type ApprovalSeed struct {
+	PluginKey  string
+	SourceHash string
+	Approved   bool
+}
+
+var defaultGate = NewExecutionGate()
+
+// DefaultGate 返回进程级默认审批闸门（生产执行路径使用，惰性创建）。
+func DefaultGate() *ExecutionGate {
+	return defaultGate
+}
+
+// SeedGateApprovals 用持久化审批记录装载/覆盖默认闸门（幂等；拒绝态优先）。
+func SeedGateApprovals(seeds []ApprovalSeed) {
+	for _, seed := range seeds {
+		if seed.Approved {
+			_, _ = defaultGate.Approve(seed.PluginKey, seed.SourceHash)
+		} else {
+			defaultGate.Reject(seed.PluginKey, seed.SourceHash)
+		}
+	}
+}
+
+// ApprovalSecurityPolicy 构造启用了「内容寻址审批」的执行策略。
+// hookPermissions: 需要权限的钩子 → PermissionKind；nil 表示不额外要求。
+func ApprovalSecurityPolicy(declared Permissions, hookPermissions map[string]PermissionKind) *SecurityPolicy {
+	return &SecurityPolicy{
+		Gate:            defaultGate,
+		RequireApproval: true,
+		Declared:        declared,
+		HookPermissions: hookPermissions,
+	}
+}
+
+// ---------------------------------------------------------------------------
 // Ed25519 签名
 // ---------------------------------------------------------------------------
 
@@ -374,25 +446,37 @@ func ResolveSandboxPolicy(require SandboxRequirement, detected []SandboxMode) (m
 	case SandboxDisabled:
 		return SandboxModeNone, false, nil
 	case SandboxRequired:
-		if m, ok := strongestDetected(detected); ok {
+		// 必需策略只认真实隔离（docker/bubblewrap）；仅 workspace 不算满足，
+		// fail-closed 拒绝，绝不静默降级到「无防护」。
+		if m, ok := strongestDetected(detected, false); ok {
 			return m, false, nil
 		}
 		return SandboxModeUnavailable, false, ErrSandboxUnavailable
 	case SandboxLenient:
-		if m, ok := strongestDetected(detected); ok {
-			return m, false, nil
+		if m, ok := strongestDetected(detected, true); ok {
+			return m, m == SandboxModeWorkspace, nil
 		}
+		// 连 workspace 都探测不到：仍降级 workspace，但必须明示 degraded。
 		return SandboxModeWorkspace, true, nil
 	default:
 		return SandboxModeNone, false, nil
 	}
 }
 
-func strongestDetected(detected []SandboxMode) (SandboxMode, bool) {
-	for _, m := range []SandboxMode{SandboxModeDocker, SandboxModeBubblewrap, SandboxModeWorkspace} {
+// strongestDetected 按 docker > bubblewrap > (workspace, 仅 allowWorkspace)
+// 优先级返回检测到的隔离。allowWorkspace=false 时 workspace 不参与。
+func strongestDetected(detected []SandboxMode, allowWorkspace bool) (SandboxMode, bool) {
+	for _, m := range []SandboxMode{SandboxModeDocker, SandboxModeBubblewrap} {
 		for _, d := range detected {
 			if d == m {
 				return m, true
+			}
+		}
+	}
+	if allowWorkspace {
+		for _, d := range detected {
+			if d == SandboxModeWorkspace {
+				return SandboxModeWorkspace, true
 			}
 		}
 	}

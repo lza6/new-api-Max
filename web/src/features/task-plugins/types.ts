@@ -87,6 +87,8 @@ export type TaskPluginListItem = {
     | 'disabled'
     | 'disabled_fallback'
     | 'not_registered'
+    | 'pending_approval'
+  approval_status?: string
   runtime_error?: string
   factory_meta?: TaskPluginMeta
   channel_count: number

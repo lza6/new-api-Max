@@ -39,6 +39,7 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { resolveLocalizedText } from '@/lib/localized-text'
 
 import {
+  approveTaskPlugin,
   deleteTaskPluginVersion,
   listTaskPlugins,
   setTaskPluginStatus,
@@ -74,6 +75,9 @@ export function PluginsTable(props: PluginsTableProps) {
     plugin: TaskPluginListItem
     enabled: boolean
   } | null>(null)
+  const [rejectTarget, setRejectTarget] = useState<TaskPluginListItem | null>(
+    null
+  )
   const pluginsQuery = useQuery({
     queryKey: ['task-plugins'],
     queryFn: listTaskPlugins,
@@ -104,6 +108,20 @@ export function PluginsTable(props: PluginsTableProps) {
       }
       handleServerError(error)
     },
+  })
+  const approvalMutation = useMutation({
+    mutationFn: ({ key, version, approve }: { key: string; version: string; approve: boolean }) =>
+      approveTaskPlugin(key, version, approve),
+    onSuccess: (_data, variables) => {
+      toast.success(
+        variables.approve
+          ? t('Plugin approved')
+          : t('Plugin approval rejected')
+      )
+      queryClient.invalidateQueries({ queryKey: ['task-plugins'] })
+      setRejectTarget(null)
+    },
+    onError: (error) => handleServerError(error),
   })
   const deleteMutation = useMutation({
     mutationFn: (plugin: TaskPluginListItem) =>
@@ -269,6 +287,9 @@ export function PluginsTable(props: PluginsTableProps) {
               </Badge>
             )
           }
+          if (status === 'pending_approval') {
+            return <Badge variant='warning'>{t('Pending approval')}</Badge>
+          }
           return <Badge variant='secondary'>{t('Not registered')}</Badge>
         },
       },
@@ -298,6 +319,27 @@ export function PluginsTable(props: PluginsTableProps) {
                 <Upload />
                 {t('Upload new version')}
               </DropdownMenuItem>
+              {row.original.runtime_status === 'pending_approval' && (
+                <>
+                  <DropdownMenuItem
+                    onClick={() =>
+                      approvalMutation.mutate({
+                        key: row.original.meta.key,
+                        version: row.original.meta.version,
+                        approve: true,
+                      })
+                    }
+                  >
+                    {t('Approve')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    variant='destructive'
+                    onClick={() => setRejectTarget(row.original)}
+                  >
+                    {t('Reject')}
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuItem
                 disabled={row.original.source === 'factory'}
                 variant='destructive'
@@ -311,7 +353,7 @@ export function PluginsTable(props: PluginsTableProps) {
         ),
       },
     ],
-    [i18n.language, props, statusMutation, t]
+    [i18n.language, props, statusMutation, approvalMutation, t]
   )
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
   const [globalFilter, setGlobalFilter] = useState('')
@@ -404,6 +446,27 @@ export function PluginsTable(props: PluginsTableProps) {
             enabled: statusConfirmation.enabled,
           })
         }}
+      />
+      <ConfirmDialog
+        open={Boolean(rejectTarget)}
+        onOpenChange={(open) => {
+          if (!open) setRejectTarget(null)
+        }}
+        title={t('Reject plugin version?')}
+        destructive
+        isLoading={approvalMutation.isPending}
+        confirmText={t('Reject')}
+        handleConfirm={() => {
+          if (!rejectTarget) return
+          approvalMutation.mutate({
+            key: rejectTarget.meta.key,
+            version: rejectTarget.meta.version,
+            approve: false,
+          })
+        }}
+        desc={t(
+          'Rejecting this version keeps it inactive and blocks its source hash from running until approved.'
+        )}
       />
       <ConfirmDialog
         open={Boolean(deleteTarget)}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/ed25519"
 	"crypto/rand"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -155,6 +156,55 @@ func TestResolveSandboxPolicyFailClosed(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, SandboxModeNone, mode)
 	assert.False(t, degraded)
+}
+
+// ---------------------------------------------------------------------------
+// 沙箱运行时探测
+// ---------------------------------------------------------------------------
+
+func TestDetectSandboxModesProbesBinaries(t *testing.T) {
+	original := probeExecutable
+	t.Cleanup(func() { probeExecutable = original })
+
+	// docker + bwrap 均可用。
+	probeExecutable = func(name string) (string, error) {
+		if name == "docker" || name == "bwrap" {
+			return "/usr/bin/" + name, nil
+		}
+		return "", errors.New("not found")
+	}
+	modes := DetectSandboxModes()
+	assert.Contains(t, modes, SandboxModeDocker)
+	assert.Contains(t, modes, SandboxModeBubblewrap)
+	assert.Contains(t, modes, SandboxModeWorkspace)
+
+	// 无 docker/bwrap → 仅 workspace。
+	probeExecutable = func(_ string) (string, error) {
+		return "", errors.New("not found")
+	}
+	modes = DetectSandboxModes()
+	assert.Len(t, modes, 1)
+	assert.Equal(t, SandboxModeWorkspace, modes[0])
+}
+
+func TestResolveSandboxPolicyForHostFailClosed(t *testing.T) {
+	original := probeExecutable
+	t.Cleanup(func() { probeExecutable = original })
+	probeExecutable = func(_ string) (string, error) {
+		return "", errors.New("not found")
+	}
+
+	// 策略要求沙箱但主机无 docker/bwrap → fail-closed 拒绝。
+	mode, degraded, err := ResolveSandboxPolicyForHost(SandboxRequired)
+	require.ErrorIs(t, err, ErrSandboxUnavailable)
+	assert.Equal(t, SandboxModeUnavailable, mode)
+	assert.False(t, degraded)
+
+	// 宽松策略 → 降级 workspace 并明示 degraded。
+	mode, degraded, err = ResolveSandboxPolicyForHost(SandboxLenient)
+	require.NoError(t, err)
+	assert.Equal(t, SandboxModeWorkspace, mode)
+	assert.True(t, degraded)
 }
 
 // ---------------------------------------------------------------------------

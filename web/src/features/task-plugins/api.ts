@@ -46,6 +46,19 @@ export async function dryRunTaskPlugin(
   return requireSuccess(response.data)
 }
 
+export async function approveTaskPlugin(
+  key: string,
+  version: string,
+  approve: boolean
+) {
+  const response = await api.post<ApiResponse<unknown>>(
+    `/api/plugin/task/${encodeURIComponent(key)}/approve`,
+    { version, approve },
+    mutationConfig
+  )
+  return requireSuccess(response.data)
+}
+
 export class TaskPluginUsageError extends Error {
   constructor(
     message: string,

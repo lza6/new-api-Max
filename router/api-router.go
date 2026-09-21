@@ -264,6 +264,7 @@ func SetApiRouter(router *gin.Engine) {
 			taskPluginRoute.POST("/:key/activate", controller.ActivateTaskPlugin)
 			taskPluginRoute.POST("/:key/status", controller.SetTaskPluginStatus)
 			taskPluginRoute.POST("/:key/dryrun", controller.DryRunTaskPlugin)
+	taskPluginRoute.POST("/:key/approve", controller.ApproveTaskPlugin)
 			taskPluginRoute.DELETE("/:key/versions/:version", controller.DeleteTaskPluginVersion)
 		}
 		apiRouter.GET("/task_plugin_options", middleware.AdminAuth(), middleware.RequirePermission(authz.TaskPluginBind), controller.GetTaskPluginOptions)

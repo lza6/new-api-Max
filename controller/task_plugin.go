@@ -105,6 +105,23 @@ func UploadTaskPlugin(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	if setting.IsTaskPluginApprovalRequired() {
+		// P2-3 内容寻址审批：该源代码哈希获批前插件保持 pending/inactive，
+		// 不进入执行快照（GetTaskPluginSyncSnapshot 只取 Active 行）。
+		approved := jsplugin.DefaultGate().Check(plugin.Key, plugin.SourceHash).State == jsplugin.ApprovalApproved
+		status := "pending"
+		active := false
+		if approved {
+			status = "approved"
+			active = plugin.Enabled
+		}
+		if err = model.SetTaskPluginApprovalStatus(plugin.Key, plugin.Version, status, active); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		plugin.ApprovalStatus = status
+		plugin.Active = active
+	}
 	if err = syncTaskPluginsOnceContext(c.Request.Context()); err != nil {
 		common.ApiError(c, err)
 		return
@@ -121,19 +138,73 @@ func GetTaskPluginVersions(c *gin.Context) {
 	common.ApiSuccess(c, plugins)
 }
 
+type taskPluginApproveRequest struct {
+	Version string `json:"version" binding:"required"`
+	Approve bool   `json:"approve"`
+}
+
+// ApproveTaskPlugin 审批/拒绝某版本插件（P2-3 内容寻址：审批绑定 SourceHash）。
+// approved → 默认闸门批准该哈希 + Active=true 进入执行快照；
+// rejected → 闸门拒绝 + Active=false 移除出快照。
+func ApproveTaskPlugin(c *gin.Context) {
+	var request taskPluginApproveRequest
+	if err := c.ShouldBindJSON(&request); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	key := c.Param("key")
+	plugin, err := model.GetTaskPluginVersion(key, request.Version)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if request.Approve {
+		if _, approveErr := jsplugin.DefaultGate().Approve(plugin.Key, plugin.SourceHash); approveErr != nil {
+			common.ApiError(c, approveErr)
+			return
+		}
+	} else {
+		jsplugin.DefaultGate().Reject(plugin.Key, plugin.SourceHash)
+	}
+	plugin, err = model.ApproveTaskPluginVersion(plugin.Key, request.Version, request.Approve)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if err = syncTaskPluginsOnceContext(c.Request.Context()); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	if request.Approve {
+		// P2-3 沙箱降级链：授予执行能力时明示当前隔离等级；无 docker/bubblewrap
+		// 时降级 workspace 并告警（不静默）。
+		mode, degraded, sandboxErr := jsplugin.ResolveSandboxPolicyForHost(jsplugin.SandboxLenient)
+		if sandboxErr != nil {
+			common.SysError(fmt.Sprintf("task plugin %s@%s approved but sandbox policy unavailable: %v", plugin.Key, request.Version, sandboxErr))
+		} else if degraded {
+			common.SysError(fmt.Sprintf("task plugin %s@%s approved with degraded sandbox mode=%s (no docker/bubblewrap)", plugin.Key, request.Version, mode))
+		}
+	}
+	common.ApiSuccess(c, taskPluginDetail{
+		Plugin: plugin, Meta: jsplugin.Meta{Key: plugin.Key, Version: plugin.Version, APIVersion: plugin.APIVersion},
+		Source: plugin.Source, Layer: "override", HasIcon: plugin.HasIcon(),
+	})
+}
+
 type taskPluginListItem struct {
-	Meta          jsplugin.Meta  `json:"meta"`
-	Source        string         `json:"source"`
-	Enabled       bool           `json:"enabled"`
-	Active        bool           `json:"active"`
-	SourceHash    string         `json:"source_hash"`
-	HasIcon       bool           `json:"has_icon"`
-	Remark        string         `json:"remark"`
-	RuntimeStatus string         `json:"runtime_status"`
-	RuntimeError  string         `json:"runtime_error,omitempty"`
-	FactoryMeta   *jsplugin.Meta `json:"factory_meta,omitempty"`
-	ChannelCount  int            `json:"channel_count"`
-	InFlightCount int64          `json:"in_flight_count"`
+	Meta           jsplugin.Meta  `json:"meta"`
+	Source         string         `json:"source"`
+	Enabled        bool           `json:"enabled"`
+	Active         bool           `json:"active"`
+	SourceHash     string         `json:"source_hash"`
+	HasIcon        bool           `json:"has_icon"`
+	Remark         string         `json:"remark"`
+	RuntimeStatus  string         `json:"runtime_status"`
+	RuntimeError   string         `json:"runtime_error,omitempty"`
+	ApprovalStatus string         `json:"approval_status"`
+	FactoryMeta    *jsplugin.Meta `json:"factory_meta,omitempty"`
+	ChannelCount   int            `json:"channel_count"`
+	InFlightCount  int64          `json:"in_flight_count"`
 }
 
 type taskPluginRebuildOutcome struct {
@@ -207,9 +278,12 @@ func ListTaskPlugins(c *gin.Context) {
 			item.SourceHash = row.SourceHash
 			item.HasIcon = row.HasIcon()
 			item.Remark = row.Remark
+			item.ApprovalStatus = row.ApprovalStatus
 			if message := runtimeErrors[key]; message != "" {
 				item.RuntimeStatus = "compile_failed"
 				item.RuntimeError = message
+			} else if setting.IsTaskPluginApprovalRequired() && row.ApprovalStatus != "approved" && row.ApprovalStatus != "" {
+				item.RuntimeStatus = "pending_approval"
 			} else if runtimeMeta, ok := override[key]; ok {
 				item.Meta = runtimeMeta
 			} else if !row.Enabled {
@@ -721,6 +795,19 @@ func syncTaskPluginsOnceContext(ctx context.Context) error {
 	}
 	databasePlugins := databaseSnapshot.Plugins
 	sort.Slice(databasePlugins, func(i, j int) bool { return databasePlugins[i].Key < databasePlugins[j].Key })
+	if setting.IsTaskPluginApprovalRequired() {
+		// P2-3：用持久化审批记录装载默认闸门，使引擎执行策略（内容寻址审批）
+		// 与数据库状态一致：只有 approved 的源代码哈希在执行时通过。
+		seeds := make([]jsplugin.ApprovalSeed, 0, len(databasePlugins))
+		for _, row := range databasePlugins {
+			seeds = append(seeds, jsplugin.ApprovalSeed{
+				PluginKey:  row.Key,
+				SourceHash: row.SourceHash,
+				Approved:   row.ApprovalStatus == "approved",
+			})
+		}
+		jsplugin.SeedGateApprovals(seeds)
+	}
 	currentOverrides := jsplugin.DefaultRegistry.OverridePlugins()
 	generationBefore := jsplugin.DefaultRegistry.Generation().Number
 	logger.LogDebug(
@@ -754,6 +841,9 @@ func syncTaskPluginsOnceContext(ctx context.Context) error {
 			plugin.Version,
 		)
 		compiled, compileErr := jsplugin.CompilePlugin(plugin.Source, jsplugin.Options{Key: plugin.Key, Version: plugin.Version})
+		if compileErr == nil && setting.IsTaskPluginApprovalRequired() {
+			compiled.Engine.SetSecurityPolicy(jsplugin.ApprovalSecurityPolicy(jsplugin.Permissions{}, nil))
+		}
 		if compileErr != nil {
 			retainedIncumbent := false
 			if current := currentOverrides[plugin.Key]; current != nil {

@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/i18n"
+	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
@@ -167,11 +168,23 @@ func SubscriptionEpayNotify(c *gin.Context) {
 	LockOrder(verifyInfo.ServiceTradeNo)
 	defer UnlockOrder(verifyInfo.ServiceTradeNo)
 
-	if err := model.CompleteSubscriptionOrder(verifyInfo.ServiceTradeNo, common.GetJsonString(verifyInfo), model.PaymentProviderEpay, verifyInfo.Type); err != nil {
+	// P2-2 事件总线归一：持久化幂等（event_id+handler 唯一）+ 账本级兜底。
+	// 同一 trade_no 重复推送只完成一次订阅；返回 alreadyDone 供审计日志区分。
+	alreadyDone, dispatchErr := service.DispatchEpaySubscriptionEvent(
+		c.Request.Context(),
+		verifyInfo.ServiceTradeNo,
+		common.GetJsonString(verifyInfo),
+		verifyInfo.Type,
+	)
+	if dispatchErr != nil {
 		_, _ = c.Writer.Write([]byte("fail"))
 		return
 	}
-
+	if alreadyDone {
+		logger.LogInfo(c.Request.Context(), fmt.Sprintf("易支付订阅 重复回调幂等忽略 trade_no=%s client_ip=%s", verifyInfo.ServiceTradeNo, c.ClientIP()))
+	} else {
+		logger.LogInfo(c.Request.Context(), fmt.Sprintf("易支付订阅 成功 trade_no=%s client_ip=%s", verifyInfo.ServiceTradeNo, c.ClientIP()))
+	}
 	_, _ = c.Writer.Write([]byte("success"))
 }
 
