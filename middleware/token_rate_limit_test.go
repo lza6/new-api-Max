@@ -48,3 +48,30 @@ func TestTokenRateLimitConfigParsing(t *testing.T) {
 	assert.Zero(t, empty.QBS)
 	assert.Zero(t, empty.Concurrency)
 }
+
+func TestSubscriptionConcurrencyStore(t *testing.T) {
+	assert.True(t, acquireSubscriptionConcurrency(301, 3))
+	assert.True(t, acquireSubscriptionConcurrency(301, 3))
+	assert.True(t, acquireSubscriptionConcurrency(301, 3))
+	assert.False(t, acquireSubscriptionConcurrency(301, 3), "并发达到订阅上限应拒绝")
+
+	releaseSubscriptionConcurrency(301)
+	assert.True(t, acquireSubscriptionConcurrency(301, 3), "释放后可再次获取")
+
+	releaseSubscriptionConcurrency(301)
+	releaseSubscriptionConcurrency(301)
+	releaseSubscriptionConcurrency(301)
+}
+
+func TestResolveSubscriptionTierWithoutSubscription(t *testing.T) {
+	// 无有效用户或库不可用时安全放行（hasSub=false），不 panic。
+	c, r, hasSub := resolveSubscriptionTier(0)
+	assert.Zero(t, c)
+	assert.Zero(t, r)
+	assert.False(t, hasSub)
+
+	c, r, hasSub = resolveSubscriptionTier(1)
+	assert.Zero(t, c)
+	assert.Zero(t, r)
+	assert.False(t, hasSub)
+}

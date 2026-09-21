@@ -199,3 +199,42 @@ func TestAdminResetPlanSubscriptionsNoMatchSucceeds(t *testing.T) {
 	assert.Zero(t, result.UserCount)
 	assert.Empty(t, result.AffectedUserIds)
 }
+
+func TestCalcPlanEndTimeWeekIsSevenDays(t *testing.T) {
+	start := time.Date(2026, 9, 20, 12, 0, 0, 0, time.UTC)
+	plan := &SubscriptionPlan{DurationUnit: SubscriptionDurationWeek, DurationValue: 1}
+	end, err := calcPlanEndTime(start, plan)
+	require.NoError(t, err)
+	require.Equal(t, start.Add(7*24*time.Hour).Unix(), end)
+
+	twoWeeks := &SubscriptionPlan{DurationUnit: SubscriptionDurationWeek, DurationValue: 2}
+	end2, err := calcPlanEndTime(start, twoWeeks)
+	require.NoError(t, err)
+	require.Equal(t, start.Add(14*24*time.Hour).Unix(), end2)
+}
+
+func TestPlanAllowsModelMatrix(t *testing.T) {
+	require.True(t, (&SubscriptionPlan{Models: ""}).PlanAllowsModel("deepseek-v4-flash"))
+	require.True(t, (&SubscriptionPlan{Models: "[]"}).PlanAllowsModel("deepseek-v4-flash"))
+	require.True(t, (&SubscriptionPlan{Models: `["deepseek-v4-flash","gpt-4o-mini"]`}).PlanAllowsModel("deepseek-v4-flash"))
+	require.False(t, (&SubscriptionPlan{Models: `["gpt-4o-mini"]`}).PlanAllowsModel("deepseek-v4-flash"))
+	require.True(t, (&SubscriptionPlan{Models: "not-json"}).PlanAllowsModel("deepseek-v4-flash"))
+	var nilPlan *SubscriptionPlan
+	require.True(t, nilPlan.PlanAllowsModel("deepseek-v4-flash"))
+}
+
+func TestEffectiveTierOverrideWins(t *testing.T) {
+	sub := &UserSubscription{RpmOverride: 300, ConcurrencyOverride: 10}
+	c, r := sub.EffectiveTier(3, 150)
+	require.Equal(t, 10, c)
+	require.Equal(t, 300, r)
+
+	noOverride := &UserSubscription{}
+	c, r = noOverride.EffectiveTier(3, 150)
+	require.Equal(t, 3, c)
+	require.Equal(t, 150, r)
+
+	c, r = (*UserSubscription)(nil).EffectiveTier(3, 150)
+	require.Equal(t, 3, c)
+	require.Equal(t, 150, r)
+}

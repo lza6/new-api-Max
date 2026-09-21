@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -19,6 +20,7 @@ import (
 const (
 	SubscriptionDurationYear   = "year"
 	SubscriptionDurationMonth  = "month"
+	SubscriptionDurationWeek   = "week"
 	SubscriptionDurationDay    = "day"
 	SubscriptionDurationHour   = "hour"
 	SubscriptionDurationCustom = "custom"
@@ -172,6 +174,14 @@ type SubscriptionPlan struct {
 	// Max purchases per user (0 = unlimited)
 	MaxPurchasePerUser int `json:"max_purchase_per_user" gorm:"type:int;default:0"`
 
+	// 订阅档位：并发上限（进程内计数，超限 429）与 RPM 上限（60s 滑动窗口）。
+	// 0 = 不限制（沿用既有 token/分组/全局限流，不绕过既有防线）。
+	ConcurrencyLimit int `json:"concurrency_limit" gorm:"type:int;default:0"`
+	RpmLimit         int `json:"rpm_limit" gorm:"type:int;default:0"`
+
+	// 套餐可用模型列表（JSON 字符串数组；空 = 不限，沿用既有模型访问控制）。
+	Models string `json:"models" gorm:"type:text"`
+
 	// Upgrade user group after purchase (empty = no change)
 	UpgradeGroup string `json:"upgrade_group" gorm:"type:varchar(64);default:''"`
 
@@ -255,6 +265,11 @@ type UserSubscription struct {
 	UserId int `json:"user_id" gorm:"index;index:idx_user_sub_active,priority:1"`
 	PlanId int `json:"plan_id" gorm:"index"`
 
+	// 管理员对该订阅的档位覆盖（0 = 使用套餐档位）。覆盖仅影响限流，
+	// 不改变计费/额度；用于"单独给用户升级 rpm/并发"。
+	RpmOverride         int `json:"rpm_override" gorm:"type:int;default:0"`
+	ConcurrencyOverride int `json:"concurrency_override" gorm:"type:int;default:0"`
+
 	AmountTotal int64 `json:"amount_total" gorm:"type:bigint;not null;default:0"`
 	AmountUsed  int64 `json:"amount_used" gorm:"type:bigint;not null;default:0"`
 
@@ -292,6 +307,35 @@ func (s *UserSubscription) BeforeUpdate(tx *gorm.DB) error {
 	return nil
 }
 
+// PlanAllowsModel 判断套餐模型矩阵是否允许指定模型。Models 为空（空串或 "[]"）
+// 表示不限模型，沿用既有模型访问控制；配置损坏时放行（不拦截正常请求）。
+func (p *SubscriptionPlan) PlanAllowsModel(modelName string) bool {
+	if p == nil || modelName == "" || strings.TrimSpace(p.Models) == "" || p.Models == "[]" {
+		return true
+	}
+	var models []string
+	if err := common.UnmarshalJsonStr(p.Models, &models); err != nil || len(models) == 0 {
+		return true
+	}
+	return slices.Contains(models, modelName)
+}
+
+// EffectiveTier 返回订阅生效的并发/RPM 档位：管理员对单个订阅的覆盖优先，
+// 未覆盖回退到套餐自带档位；0 表示不限（沿用既有 token/分组/全局限流）。
+func (s *UserSubscription) EffectiveTier(planConcurrency, planRpm int) (concurrencyLimit, rpmLimit int) {
+	concurrencyLimit, rpmLimit = planConcurrency, planRpm
+	if s == nil {
+		return concurrencyLimit, rpmLimit
+	}
+	if s.ConcurrencyOverride > 0 {
+		concurrencyLimit = s.ConcurrencyOverride
+	}
+	if s.RpmOverride > 0 {
+		rpmLimit = s.RpmOverride
+	}
+	return concurrencyLimit, rpmLimit
+}
+
 type SubscriptionSummary struct {
 	Subscription *UserSubscription `json:"subscription"`
 }
@@ -318,6 +362,8 @@ func calcPlanEndTime(start time.Time, plan *SubscriptionPlan) (int64, error) {
 		return start.AddDate(plan.DurationValue, 0, 0).Unix(), nil
 	case SubscriptionDurationMonth:
 		return start.AddDate(0, plan.DurationValue, 0).Unix(), nil
+	case SubscriptionDurationWeek:
+		return start.Add(time.Duration(plan.DurationValue) * 7 * 24 * time.Hour).Unix(), nil
 	case SubscriptionDurationDay:
 		return start.Add(time.Duration(plan.DurationValue) * 24 * time.Hour).Unix(), nil
 	case SubscriptionDurationHour:

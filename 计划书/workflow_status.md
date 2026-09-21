@@ -84,3 +84,12 @@
 - 前端 pricing：getModelStats + ModelCard 统计条（Today calls/success · 30d calls/success），失败静默降级
 - 验证：后端 build/service 绿；前端 typecheck/build/vitest（pricing 204/204）绿；i18n 7 语言同步
 - 待办：效果测试整合进模型卡片（B2-3）、效果测试数据可配置化（B2-4）、订阅 Phase C
+
+## 十一、002 Phase C 订阅档位/模型矩阵/覆盖（v1.2.66 后端核心，2026-09-22）
+- SubscriptionPlan 增列 concurrency_limit/rpm_limit/models（JSON 数组）；UserSubscription 增列 rpm_override/concurrency_override
+- 周卡单位 SubscriptionDurationWeek（7*24h）+ calcPlanEndTime 分支 + 单测
+- middleware.SubscriptionRateLimit：订阅并发/RPM→429（覆盖优先，未订阅/DB 不可用 fail-open；429 文案带微信 Tf00798 定制引导），挂载 relay 链 TokenRateLimit 之后
+- 管理端档位覆盖端点 PATCH /subscription/admin/user_subscriptions/:id/tier + 审计留痕
+- 套餐创建/更新接收并校验新档位字段（非负）
+- 单测：model 周卡/矩阵/覆盖 + middleware 并发/限流/resolve fail-open 全绿
+- 待办：模型矩阵接入 relay 校验（C4 执行层）、前端套餐表单/覆盖 UI + 微信文案（C7）、deepseek-v4-flash 入卡种子、三库 conformance

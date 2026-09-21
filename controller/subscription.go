@@ -190,6 +190,14 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "总额度不能为负数")
 		return
 	}
+	if req.Plan.ConcurrencyLimit < 0 {
+		common.ApiErrorMsg(c, "并发上限不能为负数")
+		return
+	}
+	if req.Plan.RpmLimit < 0 {
+		common.ApiErrorMsg(c, "RPM 上限不能为负数")
+		return
+	}
 	req.Plan.UpgradeGroup = strings.TrimSpace(req.Plan.UpgradeGroup)
 	if req.Plan.UpgradeGroup != "" {
 		if _, ok := ratio_setting.GetGroupRatioCopy()[req.Plan.UpgradeGroup]; !ok {
@@ -264,6 +272,14 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "总额度不能为负数")
 		return
 	}
+	if req.Plan.ConcurrencyLimit < 0 {
+		common.ApiErrorMsg(c, "并发上限不能为负数")
+		return
+	}
+	if req.Plan.RpmLimit < 0 {
+		common.ApiErrorMsg(c, "RPM 上限不能为负数")
+		return
+	}
 	req.Plan.UpgradeGroup = strings.TrimSpace(req.Plan.UpgradeGroup)
 	if req.Plan.UpgradeGroup != "" {
 		if _, ok := ratio_setting.GetGroupRatioCopy()[req.Plan.UpgradeGroup]; !ok {
@@ -305,6 +321,9 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 			"downgrade_group":            req.Plan.DowngradeGroup,
 			"quota_reset_period":         req.Plan.QuotaResetPeriod,
 			"quota_reset_custom_seconds": req.Plan.QuotaResetCustomSeconds,
+			"concurrency_limit":          req.Plan.ConcurrencyLimit,
+			"rpm_limit":                  req.Plan.RpmLimit,
+			"models":                     req.Plan.Models,
 			"updated_at":                 common.GetTimestamp(),
 		}
 		if req.Plan.AllowBalancePay != nil {
@@ -548,5 +567,43 @@ func AdminDeleteUserSubscription(c *gin.Context) {
 		common.ApiSuccess(c, gin.H{"message": msg})
 		return
 	}
+	common.ApiSuccess(c, nil)
+}
+
+type AdminSetUserSubscriptionTierRequest struct {
+	RpmOverride         int `json:"rpm_override"`
+	ConcurrencyOverride int `json:"concurrency_override"`
+}
+
+// AdminSetUserSubscriptionTier 管理员设置单个订阅的档位覆盖（rpm/并发）。
+// 0 = 未覆盖，回退到套餐自带档位；仅影响限流，不改变计费/额度。审计留痕。
+func AdminSetUserSubscriptionTier(c *gin.Context) {
+	subId, _ := strconv.Atoi(c.Param("id"))
+	if subId <= 0 {
+		common.ApiErrorMsg(c, "无效的订阅ID")
+		return
+	}
+	var req AdminSetUserSubscriptionTierRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		common.ApiErrorMsg(c, "参数错误")
+		return
+	}
+	if req.RpmOverride < 0 || req.ConcurrencyOverride < 0 {
+		common.ApiErrorMsg(c, "档位不能为负数")
+		return
+	}
+	if err := model.DB.Model(&model.UserSubscription{}).Where("id = ?", subId).Updates(map[string]any{
+		"rpm_override":         req.RpmOverride,
+		"concurrency_override": req.ConcurrencyOverride,
+		"updated_at":           common.GetTimestamp(),
+	}).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	recordManageAudit(c, "subscription.tier_override", map[string]any{
+		"subscription_id":      subId,
+		"rpm_override":         req.RpmOverride,
+		"concurrency_override": req.ConcurrencyOverride,
+	})
 	common.ApiSuccess(c, nil)
 }
