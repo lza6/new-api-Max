@@ -63,6 +63,7 @@
 <tr><td>v1.2.68</td><td><code>c491ee763</code></td><td>套餐表单：周卡 week、并发/RPM、模型矩阵（逗号转 JSON）</td></tr>
 <tr><td>v1.2.69</td><td><code>f42b0cad0</code></td><td>微信 Tf00798 定制提示；deepseek-v4-flash 默认入卡；override API 客户端</td></tr>
 <tr><td>v1.2.70</td><td><code>9321ef214</code></td><td>user-subscriptions 弹窗 Tier Override 列（并发/RPM 覆盖+保存，接 PATCH /tier）</td></tr>
+<tr><td>v1.2.71</td><td><code>8c08ba4fc</code></td><td>热路径订阅负缓存（审查 P1）：非订阅用户免每请求 DB 订阅读，TTL 15s，订阅用户不缓存保实时</td></tr>
 </table>
 <p>独立审查线程（只读）：<code>计划书/审查-2026-09-22-v1.2.62-70.md</code> —— 无阻塞缺陷；1 项 P1 性能建议（热路径订阅查询合并/负缓存，下一版本可选修复）。</p>
 <p style="color:#92400e">三库 conformance：MySQL/PG 因无 DSN/实例 SKIP（证据：<code>TEST_MYSQL_DSN is not configured; skipping MySQL conformance</code>），SQLite PASS。</p>
@@ -91,4 +92,5 @@
 <p style="margin-top:24px;color:#6b7280;font-size:13px">证据路径：<code>计划书/workflow_status.md</code> ｜ 规范：<code>.specify/specs/002-subscription-site-stats/</code> ｜ 测试：model/service/middleware/controller 相关包全绿；前端 typecheck/build/vitest 绿。</p>
 </body>
 </html>
+
 
