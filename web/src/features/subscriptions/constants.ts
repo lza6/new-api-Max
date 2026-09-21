@@ -25,6 +25,7 @@ import type { TFunction } from 'i18next'
 export const DURATION_UNITS = [
   { value: 'year', labelKey: 'years' },
   { value: 'month', labelKey: 'months' },
+  { value: 'week', labelKey: 'weeks' },
   { value: 'day', labelKey: 'days' },
   { value: 'hour', labelKey: 'hours' },
   { value: 'custom', labelKey: 'Custom (seconds)' },

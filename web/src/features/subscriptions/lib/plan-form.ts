@@ -28,7 +28,7 @@ export function getPlanFormSchema(t: TFunction) {
     title: z.string().min(1, t('Please enter plan title')),
     subtitle: z.string().optional(),
     price_amount: z.coerce.number().min(0, t('Please enter amount')),
-    duration_unit: z.enum(['year', 'month', 'day', 'hour', 'custom']),
+    duration_unit: z.enum(['year', 'month', 'week', 'day', 'hour', 'custom']),
     duration_value: z.coerce.number().min(1),
     custom_seconds: z.coerce.number().min(0).optional(),
     quota_reset_period: z.enum([
@@ -50,6 +50,9 @@ export function getPlanFormSchema(t: TFunction) {
     stripe_price_id: z.string().optional(),
     creem_product_id: z.string().optional(),
     waffo_pancake_product_id: z.string().optional(),
+    concurrency_limit: z.coerce.number().min(0),
+    rpm_limit: z.coerce.number().min(0),
+    models: z.string().optional(),
   })
 }
 
@@ -75,6 +78,9 @@ export const PLAN_FORM_DEFAULTS: PlanFormValues = {
   stripe_price_id: '',
   creem_product_id: '',
   waffo_pancake_product_id: '',
+  concurrency_limit: 0,
+  rpm_limit: 0,
+  models: '',
 }
 
 export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {
@@ -98,7 +104,22 @@ export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {
     stripe_price_id: plan.stripe_price_id || '',
     creem_product_id: plan.creem_product_id || '',
     waffo_pancake_product_id: plan.waffo_pancake_product_id || '',
+    concurrency_limit: Number(plan.concurrency_limit || 0),
+    rpm_limit: Number(plan.rpm_limit || 0),
+    models: plan.models
+      ? JSON.parse(plan.models)
+          .filter((m: unknown) => typeof m === 'string' && m.trim() !== '')
+          .join(', ')
+      : '',
   }
+}
+
+function modelsToJson(modelsText?: string): string {
+  const items = (modelsText || '')
+    .split(/[,，\n]/)
+    .map((m) => m.trim())
+    .filter((m) => m !== '')
+  return items.length ? JSON.stringify(items) : ''
 }
 
 export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
@@ -119,6 +140,9 @@ export function formValuesToPlanPayload(values: PlanFormValues): PlanPayload {
       total_amount: parseQuotaFromDollars(Number(values.total_amount || 0)),
       upgrade_group: values.upgrade_group || '',
       downgrade_group: values.downgrade_group || '',
+      concurrency_limit: Number(values.concurrency_limit || 0),
+      rpm_limit: Number(values.rpm_limit || 0),
+      models: modelsToJson(values.models),
     },
   }
 }

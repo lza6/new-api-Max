@@ -511,6 +511,79 @@ export function SubscriptionsMutateDrawer({
                 )}
               />
 
+              <div className='grid grid-cols-2 gap-3'>
+                <FormField
+                  control={form.control}
+                  name='concurrency_limit'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('Concurrency limit')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='number'
+                          min={0}
+                          placeholder='3'
+                          onChange={(e) =>
+                            field.onChange(
+                              Number.parseInt(e.target.value, 10) || 0
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name='rpm_limit'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('RPM Limit')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='number'
+                          min={0}
+                          placeholder='150'
+                          onChange={(e) =>
+                            field.onChange(
+                              Number.parseInt(e.target.value, 10) || 0
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name='models'
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      {t('Allowed Models (comma separated)')}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        {...field}
+                        placeholder='deepseek-v4-flash, gpt-4o-mini'
+                      />
+                    </FormControl>
+                    <p className='text-muted-foreground text-xs'>
+                      {t(
+                        'Empty means unlimited; subscribed users can only call these models.'
+                      )}
+                    </p>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <div className='flex flex-col gap-3'>
                 <FormField
                   control={form.control}
@@ -839,3 +912,4 @@ export function SubscriptionsMutateDrawer({
     </Sheet>
   )
 }
+

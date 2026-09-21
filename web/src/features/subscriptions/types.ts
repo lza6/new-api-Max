@@ -28,7 +28,7 @@ export const subscriptionPlanSchema = z.object({
   subtitle: z.string().optional(),
   price_amount: z.number(),
   currency: z.string().default('USD'),
-  duration_unit: z.enum(['year', 'month', 'day', 'hour', 'custom']),
+  duration_unit: z.enum(['year', 'month', 'week', 'day', 'hour', 'custom']),
   duration_value: z.number(),
   custom_seconds: z.number().optional(),
   quota_reset_period: z.enum(['never', 'daily', 'weekly', 'monthly', 'custom']),
@@ -44,6 +44,9 @@ export const subscriptionPlanSchema = z.object({
   stripe_price_id: z.string().optional(),
   creem_product_id: z.string().optional(),
   waffo_pancake_product_id: z.string().optional(),
+  concurrency_limit: z.number().optional().default(0),
+  rpm_limit: z.number().optional().default(0),
+  models: z.string().optional().default(''),
 })
 
 export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>
@@ -67,6 +70,8 @@ export const userSubscriptionSchema = z.object({
   amount_total: z.number(),
   amount_used: z.number(),
   next_reset_time: z.number().optional(),
+  rpm_override: z.number().optional().default(0),
+  concurrency_override: z.number().optional().default(0),
 })
 
 export type UserSubscription = z.infer<typeof userSubscriptionSchema>

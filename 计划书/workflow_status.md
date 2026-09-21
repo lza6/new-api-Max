@@ -101,3 +101,8 @@
 
 ## 十三、终局交付物（2026-09-22）
 - 变更报告+测验：计划书/变更报告-v1.2.62-67.html（上下文/直觉/逐版本变更/验证证据/待闭环/测验+答案）
+
+## 十四、002 Phase C7 订阅前端（v1.2.68，2026-09-22）
+- 套餐表单：周卡单位 week、并发上限 Concurrency limit、RPM Limit、Allowed Models（逗号分隔→JSON 数组）字段
+- plan-form 转换（JSON⇄逗号文本）；i18n 7 语言同步；typecheck 绿（订阅 feature 无 vitest 文件）
+- 待办：每用户覆盖 UI（user-subscriptions 弹窗 + PATCH tier）、订阅页微信 Tf00798 文案、deepseek-v4-flash 默认入卡
