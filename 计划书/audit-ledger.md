@@ -200,3 +200,10 @@
 - 结果：TestDBConformance 全组 sqlite+postgres PASS；mysql SKIP（未安装）
 - 覆盖：新 Log 字节列、订阅档位/矩阵/覆盖列在 PG 上 AutoMigrate 幂等通过
 - 复用：下次验证 PG 用 `scripts/db-conformance.ps1`（需 TEST_POSTGRES_DSN）；MySQL 需安装实例后再跑
+
+## 2026-09-22 三库 conformance 全闭环（SQLite + PostgreSQL 16 + MySQL 8）
+- MySQL 8：服务器 Docker 临时实例（127.0.0.1:3306, MYSQL_DATABASE=newapi_conformance_test），本机经 SSH 隧道（plink -L 3307:127.0.0.1:3306）跑 TestDBConformance → 全组 PASS（含 AutoMigrate 幂等/日志索引/锁/保留列/JSON 往返）；测后容器已清理
+- PostgreSQL 16：本机临时 trust 集群跑全组 PASS（见上）
+- SQLite：始终 PASS
+- 结论：新列（logs.request_bytes/response_bytes；subscription_plans.concurrency_limit/rpm_limit/models；user_subscriptions.rpm_override/concurrency_override）在三库全部满足 schema/迁移/幂等契约
+- 复用：三库无需 Docker 也可复现（SQLite 本地 / PG 本机实例 / MySQL 服务器 docker + SSH 隧道）

@@ -158,3 +158,7 @@
 - 切换：sed 换 tag + docker compose up -d new-api → healthy
 - 线上验收：/api/status HTTP 200；容器 Up healthy；真实计费日志 ¥ 正常；7 新列（request_bytes/response_bytes/concurrency_limit/rpm_limit/models/rpm_override/concurrency_override）在生产 PG AutoMigrate 完成
 - 回滚：cp 备份 compose → sed 换回 local-v1.2.38 → docker compose up -d new-api
+
+## 二十四、三库 conformance 全闭环（2026-09-22）
+- MySQL 8 真实实例（服务器 docker + SSH 隧道）→ TestDBConformance 全组 PASS
+- 至此 SQLite + PostgreSQL16 + MySQL8 三库 conformance 全部 PASS（唯一硬质量门关闭）
