@@ -116,3 +116,9 @@
 - 前端（ReadableStream）核验：lastSeq 增量续传 + MAX_RETRY 3 + error 兜底终态；非 EventSource 路径因需携带 Authorization header（设计约束）。
 - 测试矩阵：后端 TestStreamTaskEvents 6/6（含 500 条无缺无重、权限 404、取消停止）；前端 vitest SSE 4 文件 19/19 PASS；三库 conformance 24/24（上轮）。
 - 结论：P1-3 批次四项方案（seq 续传/前端重连/状态机事件闭环/权限）全部落地并验收。
+## P1-4 多因子凸组合路由验收（2026-09-21, v1.2.53）
+- ① 因子归一化（验收）：ScoreChannelFactors —— health/latency/quality 0-1 线性映射；未知输入取中性 0.5（不惩罚新渠道）；env ROUTE_W_* 覆盖 + 归一化凸组合（和=1）。
+- ② 决策可解释（验收）：ExplainFactorDecision —— 「combo "c1" factor -> channel #7 score=X health=Y latency=Z quality=W」一行可读理由；路由日志写入 SysLog（other.routing）。
+- ③ fail-open（验收）：因子评估异常/无法评分 → 回落固定权重路由（fail-open），快照热路径由 latencyFactor 纯内存读取承担，无 5xx 风险。
+- 测试矩阵：factor 评分器 6/6 + combo 全量 ok；三库 conformance 24/24。
+- 落点：service/channel_factor_route.go（新增评分器）+ channel_combo_route.go（factor 策略接入）+ channel_factor_route_test.go。
