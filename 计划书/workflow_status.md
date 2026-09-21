@@ -267,3 +267,21 @@
 - 费用类型：消费日志 other.billing_source="subscription"（=按订阅计费，非钱包）；用户 quota 仍 0 未扣
 - 日志按用户筛选：后端 /api/log/search username 可用；前端 admin filter bar 已有 username 输入框（common-logs-filter-bar.tsx）
 - 复现脚本：.codex/e2e-scratch/e2e-sub-live.mjs（APIKEY 直测 / CODE 兑换两种模式）
+
+## 四十三、模型效果测试整合进模型卡片（v1.2.84，2026-09-22）
+- features/pricing/lib/model-test-meta.ts：MODEL_TEST_META（deepseek-v4-flash，testedAt=2026-09-18 02:28:15，asset=/model-test.html）
+- /model-test 支持 ?model= 参数（validateSearch）；未发布测试的模型显示提示，不再只写死一个模型
+- ModelCard 卡片内新增「效果测试 · <测试日期时间>」按钮 → /model-test?model=<model_name>
+- 验证：typecheck 绿、oxlint 绿、JSON 有效；生产 /model-test?model=deepseek-v4-flash 200、/model-test.html 200
+
+## 四十四、生产热更新 v1.2.84（2026-09-22，真实执行+线上验收）
+- backup compose .bak.20260922-065638 → build local-v1.2.84 → up -d；healthy；VERSION=v1.2.84
+- /api/status 200；/model-test 200；/model-test.html 200
+- 线上当前 = v1.2.84（订阅全链 + 兑换码→订阅 + 续费顺延 + 模型流量排行 + 基础限速 3/s+120rpm + 模型效果测试入卡）
+- 回滚：compose 备份 .bak.<TS> → sed 换回旧 tag → up -d
+
+## 四十五、模型多分组核验（v1.2.84 线上，2026-09-22）
+- 根因结论：旧版 v1.2.38 生产缺多分组 UI；现 v1.2.84 已具备
+- 前端：models/model-groups-dialog.tsx「Assign model groups」多选 Checkbox → updateModelGroups 同步渠道分组并集 + abilities；model-form enable_groups 数组
+- 后端：POST /api/model/groups（controller/model_groups.go）+ Model.Groups
+- 线上数据：deepseek-v4-flash 当前 groups='default'（models 表 68 行），管理员可在后台「模型分组归类」对话框将其加入多个分组
