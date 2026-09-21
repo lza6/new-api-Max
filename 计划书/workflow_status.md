@@ -162,3 +162,8 @@
 ## 二十四、三库 conformance 全闭环（2026-09-22）
 - MySQL 8 真实实例（服务器 docker + SSH 隧道）→ TestDBConformance 全组 PASS
 - 至此 SQLite + PostgreSQL16 + MySQL8 三库 conformance 全部 PASS（唯一硬质量门关闭）
+
+## 二十五、订阅 CNY 1:1 定价（v1.2.74，2026-09-22）
+- controller/subscription.go：计划币种默认/强制 USD→CNY（4 处）
+- calcSubscriptionBalanceQuota 已是 价格×QuotaPerUnit → 人民币 1:1（2元=100万额度、25元=1250万、60元=3000万），加计费回归测试
+- 待办：前端订阅页 ¥ 符号显示（当前硬编码 $）、三张无限卡创建、部署 v1.2.74 到生产

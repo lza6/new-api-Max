@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lza6/new-api-Max/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -237,4 +238,29 @@ func TestEffectiveTierOverrideWins(t *testing.T) {
 	c, r = (*UserSubscription)(nil).EffectiveTier(3, 150)
 	require.Equal(t, 3, c)
 	require.Equal(t, 150, r)
+}
+
+func TestCalcSubscriptionBalanceQuotaOneToOneCNY(t *testing.T) {
+	prev := common.QuotaPerUnit
+	common.QuotaPerUnit = 500_000
+	t.Cleanup(func() { common.QuotaPerUnit = prev })
+
+	// 人民币 1:1：2 元 → 2×500000；25 元 → 25×500000；60 元 → 60×500000。
+	cases := []struct {
+		price float64
+		want  int
+	}{
+		{2, 1_000_000},
+		{25, 12_500_000},
+		{60, 30_000_000},
+		{2.5, 1_250_000}, // ceil 后仍精确
+	}
+	for _, tc := range cases {
+		got, err := calcSubscriptionBalanceQuota(tc.price)
+		require.NoError(t, err)
+		require.Equal(t, tc.want, got)
+	}
+	got, err := calcSubscriptionBalanceQuota(0)
+	require.NoError(t, err)
+	require.Zero(t, got)
 }
