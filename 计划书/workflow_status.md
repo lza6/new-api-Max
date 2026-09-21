@@ -167,3 +167,9 @@
 - controller/subscription.go：计划币种默认/强制 USD→CNY（4 处）
 - calcSubscriptionBalanceQuota 已是 价格×QuotaPerUnit → 人民币 1:1（2元=100万额度、25元=1250万、60元=3000万），加计费回归测试
 - 待办：前端订阅页 ¥ 符号显示（当前硬编码 $）、三张无限卡创建、部署 v1.2.74 到生产
+
+## 二十六、生产热更新 v1.2.74（2026-09-22，真实执行+线上验收）
+- checkout v1.2.74(4e3a12cce) + VERSION 写入 + docker build local-v1.2.74 BUILD_OK
+- compose tag 换 local-v1.2.74 + up -d；容器 healthy；/api/status HTTP 200；外部真实流量正常
+- 至此线上 = v1.2.74（含 CNY 1:1 定价、订阅全链、基础限速、管理端点、统计）
+- 回滚：compose 备份 .bak.<TS> → sed 换回旧 tag → up -d
