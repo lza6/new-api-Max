@@ -397,6 +397,9 @@ export type SecuritySettings = {
   'relay.global_concurrency_limit': number
   'relay.global_concurrency_queue': number
   'relay.global_concurrency_wait_timeout': number
+  'relay.user_base_rate_limit_enabled': boolean
+  'relay.user_base_concurrency_limit': number
+  'relay.user_base_rpm_limit': number
 }
 
 export type UpstreamChannel = {

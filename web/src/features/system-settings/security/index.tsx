@@ -47,6 +47,9 @@ const defaultSecuritySettings: SecuritySettings = {
   'relay.global_concurrency_limit': 0,
   'relay.global_concurrency_queue': 1000,
   'relay.global_concurrency_wait_timeout': 30,
+  'relay.user_base_rate_limit_enabled': true,
+  'relay.user_base_concurrency_limit': 3,
+  'relay.user_base_rpm_limit': 120,
 }
 
 export function SecuritySettings() {

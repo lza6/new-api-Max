@@ -21,6 +21,7 @@ import { SensitiveWordsSection } from '../request-limits/sensitive-words-section
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
 import { GlobalConcurrencySection } from '../request-limits/global-concurrency-section'
+import { UserRateLimitSection } from '../request-limits/user-rate-limit-section'
 import { LoginSessionLimitSection } from './login-session-limit-section'
 import type { SecuritySettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
@@ -53,6 +54,21 @@ const SECURITY_SECTIONS = [
           limit: settings['relay.global_concurrency_limit'],
           queue: settings['relay.global_concurrency_queue'],
           waitTimeout: settings['relay.global_concurrency_wait_timeout'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'user-rate-limit',
+    titleKey: 'User Base Rate Limit',
+    build: (settings: SecuritySettings) => (
+      <UserRateLimitSection
+        defaultValues={{
+          enabled:
+            settings['relay.user_base_rate_limit_enabled'] ?? true,
+          concurrency:
+            Number(settings['relay.user_base_concurrency_limit']) || 3,
+          rpm: Number(settings['relay.user_base_rpm_limit']) || 120,
         }}
       />
     ),

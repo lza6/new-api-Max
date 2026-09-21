@@ -200,3 +200,9 @@
 - checkout v1.2.76(707d5a183) + build local-v1.2.76 + tag 切换 + up -d
 - 容器 healthy；/api/status 200；分组订阅门禁已上线
 - 回滚：compose 备份 + 换回旧 tag + up -d
+
+## 三十二、前端 relay 每用户基础限速设置表单（v1.2.77，2026-09-22）
+- request-limits/user-rate-limit-section.tsx：启用开关 + 并发(秒) + RPM 表单（写 relay.user_base_rate_limit_* option，热更新）
+- registry 挂载（Security→Rate Limiting 组）+ defaultSettings + SecuritySettings 类型补 3 键 + i18n 7 语言
+- typecheck 绿
+- 待办：分组/用户覆盖 UI（后端端点已就绪 v1.2.73）；部署 v1.2.77
