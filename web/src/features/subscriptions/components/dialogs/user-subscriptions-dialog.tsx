@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Ban, Plus, RotateCcw, Trash2 } from 'lucide-react'
+import { Ban, Plus, RotateCcw, Save, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -35,6 +35,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { TableId } from '@/components/table-id'
 import { Button } from '@/components/ui/button'
 import { Combobox } from '@/components/ui/combobox'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenuItem,
   DropdownMenuSeparator,
@@ -58,6 +59,7 @@ import {
   invalidateUserSubscription,
   deleteUserSubscription,
   resetUserSubscriptionsByPlan,
+  setUserSubscriptionTier,
 } from '../../api'
 import { formatTimestamp } from '../../lib'
 import type { PlanRecord, UserSubscriptionRecord } from '../../types'
@@ -104,6 +106,51 @@ function SubscriptionStatusBadge(props: {
   )
 }
 
+function TierOverrideCell(props: {
+  sub: UserSubscriptionRecord['subscription']
+  saving: boolean
+  onSave: (subId: number, rpm: number, concurrency: number) => void
+}) {
+  const { t } = useTranslation()
+  const [rpm, setRpm] = useState(String(props.sub.rpm_override || 0))
+  const [concurrency, setConcurrency] = useState(
+    String(props.sub.concurrency_override || 0)
+  )
+  const parse = (v: string) => Math.max(0, Number.parseInt(v, 10) || 0)
+  return (
+    <div className='flex items-center gap-1.5'>
+      <Input
+        type='number'
+        min={0}
+        value={concurrency}
+        onChange={(e) => setConcurrency(e.target.value)}
+        aria-label={t('Concurrency override')}
+        className='h-8 w-[70px]'
+        title={t('Concurrency override')}
+      />
+      <Input
+        type='number'
+        min={0}
+        value={rpm}
+        onChange={(e) => setRpm(e.target.value)}
+        aria-label={t('RPM override')}
+        className='h-8 w-[70px]'
+        title={t('RPM override')}
+      />
+      <Button
+        type='button'
+        size='icon-xs'
+        variant='outline'
+        disabled={props.saving}
+        onClick={() => props.onSave(props.sub.id, parse(rpm), parse(concurrency))}
+        aria-label={t('Save tier override')}
+      >
+        <Save size={14} />
+      </Button>
+    </div>
+  )
+}
+
 export function UserSubscriptionsDialog(props: Props) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
@@ -117,6 +164,7 @@ export function UserSubscriptionsDialog(props: Props) {
     planId: number
     planTitle: string
   } | null>(null)
+  const [tierSavingId, setTierSavingId] = useState<number | null>(null)
   const [confirmAction, setConfirmAction] = useState<{
     type: 'invalidate' | 'delete'
     subId: number
@@ -184,6 +232,31 @@ export function UserSubscriptionsDialog(props: Props) {
       handleServerError(error, t('Request failed'))
     } finally {
       setCreating(false)
+    }
+  }
+
+  const handleTierOverride = async (
+    subId: number,
+    rpm: number,
+    concurrency: number
+  ) => {
+    setTierSavingId(subId)
+    try {
+      const res = await setUserSubscriptionTier(subId, {
+        rpm_override: rpm,
+        concurrency_override: concurrency,
+      })
+      if (res.success) {
+        toast.success(t('Tier override saved'))
+        await loadData()
+        props.onSuccess?.()
+      } else {
+        handleServerError(res)
+      }
+    } catch (error) {
+      handleServerError(error, t('Operation failed'))
+    } finally {
+      setTierSavingId(null)
     }
   }
 
@@ -342,6 +415,17 @@ export function UserSubscriptionsDialog(props: Props) {
                       ? `${formatQuota(used)}/${formatQuota(total)}`
                       : t('Unlimited')
                   },
+                },
+                {
+                  id: 'tier',
+                  header: t('Tier Override'),
+                  cell: (record) => (
+                    <TierOverrideCell
+                      sub={record.subscription}
+                      saving={tierSavingId === record.subscription.id}
+                      onSave={handleTierOverride}
+                    />
+                  ),
                 },
                 {
                   id: 'actions',

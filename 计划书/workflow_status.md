@@ -111,3 +111,8 @@
 - 订阅管理页微信 Tf00798 高并发定制提示（i18n 7 语言）
 - 新套餐默认 Models 预填 deepseek-v4-flash（本站主力模型默认入卡）
 - api.setUserSubscriptionTier（PATCH /tier）客户端就绪（UI 控件待接）
+
+## 十六、002 Phase C7 完成（v1.2.70，2026-09-22）
+- user-subscriptions 弹窗新增 Tier Override 列：并发/RPM 覆盖输入 + 保存（接 PATCH /tier，成功 toast + 刷新 + onSuccess）
+- i18n 7 语言同步；typecheck 绿
+- 至此订阅前端 C7 代码全部落地（后端 v1.2.66+67 已就绪）
