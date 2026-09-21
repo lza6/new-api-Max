@@ -42,6 +42,8 @@ import { taskPriceLabel } from '../lib/task-price-display'
 import type { PricingModel, PriceType, TokenUnit } from '../types'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPerfBadge, type ModelPerfBadgeData } from './model-perf-badge'
+import { formatNumber } from '@/lib/format'
+import type { ModelStat } from '../types'
 
 export interface ModelCardProps {
   model: PricingModel
@@ -52,6 +54,7 @@ export interface ModelCardProps {
   showRechargePrice?: boolean
   selectedGroup?: string
   perf?: ModelPerfBadgeData
+  stats?: ModelStat
 }
 
 export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
@@ -344,6 +347,34 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             )}
           </dl>
         )}
+        {props.stats ? (
+          <dl className='text-muted-foreground mt-3 grid grid-cols-2 gap-x-3 gap-y-1 border-t pt-3 text-xs sm:grid-cols-4'>
+            <div>
+              <dt>{t('Today calls')}</dt>
+              <dd className='text-foreground/85 font-mono font-semibold tabular-nums'>
+                {formatNumber(props.stats.today_total)}
+              </dd>
+            </div>
+            <div>
+              <dt>{t('Today success')}</dt>
+              <dd className='text-emerald-600 dark:text-emerald-400 font-mono font-semibold tabular-nums'>
+                {formatNumber(props.stats.today_success)}
+              </dd>
+            </div>
+            <div>
+              <dt>{t('30d calls')}</dt>
+              <dd className='text-foreground/85 font-mono font-semibold tabular-nums'>
+                {formatNumber(props.stats.days30_total)}
+              </dd>
+            </div>
+            <div>
+              <dt>{t('30d success')}</dt>
+              <dd className='text-emerald-600 dark:text-emerald-400 font-mono font-semibold tabular-nums'>
+                {formatNumber(props.stats.days30_success)}
+              </dd>
+            </div>
+          </dl>
+        ) : null}
       </CardContent>
       <CardFooter className='mt-auto border-0 bg-transparent pt-0'>
         <ModelPerfBadge

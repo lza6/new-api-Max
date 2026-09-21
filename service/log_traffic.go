@@ -111,3 +111,41 @@ func AggregateBandwidthByDay(records []TrafficBytesRecord, loc *time.Location, l
 	}
 	return out
 }
+
+// ModelStat 模型广场卡片统计（站点级聚合）：今日/近 30 天 调用总数与成功数。
+// 成功 = consume 计费日志数；总数 = consume + error（错误日志带 model_name）。
+type ModelStat struct {
+	Model         string `json:"model"`
+	TodayTotal    int64  `json:"today_total"`
+	TodaySuccess  int64  `json:"today_success"`
+	Days30Total   int64  `json:"days30_total"`
+	Days30Success int64  `json:"days30_success"`
+}
+
+// MergeModelStats 将四组（今日成功/今日失败/30天成功/30天失败）按模型名合并为
+// 站点级统计，并按近 30 天总数降序。任一窗口可为空 map。
+func MergeModelStats(consumeToday, errorToday, consume30, error30 map[string]int64) []ModelStat {
+	keys := make(map[string]struct{})
+	for _, m := range []map[string]int64{consumeToday, errorToday, consume30, error30} {
+		for k := range m {
+			keys[k] = struct{}{}
+		}
+	}
+	out := make([]ModelStat, 0, len(keys))
+	for model := range keys {
+		out = append(out, ModelStat{
+			Model:         model,
+			TodayTotal:    consumeToday[model] + errorToday[model],
+			TodaySuccess:  consumeToday[model],
+			Days30Total:   consume30[model] + error30[model],
+			Days30Success: consume30[model],
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Days30Total != out[j].Days30Total {
+			return out[i].Days30Total > out[j].Days30Total
+		}
+		return out[i].Model < out[j].Model
+	})
+	return out
+}

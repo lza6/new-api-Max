@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
-import type { PricingData } from './types'
+import type { ModelStatsResponse, PricingData } from './types'
 
 // ----------------------------------------------------------------------------
 // Pricing APIs
@@ -27,5 +27,14 @@ import type { PricingData } from './types'
 // Get model pricing data
 export async function getPricing(): Promise<PricingData> {
   const res = await api.get('/api/pricing')
+  return res.data
+}
+
+/**
+ * Get site-level per-model usage stats (today + last 30 days total/success).
+ * Aggregates only, no PII; used by model plaza cards.
+ */
+export async function getModelStats(): Promise<ModelStatsResponse> {
+  const res = await api.get('/api/model/stats')
   return res.data
 }

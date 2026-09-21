@@ -269,3 +269,51 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 	}
 	common.ApiSuccess(c, gin.H{"days": days, "limit": limit, "leaderboard": out})
 }
+
+// GetModelStats 模型广场卡片统计：每个模型今日/近 30 天调用总数与成功数（站点级聚合，
+// 无用户维度、无敏感字段）。成功 = consume 计费日志数；总数 = consume + error。
+// GET /api/model/stats
+func GetModelStats(c *gin.Context) {
+	now := time.Now()
+	loc := now.Location()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).Unix()
+	start30d := now.AddDate(0, 0, -30).Unix()
+	groupCount := func(logType int, from int64) (map[string]int64, error) {
+		var rows []struct {
+			ModelName string
+			C         int64
+		}
+		if err := model.LOG_DB.Model(&model.Log{}).
+			Select("model_name, COUNT(*) AS c").
+			Where("type = ? AND created_at >= ? AND model_name <> ''", logType, from).
+			Group("model_name").Scan(&rows).Error; err != nil {
+			return nil, err
+		}
+		out := make(map[string]int64, len(rows))
+		for _, r := range rows {
+			out[r.ModelName] = r.C
+		}
+		return out, nil
+	}
+	consumeToday, err := groupCount(model.LogTypeConsume, startOfToday)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		return
+	}
+	errorToday, err := groupCount(model.LogTypeError, startOfToday)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		return
+	}
+	consume30, err := groupCount(model.LogTypeConsume, start30d)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		return
+	}
+	error30, err := groupCount(model.LogTypeError, start30d)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		return
+	}
+	common.ApiSuccess(c, gin.H{"stats": service.MergeModelStats(consumeToday, errorToday, consume30, error30)})
+}

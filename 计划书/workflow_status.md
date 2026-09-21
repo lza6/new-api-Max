@@ -77,3 +77,10 @@
 - v1.2.63 = 908a249fc：智能流量单位（后端 FormatBytes + 前端 formatTraffic）、站点权威统计（/api/log/overview + 公共 /api/site/stats）、日带宽排行（/api/log/bandwidth/leaderboard）、Log 持久化字节列、首页真实统计卡、i18n 7 语言；本地/远端 SHA 一致
 - 阻塞登记：Log 新列 MySQL/PG conformance 需 Docker 实例（本机无 docker）
 - 新增节点（Phase B-2，进行中）：系统信息资源解耦采样 ✅ → 模型广场卡片统计 ⏳ → 效果测试整合 ⏳
+
+## 十、002 Phase B-2 模型广场统计（v1.2.65，2026-09-22）
+- 后端 GET /api/model/stats：每模型 今日/近30天 调用总数与成功数（consume=成功，consume+error=总数；站点级聚合、限流、无 PII）
+- service.MergeModelStats 纯函数 + 单测（合并/排序/空 map）
+- 前端 pricing：getModelStats + ModelCard 统计条（Today calls/success · 30d calls/success），失败静默降级
+- 验证：后端 build/service 绿；前端 typecheck/build/vitest（pricing 204/204）绿；i18n 7 语言同步
+- 待办：效果测试整合进模型卡片（B2-3）、效果测试数据可配置化（B2-4）、订阅 Phase C

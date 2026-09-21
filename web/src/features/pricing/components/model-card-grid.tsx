@@ -26,7 +26,8 @@ import { getPerfMetricsSummary } from '@/features/performance-metrics/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { DEFAULT_PRICING_PAGE_SIZE, DEFAULT_TOKEN_UNIT } from '../constants'
-import type { PricingModel, TokenUnit } from '../types'
+import { getModelStats } from '../api'
+import type { ModelStat, PricingModel, TokenUnit } from '../types'
 import { ModelCard } from './model-card'
 import type { ModelPerfBadgeData } from './model-perf-badge'
 
@@ -55,6 +56,13 @@ export function ModelCardGrid(props: ModelCardGridProps) {
     retry: false,
   })
 
+  const statsQuery = useQuery({
+    queryKey: ['model-stats'],
+    queryFn: async () => requireServerSuccess(await getModelStats()).data,
+    staleTime: 60 * 1000,
+    retry: false,
+  })
+
   const pagedModels = useMemo(() => {
     const start = (currentPage - 1) * pageSize
     return props.models.slice(start, start + pageSize)
@@ -67,6 +75,14 @@ export function ModelCardGrid(props: ModelCardGridProps) {
     }
     return map
   }, [perfQuery.data])
+
+  const statsMap = useMemo(() => {
+    const map = new Map<string, ModelStat>()
+    for (const stat of statsQuery.data?.stats ?? []) {
+      map.set(stat.model, stat)
+    }
+    return map
+  }, [statsQuery.data])
 
   if (props.models.length === 0) {
     return null
@@ -85,6 +101,7 @@ export function ModelCardGrid(props: ModelCardGridProps) {
             showRechargePrice={props.showRechargePrice}
             selectedGroup={props.selectedGroup}
             perf={perfMap.get(model.model_name || '')}
+            stats={statsMap.get(model.model_name || '')}
             onClick={() => props.onModelClick(model.model_name || '')}
           />
         ))}

@@ -57,3 +57,23 @@ func TestAggregateBandwidthByDay(t *testing.T) {
 	require.Nil(t, AggregateBandwidthByDay(nil, time.UTC, 0))
 	require.Empty(t, AggregateBandwidthByDay([]TrafficBytesRecord{}, time.UTC, 10))
 }
+
+func TestMergeModelStats(t *testing.T) {
+	got := MergeModelStats(
+		map[string]int64{"a": 10, "b": 1},
+		map[string]int64{"a": 2},
+		map[string]int64{"a": 100, "b": 50},
+		map[string]int64{"a": 5, "c": 3},
+	)
+	require.Len(t, got, 3)
+	require.Equal(t, "a", got[0].Model)
+	require.Equal(t, int64(12), got[0].TodayTotal)
+	require.Equal(t, int64(10), got[0].TodaySuccess)
+	require.Equal(t, int64(105), got[0].Days30Total)
+	require.Equal(t, int64(100), got[0].Days30Success)
+	require.Equal(t, "b", got[1].Model)
+	require.Equal(t, "c", got[2].Model)
+
+	empty := MergeModelStats(nil, nil, nil, nil)
+	require.Empty(t, empty)
+}

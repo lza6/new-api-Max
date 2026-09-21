@@ -130,3 +130,23 @@ export type PriceType =
   | 'audio_input'
   | 'audio_output'
 export type QuotaType = 0 | 1 // 0: token-based, 1: per-request
+
+/**
+ * Site-level per-model usage stats (aggregates, no PII) for model plaza cards:
+ * today / last-30-days total and success call counts.
+ */
+export type ModelStat = {
+  model: string
+  today_total: number
+  today_success: number
+  days30_total: number
+  days30_success: number
+}
+
+export type ModelStatsResponse = {
+  success: boolean
+  message?: string
+  data?: {
+    stats: ModelStat[]
+  }
+}
