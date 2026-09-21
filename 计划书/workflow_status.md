@@ -98,3 +98,6 @@
 - service.CheckSubscriptionModelAccess：有 active 订阅时请求模型必须在套餐 Models 内（空=不限）；无订阅/DB 不可用 fail-open
 - 接入 RelayHelper 主咽喉（GenRelayInfo 后）：越权模型 403 model_not_in_subscription + 可读文案（含微信 Tf00798 定制引导）
 - 单测：fail-open 分支 + 矩阵放行/拒绝/开放套餐（真实内存库种子）全绿
+
+## 十三、终局交付物（2026-09-22）
+- 变更报告+测验：计划书/变更报告-v1.2.62-67.html（上下文/直觉/逐版本变更/验证证据/待闭环/测验+答案）

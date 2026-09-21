@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>new-api-Max 变更报告 v1.2.62 → v1.2.67</title>
+<style>
+  body{font-family:-apple-system,"Segoe UI",Roboto,"Microsoft YaHei",sans-serif;line-height:1.6;color:#1f2937;max-width:960px;margin:0 auto;padding:24px;background:#f9fafb}
+  h1{font-size:26px;border-bottom:3px solid #2563eb;padding-bottom:8px}
+  h2{font-size:19px;margin-top:28px;color:#111827}
+  table{border-collapse:collapse;width:100%;background:#fff;margin:12px 0}
+  th,td{border:1px solid #d1d5db;padding:8px 10px;text-align:left;font-size:14px}
+  th{background:#eff6ff}
+  code{background:#f3f4f6;padding:1px 5px;border-radius:4px;font-size:13px}
+  .tag{display:inline-block;padding:1px 8px;border-radius:999px;font-size:12px;font-weight:600}
+  .ok{background:#d1fae5;color:#065f46}.warn{background:#fef3c7;color:#92400e}.todo{background:#fee2e2;color:#991b1b}
+  .quiz{background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:16px 20px;margin-top:24px}
+  .quiz h3{margin-top:0}
+  details{margin:8px 0;border:1px solid #e5e7eb;border-radius:8px;padding:8px 12px;background:#fff}
+  summary{cursor:pointer;font-weight:600}
+</style>
+</head>
+<body>
+<h1>new-api-Max 变更报告 v1.2.62 → v1.2.67</h1>
+<p>生成：2026-09-22 ｜ 主项目：AI API 网关（Go + React，已生产部署） ｜ 全部提交已推送，远端 SHA 逐版本核验一致（无强推）。</p>
+
+<h2>一、上下文与直觉</h2>
+<p>本阶段围绕三条主线推进：<b>(1) 生产稳定性收口</b>——B4-1 提交误删任务落库属真实生产回归（任务行不落库、internal_task_id=0、轮询/SSE 断链），优先修复；<b>(2) 网站权威性与可观测性</b>——流量统计此前只会显示 MB、无站点累计口径、无带宽排行，且"模型广场/系统信息"存在展示缺口，需要"一次请求能查清、首页数字是真的"；<b>(3) 订阅商业化</b>——存量订阅基建（套餐/余额购买/支付/分组升级）已很完整，缺的是"档位化"能力：并发/RPM 限流→429、模型×套餐访问矩阵、每用户档位覆盖、周卡单位。</p>
+<p>直觉判断：能复用存量组件/表结构的一律复用（如套餐 CRUD、`InMemoryRateLimiter`、gopsutil 采样、consume log 持久列），新增只做"缺口最小增量"；限流与矩阵校验一律 <b>fail-open</b>（无订阅/配置损坏/DB 不可用不拦截），避免新功能误伤存量请求。</p>
+
+<h2>二、做了什么（按版本）</h2>
+<table>
+<tr><th>版本</th><th>SHA</th><th>变更</th><th>验证证据</th></tr>
+<tr><td>v1.2.62</td><td><code>1609a1979</code></td><td>恢复 <code>executeTaskSubmissionWith</code> 任务落库；controller 测试基线（TestMain 全模型迁移、<code>:memory:</code> sqlite 单连接、<code>model.InitCol</code> 导出）；task_unconfirmed 测试基建修复（真实 gin context + wallet_only + 用户/令牌种子）</td><td><code>go test ./controller/ -run 'Task|Plugin|Event'</code> 全绿；model 全绿</td></tr>
+<tr><td>v1.2.63</td><td><code>908a249fc</code></td><td>智能流量单位（后端 <code>common.FormatBytes</code> + 前端 <code>formatTraffic</code>，B→TB 1024 进制）；Log 持久化 <code>request_bytes/response_bytes</code> 列；站点权威统计 <code>GET /api/log/overview</code> + 公共 <code>GET /api/site/stats</code>；日带宽排行 <code>GET /api/log/bandwidth/leaderboard</code>；首页真实统计卡；TrafficBadges 智能单位；i18n 7 语言</td><td>后端 build/common/service 绿；前端 typecheck/build/vitest 绿</td></tr>
+<tr><td>v1.2.64</td><td><code>e62d95017</code></td><td>系统信息 CPU/内存/状态不显示根因修复：资源采样与"性能监控开关"解耦，恒 5s 采样</td><td>common 构建+测试绿</td></tr>
+<tr><td>v1.2.65</td><td><code>fba3e9418</code></td><td>模型广场每模型卡片统计：<code>GET /api/model/stats</code>（今日/近30天 总数+成功数，成功=consume 计费日志）；前端 ModelCard 统计条</td><td>pricing vitest <b>204/204</b>；typecheck/build 绿</td></tr>
+<tr><td>v1.2.66</td><td><code>083fb87a6</code></td><td>订阅档位：<code>SubscriptionPlan</code> + <code>concurrency_limit/rpm_limit/models(JSON)</code>；<code>UserSubscription</code> + <code>rpm_override/concurrency_override</code>；周卡单位 week（7×24h）；<code>middleware.SubscriptionRateLimit</code>（并发/RPM→429，覆盖优先，未订阅/DB 不可用 fail-open，429 文案带微信 Tf00798）；管理端档位覆盖 <code>PATCH /subscription/admin/user_subscriptions/:id/tier</code>（审计留痕）；套餐表单校验</td><td>model 周卡/矩阵/覆盖 + middleware 并发/解析 fail-open 全绿</td></tr>
+<tr><td>v1.2.67</td><td><code>e673b10f8</code></td><td>订阅模型矩阵执行层：<code>service.CheckSubscriptionModelAccess</code>（有订阅时请求模型必须在套餐 Models 内，空=不限，fail-open）；接入 RelayHelper 主咽喉 → 越权模型 403 <code>model_not_in_subscription</code> + 可读文案</td><td>service 矩阵单测（真实内存库种子）全绿；<code>go build ./...</code> OK</td></tr>
+</table>
+
+<h2>三、设计要点（直觉落地）</h2>
+<ul>
+<li><b>计费/资金不变量</b>：本次未触碰任何计费数值口径；订阅覆盖仅影响限流，不改额度。</li>
+<li><b>限流叠加语义</b>：订阅档位与既有 token/分组/全局并发并存，任一超限即 429（取最严），不绕过既有防线。</li>
+<li><b>三库兼容</b>：新列均为 GORM bigint/text 标准列，聚合用 <code>COALESCE(SUM(...))</code> 与 <code>COUNT(*)</code>；SQLite 已验证。</li>
+<li><b>fail-open 原则</b>：矩阵/档位解析任何异常都放行，保证新功能上线不误伤存量流量。</li>
+</ul>
+
+<h2>四、仍待闭环（诚实）</h2>
+<table>
+<tr><th>项</th><th>状态</th><th>说明</th></tr>
+<tr><td>订阅前端 C7（套餐表单档位/模型矩阵、覆盖 UI、微信 Tf00798 文案、deepseek-v4-flash 默认入卡）</td><td><span class="tag todo">待办</span></td><td>后端已就绪，前端表单/管理页未接</td></tr>
+<tr><td>三库 conformance（MySQL/PG）</td><td><span class="tag warn">blocker</span></td><td>本机无 Docker；新列 SQLite 已验证，MySQL/PG 需实例环境跑 <code>scripts/db-conformance.ps1</code></td></tr>
+<tr><td>发行版上游地址泄漏</td><td><span class="tag warn">需你在 GitHub 侧核查</span></td><td>仓库全量扫描仅官方 SDK 默认地址，无私有上游/密钥；Release 描述需人工确认后我可整改</td></tr>
+<tr><td>独立审查线程循环 + 复验</td><td><span class="tag todo">待办</span></td><td>终局质量门</td></tr>
+</table>
+
+<div class="quiz">
+<h2>五、变更测验（请回答，答案在下方折叠）</h2>
+<ol>
+<li>v1.2.62 修复的生产回归是什么？为什么它会导致任务轮询/SSE 断链？</li>
+<li>站点权威统计的"总带宽"来自哪两个持久化列？为什么不直接扫 <code>other</code> JSON？</li>
+<li>订阅档位限流超限返回什么状态码？"覆盖"和"套餐档位"谁的优先级更高？</li>
+<li>模型矩阵校验在什么条件下 <b>放行</b>（fail-open）？请列出至少三种。</li>
+<li>系统信息页 CPU/内存不显示的根因是什么？v1.2.64 怎么修的？</li>
+<li>模型广场卡片上的"成功数"口径是什么？（成功 = ？）</li>
+</ol>
+<details><summary>答案</summary>
+<ol>
+<li>B4-1 提交误删了 <code>executeTaskSubmissionWith</code> 成功路径的 <code>task.InsertWithContext</code>，任务行从不落库（internal_task_id=0），轮询/续传查不到任务，SSE 断线续传失去锚点。</li>
+<li><code>request_bytes</code> + <code>response_bytes</code> 持久化列；扫 JSON 无法用 SQL SUM，百万级会慢查询。</li>
+<li>429；覆盖（<code>RpmOverride/ConcurrencyOverride</code>）优先，0=回退套餐档位。</li>
+<li>无 active 订阅、套餐 Models 为空（<code>""</code>/<code>[]</code>）、配置损坏（非 JSON）、DB 不可用（<code>model.DB == nil</code>）、模型名为空。</li>
+<li>资源采样被"性能监控开关"门控，开关关闭后 <code>GetSystemStatus()</code> 恒为 0；v1.2.64 把 5s 采样与开关解耦（开关只控制 middleware 超载拒绝）。</li>
+<li>成功 = consume 计费日志数；总数 = consume + error 日志数（错误日志也带 model_name）。</li>
+</ol>
+</details>
+</div>
+
+<p style="margin-top:24px;color:#6b7280;font-size:13px">证据路径：<code>计划书/workflow_status.md</code> ｜ 规范：<code>.specify/specs/002-subscription-site-stats/</code> ｜ 测试：model/service/middleware/controller 相关包全绿；前端 typecheck/build/vitest 绿。</p>
+</body>
+</html>
