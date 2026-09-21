@@ -93,3 +93,8 @@
 - 套餐创建/更新接收并校验新档位字段（非负）
 - 单测：model 周卡/矩阵/覆盖 + middleware 并发/限流/resolve fail-open 全绿
 - 待办：模型矩阵接入 relay 校验（C4 执行层）、前端套餐表单/覆盖 UI + 微信文案（C7）、deepseek-v4-flash 入卡种子、三库 conformance
+
+## 十二、002 Phase C 模型矩阵执行层（v1.2.67，2026-09-22）
+- service.CheckSubscriptionModelAccess：有 active 订阅时请求模型必须在套餐 Models 内（空=不限）；无订阅/DB 不可用 fail-open
+- 接入 RelayHelper 主咽喉（GenRelayInfo 后）：越权模型 403 model_not_in_subscription + 可读文案（含微信 Tf00798 定制引导）
+- 单测：fail-open 分支 + 矩阵放行/拒绝/开放套餐（真实内存库种子）全绿

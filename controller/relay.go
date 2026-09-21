@@ -128,6 +128,13 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	// 订阅模型矩阵：有 active 订阅时，请求模型必须在套餐 Models 内
+	// （无订阅/未配置/查询失败 fail-open，沿用既有模型访问控制）。
+	if allowed, reason, accessErr := service.CheckSubscriptionModelAccess(relayInfo.UserId, relayInfo.OriginModelName); accessErr == nil && !allowed {
+		newAPIError = types.NewErrorWithStatusCode(fmt.Errorf("%s", reason), "model_not_in_subscription", http.StatusForbidden, types.ErrOptionWithSkipRetry())
+		return
+	}
+
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken
 	// Avoid building huge CombineText (strings.Join) when token counting and sensitive check are both disabled.

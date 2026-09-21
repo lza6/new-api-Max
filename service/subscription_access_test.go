@@ -1,0 +1,88 @@
+package service
+
+import (
+	"testing"
+
+	"github.com/glebarez/sqlite"
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
+)
+
+func seedSubscriptionAccessDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	previousDB := model.DB
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, connErr := db.DB()
+	require.NoError(t, connErr)
+	sqlDB.SetMaxOpenConns(1)
+	require.NoError(t, db.AutoMigrate(&model.SubscriptionPlan{}, &model.UserSubscription{}))
+	model.DB = db
+	t.Cleanup(func() { model.DB = previousDB })
+	return db
+}
+
+func TestCheckSubscriptionModelAccess(t *testing.T) {
+	// fail-open：无订阅/非法输入/DB 不可用一律放行。
+	allowed, _, err := CheckSubscriptionModelAccess(0, "deepseek-v4-flash")
+	require.NoError(t, err)
+	require.True(t, allowed)
+
+	allowed, _, err = CheckSubscriptionModelAccess(1, "")
+	require.NoError(t, err)
+	require.True(t, allowed)
+
+	previousDB := model.DB
+	model.DB = nil
+	allowed, _, err = CheckSubscriptionModelAccess(1, "deepseek-v4-flash")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	model.DB = previousDB
+}
+
+func TestCheckSubscriptionModelAccessMatrix(t *testing.T) {
+	db := seedSubscriptionAccessDB(t)
+	now := common.GetTimestamp()
+	plan := &model.SubscriptionPlan{
+		Title:            "天卡无限",
+		Models:           `["deepseek-v4-flash","gpt-4o-mini"]`,
+		DurationUnit:     model.SubscriptionDurationDay,
+		DurationValue:    1,
+		PriceAmount:      2,
+		TotalAmount:      0,
+		ConcurrencyLimit: 3,
+		RpmLimit:         150,
+	}
+	require.NoError(t, db.Create(plan).Error)
+	sub := &model.UserSubscription{
+		UserId:    61001,
+		PlanId:    plan.Id,
+		Status:    "active",
+		StartTime: now,
+		EndTime:   now + 86400,
+	}
+	require.NoError(t, db.Create(sub).Error)
+
+	allowed, reason, err := CheckSubscriptionModelAccess(sub.UserId, "deepseek-v4-flash")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.Empty(t, reason)
+
+	allowed, reason, err = CheckSubscriptionModelAccess(sub.UserId, "claude-3-5-sonnet")
+	require.NoError(t, err)
+	require.False(t, allowed)
+	require.Contains(t, reason, "不在当前订阅套餐")
+	require.Contains(t, reason, "Tf00798")
+
+	// 套餐 Models 为空 = 不限。
+	openPlan := &model.SubscriptionPlan{Title: "开放套餐", Models: "", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, PriceAmount: 1}
+	require.NoError(t, db.Create(openPlan).Error)
+	openSub := &model.UserSubscription{UserId: 61002, PlanId: openPlan.Id, Status: "active", StartTime: now, EndTime: now + 86400}
+	require.NoError(t, db.Create(openSub).Error)
+	allowed, reason, err = CheckSubscriptionModelAccess(openSub.UserId, "any-model")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.Empty(t, reason)
+}
