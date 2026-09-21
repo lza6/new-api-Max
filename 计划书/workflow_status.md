@@ -285,3 +285,24 @@
 - 前端：models/model-groups-dialog.tsx「Assign model groups」多选 Checkbox → updateModelGroups 同步渠道分组并集 + abilities；model-form enable_groups 数组
 - 后端：POST /api/model/groups（controller/model_groups.go）+ Model.Groups
 - 线上数据：deepseek-v4-flash 当前 groups='default'（models 表 68 行），管理员可在后台「模型分组归类」对话框将其加入多个分组
+
+## 四十六、分组/用户限速覆盖设置 UI（v1.2.85，2026-09-22）
+- request-limits/rate-limit-overrides-section.tsx：Security → Rate Limiting 新增「Rate Limit Overrides」
+- GET/PUT /api/option/relay/rate_limit/overrides*（RootAuth）：列出/新增/修改/移除 分组与用户覆盖（0/0=移除，立即热更新）
+- 生效优先级：用户覆盖 > 分组覆盖 > 基础默认（3/s + 120RPM）；typecheck 绿、oxlint 绿、i18n 7 语言(主推 en/zh/zh-TW)
+
+## 四十七、生产热更新 v1.2.85 + 订阅分组配置（2026-09-22，真实执行+线上验收）
+- backup compose .bak.20260922-072623 → 配置写库 → build local-v1.2.85 → up -d；healthy；VERSION=v1.2.85；/api/status 200
+- 配置（生产 PG）：
+  - subscription_plans 1/2/3：upgrade_group='subscriber'（购买/兑换自动升级分组）
+  - options relay.subscription_required_groups=["subscriber"]（该分组需订阅门禁）
+  - GroupRatio={"default":0.1,"subscriber":0.1}；UserUsableGroups={"default":"","subscriber":"订阅用户"}
+  - channels id=20 group='default,subscriber'；models deepseek-v4-flash groups='default,subscriber'
+- 回滚：compose 备份 .bak.<TS> → sed 换回旧 tag → up -d；配置项可单独改回
+
+## 四十八、订阅自动升级分组 + 门禁 E2E（v1.2.85 线上，2026-09-22）
+- e2e_sub1（初始 default）兑换订阅码 → 自动升级 group='subscriber'（DB 实证 user 912）；订阅行 upgrade_group='subscriber' active
+- 订阅用户 subscriber 分组调用 deepseek-v4-flash → 200（channel 20 default,subscriber）
+- e2e_nosub（无订阅，兑换额度 1000 走真实缓存路径）手动选 subscriber 分组 token → 调用 → 403「分组 subscriber 需持有订阅后才能使用，请先购买订阅或联系微信 Tf00798 定制」
+- 教训记录：token 创建 API payload 为扁平结构（{name,unlimited_quota,group}），包 {token:{...}} 会导致 name/group 丢失、后端兜底强制无限额度
+- 复现脚本：.codex/e2e-scratch/e2e-group.mjs
