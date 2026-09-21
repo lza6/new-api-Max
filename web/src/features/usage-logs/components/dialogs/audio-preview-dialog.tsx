@@ -49,7 +49,7 @@ interface AudioPreviewDialogProps {
 }
 
 function formatDuration(seconds?: number): string {
-  if (!seconds || seconds <= 0) return '--:--'
+  if (!seconds || seconds <= 0) {return '--:--'}
   const m = Math.floor(seconds / 60)
   const s = Math.floor(seconds % 60)
   return `${m}:${s.toString().padStart(2, '0')}`
@@ -71,7 +71,7 @@ function AudioClipCard({ clip }: { clip: AudioClip }) {
   const imageUrl = clip.image_url || clip.image_large_url
   const audioUrl = clip.audio_url
 
-  if (!audioUrl) return null
+  if (!audioUrl) {return null}
 
   return (
     <div className='bg-card flex gap-4 rounded-lg border p-4'>

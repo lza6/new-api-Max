@@ -68,7 +68,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
         ? await getAllBillingHistory(page, pageSize, debouncedKeyword)
         : await getUserBillingHistory(page, pageSize, debouncedKeyword)
 
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current) {return}
 
       if (isApiSuccess(response) && response.data) {
         setRecords(response.data.items || [])
@@ -79,7 +79,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
         setTotal(0)
       }
     } catch (error) {
-      if (requestId !== requestIdRef.current) return
+      if (requestId !== requestIdRef.current) {return}
       handleServerError(error, i18next.t('Failed to load billing history'))
       setRecords([])
       setTotal(0)
@@ -148,7 +148,7 @@ export function useBillingHistory(options: UseBillingHistoryOptions = {}) {
 
   // Fetch data after the search draft has settled.
   useEffect(() => {
-    if (keyword !== debouncedKeyword) return
+    if (keyword !== debouncedKeyword) {return}
 
     fetchBillingHistory()
   }, [debouncedKeyword, fetchBillingHistory, keyword])

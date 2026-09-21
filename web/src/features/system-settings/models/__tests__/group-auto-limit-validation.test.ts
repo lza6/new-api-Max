@@ -32,7 +32,7 @@ describe('per-token Auto group limit validation', () => {
     for (const maxTokenAutoGroups of [0, -1, 1.5]) {
       const result = schema.safeParse(maxTokenAutoGroups)
       expect(result.success).toBe(false)
-      if (result.success) continue
+      if (result.success) {continue}
       expect(result.error.issues[0]?.message).toBe('Enter a positive integer')
     }
   })

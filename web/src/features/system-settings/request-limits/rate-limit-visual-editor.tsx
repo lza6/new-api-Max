@@ -46,7 +46,7 @@ export function RateLimitVisualEditor({
   const [editData, setEditData] = useState<RateLimitEntry | null>(null)
 
   const rateLimits = useMemo(() => {
-    if (!value || value.trim() === '') return []
+    if (!value || value.trim() === '') {return []}
 
     const parsed = safeJsonParseWithValidation<Record<string, unknown>>(value, {
       fallback: {},
@@ -75,7 +75,7 @@ export function RateLimitVisualEditor({
   }, [value])
 
   const filteredRateLimits = useMemo(() => {
-    if (!searchText) return rateLimits
+    if (!searchText) {return rateLimits}
     const lowerSearch = searchText.toLowerCase()
     return rateLimits.filter((limit) =>
       limit.groupName.toLowerCase().includes(lowerSearch)

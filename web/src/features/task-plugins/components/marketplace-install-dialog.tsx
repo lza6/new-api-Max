@@ -65,7 +65,7 @@ type MarketplaceInstallDialogProps = {
 }
 
 export function MarketplaceInstallDialog(props: MarketplaceInstallDialogProps) {
-  if (!props.target) return null
+  if (!props.target) {return null}
   return (
     <MarketplaceInstallContent
       key={`${props.target.source.index_url}-${props.target.plugin.key}-${props.target.version}`}
@@ -100,7 +100,7 @@ function MarketplaceInstallContent(
     retry: false,
     meta: { errorToast: false },
     queryFn: async () => {
-      if (!entry) throw new Error('missing marketplace entry')
+      if (!entry) {throw new Error('missing marketplace entry')}
       const url = resolvePluginSourceUrl(target.source.index_url, entry.path)
       if (!url) {
         throw new Error(
@@ -196,7 +196,7 @@ function MarketplaceInstallContent(
   )
 
   let confirmLabel = t('Install and enable')
-  if (installMutation.isPending) confirmLabel = t('Installing...')
+  if (installMutation.isPending) {confirmLabel = t('Installing...')}
 
   const sourcePreview = sourceQuery.data ? (
     <JavaScriptViewer

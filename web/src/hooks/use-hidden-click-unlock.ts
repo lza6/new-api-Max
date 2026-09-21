@@ -46,7 +46,7 @@ export function useHiddenClickUnlock(
   }, [])
 
   const handleClick = useCallback((): void => {
-    if (disabled || unlocked) return
+    if (disabled || unlocked) {return}
 
     const nextClickCount = clickCountRef.current + 1
     clickCountRef.current = nextClickCount

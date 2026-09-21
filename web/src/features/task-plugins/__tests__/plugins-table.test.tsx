@@ -30,7 +30,7 @@ vi.mock('@/lib/lobe-icon', () => ({ getLobeIcon: () => null }))
 
 const clients: QueryClient[] = []
 afterEach(() => {
-  for (const client of clients) client.clear()
+  for (const client of clients) {client.clear()}
   clients.length = 0
   localStorage.removeItem('task-plugins-view-mode')
 })

@@ -31,7 +31,7 @@ export function useResetForm<TFieldValues extends FieldValues>(
   const lastSerializedDefaults = useRef<string | null>(null)
 
   useEffect(() => {
-    if (!values) return
+    if (!values) {return}
 
     const serializedDefaults = JSON.stringify(values)
     if (serializedDefaults === lastSerializedDefaults.current) {

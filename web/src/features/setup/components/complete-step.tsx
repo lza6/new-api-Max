@@ -62,7 +62,7 @@ function readOnboardingDismissed(): boolean {
 function OnboardingSteps() {
   const { t } = useTranslation()
   const [dismissed, setDismissed] = useState(readOnboardingDismissed)
-  if (dismissed) return null
+  if (dismissed) {return null}
 
   const dismiss = () => {
     setDismissed(true)

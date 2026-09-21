@@ -37,8 +37,8 @@ export const apiKeySchema = z.object({
   auto_groups: z.array(z.string()).nullish().default(null),
   cross_group_retry: z
     .preprocess((v) => {
-      if (v === 1) return true
-      if (v === 0) return false
+      if (v === 1) {return true}
+      if (v === 0) {return false}
       return v
     }, z.boolean())
     .optional()

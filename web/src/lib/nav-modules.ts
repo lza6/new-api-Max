@@ -62,16 +62,16 @@ export function parseHeaderNavBoolean(
   raw: unknown,
   fallback: boolean
 ): boolean {
-  if (typeof raw === 'boolean') return raw
+  if (typeof raw === 'boolean') {return raw}
   if (typeof raw === 'number') {
-    if (raw === 1) return true
-    if (raw === 0) return false
+    if (raw === 1) {return true}
+    if (raw === 0) {return false}
     return fallback
   }
   if (typeof raw === 'string') {
     const normalized = raw.trim().toLowerCase()
-    if (normalized === 'true' || normalized === '1') return true
-    if (normalized === 'false' || normalized === '0') return false
+    if (normalized === 'true' || normalized === '1') {return true}
+    if (normalized === 'false' || normalized === '0') {return false}
   }
   return fallback
 }
@@ -98,8 +98,8 @@ function parseAccess(raw: unknown, fallback: ModuleAccess): ModuleAccess {
 }
 
 function parseHeaderNavRecord(raw: unknown): Record<string, unknown> | null {
-  if (!raw || String(raw).trim() === '') return null
-  if (raw && typeof raw === 'object') return raw as Record<string, unknown>
+  if (!raw || String(raw).trim() === '') {return null}
+  if (raw && typeof raw === 'object') {return raw as Record<string, unknown>}
 
   try {
     return JSON.parse(String(raw)) as Record<string, unknown>
@@ -111,7 +111,7 @@ function parseHeaderNavRecord(raw: unknown): Record<string, unknown> | null {
 export function parseHeaderNavModules(raw: unknown): HeaderNavModules {
   const result = cloneHeaderNavDefaults()
   const parsed = parseHeaderNavRecord(raw)
-  if (!parsed) return result
+  if (!parsed) {return result}
 
   Object.entries(parsed).forEach(([key, value]) => {
     if (key === 'pricing') {
@@ -206,10 +206,10 @@ export function isSidebarModuleEnabled(
   module: string
 ): boolean {
   const status = readCachedStatus()
-  if (!status) return true
+  if (!status) {return true}
 
   const raw = status.SidebarModulesAdmin
-  if (!raw || String(raw).trim() === '') return true
+  if (!raw || String(raw).trim() === '') {return true}
 
   try {
     const parsed = JSON.parse(String(raw)) as Record<
@@ -217,9 +217,9 @@ export function isSidebarModuleEnabled(
       Record<string, boolean>
     >
     const sectionConfig = parsed[section]
-    if (!sectionConfig) return true
-    if (sectionConfig.enabled === false) return false
-    if (sectionConfig[module] === false) return false
+    if (!sectionConfig) {return true}
+    if (sectionConfig.enabled === false) {return false}
+    if (sectionConfig[module] === false) {return false}
     return true
   } catch {
     return true

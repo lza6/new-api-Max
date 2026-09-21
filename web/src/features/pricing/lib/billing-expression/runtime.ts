@@ -34,7 +34,7 @@ type RuntimeValue = { value: unknown; integer?: boolean }
 /** The supported, deterministic subset of GJSON paths (not JavaScript property access). */
 export function readRequestPath(body: unknown, rawPath: string): unknown {
   const path = rawPath.trim()
-  if (!path) return null
+  if (!path) {return null}
   const parts: string[] = []
   let part = ''
   for (let i = 0; i < path.length; i++) {
@@ -59,11 +59,11 @@ export function readRequestPath(body: unknown, rawPath: string): unknown {
   for (let i = 0; i < parts.length; i++) {
     const key = parts[i]
     if (Array.isArray(value)) {
-      if (key === '#' && i === parts.length - 1) return value.length
+      if (key === '#' && i === parts.length - 1) {return value.length}
       if (key === '#') {
         throw new BillingExpressionError({ code: 'unsupported', detail: path })
       }
-      if (!/^\d+$/.test(key)) return null
+      if (!/^\d+$/.test(key)) {return null}
       const index = Number(key)
       value = Number.isSafeInteger(index) ? value[index] : undefined
     } else if (
@@ -87,7 +87,7 @@ function billingString(value: unknown, depth = 0): string {
       detail: 'request value depth',
     })
   }
-  if (value == null) return '<nil>'
+  if (value == null) {return '<nil>'}
   if (Array.isArray(value)) {
     return `[${value.map((item) => billingString(item, depth + 1)).join(' ')}]`
   }
@@ -104,7 +104,7 @@ function billingString(value: unknown, depth = 0): string {
         detail: 'request number',
       })
     }
-    if (Object.is(value, -0)) return '-0'
+    if (Object.is(value, -0)) {return '-0'}
     const [mantissa, exponent] = value.toExponential().split('e')
     if (Number(exponent) >= 6 || Number(exponent) < -4) {
       return `${mantissa}e${Number(exponent) < 0 ? '-' : '+'}${Math.abs(Number(exponent)).toString().padStart(2, '0')}`
@@ -208,7 +208,7 @@ class BillingRuntime {
       }
       const key = name.trim().toLowerCase()
       const value = rawValue.trim()
-      if (key && value) this.headers.set(key, value)
+      if (key && value) {this.headers.set(key, value)}
     }
   }
 
@@ -276,14 +276,14 @@ class BillingRuntime {
       return this.evaluate(condition ? node.yes : node.no)
     }
     if (node.kind === 'unary') {
-      if (node.operator === '!') return { value: !this.boolean(node.operand) }
+      if (node.operator === '!') {return { value: !this.boolean(node.operand) }}
       const operand = this.numeric(node.operand)
       return {
         value: node.operator === '-' ? -operand.value : operand.value,
         integer: operand.integer,
       }
     }
-    if (node.kind === 'binary') return this.binary(node)
+    if (node.kind === 'binary') {return this.binary(node)}
     return this.call(node)
   }
 
@@ -528,7 +528,7 @@ export function evaluateBillingExpression(
     typeof expression === 'string'
       ? compileBillingExpression(expression)
       : expression
-  if (compiled.status !== 'ready') return compiled
+  if (compiled.status !== 'ready') {return compiled}
   try {
     for (const [name, value] of Object.entries(context.tokens ?? {})) {
       if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {

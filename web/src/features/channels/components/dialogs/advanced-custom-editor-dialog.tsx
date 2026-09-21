@@ -330,7 +330,7 @@ export function AdvancedCustomEditorDialog({
   // Route keys are disposable UI identity and do not belong in the saved config.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const parsed =
       parseAdvancedCustomConfig(value) || createAdvancedCustomConfig()
     const normalized = normalizeAdvancedCustomConfig(parsed)
@@ -377,7 +377,7 @@ export function AdvancedCustomEditorDialog({
   }
 
   const addRoute = (incomingPath: string | null) => {
-    if (!incomingPath || usedIncomingPaths.has(incomingPath)) return
+    if (!incomingPath || usedIncomingPaths.has(incomingPath)) {return}
     setConfig((current) => {
       const next = normalizeAdvancedCustomConfig(current)
       return {
@@ -442,7 +442,7 @@ export function AdvancedCustomEditorDialog({
       group.routeRows.map((routeRow) => routeRow.index)
     )
     const nextRoutes = routes.map((route, routeIndex) => {
-      if (!groupRouteIndexes.has(routeIndex)) return route
+      if (!groupRouteIndexes.has(routeIndex)) {return route}
       if (resolvedIncomingPath === ADVANCED_CUSTOM_MODEL_LIST_PATH) {
         return {
           ...route,
@@ -474,7 +474,7 @@ export function AdvancedCustomEditorDialog({
   }
 
   const swapRoutes = (fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return
+    if (fromIndex === toIndex) {return}
     const nextRoutes = [...routes]
     const nextRouteKeys = allRouteRows.map((routeRow) => routeRow.routeKey)
     const fromRoute = nextRoutes[fromIndex]
@@ -494,7 +494,7 @@ export function AdvancedCustomEditorDialog({
       .map(({ routeIndex }) => routeIndex)
     const position = samePathIndexes.indexOf(index)
     const nextIndex = samePathIndexes.at(position + direction)
-    if (nextIndex === undefined) return
+    if (nextIndex === undefined) {return}
     swapRoutes(index, nextIndex)
   }
 
@@ -507,7 +507,7 @@ export function AdvancedCustomEditorDialog({
         break
       }
     }
-    if (lastSamePathIndex < 0 || index === lastSamePathIndex) return
+    if (lastSamePathIndex < 0 || index === lastSamePathIndex) {return}
 
     const nextRoutes = [...routes]
     const nextRouteKeys = allRouteRows.map((routeRow) => routeRow.routeKey)
@@ -575,7 +575,7 @@ export function AdvancedCustomEditorDialog({
   }
 
   const switchTab = (nextTab: AdvancedCustomEditorTab) => {
-    if (!advancedCustomTabs.has(nextTab)) return
+    if (!advancedCustomTabs.has(nextTab)) {return}
     if (activeTab !== 'json') {
       if (nextTab === 'json') {
         setJsonText(stringifyAdvancedCustomConfig(normalizedConfig))
@@ -586,7 +586,7 @@ export function AdvancedCustomEditorDialog({
     }
 
     const parsed = parseJsonEditorConfig()
-    if (!parsed) return
+    if (!parsed) {return}
     const normalized = normalizeAdvancedCustomConfig(parsed)
     setConfig(normalized)
     setRouteKeys(createRouteKeys(normalized.advanced_routes?.length || 0))
@@ -595,7 +595,7 @@ export function AdvancedCustomEditorDialog({
 
   const handleJsonChange = (nextValue: string) => {
     setJsonText(nextValue)
-    if (jsonError) setJsonError('')
+    if (jsonError) {setJsonError('')}
   }
 
   const selectTemplate = (nextTemplateKey: string) => {
@@ -608,7 +608,7 @@ export function AdvancedCustomEditorDialog({
   }
 
   const applySelectedTemplate = () => {
-    if (!selectedTemplate) return
+    if (!selectedTemplate) {return}
     const templateRoutes = (selectedTemplate.config.advanced_routes || []).map(
       (route) => ({
         ...route,
@@ -721,7 +721,7 @@ export function AdvancedCustomEditorDialog({
 options={availableIncomingPathOptions}
 value=''
 onValueChange={(incomingPath) => {
-                  if (typeof incomingPath === 'string') addRoute(incomingPath)
+                  if (typeof incomingPath === 'string') {addRoute(incomingPath)}
                 }}
 disabled={availableIncomingPathOptions.length === 0}
 className='w-full'
@@ -730,7 +730,7 @@ placeholder={t('Add route')}
               <Select
                 value={null}
                 onValueChange={(value) => {
-                  if (typeof value === 'string') selectTemplate(value)
+                  if (typeof value === 'string') {selectTemplate(value)}
                 }}
               >
                 <SelectTrigger size='sm'>
@@ -800,8 +800,8 @@ placeholder={t('Add route')}
                 onOpenChange={(expanded) =>
                   setExpandedRouteGroups((current) => {
                     const next = new Set(current)
-                    if (expanded) next.add(routeGroup.incomingPath)
-                    else next.delete(routeGroup.incomingPath)
+                    if (expanded) {next.add(routeGroup.incomingPath)}
+                    else {next.delete(routeGroup.incomingPath)}
                     return next
                   })
                 }
@@ -992,7 +992,7 @@ function ManagementRouteEditor({
     field: Exclude<keyof NonNullable<AdvancedCustomRoute['auth']>, 'type'>,
     value: string
   ) => {
-    if (!route.auth || route.auth.type === 'none') return
+    if (!route.auth || route.auth.type === 'none') {return}
     onChange({
       ...route,
       auth: {
@@ -1346,7 +1346,7 @@ function RouteEditor({
     value: string
   ) => {
     const currentAuth = route.auth
-    if (!currentAuth || currentAuth.type === 'none') return
+    if (!currentAuth || currentAuth.type === 'none') {return}
     onChange({
       auth: {
         type: currentAuth.type as AdvancedCustomAuthType,

@@ -57,9 +57,9 @@ export function LanguagePreferencesCard(props: LanguagePreferencesCardProps) {
   }, [savedLanguage])
 
   const handleLanguageChange = async (language: string | null) => {
-    if (!language) return
+    if (!language) {return}
     const nextLanguage = normalizeInterfaceLanguage(language)
-    if (nextLanguage === currentLanguage) return
+    if (nextLanguage === currentLanguage) {return}
 
     const previousLanguage = currentLanguage
     setCurrentLanguage(nextLanguage)

@@ -60,9 +60,9 @@ function formatJsonValidationError(
   error?: JsonValidationError,
   fallback = 'Invalid JSON'
 ) {
-  if (!error) return t(fallback)
+  if (!error) {return t(fallback)}
 
-  if (error.type === 'required') return t('Value is required')
+  if (error.type === 'required') {return t('Value is required')}
   if (error.type === 'structure') {
     return t(
       fallback === 'Invalid JSON' ? 'JSON structure is invalid' : fallback
@@ -199,7 +199,7 @@ export function RatioSettingsCard({
   )
   const resetMutation = useMutation({
     mutationFn: async () => {
-      if (!pricingBaseline) return
+      if (!pricingBaseline) {return}
       await savePricing.mutateAsync(
         pricingBaseline.entries.map((entry) => ({
           model_name: entry.model_name,
@@ -366,7 +366,7 @@ export function RatioSettingsCard({
         BillingExpr: normalizeJsonString(values.BillingExpr),
       }
 
-      if (!pricingBaseline) return
+      if (!pricingBaseline) {return}
       try {
         const changes = buildPricingChanges(
           pricingBaseline,
@@ -472,7 +472,7 @@ export function RatioSettingsCard({
           />
         )
       }
-      if (!pricingBaseline) return <LoadingState />
+      if (!pricingBaseline) {return <LoadingState />}
       return (
         <>
           {savePricing.isError && (
@@ -481,7 +481,7 @@ export function RatioSettingsCard({
               size='sm'
               onClick={async () => {
                 const refreshed = await pricingQuery.refetch()
-                if (refreshed.data) setPricingBaseline(refreshed.data)
+                if (refreshed.data) {setPricingBaseline(refreshed.data)}
                 savePricing.reset()
               }}
             >

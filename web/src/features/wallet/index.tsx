@@ -192,7 +192,7 @@ export function Wallet(props: WalletProps) {
 
   // Handle payment confirmation
   const handlePaymentConfirm = async () => {
-    if (!selectedPaymentMethod) return
+    if (!selectedPaymentMethod) {return}
 
     const success = await dispatchSelectedPayment(
       selectedPaymentMethod,
@@ -213,7 +213,7 @@ export function Wallet(props: WalletProps) {
 
   // Handle redemption
   const handleRedeem = async () => {
-    if (!redemptionCode) return
+    if (!redemptionCode) {return}
 
     const success = await redeemCode(redemptionCode)
     if (success) {
@@ -239,7 +239,7 @@ export function Wallet(props: WalletProps) {
 
   // Handle Creem payment confirmation
   const handleCreemConfirm = async () => {
-    if (!selectedCreemProduct) return
+    if (!selectedCreemProduct) {return}
 
     const success = await processCreemPayment(selectedCreemProduct.productId)
     if (success) {

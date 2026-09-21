@@ -264,7 +264,7 @@ export function Pricing() {
             <ModelDetailsDrawer
               open={Boolean(selectedModel)}
               onOpenChange={(open) => {
-                if (!open) setSelectedModelName(null)
+                if (!open) {setSelectedModelName(null)}
               }}
               model={selectedModel}
               groupRatio={groupRatio || {}}

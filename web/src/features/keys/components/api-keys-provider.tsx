@@ -75,8 +75,8 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
 
   const resolveRealKey = useCallback(
     async (id: number): Promise<string | null> => {
-      if (resolvedKeys[id]) return resolvedKeys[id]
-      if (id in pendingRequests.current) return pendingRequests.current[id]
+      if (resolvedKeys[id]) {return resolvedKeys[id]}
+      if (id in pendingRequests.current) {return pendingRequests.current[id]}
 
       const request = (async () => {
         setLoadingKeys((prev) => ({ ...prev, [id]: true }))
@@ -113,7 +113,7 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
       const uncachedIds = ids.filter((id) => !resolvedKeys[id])
       if (uncachedIds.length === 0) {
         const result: Record<number, string> = {}
-        for (const id of ids) result[id] = resolvedKeys[id]
+        for (const id of ids) {result[id] = resolvedKeys[id]}
         return result
       }
 
@@ -132,7 +132,7 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
 
           const result: Record<number, string> = { ...newKeys }
           for (const id of ids) {
-            if (resolvedKeys[id]) result[id] = resolvedKeys[id]
+            if (resolvedKeys[id]) {result[id] = resolvedKeys[id]}
           }
           return result
         }

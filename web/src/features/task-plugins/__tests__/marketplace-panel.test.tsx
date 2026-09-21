@@ -96,7 +96,7 @@ function installIndexFetchMock() {
 }
 
 afterEach(() => {
-  for (const queryClient of queryClients) queryClient.clear()
+  for (const queryClient of queryClients) {queryClient.clear()}
   queryClients.length = 0
   vi.unstubAllGlobals()
 })

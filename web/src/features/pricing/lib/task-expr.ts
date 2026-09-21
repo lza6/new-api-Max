@@ -70,7 +70,7 @@ export type TaskPreviewResult = {
 export function getTaskNumberFields(
   schema: BillingUsageSchema | null | undefined
 ): [string, BillingUsageFieldSchema][] {
-  if (!schema) return []
+  if (!schema) {return []}
   return Object.entries(schema)
     .filter((entry) => entry[1].type === 'number' && Boolean(entry[1].unit))
     .sort(([left], [right]) => left.localeCompare(right))
@@ -79,7 +79,7 @@ export function getTaskNumberFields(
 export function getTaskEnumFields(
   schema: BillingUsageSchema | null | undefined
 ): [string, BillingUsageFieldSchema][] {
-  if (!schema) return []
+  if (!schema) {return []}
   return Object.entries(schema)
     .filter((entry) => Boolean(entry[1].enum?.length))
     .sort(([left], [right]) => left.localeCompare(right))
@@ -155,7 +155,7 @@ export function taskMatrixToTiers(
 ): TaskVisualTier[] {
   const numberFields = getTaskNumberFields(schema)
   const firstRow = config.rows[0]
-  if (numberFields.length === 0 || !firstRow) return []
+  if (numberFields.length === 0 || !firstRow) {return []}
 
   const isUniform = config.rows.every(
     (row) =>
@@ -199,9 +199,9 @@ export function tryParseTaskMatrixConfig(
   expression: string | null | undefined,
   schema: BillingUsageSchema
 ): TaskMatrixConfig | null {
-  if (!expression) return null
+  if (!expression) {return null}
   const tiers = parseTaskTiersFromExpr(expression, schema)
-  if (tiers.length === 0) return null
+  if (tiers.length === 0) {return null}
 
   const enumFields = getTaskEnumFields(schema)
   const numberFields = getTaskNumberFields(schema)
@@ -222,13 +222,13 @@ export function tryParseTaskMatrixConfig(
     }
   }
 
-  if (tiers.length !== combinations.length) return null
+  if (tiers.length !== combinations.length) {return null}
   const fallbackTier = tiers.at(-1)
-  if (!fallbackTier || fallbackTier.conditions.length !== 0) return null
+  if (!fallbackTier || fallbackTier.conditions.length !== 0) {return null}
 
   const tiersByCombination = new Map<string, (typeof tiers)[number]>()
   for (const tier of tiers.slice(0, -1)) {
-    if (tier.conditions.length !== enumFields.length) return null
+    if (tier.conditions.length !== enumFields.length) {return null}
 
     const valuesByField = new Map<string, string>()
     for (const condition of tier.conditions) {
@@ -241,13 +241,13 @@ export function tryParseTaskMatrixConfig(
       }
       valuesByField.set(condition.field, condition.value)
     }
-    if (valuesByField.size !== enumFields.length) return null
+    if (valuesByField.size !== enumFields.length) {return null}
 
     const combination = Object.fromEntries(
       enumFields.map(([field]) => [field, valuesByField.get(field) ?? ''])
     )
     const key = taskMatrixCombinationKey(combination, enumFields)
-    if (tiersByCombination.has(key)) return null
+    if (tiersByCombination.has(key)) {return null}
     tiersByCombination.set(key, tier)
   }
 
@@ -255,7 +255,7 @@ export function tryParseTaskMatrixConfig(
     (combination) =>
       !tiersByCombination.has(taskMatrixCombinationKey(combination, enumFields))
   )
-  if (missingCombinations.length !== 1) return null
+  if (missingCombinations.length !== 1) {return null}
   tiersByCombination.set(
     taskMatrixCombinationKey(missingCombinations[0], enumFields),
     fallbackTier
@@ -266,7 +266,7 @@ export function tryParseTaskMatrixConfig(
     const tier = tiersByCombination.get(
       taskMatrixCombinationKey(combination, enumFields)
     )
-    if (!tier) return null
+    if (!tier) {return null}
     rows.push({
       combination,
       constant: tier.constant,
@@ -284,7 +284,7 @@ export function evaluateTaskVisualConfig(
   schema?: BillingUsageSchema
 ): TaskPreviewResult | null {
   const fallback = config.tiers.at(-1)
-  if (!fallback) return null
+  if (!fallback) {return null}
 
   let matchedTier = fallback
   for (const tier of config.tiers.slice(0, -1)) {
@@ -298,7 +298,7 @@ export function evaluateTaskVisualConfig(
   }
 
   const constant = Number(matchedTier.constant)
-  if (!Number.isFinite(constant) || constant < 0) return null
+  if (!Number.isFinite(constant) || constant < 0) {return null}
 
   const parts: TaskPreviewResult['parts'] = []
   if (constant > 0) {
@@ -307,16 +307,16 @@ export function evaluateTaskVisualConfig(
 
   for (const [field, rawUnitPrice] of Object.entries(matchedTier.unitPrices)) {
     const unitPrice = Number(rawUnitPrice)
-    if (!Number.isFinite(unitPrice) || unitPrice < 0) return null
-    if (unitPrice === 0) continue
+    if (!Number.isFinite(unitPrice) || unitPrice < 0) {return null}
+    if (unitPrice === 0) {continue}
 
     const quantity = Number(sample[field])
-    if (!Number.isFinite(quantity) || quantity < 0) return null
+    if (!Number.isFinite(quantity) || quantity < 0) {return null}
     const amount =
       schema?.[field]?.unit === 'token'
         ? (quantity * unitPrice) / TASK_TOKEN_PRICE_SCALE
         : quantity * unitPrice
-    if (!Number.isFinite(amount)) return null
+    if (!Number.isFinite(amount)) {return null}
     parts.push({ kind: 'usage', field, amount, quantity, unitPrice })
   }
 
@@ -325,7 +325,7 @@ export function evaluateTaskVisualConfig(
   const terms = [String(constant)]
   const normalizedUsage = { ...sample }
   for (const part of parts) {
-    if (part.kind !== 'usage' || !part.field) continue
+    if (part.kind !== 'usage' || !part.field) {continue}
     normalizedUsage[part.field] = part.quantity ?? 0
     const scale = schema?.[part.field]?.unit === 'token' ? ' / 1000000' : ''
     terms.push(`u(${JSON.stringify(part.field)}) * ${part.unitPrice}${scale}`)
@@ -334,7 +334,7 @@ export function evaluateTaskVisualConfig(
     `tier(${JSON.stringify(matchedTier.label)}, ${terms.join(' + ')})`,
     { usage: normalizedUsage }
   )
-  if (result.status !== 'success') return null
+  if (result.status !== 'success') {return null}
   return { tier: matchedTier, total: result.cost, parts }
 }
 
@@ -343,14 +343,14 @@ export function evaluateTaskUsageExamples(
   schema: BillingUsageSchema | null | undefined,
   examples: BillingUsageExample[] | null | undefined
 ): { label: string; total: number }[] {
-  if (!expression || !schema || !examples?.length) return []
+  if (!expression || !schema || !examples?.length) {return []}
   const { billingExpr } = splitBillingExprAndRequestRules(expression)
   const config = tryParseTaskVisualConfig(billingExpr, schema)
-  if (!config) return []
+  if (!config) {return []}
   const rows: { label: string; total: number }[] = []
   for (const example of examples) {
     const result = evaluateTaskVisualConfig(config, example.facts, schema)
-    if (!result) continue
+    if (!result) {continue}
     rows.push({ label: example.label, total: result.total })
   }
   return rows
@@ -360,7 +360,7 @@ export function normalizeTaskVisualConfig(
   config: TaskVisualConfig | null | undefined,
   schema: BillingUsageSchema
 ): TaskVisualConfig {
-  if (!config?.tiers?.length) return createDefaultTaskVisualConfig(schema)
+  if (!config?.tiers?.length) {return createDefaultTaskVisualConfig(schema)}
   const numberFields = new Set(
     getTaskNumberFields(schema).map(([field]) => field)
   )
@@ -397,7 +397,7 @@ function generateTaskTierBody(
   numberFields: [string, BillingUsageFieldSchema][]
 ): string {
   const parts: string[] = []
-  if (tier.constant > 0) parts.push(String(tier.constant))
+  if (tier.constant > 0) {parts.push(String(tier.constant))}
   for (const [field, definition] of numberFields) {
     const price = tier.unitPrices[field] ?? 0
     if (definition.unit === 'token') {
@@ -432,7 +432,7 @@ export function generateTaskExprFromConfig(
   schema: BillingUsageSchema
 ): string {
   const numberFields = getTaskNumberFields(schema)
-  if (numberFields.length === 0) return ''
+  if (numberFields.length === 0) {return ''}
   const normalized = normalizeTaskVisualConfig(config, schema)
   if (normalized.tiers.length === 1) {
     return generateTaskTierCall(normalized.tiers[0], numberFields)
@@ -447,7 +447,7 @@ export function generateTaskExprFromConfig(
       continue
     }
     const condition = generateTaskCondition(tier.conditions)
-    if (!condition) return ''
+    if (!condition) {return ''}
     parts.push(`${condition} ? ${call}`)
   }
   return parts.join(' : ')
@@ -457,9 +457,9 @@ export function tryParseTaskVisualConfig(
   expression: string | null | undefined,
   schema: BillingUsageSchema
 ): TaskVisualConfig | null {
-  if (!expression) return null
+  if (!expression) {return null}
   const tiers = parseTaskTiersFromExpr(expression, schema)
-  if (tiers.length === 0) return null
+  if (tiers.length === 0) {return null}
   return normalizeTaskVisualConfig(
     {
       tiers: tiers.map((tier) => ({

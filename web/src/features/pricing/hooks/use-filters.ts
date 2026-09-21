@@ -142,12 +142,12 @@ export function useFilters(models: PricingModel[]) {
   )
 
   const availableTags = useMemo(() => {
-    if (!models || models.length === 0) return []
+    if (!models || models.length === 0) {return []}
     return extractAllTags(models)
   }, [models])
 
   const filteredModels = useMemo(() => {
-    if (!models || models.length === 0) return []
+    if (!models || models.length === 0) {return []}
 
     return filterAndSortModels(models, {
       search: debouncedSearchInput,

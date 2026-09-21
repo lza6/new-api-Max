@@ -170,7 +170,7 @@ export function ChannelsPrimaryButtons() {
           <TooltipTrigger render={<span className='inline-flex' />}>
             <Button
               onClick={() => {
-                if (!canEditSensitive) return
+                if (!canEditSensitive) {return}
                 setCurrentRow(null)
                 setOpen('create-channel')
               }}
@@ -288,7 +288,7 @@ export function ChannelsPrimaryButtons() {
             <DropdownMenuItem
               onSelect={(e) => {
                 e.preventDefault()
-                if (!canEditSensitive) return
+                if (!canEditSensitive) {return}
                 setShowDeleteDialog(true)
               }}
               disabled={!canEditSensitive}
@@ -312,7 +312,7 @@ export function ChannelsPrimaryButtons() {
         )}
         destructive
         handleConfirm={() => {
-          if (!canEditSensitive) return
+          if (!canEditSensitive) {return}
           handleDeleteAllDisabled(queryClient, (_count) => {
             // eslint-disable-next-line no-console
             console.log(`Deleted ${_count} channels`)

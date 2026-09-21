@@ -79,7 +79,7 @@ export function ComboboxInput({
   const displayValue = open ? searchValue : (selectedOption?.label ?? value)
 
   const filteredOptions = React.useMemo(() => {
-    if (!searchChanged || !searchValue.trim()) return options
+    if (!searchChanged || !searchValue.trim()) {return options}
     const search = searchValue.toLowerCase().trim()
     return options.filter(
       (option) =>
@@ -95,7 +95,7 @@ export function ComboboxInput({
 
   // Handle click outside to close
   React.useEffect(() => {
-    if (!open) return
+    if (!open) {return}
 
     const handleClickOutside = (e: MouseEvent) => {
       if (
@@ -127,7 +127,7 @@ export function ComboboxInput({
       return
     }
 
-    if (!open) return
+    if (!open) {return}
 
     switch (e.key) {
       case 'ArrowDown':
@@ -150,7 +150,7 @@ export function ComboboxInput({
           e.preventDefault()
           handleSelect(searchValue.trim())
         } else {
-          if (!onKeyDown) e.preventDefault()
+          if (!onKeyDown) {e.preventDefault()}
           // No highlighted option, just close the dropdown and keep current value
           setOpen(false)
           setSearchValue('')
@@ -167,7 +167,7 @@ export function ComboboxInput({
 
   // Scroll highlighted item into view
   React.useEffect(() => {
-    if (highlightedIndex < 0 || !listRef.current) return
+    if (highlightedIndex < 0 || !listRef.current) {return}
     const item = listRef.current.children[highlightedIndex] as HTMLElement
     item?.scrollIntoView({ block: 'nearest' })
   }, [highlightedIndex])
@@ -207,7 +207,7 @@ export function ComboboxInput({
           if (allowCustomValue) {
             onValueChange(nextValue)
           }
-          if (!open) setOpen(true)
+          if (!open) {setOpen(true)}
         }}
         onPointerDown={() => {
           pointerFocusRef.current = true
@@ -231,7 +231,7 @@ export function ComboboxInput({
         }}
         onKeyDown={(event) => {
           handleKeyDown(event)
-          if (!event.defaultPrevented) onKeyDown?.(event)
+          if (!event.defaultPrevented) {onKeyDown?.(event)}
         }}
         className={cn('pr-9', className)}
       />

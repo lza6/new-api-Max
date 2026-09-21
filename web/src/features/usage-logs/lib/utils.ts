@@ -207,7 +207,7 @@ export function buildApiParams(config: {
   // Override with column filters if present
   if (columnFilters.length > 0) {
     columnFilters.forEach(({ id, value }) => {
-      if (value === undefined || value === null || value === '') return
+      if (value === undefined || value === null || value === '') {return}
 
       switch (id) {
         case 'type':
@@ -223,10 +223,10 @@ export function buildApiParams(config: {
           params.group = String(value)
           break
         case 'channel':
-          if (isAdmin) params.channel = Number(value) || 0
+          if (isAdmin) {params.channel = Number(value) || 0}
           break
         case 'username':
-          if (isAdmin) params.username = String(value)
+          if (isAdmin) {params.username = String(value)}
           break
       }
     })

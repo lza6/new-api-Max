@@ -98,8 +98,8 @@ export function validateComboPayload(
   t: (key: string) => string
 ): string | null {
   const name = payload.name.trim()
-  if (!name) return t('Combo name is required')
-  if (name.length > 64) return t('Combo name must be 1-64 characters')
+  if (!name) {return t('Combo name is required')}
+  if (name.length > 64) {return t('Combo name must be 1-64 characters')}
 
   if (!['fallback', 'round-robin', 'weighted'].includes(payload.strategy)) {
     return t('Invalid combo strategy')
@@ -112,7 +112,7 @@ export function validateComboPayload(
   }> = []
   try {
     const parsed: unknown = JSON.parse(payload.models)
-    if (Array.isArray(parsed)) items = parsed as typeof items
+    if (Array.isArray(parsed)) {items = parsed as typeof items}
   } catch {
     return t('Combo candidates must be a valid JSON array')
   }

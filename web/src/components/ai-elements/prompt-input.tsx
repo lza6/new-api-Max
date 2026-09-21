@@ -177,33 +177,34 @@ export function PromptInputProvider({
   const openRef = useRef<() => void>(() => {})
 
   const add = useCallback((files: File[] | FileList) => {
-    const incoming = Array.from(files)
-    if (incoming.length === 0) return
+    const incoming = [...files]
+    if (incoming.length === 0) {return}
 
-    setAttachements((prev) =>
-      prev.concat(
-        incoming.map((file) => ({
+    setAttachements((prev) => [
+      ...prev,
+      ...incoming.map((file) => ({
           id: nanoid(),
           type: 'file' as const,
           url: URL.createObjectURL(file),
           mediaType: file.type,
           filename: file.name,
-        }))
-      )
-    )
+        })),
+    ])
   }, [])
 
   const remove = useCallback((id: string) => {
     setAttachements((prev) => {
       const found = prev.find((f) => f.id === id)
-      if (found?.url) URL.revokeObjectURL(found.url)
+      if (found?.url) {URL.revokeObjectURL(found.url)}
       return prev.filter((f) => f.id !== id)
     })
   }, [])
 
   const clear = useCallback(() => {
     setAttachements((prev) => {
-      for (const f of prev) if (f.url) URL.revokeObjectURL(f.url)
+      for (const f of prev) {
+        if (f.url) URL.revokeObjectURL(f.url)
+      }
       return []
     })
   }, [])
@@ -509,7 +510,7 @@ export const PromptInput = ({
 
   const addLocal = useCallback(
     (fileList: File[] | FileList) => {
-      const incoming = Array.from(fileList)
+      const incoming = [...fileList]
       const accepted = incoming.filter((f) => matchesAccept(f))
       if (incoming.length && accepted.length === 0) {
         onError?.({
@@ -552,7 +553,7 @@ export const PromptInput = ({
             filename: file.name,
           })
         }
-        return prev.concat(next)
+        return [...prev, ...next]
       })
     },
     [matchesAccept, maxFiles, maxFileSize, onError, t]
@@ -607,7 +608,7 @@ export const PromptInput = ({
 
   // Let provider know about our hidden file input so external menus can call openFileDialog()
   useEffect(() => {
-    if (!usingProvider) return
+    if (!usingProvider) {return}
     controller.__registerFileInput(inputRef, () => inputRef.current?.click())
   }, [usingProvider, controller])
 
@@ -622,7 +623,7 @@ export const PromptInput = ({
   // Attach drop handlers on nearest form and document (opt-in)
   useEffect(() => {
     const form = formRef.current
-    if (!form) return
+    if (!form) {return}
 
     const onDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes('Files')) {
@@ -646,7 +647,7 @@ export const PromptInput = ({
   }, [add])
 
   useEffect(() => {
-    if (!globalDrop) return
+    if (!globalDrop) {return}
 
     const onDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes('Files')) {
@@ -673,7 +674,7 @@ export const PromptInput = ({
     () => () => {
       if (!usingProvider) {
         for (const f of files) {
-          if (f.url) URL.revokeObjectURL(f.url)
+          if (f.url) {URL.revokeObjectURL(f.url)}
         }
       }
     },
@@ -760,9 +761,11 @@ export const PromptInput = ({
             controller.textInput.clear()
           }
         }
-      } catch (_error) {
+      } catch {
         // Don't clear on error - user may want to retry
       }
+    }).catch(() => {
+      // Blob conversion failure: leave attachments for retry (already caught above)
     })
   }
 
@@ -843,7 +846,7 @@ export const PromptInputTextarea = ({
       e.preventDefault()
       const lastAttachment =
         attachments.files.length > 0
-          ? attachments.files[attachments.files.length - 1]
+          ? attachments.files.at(-1)
           : undefined
       if (lastAttachment) {
         attachments.remove(lastAttachment.id)
@@ -1138,6 +1141,9 @@ export const PromptInputSpeechButton = ({
       speechRecognition.onresult = (event) => {
         let finalTranscript = ''
 
+        // event.results is a SpeechRecognitionResultList (array-like, not
+        // spread-iterable); Array.from is required here.
+        // eslint-disable-next-line unicorn/prefer-spread
         const results = Array.from(event.results)
 
         for (const result of results) {

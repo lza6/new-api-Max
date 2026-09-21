@@ -95,10 +95,10 @@ export function getServerErrorSources(
   const seen = new Set<object>()
   for (let index = 0; index < pending.length; index++) {
     const source = pending[index]
-    if (!isRecord(source) || seen.has(source)) continue
+    if (!isRecord(source) || seen.has(source)) {continue}
     seen.add(source)
     sources.push(source)
-    if (isRecord(source.response)) pending.push(source.response.data)
+    if (isRecord(source.response)) {pending.push(source.response.data)}
     pending.push(source.cause, source.error)
   }
   return sources
@@ -111,9 +111,9 @@ export function getServerErrorMessageKey(value: unknown): string | null {
         serverErrorMessageKeys[
           source.code as keyof typeof serverErrorMessageKeys
         ]
-      if (key) return key
+      if (key) {return key}
     }
-    if (source[safeServerErrorMessage]) break
+    if (source[safeServerErrorMessage]) {break}
   }
   return null
 }
@@ -123,7 +123,7 @@ export function getServerErrorStatus(value: unknown): number | undefined {
     const status = isRecord(source.response)
       ? source.response.status
       : source.status
-    if (typeof status === 'number') return status
+    if (typeof status === 'number') {return status}
   }
   return undefined
 }
@@ -146,7 +146,7 @@ function messageText(value: unknown): string | undefined {
     return undefined
   }
   // A proxy's HTML error document is not an actionable API error message.
-  if (/^\s*(?:<!doctype|<html[\s>])/i.test(value)) return undefined
+  if (/^\s*(?:<!doctype|<html[\s>])/i.test(value)) {return undefined}
   return value
 }
 
@@ -180,18 +180,18 @@ const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = 
  */
 export function getFriendlyErrorMessage(value: unknown): string | null {
   const sources = getServerErrorSources(value)
-  if (sources.some((source) => source[safeServerErrorMessage])) return null
+  if (sources.some((source) => source[safeServerErrorMessage])) {return null}
   const haystacks: string[] = []
   for (const source of sources) {
     const code = typeof source.code === 'string' ? source.code : undefined
-    if (code) haystacks.push(code)
-    if (typeof source.message === 'string') haystacks.push(source.message)
+    if (code) {haystacks.push(code)}
+    if (typeof source.message === 'string') {haystacks.push(source.message)}
     if (isRecord(source.response)) {
       const data = source.response.data
-      if (typeof data === 'string') haystacks.push(data)
+      if (typeof data === 'string') {haystacks.push(data)}
       else if (isRecord(data)) {
-        if (typeof data.message === 'string') haystacks.push(data.message)
-        if (typeof data.code === 'string') haystacks.push(data.code)
+        if (typeof data.message === 'string') {haystacks.push(data.message)}
+        if (typeof data.code === 'string') {haystacks.push(data.code)}
         // B6-2：后端 OpenAI 信封为 {error:{message,type,code}}，type 是
         // 稳定机器可读枚举（insufficient_quota/key_invalid/rate_limited/
         // upstream_unavailable/content_filtered），优先读它作为映射来源。
@@ -210,9 +210,9 @@ export function getFriendlyErrorMessage(value: unknown): string | null {
     }
   }
   const haystack = haystacks.join('\n')
-  if (!haystack) return null
+  if (!haystack) {return null}
   for (const { pattern, messageKey } of FRIENDLY_ERROR_PATTERNS) {
-    if (pattern.test(haystack)) return i18next.t(messageKey)
+    if (pattern.test(haystack)) {return i18next.t(messageKey)}
   }
   return null
 }
@@ -234,10 +234,10 @@ export function getServerErrorMessage(
     )
   }
   const key = getServerErrorMessageKey(value)
-  if (key) return i18next.t(key)
+  if (key) {return i18next.t(key)}
   // B6-2：命中人话映射时优先使用友好文案（未知错误保持原有行为）。
   const friendly = getFriendlyErrorMessage(value)
-  if (friendly) return friendly
+  if (friendly) {return friendly}
   for (const source of sources) {
     if (
       source instanceof Error ||
@@ -251,14 +251,14 @@ export function getServerErrorMessage(
       : messageText(source.error)
     const message =
       messageText(source.message) || detail || messageText(source.title)
-    if (message) return message
+    if (message) {return message}
   }
   const status = getServerErrorStatus(value)
-  if (status === 304) return i18next.t('Content not modified!')
-  if (status === 204) return i18next.t('Content not found.')
+  if (status === 304) {return i18next.t('Content not modified!')}
+  if (status === 204) {return i18next.t('Content not found.')}
   for (const source of sources) {
     const message = messageText(source.message)
-    if (message) return message
+    if (message) {return message}
   }
   return messageText(value) || (fallback ?? i18next.t('Something went wrong!'))
 }

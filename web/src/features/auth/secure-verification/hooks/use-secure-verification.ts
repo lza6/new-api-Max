@@ -56,7 +56,7 @@ function verificationReducer(
     case 'loading':
       return { phase: 'loading', request: action.request }
     case 'loaded': {
-      if (state.phase !== 'loading') return state
+      if (state.phase !== 'loading') {return state}
       const methods = action.requirements.methods.filter(
         (option) => option.available
       )
@@ -98,16 +98,16 @@ function verificationReducer(
       }
       return { ...state, input: action.input, error: undefined }
     case 'submit': {
-      if (state.phase !== 'ready') return state
+      if (state.phase !== 'ready') {return state}
       let input = state.input
       if (input?.method === 'password') {
         input = { method: 'password', password: '' }
       }
-      if (input?.method === '2fa') input = { method: '2fa', code: '' }
+      if (input?.method === '2fa') {input = { method: '2fa', code: '' }}
       return { ...state, phase: 'verifying', input, error: undefined }
     }
     case 'error':
-      if (state.phase === 'idle') return state
+      if (state.phase === 'idle') {return state}
       if (state.phase === 'loading' || state.phase === 'error') {
         return { phase: 'error', request: state.request, error: action.error }
       }
@@ -145,7 +145,7 @@ export function useSecureVerification() {
     const current = pending.current
     pending.current = null
     current?.controller.abort()
-    if (current) current.initialPassword = undefined
+    if (current) {current.initialPassword = undefined}
     current?.resolve(null)
     dispatch({ type: 'reset' })
   }, [])
@@ -165,7 +165,7 @@ export function useSecureVerification() {
               current.request.scope,
               current.controller.signal
             )
-      if (pending.current !== current) return
+      if (pending.current !== current) {return}
       const initialPassword = current.initialPassword
       current.initialPassword = undefined
       if (
@@ -182,12 +182,12 @@ export function useSecureVerification() {
             requirements.password_encryption_enabled,
             current.controller.signal
           )
-          if (pending.current !== current) return
+          if (pending.current !== current) {return}
           pending.current = null
           dispatch({ type: 'reset' })
           current.resolve(proof)
         } catch (error) {
-          if (pending.current !== current) return
+          if (pending.current !== current) {return}
           pending.current = null
           dispatch({ type: 'reset' })
           current.reject(error)
@@ -206,7 +206,7 @@ export function useSecureVerification() {
           requirements.password_encryption_enabled,
           current.controller.signal
         )
-        if (pending.current !== current) return
+        if (pending.current !== current) {return}
         pending.current = null
         dispatch({ type: 'reset' })
         current.resolve(proof)
@@ -230,7 +230,7 @@ export function useSecureVerification() {
       request: RequestVerificationOptions,
       initialPassword?: string
     ): Promise<SecurityProof | null> => {
-      if (pending.current) return Promise.resolve(null)
+      if (pending.current) {return Promise.resolve(null)}
       return new Promise((resolve, reject) => {
         const current: PendingVerification = {
           kind: 'operation',
@@ -250,7 +250,7 @@ export function useSecureVerification() {
 
   const requestLoginVerification = useCallback(
     (challenge: LoginChallenge): Promise<AuthBundle | null> => {
-      if (pending.current) return Promise.resolve(null)
+      if (pending.current) {return Promise.resolve(null)}
       return new Promise((resolve, reject) => {
         const current: PendingVerification = {
           kind: 'login',
@@ -290,7 +290,7 @@ export function useSecureVerification() {
           current.request.challenge,
           current.controller.signal
         )
-        if (pending.current !== current) return
+        if (pending.current !== current) {return}
         current.resolve(bundle)
       } else {
         const proof = await verify(
@@ -299,13 +299,13 @@ export function useSecureVerification() {
           state.requirements.password_encryption_enabled,
           current.controller.signal
         )
-        if (pending.current !== current) return
+        if (pending.current !== current) {return}
         current.resolve(proof)
       }
       pending.current = null
       dispatch({ type: 'reset' })
     } catch (error) {
-      if (pending.current !== current) return
+      if (pending.current !== current) {return}
       const failure = AuthOperationError.from(error)
       if (failure.code === 'AUTH_CANCELLED') {
         cancel()

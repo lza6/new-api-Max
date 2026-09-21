@@ -70,7 +70,7 @@ export const useNotificationStore = create<NotificationState>()(
 
       isNoticeClosed: () => {
         const { closedUntilDate } = get()
-        if (!closedUntilDate) return false
+        if (!closedUntilDate) {return false}
 
         const today = new Date().toDateString()
         return closedUntilDate === today

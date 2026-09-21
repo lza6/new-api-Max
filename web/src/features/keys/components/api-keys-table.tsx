@@ -110,7 +110,7 @@ function ApiKeysMobileList({
   const { t } = useTranslation()
   const rows = table.getRowModel().rows
 
-  if (isLoading) return <ApiKeysMobileSkeleton />
+  if (isLoading) {return <ApiKeysMobileSkeleton />}
 
   if (!rows.length) {
     return (

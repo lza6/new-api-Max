@@ -146,7 +146,7 @@ function replaceToken(source: string, token: string, value: string) {
 
 function normalizeApiKey(apiKey: string): string {
   const trimmed = apiKey.trim()
-  if (!trimmed) return ''
+  if (!trimmed) {return ''}
   return trimmed.startsWith('sk-') ? trimmed : `sk-${trimmed}`
 }
 
@@ -215,6 +215,6 @@ export function resolveChatUrl({
 export function getFirstActiveKey(
   keys: ActiveApiKey[] | undefined
 ): ActiveApiKey | undefined {
-  if (!Array.isArray(keys)) return undefined
+  if (!Array.isArray(keys)) {return undefined}
   return keys.find((item) => item.status === API_KEY_STATUS.ENABLED)
 }

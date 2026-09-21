@@ -149,7 +149,7 @@ const BUILTIN_BINDINGS: ReadonlyArray<{
 ]
 
 function CustomProviderIcon(props: { iconUrl?: string }) {
-  if (!props.iconUrl) return <Link2 className='h-4 w-4' />
+  if (!props.iconUrl) {return <Link2 className='h-4 w-4' />}
   return (
     <img
       src={props.iconUrl}
@@ -176,7 +176,7 @@ export function UserBindingDialog(props: Props) {
   })
 
   const fetchData = useCallback(async () => {
-    if (!props.userId) return
+    if (!props.userId) {return}
     setLoading(true)
     try {
       const [userRes, oauthRes] = await Promise.all([
@@ -278,7 +278,7 @@ export function UserBindingDialog(props: Props) {
   const boundCount = allBindings.filter((b) => b.isBound).length
 
   const handleUnbind = async () => {
-    if (!unbindTarget || !props.userId) return
+    if (!unbindTarget || !props.userId) {return}
     setUnbinding(true)
     try {
       let res

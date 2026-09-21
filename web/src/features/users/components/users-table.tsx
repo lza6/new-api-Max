@@ -233,7 +233,7 @@ export function UsersTable() {
         ],
       }}
       getRowClassName={(row, { isMobile }) => {
-        if (!isDisabledUserRow(row.original)) return undefined
+        if (!isDisabledUserRow(row.original)) {return undefined}
         return isMobile ? DISABLED_ROW_MOBILE : DISABLED_ROW_DESKTOP
       }}
       bulkActions={<DataTableBulkActions table={table} />}

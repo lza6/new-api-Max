@@ -56,7 +56,7 @@ export function ModelPricingPanel(props: {
   const [resetOpen, setResetOpen] = useState(false)
   const editor = useRef<ModelPricingEditorPanelHandle>(null)
   const editData = useMemo(() => {
-    if (!entry) return null
+    if (!entry) {return null}
     const values = { ...entry.configured }
     if (entry.effective['billing_setting.billing_mode'] === 'tiered_expr') {
       values['billing_setting.billing_mode'] = 'tiered_expr'
@@ -76,10 +76,10 @@ export function ModelPricingPanel(props: {
   }, [query.data, entry, props.modelName])
 
   const persist = async (reset = false) => {
-    if (!entry) return
+    if (!entry) {return}
     try {
       const draft = reset ? null : await editor.current?.commitDraft()
-      if (!reset && !draft) return
+      if (!reset && !draft) {return}
       await save.mutateAsync([
         {
           model_name: entry.model_name,
@@ -116,7 +116,7 @@ export function ModelPricingPanel(props: {
       />
     )
   }
-  if (!editData || !entry) return <LoadingState />
+  if (!editData || !entry) {return <LoadingState />}
   const effectivePricing = modelPricingDisplay(entry)
 
   return (
@@ -202,7 +202,7 @@ export function ModelPricingPanel(props: {
                         },
                       ] as const
                     ).map((field) => {
-                      if (effectivePricing[field.field] == null) return null
+                      if (effectivePricing[field.field] == null) {return null}
                       return (
                         <div key={field.field}>
                           <dt className='text-muted-foreground'>

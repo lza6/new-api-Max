@@ -278,7 +278,7 @@ export function ChannelSelectorDialog({
   )
 
   const filteredChannels = useMemo(() => {
-    if (!debouncedSearch.trim()) return channels
+    if (!debouncedSearch.trim()) {return channels}
 
     const searchLower = debouncedSearch.toLowerCase()
     return channels.filter(
@@ -294,8 +294,8 @@ export function ChannelSelectorDialog({
     return [...filteredChannels].sort((a, b) => {
       const aIsOfficial = isOfficialChannel(a)
       const bIsOfficial = isOfficialChannel(b)
-      if (aIsOfficial && !bIsOfficial) return -1
-      if (!aIsOfficial && bIsOfficial) return 1
+      if (aIsOfficial && !bIsOfficial) {return -1}
+      if (!aIsOfficial && bIsOfficial) {return 1}
       return 0
     })
   }, [filteredChannels])
@@ -359,7 +359,7 @@ export function ChannelSelectorDialog({
           bodyContainerClassName='[scrollbar-gutter:stable]'
           splitHeader
           getColumnClassName={(columnId, part) => {
-            if (columnId === 'select') return 'w-11 text-center align-middle'
+            if (columnId === 'select') {return 'w-11 text-center align-middle'}
             if (columnId === 'status') {
               return part === 'header' ? 'h-11 align-middle' : 'align-middle'
             }

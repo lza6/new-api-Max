@@ -68,16 +68,16 @@ const UPTIME_FOCUSED_AXIS_MIN = 95
 const UPTIME_MINOR_OUTAGE_AXIS_MIN = 90
 
 function toUptimeChartValue(value: number): number {
-  if (!Number.isFinite(value)) return 0
+  if (!Number.isFinite(value)) {return 0}
   return Math.min(UPTIME_AXIS_MAX, Math.max(0, value))
 }
 
 function getUptimeAxisMin(values: number[]): number {
   const finiteValues = values.filter((value) => Number.isFinite(value))
-  if (finiteValues.length === 0) return UPTIME_FOCUSED_AXIS_MIN
+  if (finiteValues.length === 0) {return UPTIME_FOCUSED_AXIS_MIN}
 
   const minValue = Math.max(0, Math.min(...finiteValues))
-  if (minValue >= UPTIME_FOCUSED_AXIS_MIN) return UPTIME_FOCUSED_AXIS_MIN
+  if (minValue >= UPTIME_FOCUSED_AXIS_MIN) {return UPTIME_FOCUSED_AXIS_MIN}
   if (minValue >= UPTIME_MINOR_OUTAGE_AXIS_MIN) {
     return UPTIME_MINOR_OUTAGE_AXIS_MIN
   }
@@ -102,7 +102,7 @@ export function LatencyTrendChart(props: {
   const { textColor, gridColor } = getChartThemeTokens(resolvedTheme)
 
   const spec = useMemo(() => {
-    if (props.series.length === 0) return null
+    if (props.series.length === 0) {return null}
     const data = props.series.map((point) => ({
       time: formatHourLabel(point.timestamp),
       group: point.group,
@@ -200,7 +200,7 @@ export function UptimeTrendChart(props: {
   const { textColor, gridColor } = getChartThemeTokens(resolvedTheme)
 
   const spec = useMemo(() => {
-    if (props.series.length === 0) return null
+    if (props.series.length === 0) {return null}
 
     const rawData = props.series.map((point) => ({
       date: formatDayLabel(point.date),
@@ -338,7 +338,7 @@ export function ThroughputBarChart(props: {
   )
 
   const spec = useMemo(() => {
-    if (filtered.length === 0) return null
+    if (filtered.length === 0) {return null}
     return {
       type: 'bar' as const,
       direction: 'horizontal' as const,

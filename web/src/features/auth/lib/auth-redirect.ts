@@ -47,10 +47,10 @@ export function sanitizeAuthRedirect(
   value: unknown,
   origin: string
 ): string | null {
-  if (typeof value !== 'string') return null
+  if (typeof value !== 'string') {return null}
 
   const target = value.trim()
-  if (!target || target.includes('\\') || target.startsWith('//')) return null
+  if (!target || target.includes('\\') || target.startsWith('//')) {return null}
 
   let trustedOrigin: URL
   try {
@@ -58,7 +58,7 @@ export function sanitizeAuthRedirect(
   } catch {
     return null
   }
-  if (!allowedRedirectProtocols.has(trustedOrigin.protocol)) return null
+  if (!allowedRedirectProtocols.has(trustedOrigin.protocol)) {return null}
 
   let redirectURL: URL
   try {

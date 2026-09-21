@@ -73,7 +73,7 @@ export function TransferDialog({
   }, [minimumAmount, open])
 
   const handleConfirm = async () => {
-    if (!canTransfer) return
+    if (!canTransfer) {return}
 
     const success = await onConfirm(transferQuota)
     if (success) {

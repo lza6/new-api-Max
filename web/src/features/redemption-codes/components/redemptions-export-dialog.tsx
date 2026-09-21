@@ -50,15 +50,15 @@ export function RedemptionsExportDialog(props: RedemptionsExportDialogProps) {
       return
     }
     const headers: string[] = []
-    if (includeName) headers.push(t('Name'))
+    if (includeName) {headers.push(t('Name'))}
     headers.push(t('Code'))
-    if (includeQuota) headers.push(t('Quota'))
+    if (includeQuota) {headers.push(t('Quota'))}
 
     const rows = props.data.keys.map((key) => {
       const row: string[] = []
-      if (includeName) row.push(props.data.name)
+      if (includeName) {row.push(props.data.name)}
       row.push(key)
-      if (includeQuota) row.push(props.data.quota)
+      if (includeQuota) {row.push(props.data.quota)}
       return row.map((value) => value.replaceAll(/[\t\r\n]+/g, ' '))
     })
 
@@ -100,7 +100,7 @@ export function RedemptionsExportDialog(props: RedemptionsExportDialogProps) {
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) props.onClose()
+        if (!open) {props.onClose()}
       }}
       title={t('Redemption codes created')}
       description={t('Successfully created {{count}} redemption codes', {

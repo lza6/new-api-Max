@@ -151,7 +151,7 @@ export function CreateDeploymentDrawer({
 
   const hardwareOptions = useMemo(() => {
     const items = hardwareTypesData?.data?.hardware_types || []
-    if (!Array.isArray(items)) return []
+    if (!Array.isArray(items)) {return []}
     return items.map((h: Record<string, unknown>) => ({
       label:
         (h?.brand_name ? `${h.brand_name} ` : '') + String(h?.name ?? h?.id),
@@ -162,9 +162,9 @@ export function CreateDeploymentDrawer({
 
   // Keep gpus_per_container <= max_gpus
   useEffect(() => {
-    if (!hardwareId) return
+    if (!hardwareId) {return}
     const hw = hardwareOptions.find((x) => x.value === hardwareId)
-    if (!hw) return
+    if (!hw) {return}
     const max =
       Number.isFinite(hw.max_gpus) && hw.max_gpus > 0 ? hw.max_gpus : 1
     if (gpuCount > max) {
@@ -186,12 +186,12 @@ export function CreateDeploymentDrawer({
 
   const locationOptions = useMemo(() => {
     const replicas = replicasData?.data?.replicas || []
-    if (!Array.isArray(replicas)) return []
+    if (!Array.isArray(replicas)) {return []}
     const map = new Map<string, { label: string; value: string }>()
     replicas.forEach((r: Record<string, unknown>) => {
       const id = (r?.location_id ??
         (r?.location as Record<string, unknown>)?.id) as string | undefined
-      if (id === null || id === undefined) return
+      if (id === null || id === undefined) {return}
       const name = (r?.location_name ??
         (r?.location as Record<string, unknown>)?.name ??
         r?.name ??
@@ -238,7 +238,7 @@ export function CreateDeploymentDrawer({
     queryKey: ['deployment-name-check', resourceName],
     queryFn: async () => {
       const name = (resourceName || '').trim()
-      if (!name) return null
+      if (!name) {return null}
       return requireServerSuccess(await checkClusterNameAvailability(name))
     },
     enabled: open && Boolean(resourceName && resourceName.trim().length > 0),
@@ -348,7 +348,7 @@ export function CreateDeploymentDrawer({
 
   // Reset form when opening
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     form.reset({
       resource_private_name: '',
       image_url: BUILTIN_IMAGE,
@@ -370,13 +370,13 @@ export function CreateDeploymentDrawer({
 
   const priceSummary = useMemo<string>(() => {
     const est = priceData?.data
-    if (!est || typeof est !== 'object') return ''
+    if (!est || typeof est !== 'object') {return ''}
     const total =
       (est as Record<string, unknown>)?.total_cost ??
       (est as Record<string, unknown>)?.total ??
       ''
     const currency = (est as Record<string, unknown>)?.currency ?? ''
-    if (total === '' && currency === '') return ''
+    if (total === '' && currency === '') {return ''}
     return `${total} ${currency}`.trim()
   }, [priceData])
   void priceSummary
@@ -501,7 +501,7 @@ export function CreateDeploymentDrawer({
                         options={locationOptions}
                         selected={(field.value || []) as string[]}
                         onChange={(vals) => {
-                          if (isLoadingReplicas || !hardwareId) return
+                          if (isLoadingReplicas || !hardwareId) {return}
                           field.onChange(vals)
                         }}
                         placeholder={

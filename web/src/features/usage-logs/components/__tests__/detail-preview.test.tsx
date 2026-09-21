@@ -83,7 +83,7 @@ function DetailPreview(props: { other: LogOtherData; isAdmin: boolean }) {
     .getRowModel()
     .rows[0].getAllCells()
     .find((item) => item.column.id === 'content')
-  if (!cell) throw new Error('The log must have a content column')
+  if (!cell) {throw new Error('The log must have a content column')}
   return flexRender(cell.column.columnDef.cell, cell.getContext())
 }
 const plugin = {

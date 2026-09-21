@@ -62,7 +62,7 @@ export function StatusCodeRiskDialog({
   const canConfirm = allChecked && textMatches
 
   const handleConfirm = () => {
-    if (!canConfirm) return
+    if (!canConfirm) {return}
     setCheckedItems(new Set())
     setConfirmText('')
     onConfirm()
@@ -77,8 +77,8 @@ export function StatusCodeRiskDialog({
   const toggleCheck = (idx: number) => {
     setCheckedItems((prev) => {
       const next = new Set(prev)
-      if (next.has(idx)) next.delete(idx)
-      else next.add(idx)
+      if (next.has(idx)) {next.delete(idx)}
+      else {next.add(idx)}
       return next
     })
   }

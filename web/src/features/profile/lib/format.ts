@@ -26,7 +26,7 @@ import type { UserProfile, UserSettings } from '../types'
  * Parse user settings from JSON string
  */
 export function parseUserSettings(settingsJson?: string): UserSettings {
-  if (!settingsJson) return {}
+  if (!settingsJson) {return {}}
 
   try {
     return JSON.parse(settingsJson) as UserSettings
@@ -39,7 +39,7 @@ export function parseUserSettings(settingsJson?: string): UserSettings {
  * Get display name or fallback to username
  */
 export function getDisplayName(user?: UserProfile): string {
-  if (!user) return ''
+  if (!user) {return ''}
   return user.display_name || user.username
 }
 
@@ -47,9 +47,9 @@ export function getDisplayName(user?: UserProfile): string {
  * Get user initials for avatar
  */
 export function getUserInitials(user?: UserProfile): string {
-  if (!user) return '?'
+  if (!user) {return '?'}
   const name = getDisplayName(user)
-  if (!name) return '?'
+  if (!name) {return '?'}
 
   const parts = name.trim().split(/\s+/)
   if (parts.length >= 2) {

@@ -81,7 +81,7 @@ interface DetailSegment {
 }
 
 function formatRatioCompact(ratio: number | undefined): string {
-  if (ratio == null || !Number.isFinite(ratio)) return '-'
+  if (ratio == null || !Number.isFinite(ratio)) {return '-'}
   return ratio % 1 === 0
     ? String(ratio)
     : ratio.toFixed(4).replace(/\.?0+$/, '')
@@ -140,7 +140,7 @@ function buildTypeDetailSegments(
     return [{ text: t('Async task refund') }]
   }
 
-  if (log.type !== 2) return []
+  if (log.type !== 2) {return []}
 
   const isViolation = isViolationFeeLog(other)
   if (isViolation) {
@@ -159,7 +159,7 @@ function buildTypeDetailSegments(
     return segments
   }
 
-  if (!other) return []
+  if (!other) {return []}
 
   const segments: DetailSegment[] = []
 
@@ -362,8 +362,8 @@ export function useCommonLogsColumns(
         )
       },
       filterFn: (row, _id, value) => {
-        if (!Array.isArray(value) || value.length === 0) return true
-        if (value.includes(LOG_TYPE_ALL_VALUE)) return true
+        if (!Array.isArray(value) || value.length === 0) {return true}
+        if (value.includes(LOG_TYPE_ALL_VALUE)) {return true}
         return value.includes(String(row.original.type))
       },
       enableHiding: false,
@@ -382,7 +382,7 @@ export function useCommonLogsColumns(
             useUsageLogsContext()
           const log = row.original
 
-          if (!isDisplayableLogType(log.type)) return null
+          if (!isDisplayableLogType(log.type)) {return null}
 
           const other = parseLogOther(log.other)
           const affinity = other?.admin_info?.channel_affinity
@@ -539,7 +539,7 @@ export function useCommonLogsColumns(
             useUsageLogsContext()
           const log = row.original
 
-          if (!log.username) return null
+          if (!log.username) {return null}
 
           return (
             <button
@@ -593,15 +593,15 @@ export function useCommonLogsColumns(
     cell: function TokenNameCell({ row }) {
       const { sensitiveVisible } = useUsageLogsContext()
       const log = row.original
-      if (!isDisplayableLogType(log.type)) return null
+      if (!isDisplayableLogType(log.type)) {return null}
 
       const tokenName = log.token_name
-      if (!tokenName) return null
+      if (!tokenName) {return null}
 
       const other = parseLogOther(log.other)
       const displayName = sensitiveVisible ? tokenName : '••••'
       let group = log.group
-      if (!group) group = other?.group || ''
+      if (!group) {group = other?.group || ''}
       const groupRatio = getGroupRatio(other)
 
       return (
@@ -655,7 +655,7 @@ export function useCommonLogsColumns(
       header: t('Model'),
       cell: function ModelCell({ row }) {
         const log = row.original
-        if (!isDisplayableLogType(log.type)) return null
+        if (!isDisplayableLogType(log.type)) {return null}
 
         const modelInfo = formatModelName(log)
 
@@ -675,7 +675,7 @@ export function useCommonLogsColumns(
       header: t('Stream'),
       cell: ({ row }) => {
         const log = row.original
-        if (!isTimingLogType(log.type)) return null
+        if (!isTimingLogType(log.type)) {return null}
 
         const useTime = row.getValue('use_time') as number
         const other = parseLogOther(log.other)
@@ -700,7 +700,7 @@ export function useCommonLogsColumns(
       header: 'Tokens',
       cell: ({ row }) => {
         const log = row.original
-        if (!isDisplayableLogType(log.type)) return null
+        if (!isDisplayableLogType(log.type)) {return null}
 
         const other = parseLogOther(log.other)
 
@@ -747,7 +747,7 @@ export function useCommonLogsColumns(
       header: t('Cost'),
       cell: ({ row }) => {
         const log = row.original
-        if (!isDisplayableLogType(log.type)) return null
+        if (!isDisplayableLogType(log.type)) {return null}
 
         const quota = row.getValue('quota') as number
         const other = parseLogOther(log.other)
@@ -760,7 +760,7 @@ export function useCommonLogsColumns(
       header: t('Timing'),
       cell: ({ row }) => {
         const log = row.original
-        if (!isTimingLogType(log.type)) return null
+        if (!isTimingLogType(log.type)) {return null}
 
         const useTime = row.getValue('use_time') as number
         const other = parseLogOther(log.other)

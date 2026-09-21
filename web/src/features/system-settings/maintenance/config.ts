@@ -88,12 +88,12 @@ export const SIDEBAR_MODULES_DEFAULT: SidebarModulesAdminConfig = {
 }
 
 const toBoolean = (value: unknown, fallback: boolean): boolean => {
-  if (typeof value === 'boolean') return value
-  if (typeof value === 'number') return value === 1
+  if (typeof value === 'boolean') {return value}
+  if (typeof value === 'number') {return value === 1}
   if (typeof value === 'string') {
     const normalized = value.trim().toLowerCase()
-    if (normalized === 'true' || normalized === '1') return true
-    if (normalized === 'false' || normalized === '0') return false
+    if (normalized === 'true' || normalized === '1') {return true}
+    if (normalized === 'false' || normalized === '0') {return false}
   }
   return fallback
 }
@@ -189,14 +189,14 @@ export function parseSidebarModulesAdmin(
 ): SidebarModulesAdminConfig {
   const defaults = cloneSidebarDefault()
   // If empty string, null, or undefined, use default config
-  if (!value || value.trim() === '') return defaults
+  if (!value || value.trim() === '') {return defaults}
 
   try {
     const parsed = JSON.parse(value) as Record<string, unknown>
     const result: SidebarModulesAdminConfig = {}
 
     Object.entries(parsed).forEach(([sectionKey, raw]) => {
-      if (!raw || typeof raw !== 'object') return
+      if (!raw || typeof raw !== 'object') {return}
 
       const defaultSection = defaults[sectionKey] ?? { enabled: true }
       const sectionConfig: SidebarSectionConfig = {
@@ -208,7 +208,7 @@ export function parseSidebarModulesAdmin(
 
       Object.entries(raw as Record<string, unknown>).forEach(
         ([moduleKey, moduleValue]) => {
-          if (moduleKey === 'enabled') return
+          if (moduleKey === 'enabled') {return}
           sectionConfig[moduleKey] = toBoolean(
             moduleValue,
             defaultSection[moduleKey] ?? true

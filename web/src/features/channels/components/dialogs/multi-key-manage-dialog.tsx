@@ -117,7 +117,7 @@ export function MultiKeyManageDialog({
     size: number = pageSize,
     status: number | null = statusFilter
   ) => {
-    if (!currentRow) return
+    if (!currentRow) {return}
 
     setIsLoading(true)
     try {
@@ -160,7 +160,7 @@ export function MultiKeyManageDialog({
   }
 
   const performAction = async () => {
-    if (!confirmAction || !currentRow) return
+    if (!confirmAction || !currentRow) {return}
     if (
       !canEditSensitive &&
       (confirmAction.type === 'delete' ||
@@ -226,11 +226,11 @@ export function MultiKeyManageDialog({
   }
 
   const formatKeyTimestamp = (timestamp?: number) => {
-    if (!timestamp) return '-'
+    if (!timestamp) {return '-'}
     return formatTimestamp(timestamp)
   }
 
-  if (!currentRow) return null
+  if (!currentRow) {return null}
 
   return (
     <>
@@ -349,7 +349,7 @@ export function MultiKeyManageDialog({
                   variant='destructive'
                   size='sm'
                   onClick={() => {
-                    if (!canEditSensitive) return
+                    if (!canEditSensitive) {return}
                     setConfirmAction({ type: 'delete-disabled' })
                   }}
                   disabled={!canEditSensitive}

@@ -207,7 +207,7 @@ export function useSettingsForm<T extends FieldValues>({
   /* eslint-enable react-hooks/refs */
 
   useEffect(() => {
-    if (!expandedDefaults) return
+    if (!expandedDefaults) {return}
 
     const flattened = flattenValues(expandedDefaults as T)
     const serialized = JSON.stringify(flattened)
@@ -223,13 +223,13 @@ export function useSettingsForm<T extends FieldValues>({
   }, [expandedDefaults, form])
 
   const defaultCompare = (a: unknown, b: unknown): boolean => {
-    if (a === b) return true
+    if (a === b) {return true}
 
     if (Array.isArray(a) && Array.isArray(b)) {
       return JSON.stringify(a) === JSON.stringify(b)
     }
 
-    if (typeof a !== typeof b) return false
+    if (typeof a !== typeof b) {return false}
 
     // Handle arrays
     // Handle objects (but not null)

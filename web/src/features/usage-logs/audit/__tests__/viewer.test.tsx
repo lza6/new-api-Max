@@ -173,7 +173,7 @@ it.each([
     if ('id' in params || 'target_user_id' in params) {
       expect(cell).toHaveTextContent('(ID: 11)')
     }
-    if (outcome) expect(cell).toHaveTextContent(outcome)
+    if (outcome) {expect(cell).toHaveTextContent(outcome)}
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   }
 )
@@ -226,8 +226,8 @@ it.each([false, true])(
     expect(id).toHaveClass('shrink-0')
     expect(id.closest('.truncate')).toBeNull()
     expect(screen.getByText('Enabled → Disabled')).toBeVisible()
-    if (mobile) expect(screen.queryByRole('table')).not.toBeInTheDocument()
-    else expect(screen.getByRole('table')).toBeVisible()
+    if (mobile) {expect(screen.queryByRole('table')).not.toBeInTheDocument()}
+    else {expect(screen.getByRole('table')).toBeVisible()}
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Details' }))
     const dialog = await screen.findByRole('dialog', { name: 'Log Details' })
@@ -632,7 +632,7 @@ it('clears global records and open details on revocation, falls back to self, an
         },
       }
     }
-    if (url === '/api/audit' && revoked) throw forbidden
+    if (url === '/api/audit' && revoked) {throw forbidden}
     return {
       data: {
         success: true,

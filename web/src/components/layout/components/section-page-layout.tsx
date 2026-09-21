@@ -66,9 +66,9 @@ export function SectionPageLayout(props: SectionPageLayoutProps) {
   let breadcrumb: ReactNode = null
 
   Children.forEach(props.children, (node) => {
-    if (!isValidElement(node)) return
+    if (!isValidElement(node)) {return}
     const child = node as ReactElement<SlotProps>
-    if (child.type === SectionPageLayoutTitle) title = child.props.children
+    if (child.type === SectionPageLayoutTitle) {title = child.props.children}
     else if (child.type === SectionPageLayoutActions) {
       actions = child.props.children
     } else if (child.type === SectionPageLayoutContent) {

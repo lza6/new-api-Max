@@ -157,7 +157,7 @@ export function PasskeySection(props: PasskeySectionProps) {
 
   useEffect(() => {
     const serialized = JSON.stringify(props.defaultValues)
-    if (serialized === baselineSerializedRef.current) return
+    if (serialized === baselineSerializedRef.current) {return}
     baselineRef.current = props.defaultValues
     baselineSerializedRef.current = serialized
     form.reset(buildFormDefaults(props.defaultValues))

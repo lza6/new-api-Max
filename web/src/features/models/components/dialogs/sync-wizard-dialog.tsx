@@ -117,7 +117,7 @@ export function SyncWizardDialog(props: {
 
   const apply = useMutation({
     mutationFn: async (selections: MetadataSyncSelection[]) => {
-      if (!preview) throw new Error(t('Preview metadata first'))
+      if (!preview) {throw new Error(t('Preview metadata first'))}
       const response = await syncUpstream({
         locale: preview.source.locale,
         source_version: preview.source.version,
@@ -385,7 +385,7 @@ export function SyncWizardDialog(props: {
                 disabled={busy}
                 items={getSyncLocaleOptions(t)}
                 onValueChange={(value) => {
-                  if (value) setLocale(value as SyncLocale)
+                  if (value) {setLocale(value as SyncLocale)}
                   setPreview(null)
                   setSelection({})
                   setPage(0)

@@ -123,13 +123,13 @@ export function MarketShareSection(props: MarketShareSectionProps) {
     )
     return [...props.history.points].sort((a, b) => {
       const tsCmp = a.ts.localeCompare(b.ts)
-      if (tsCmp !== 0) return tsCmp
+      if (tsCmp !== 0) {return tsCmp}
       return (order.get(a.vendor) ?? 999) - (order.get(b.vendor) ?? 999)
     })
   }, [props.history])
 
   const spec = useMemo(() => {
-    if (orderedPoints.length === 0) return null
+    if (orderedPoints.length === 0) {return null}
     return {
       type: 'bar' as const,
       data: [{ id: 'vendor-share', values: orderedPoints }],

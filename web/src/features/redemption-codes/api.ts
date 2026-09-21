@@ -47,7 +47,7 @@ export async function searchRedemptions(
   const { keyword = '', status = '', p = 1, page_size = 10 } = params
   const queryParams = new URLSearchParams()
   queryParams.set('keyword', keyword)
-  if (status) queryParams.set('status', status)
+  if (status) {queryParams.set('status', status)}
   queryParams.set('p', String(p))
   queryParams.set('page_size', String(page_size))
   const res = await api.get(`/api/redemption/search?${queryParams.toString()}`)

@@ -138,7 +138,7 @@ test.each([
       expect(quota).not.toHaveAttribute('aria-disabled', 'true')
       expect(name).toBeChecked()
       expect(quota).toBeChecked()
-      if (!options.name) await user.click(name)
+      if (!options.name) {await user.click(name)}
       if (!options.quota) {
         quota.focus()
         await user.keyboard(' ')

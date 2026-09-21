@@ -43,7 +43,7 @@ export function Turnstile({
 
   useEffect(() => {
     const render = () => {
-      if (!ref.current || !window.turnstile) return
+      if (!ref.current || !window.turnstile) {return}
       try {
         window.turnstile.render(ref.current, {
           sitekey: siteKey,
@@ -61,7 +61,7 @@ export function Turnstile({
       return
     }
     const scriptId = 'cf-turnstile'
-    if (document.getElementById(scriptId)) return
+    if (document.getElementById(scriptId)) {return}
     const s = document.createElement('script')
     s.id = scriptId
     s.src =

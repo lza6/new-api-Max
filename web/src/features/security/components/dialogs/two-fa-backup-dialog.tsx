@@ -44,7 +44,7 @@ export function TwoFABackupDialog(props: TwoFABackupDialogProps) {
 
   useEffect(() => {
     setBackupCodes([])
-    if (!props.open) cancel()
+    if (!props.open) {cancel()}
   }, [props.open, security.sessionKey, cancel])
 
   const handleOpenChange = (open: boolean) => {
@@ -54,7 +54,7 @@ export function TwoFABackupDialog(props: TwoFABackupDialogProps) {
       setBackupCodes([])
     }
     props.onOpenChange(open)
-    if (changed) props.onSuccess()
+    if (changed) {props.onSuccess()}
   }
   const handleRegenerate = async () => {
     const result = await security.run(async (signal) => {
@@ -64,7 +64,7 @@ export function TwoFABackupDialog(props: TwoFABackupDialogProps) {
       )
       return regenerate2FABackupCodes(proof, signal)
     })
-    if (!result) return
+    if (!result) {return}
     setBackupCodes(result.backup_codes)
     toast.success(t('Backup codes regenerated successfully'))
   }

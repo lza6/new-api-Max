@@ -161,7 +161,7 @@ export function ViewLogsDialog({
   }, [logLines, autoScroll])
 
   const handleDownload = () => {
-    if (!logsText.trim()) return
+    if (!logsText.trim()) {return}
     const blob = new Blob([logsText], { type: 'text/plain' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -268,7 +268,7 @@ export function ViewLogsDialog({
           <Combobox
             options={containers.flatMap((c) => {
               const id = c?.container_id
-              if (typeof id !== 'string' || !id) return []
+              if (typeof id !== 'string' || !id) {return []}
               const status =
                 typeof c?.status === 'string' && c.status
                   ? ` (${c.status})`

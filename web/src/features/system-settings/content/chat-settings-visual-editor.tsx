@@ -68,7 +68,7 @@ export function ChatSettingsVisualEditor({
   }, [value])
 
   const filteredChats = useMemo(() => {
-    if (!searchText) return chats
+    if (!searchText) {return chats}
     const lowerSearch = searchText.toLowerCase()
     return chats.filter(
       (chat) =>

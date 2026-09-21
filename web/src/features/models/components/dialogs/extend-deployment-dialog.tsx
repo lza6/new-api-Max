@@ -52,7 +52,7 @@ export function ExtendDeploymentDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (open) setHours(1)
+    if (open) {setHours(1)}
   }, [open])
 
   const { data: detailsRes, isLoading: isLoadingDetails } = useQuery({
@@ -67,14 +67,14 @@ export function ExtendDeploymentDialog({
   const details = detailsRes?.data
 
   const priceParams = useMemo(() => {
-    if (!details) return null
+    if (!details) {return null}
     const hardwareId = toInt(details.hardware_id, 0)
     const gpusPerContainer = toInt(details.gpus_per_container, 0)
     const replicaCount = toInt(details.total_containers, 0)
     const locations = Array.isArray(details.locations) ? details.locations : []
     const locationIds = locations
       .map((x) => {
-        if (!x || typeof x !== 'object') return 0
+        if (!x || typeof x !== 'object') {return 0}
         return toInt((x as Record<string, unknown>)?.id, 0)
       })
       .filter((x) => x > 0)
@@ -120,7 +120,7 @@ export function ExtendDeploymentDialog({
 
   const priceSummary = useMemo(() => {
     const data = priceRes?.data
-    if (!data || typeof data !== 'object') return ''
+    if (!data || typeof data !== 'object') {return ''}
     const record = data as Record<string, unknown>
     const breakdown = record.price_breakdown
     let total: unknown = record.total_cost
@@ -133,14 +133,14 @@ export function ExtendDeploymentDialog({
       total = b.total_cost ?? b.totalCost ?? b.TotalCost ?? total
     }
     const currency = record.currency ?? 'USDC'
-    if (total === undefined || total === null) return ''
+    if (total === undefined || total === null) {return ''}
     return `${String(total)} ${String(currency).toUpperCase()}`.trim()
   }, [priceRes])
 
   const canSubmit = Boolean(deploymentId) && hours > 0 && !isSubmitting
 
   const onSubmit = async () => {
-    if (!deploymentId) return
+    if (!deploymentId) {return}
     const h = toInt(hours, 1)
     if (h <= 0) {
       toast.error(t('Please enter a valid duration'))

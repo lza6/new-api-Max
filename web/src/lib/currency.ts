@@ -231,7 +231,7 @@ function getBillingDisplayMeta(config: CurrencyConfig): DisplayMeta {
 function mergeOptions(
   options?: CurrencyFormatOptions
 ): ResolvedCurrencyFormatOptions {
-  if (!options) return DEFAULT_FORMAT_OPTIONS
+  if (!options) {return DEFAULT_FORMAT_OPTIONS}
   return {
     digitsLarge: options.digitsLarge ?? DEFAULT_FORMAT_OPTIONS.digitsLarge,
     digitsSmall: options.digitsSmall ?? DEFAULT_FORMAT_OPTIONS.digitsSmall,
@@ -262,7 +262,7 @@ export function getCurrencyFractionDigits(
 }
 
 function removeTrailingZeros(str: string): string {
-  if (!str.includes('.')) return str
+  if (!str.includes('.')) {return str}
   return str.replace(/(\.[0-9]*?)0+$/, '$1').replace(/\.$/, '')
 }
 
@@ -287,7 +287,7 @@ function adjustForMinimum(
   digits: number,
   minimumNonZero: number
 ): number {
-  if (value === 0) return value
+  if (value === 0) {return value}
 
   const threshold = minimumNonZero > 0 ? minimumNonZero : Math.pow(10, -digits)
   const abs = Math.abs(value)
@@ -409,7 +409,7 @@ export function formatCurrencyFromUSD(
   amountUSD: number | null | undefined,
   options?: CurrencyFormatOptions
 ): string {
-  if (amountUSD == null || Number.isNaN(amountUSD)) return '-'
+  if (amountUSD == null || Number.isNaN(amountUSD)) {return '-'}
 
   const { config, meta } = getCurrencyDisplay()
   const merged = mergeOptions(options)
@@ -472,7 +472,7 @@ export function formatBillingCurrencyFromUSD(
   amountUSD: number | null | undefined,
   options?: CurrencyFormatOptions
 ): string {
-  if (amountUSD == null || Number.isNaN(amountUSD)) return '-'
+  if (amountUSD == null || Number.isNaN(amountUSD)) {return '-'}
 
   const { config } = getCurrencyDisplay()
   const meta = getBillingDisplayMeta(config)
@@ -517,7 +517,7 @@ export function formatQuotaWithCurrency(
   quota: number | null | undefined,
   options?: CurrencyFormatOptions
 ): string {
-  if (quota == null || Number.isNaN(quota)) return '-'
+  if (quota == null || Number.isNaN(quota)) {return '-'}
 
   const { config } = getCurrencyDisplay()
   const amountUSD = quota / config.quotaPerUnit
@@ -627,7 +627,7 @@ export function formatLocalCurrencyAmount(
   amount: number | null | undefined,
   options?: CurrencyFormatOptions
 ): string {
-  if (amount == null || Number.isNaN(amount)) return '-'
+  if (amount == null || Number.isNaN(amount)) {return '-'}
 
   const { config } = getCurrencyDisplay()
   const meta = getBillingDisplayMeta(config)

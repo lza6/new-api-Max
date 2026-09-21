@@ -157,7 +157,7 @@ export function MessageActions({
     })
   }
 
-  if (actions.length === 0) return null
+  if (actions.length === 0) {return null}
 
   return (
     <>

@@ -27,13 +27,13 @@ const PRESERVED_LOCAL_STORAGE_KEYS = new Set([
 ])
 
 export function initializeFrontendCache(): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') {return}
 
   try {
     const currentVersion = window.localStorage.getItem(
       FRONTEND_CACHE_VERSION_KEY
     )
-    if (currentVersion === FRONTEND_CACHE_VERSION) return
+    if (currentVersion === FRONTEND_CACHE_VERSION) {return}
 
     clearLocalUiCache()
     window.localStorage.setItem(

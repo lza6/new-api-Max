@@ -121,10 +121,10 @@ export function makeUniqueName(
   baseName: string
 ): string {
   const base = (baseName || '').trim() || 'rule'
-  if (!existingNames.has(base)) return base
+  if (!existingNames.has(base)) {return base}
   for (let i = 2; i < 1000; i++) {
     const n = `${base}-${i}`
-    if (!existingNames.has(n)) return n
+    if (!existingNames.has(n)) {return n}
   }
   return `${base}-${Date.now()}`
 }

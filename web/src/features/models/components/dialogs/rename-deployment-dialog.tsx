@@ -48,7 +48,7 @@ export function RenameDeploymentDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   useEffect(() => {
-    if (open) setName(currentName || '')
+    if (open) {setName(currentName || '')}
   }, [open, currentName])
 
   const trimmed = name.trim()
@@ -67,10 +67,10 @@ export function RenameDeploymentDialog({
     checkRes?.success === true ? checkRes?.data?.available : undefined
 
   const helper = useMemo(() => {
-    if (!trimmed) return t('Enter a new name')
-    if (isChecking) return t('Checking name...')
-    if (available === true) return t('Name is available')
-    if (available === false) return t('Name is not available')
+    if (!trimmed) {return t('Enter a new name')}
+    if (isChecking) {return t('Checking name...')}
+    if (available === true) {return t('Name is available')}
+    if (available === false) {return t('Name is not available')}
     return ''
   }, [available, isChecking, t, trimmed])
 
@@ -81,7 +81,7 @@ export function RenameDeploymentDialog({
     !isSubmitting
 
   const onSubmit = async () => {
-    if (!deploymentId) return
+    if (!deploymentId) {return}
     if (!trimmed) {
       toast.error(t('Please enter a name'))
       return

@@ -125,15 +125,15 @@ interface HeroSignal {
 }
 
 function getSavedSetupGuideExpanded(): boolean | null {
-  if (typeof window === 'undefined') return null
+  if (typeof window === 'undefined') {return null}
   const saved = window.localStorage.getItem(SETUP_GUIDE_VISIBILITY_STORAGE_KEY)
-  if (saved === 'expanded') return true
-  if (saved === 'collapsed') return false
+  if (saved === 'expanded') {return true}
+  if (saved === 'collapsed') {return false}
   return null
 }
 
 function saveSetupGuideExpanded(expanded: boolean): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') {return}
   window.localStorage.setItem(
     SETUP_GUIDE_VISIBILITY_STORAGE_KEY,
     expanded ? 'expanded' : 'collapsed'
@@ -141,14 +141,14 @@ function saveSetupGuideExpanded(expanded: boolean): void {
 }
 
 function getCurrentOrigin(): string {
-  if (typeof window === 'undefined') return ''
+  if (typeof window === 'undefined') {return ''}
   return window.location.origin
 }
 
 function normalizeEndpoint(sourceUrl?: string): string {
   const fallback = `${getCurrentOrigin()}/v1/chat/completions`
   const trimmed = sourceUrl?.trim()
-  if (!trimmed) return fallback
+  if (!trimmed) {return fallback}
 
   const withoutTrailingSlash = trimmed.replace(/\/+$/, '')
   if (withoutTrailingSlash.endsWith('/v1/chat/completions')) {
@@ -165,8 +165,8 @@ function getPreferredKey(keys: ApiKey[]): ApiKey | null {
 }
 
 function formatDisplayKey(key?: string): string {
-  if (!key) return 'sk-...'
-  if (key.length <= 14) return key
+  if (!key) {return 'sk-...'}
+  if (key.length <= 14) {return key}
   return `${key.slice(0, 7)}...${key.slice(-4)}`
 }
 
@@ -293,7 +293,7 @@ function RequestPreview(props: {
   })
   const previewLines = previewCurl.split('\n')
   const handleCopyRequest = async () => {
-    if (!props.example.keyId || isCopying) return
+    if (!props.example.keyId || isCopying) {return}
 
     setIsCopying(true)
     try {

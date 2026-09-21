@@ -38,7 +38,7 @@ export class AuthOperationError extends Error {
     error: unknown,
     fallback = 'Verification failed. Please try again.'
   ): AuthOperationError {
-    if (error instanceof AuthOperationError) return error
+    if (error instanceof AuthOperationError) {return error}
     if (axios.isAxiosError<{ message?: string; code?: string }>(error)) {
       return new AuthOperationError(
         getServerErrorMessageKey(error) ||

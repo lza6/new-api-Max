@@ -85,8 +85,8 @@ export function TaskPlugins() {
               checked={enabledQuery.data ?? false}
               disabled={enabledQuery.isLoading || enabledMutation.isPending}
               onCheckedChange={(checked) => {
-                if (checked) enabledMutation.mutate(true)
-                else setConfirmDisable(true)
+                if (checked) {enabledMutation.mutate(true)}
+                else {setConfirmDisable(true)}
               }}
             />
             <Label
@@ -160,7 +160,7 @@ export function TaskPlugins() {
         key={detail?.meta.key ?? ''}
         plugin={detail}
         onOpenChange={(open) => {
-          if (!open) setDetail(null)
+          if (!open) {setDetail(null)}
         }}
       />
       <UploadDialog

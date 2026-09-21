@@ -68,7 +68,7 @@ async function renderFilter(
 ) {
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     if (url === '/api/user/self/groups' || url === '/api/group/') {
-      if (groups === null) throw new Error('Group loading failed')
+      if (groups === null) {throw new Error('Group loading failed')}
       return {
         data: {
           success: true,

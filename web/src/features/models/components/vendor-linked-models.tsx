@@ -239,7 +239,7 @@ export function VendorLinkedModels({
       <ModelMutateDrawer
         open={Boolean(model)}
         onOpenChange={(open) => {
-          if (!open) setModel(null)
+          if (!open) {setModel(null)}
         }}
         currentRow={model}
       />

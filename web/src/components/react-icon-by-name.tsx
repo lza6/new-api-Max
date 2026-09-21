@@ -99,7 +99,7 @@ const ICON_PACK_CANDIDATES: Array<[RegExp, IconPackId[]]> = [
 
 function normalizeIconName(name: string | null | undefined): string | null {
   const trimmed = name?.trim()
-  if (!trimmed || !/^[A-Z][A-Za-z0-9]*$/.test(trimmed)) return null
+  if (!trimmed || !/^[A-Z][A-Za-z0-9]*$/.test(trimmed)) {return null}
   return trimmed
 }
 
@@ -111,7 +111,7 @@ function getCandidatePacks(iconName: string): IconPackId[] {
 
 function loadIconPack(packId: IconPackId): Promise<IconPackModule> {
   const cached = ICON_PACK_CACHE.get(packId)
-  if (cached) return cached
+  if (cached) {return cached}
 
   const promise = ICON_PACK_LOADERS[packId]()
   ICON_PACK_CACHE.set(packId, promise)
@@ -126,7 +126,7 @@ async function resolveReactIcon(iconName: string): Promise<IconType | null> {
   for (const packId of getCandidatePacks(iconName)) {
     try {
       const icon = (await loadIconPack(packId))[iconName]
-      if (isIconComponent(icon)) return icon
+      if (isIconComponent(icon)) {return icon}
     } catch {
       // Missing chunks or unknown packs should behave the same as unknown names.
     }
@@ -152,10 +152,10 @@ export function ReactIconByName({ name, ...props }: ReactIconByNameProps) {
   useEffect(() => {
     let cancelled = false
 
-    if (!iconName) return
+    if (!iconName) {return}
 
     void resolveReactIcon(iconName).then((Icon) => {
-      if (!cancelled) setResolvedIcon({ iconName, Icon })
+      if (!cancelled) {setResolvedIcon({ iconName, Icon })}
     })
 
     return () => {

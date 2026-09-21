@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { StatusBadgeProps } from '@/components/status-badge'
 
-import { type PrefillGroup, type PrefillGroupFormValues } from '../types'
+import type { PrefillGroup, PrefillGroupFormValues } from '../types'
 
 export type PrefillGroupType = PrefillGroup['type']
 
@@ -67,7 +67,7 @@ export const DEFAULT_FORM_VALUES: PrefillGroupFormValues = {
 }
 
 export function parseStringItems(items: PrefillGroup['items']): string[] {
-  if (!items) return []
+  if (!items) {return []}
   if (Array.isArray(items)) {
     return items
       .map((item) => (typeof item === 'string' ? item.trim() : ''))
@@ -92,19 +92,15 @@ export function parseStringItems(items: PrefillGroup['items']): string[] {
 }
 
 export function parseEndpointKeys(items: PrefillGroup['items']): string[] {
-  if (!items) return []
+  if (!items) {return []}
   try {
     const parsed =
       typeof items === 'string' ? JSON.parse(items || '{}') : (items as unknown)
     if (Array.isArray(parsed)) {
-      return parsed
-        .map((item) =>
-          typeof item === 'string'
-            ? item
-            : typeof item?.name === 'string'
-              ? item.name
-              : ''
-        )
+      return parsed.map((item) => {
+        if (typeof item === 'string') return item
+        return typeof item?.name === 'string' ? item.name : ''
+      })
         .filter(Boolean)
     }
     if (parsed && typeof parsed === 'object') {
@@ -117,7 +113,7 @@ export function parseEndpointKeys(items: PrefillGroup['items']): string[] {
 }
 
 export function serializeEndpointItems(items: PrefillGroup['items']): string {
-  if (!items) return ''
+  if (!items) {return ''}
   if (typeof items === 'string') {
     return items
   }

@@ -90,10 +90,10 @@ export function TelegramBindDialog({
   }, [createBindFlow, open])
 
   useEffect(() => {
-    if (!open || !flowToken) return
+    if (!open || !flowToken) {return}
 
     const handleBindResult = (event: MessageEvent<unknown>) => {
-      if (event.origin !== window.location.origin) return
+      if (event.origin !== window.location.origin) {return}
       const result = event.data as {
         type?: string
         flow_token?: string
@@ -123,7 +123,7 @@ export function TelegramBindDialog({
 
   useEffect(() => {
     const container = widgetRef.current
-    if (!container || !callbackUrl) return
+    if (!container || !callbackUrl) {return}
 
     container.replaceChildren()
     const script = document.createElement('script')

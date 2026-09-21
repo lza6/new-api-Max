@@ -23,7 +23,7 @@ const STORAGE_KEY = 'table_compact_modes'
 function getCompactMode(tableKey: string): boolean {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return false
+    if (!raw) {return false}
     const modes = JSON.parse(raw) as Record<string, boolean>
     return Boolean(modes[tableKey])
   } catch {

@@ -56,7 +56,7 @@ export function TaskEventStream({ taskId, className }: TaskEventStreamProps) {
     let retries = 0
 
     const startStream = async (since: number) => {
-      if (cancelled) return
+      if (cancelled) {return}
       setPhase('connecting')
       try {
         const headers = await getFreshAuthHeaders()
@@ -75,7 +75,7 @@ export function TaskEventStream({ taskId, className }: TaskEventStreamProps) {
         let lastSeq = since
         while (true) {
           const { done, value } = await reader.read()
-          if (done) break
+          if (done) {break}
           buffer += decoder.decode(value, { stream: true })
           let splitAt = buffer.indexOf('\n\n')
           while (splitAt >= 0) {
@@ -91,7 +91,7 @@ export function TaskEventStream({ taskId, className }: TaskEventStreamProps) {
                 splitAt = buffer.indexOf('\n\n')
                 continue
               }
-              if (parsed.id) lastSeq = Math.max(lastSeq, parsed.id)
+              if (parsed.id) {lastSeq = Math.max(lastSeq, parsed.id)}
               if (parsed.data) {
                 try {
                   const raw = JSON.parse(parsed.data) as TaskEventEnvelope
@@ -124,8 +124,8 @@ export function TaskEventStream({ taskId, className }: TaskEventStreamProps) {
           }
         }
       } catch (err) {
-        if (cancelled) return
-        if ((err as Error).name === 'AbortError') return
+        if (cancelled) {return}
+        if ((err as Error).name === 'AbortError') {return}
         retries += 1
         if (retries <= MAX_RETRY) {
           setTimeout(() => {

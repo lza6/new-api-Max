@@ -44,7 +44,7 @@ export function ProviderTable(props: ProviderTableProps) {
   )
 
   const handleDelete = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget) {return}
     await deleteProvider.mutateAsync(deleteTarget.id)
     setDeleteTarget(null)
   }

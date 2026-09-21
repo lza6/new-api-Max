@@ -194,7 +194,7 @@ export async function createOAuthAuthorization(
     }
   )
   if (res.data?.success) {
-    if (typeof res.data.data === 'string') return { state: res.data.data }
+    if (typeof res.data.data === 'string') {return { state: res.data.data }}
     if (typeof res.data.data?.flow_token === 'string') {
       return {
         state: res.data.data.flow_token,

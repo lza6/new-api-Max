@@ -38,7 +38,7 @@ export function createObjectValidator<T extends Record<string, unknown>>(
   requiredKeys: (keyof T)[]
 ): (data: unknown) => data is T {
   return (data): data is T => {
-    if (!isObjectRecord(data)) return false
+    if (!isObjectRecord(data)) {return false}
     return requiredKeys.every((key) => key in data)
   }
 }
@@ -47,7 +47,7 @@ export function createArrayValidator<T>(
   itemValidator: (item: unknown) => item is T
 ): (data: unknown) => data is T[] {
   return (data): data is T[] => {
-    if (!Array.isArray(data)) return false
+    if (!Array.isArray(data)) {return false}
     return data.every(itemValidator)
   }
 }

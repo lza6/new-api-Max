@@ -50,7 +50,7 @@ const legacySettingsTabs: Record<string, string> = {
 }
 
 function normalizeLegacyPath(pathname: string): string {
-  if (pathname === '/') return pathname
+  if (pathname === '/') {return pathname}
   return pathname.replace(/\/+$/, '')
 }
 
@@ -95,7 +95,7 @@ export function resolveLegacyRoute(rawHref: string): string | null {
   }
 
   const target = legacyConsoleRoutes[pathname]
-  if (target) return buildTargetHref(target, source)
+  if (target) {return buildTargetHref(target, source)}
   if (pathname.startsWith('/console/')) {
     return buildTargetHref('/dashboard', source)
   }

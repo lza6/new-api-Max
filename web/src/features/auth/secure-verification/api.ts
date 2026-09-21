@@ -89,7 +89,7 @@ function withDeviceAvailability(
 }
 
 export function isLoginChallenge(value: unknown): value is LoginChallenge {
-  if (!value || typeof value !== 'object') return false
+  if (!value || typeof value !== 'object') {return false}
   const challenge = value as Partial<LoginChallenge>
   return (
     challenge.require_verification === true &&
@@ -185,7 +185,7 @@ export async function verifyLogin(
     )
   }
   signal.throwIfAborted()
-  if (!isAuthBundle(result)) throw new AuthOperationError('Login failed')
+  if (!isAuthBundle(result)) {throw new AuthOperationError('Login failed')}
   return result
 }
 

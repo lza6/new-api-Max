@@ -127,7 +127,7 @@ export function TierPriceFields(props: TierPriceFieldsProps) {
   )
   const [mediaOpen, setMediaOpen] = useState(hasMediaPricing)
   useEffect(() => {
-    if (hasMediaPricing) setMediaOpen(true)
+    if (hasMediaPricing) {setMediaOpen(true)}
   }, [hasMediaPricing])
   const renderPriceVariable = (variable: {
     key: VisualPrice['variable']

@@ -56,7 +56,7 @@ export function useDebouncedColumnFilter({
   }, [value])
 
   React.useEffect(() => {
-    if (debouncedValue === value) return
+    if (debouncedValue === value) {return}
 
     onColumnFiltersChangeRef.current((previous) => {
       const filters = previous.filter((filter) => filter.id !== columnId)

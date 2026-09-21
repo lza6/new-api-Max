@@ -100,7 +100,7 @@ function OAuthCallback() {
   }
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
+    if (typeof window === 'undefined') {return}
 
     const code = search.code ?? ''
     const state = callbackState
@@ -157,7 +157,7 @@ function OAuthCallback() {
         }
         cancelResultTimeout()
         if (result.success) {
-          if (mode === 'bind') toast.success(i18next.t('Binding successful!'))
+          if (mode === 'bind') {toast.success(i18next.t('Binding successful!'))}
           window.close()
           return
         }
@@ -187,7 +187,7 @@ function OAuthCallback() {
       return () => {
         window.removeEventListener('message', handleBindingResult)
         cancelResultTimeout()
-        if (delayedClose !== undefined) window.clearTimeout(delayedClose)
+        if (delayedClose !== undefined) {window.clearTimeout(delayedClose)}
       }
     }
 
@@ -204,7 +204,7 @@ function OAuthCallback() {
     }
 
     const loginKey = `${provider}:${state}:${code}`
-    if (completedLogin.current === loginKey) return
+    if (completedLogin.current === loginKey) {return}
     let active = true
     void (async () => {
       try {
@@ -225,7 +225,7 @@ function OAuthCallback() {
           }
         }
         const response = await loginExchange.current.request
-        if (!active) return
+        if (!active) {return}
         if (response.data?.success) {
           completedLogin.current = loginKey
           if (
@@ -246,7 +246,7 @@ function OAuthCallback() {
             : response.data?.message || i18next.t('OAuth failed')
         )
       } catch (error: unknown) {
-        if (!active) return
+        if (!active) {return}
         handleServerError(
           AuthOperationError.from(error, i18next.t('OAuth failed'))
         )

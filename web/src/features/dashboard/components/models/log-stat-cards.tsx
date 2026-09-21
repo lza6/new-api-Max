@@ -93,13 +93,13 @@ export function LogStatCards(props: LogStatCardsProps) {
 
     void getUserQuotaDates(buildQueryParams(timeRange, filters), isAdmin)
       .then((res) => {
-        if (abortController.signal.aborted) return
+        if (abortController.signal.aborted) {return}
         const data = res?.data || []
         setStats(calculateDashboardStats(data))
         onDataUpdate?.(data, false)
       })
       .catch(() => {
-        if (abortController.signal.aborted) return
+        if (abortController.signal.aborted) {return}
         setStats(null)
         setError(true)
         onDataUpdate?.([], false)

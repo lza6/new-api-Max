@@ -59,7 +59,7 @@ import { safeNumberFieldProps } from '../utils/numeric-field'
 
 const numericString = z.string().refine((value) => {
   const trimmed = value.trim()
-  if (!trimmed) return true
+  if (!trimmed) {return true}
   return !Number.isNaN(Number(trimmed)) && Number(trimmed) >= 0
 }, 'Enter a non-negative number or leave empty')
 

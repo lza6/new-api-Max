@@ -75,7 +75,7 @@ export function FormNavigationGuard({
 
   // Handle browser navigation (refresh, close tab)
   useEffect(() => {
-    if (!when) return
+    if (!when) {return}
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()
@@ -91,7 +91,7 @@ export function FormNavigationGuard({
     <ConfirmDialog
       open={showDialog}
       onOpenChange={(open) => {
-        if (!open) handleCancel()
+        if (!open) {handleCancel()}
       }}
       title={resolvedTitle}
       desc={resolvedMessage}

@@ -126,7 +126,7 @@ describe('local billing expression evaluation', () => {
       usage: fixture.usage,
     })
     expect(result.status).toBe('success')
-    if (result.status !== 'success') return
+    if (result.status !== 'success') {return}
     expect(result.cost).toBeCloseTo(fixture.cost, 9)
     expect(result.matchedTier).toBe(fixture.tier)
     if (fixture.billingUnit) {
@@ -174,7 +174,7 @@ describe('local billing expression evaluation', () => {
   test('recognizes real variable dependencies without scanning strings', () => {
     const result = compileBillingExpression('tier("cr weekday", p * 2 + c * 3)')
     expect(result.status).toBe('ready')
-    if (result.status !== 'ready') return
+    if (result.status !== 'ready') {return}
     expect([...result.variables]).toEqual(['p', 'c'])
     expect([...result.functions]).toEqual(['tier'])
   })
@@ -276,7 +276,7 @@ describe('visual billing document', () => {
     tier.label = 'peak "quoted" \n'
     const result = serializeVisualBillingDocument(document)
     expect(result.ok).toBe(true)
-    if (!result.ok) return
+    if (!result.ok) {return}
     expect(
       evaluateBillingExpression(result.source, {
         now: new Date('2026-09-07T10:00:00+08:00'),
@@ -298,7 +298,7 @@ describe('visual billing document', () => {
     const document = parseVisualBillingDocument(deepSeekExpression)
     assert(document)
     const result = serializeVisualBillingDocument(document)
-    if (!result.ok) throw new Error('Expected valid document')
+    if (!result.ok) {throw new Error('Expected valid document')}
     expect(
       evaluateBillingExpression(result.source, {
         now: new Date(now),
@@ -320,10 +320,10 @@ describe('visual billing document', () => {
     }
     const range = document.root.condition
     const end = range.children[1]
-    if (end.kind !== 'comparison') throw new Error('Expected end')
+    if (end.kind !== 'comparison') {throw new Error('Expected end')}
     range.children[1] = { ...end, operator: '<=', value: '6' }
     const inclusive = serializeVisualBillingDocument(document)
-    if (!inclusive.ok) throw new Error('Expected valid inclusive end')
+    if (!inclusive.ok) {throw new Error('Expected valid inclusive end')}
     for (const hour of ['00', '06', '21', '23']) {
       expect(
         evaluateBillingExpression(inclusive.source, {
@@ -338,7 +338,7 @@ describe('visual billing document', () => {
       children: [range.children[0], { ...end, value: '24' }],
     }
     const untilMidnight = serializeVisualBillingDocument(document)
-    if (!untilMidnight.ok) throw new Error('Expected valid midnight end')
+    if (!untilMidnight.ok) {throw new Error('Expected valid midnight end')}
     expect(
       evaluateBillingExpression(untilMidnight.source, {
         now: new Date('2026-09-07T23:59:00Z'),
@@ -358,7 +358,7 @@ describe('visual billing document', () => {
       'hour("UTC") >= 9 ? (len < 100 ? tier("short", p * 1) : tier("long", p * 2)) : tier("off", p * 3)'
     )
     assert(document)
-    if (document.root.kind !== 'branch') throw new Error('Expected branch')
+    if (document.root.kind !== 'branch') {throw new Error('Expected branch')}
     document.root.condition = {
       id: visualNodeId(),
       kind: 'not',
@@ -379,7 +379,7 @@ describe('visual billing document', () => {
       },
     }
     const result = serializeVisualBillingDocument(document)
-    if (!result.ok) throw new Error('Expected negated branch')
+    if (!result.ok) {throw new Error('Expected negated branch')}
     expect(
       evaluateBillingExpression(result.source, {
         now: new Date('2026-09-07T08:00:00Z'),
@@ -397,7 +397,7 @@ describe('visual billing document', () => {
   test('rejects incomplete groups, invalid prices and invalid time bounds without returning partial source', () => {
     const document = parseVisualBillingDocument(deepSeekExpression)
     assert(document)
-    if (document.root.kind !== 'branch') throw new Error('Expected branch')
+    if (document.root.kind !== 'branch') {throw new Error('Expected branch')}
     const condition = document.root.condition
     for (const value of ['', '-1', 'NaN', 'Infinity', '1.5', '25']) {
       document.root.condition = {
@@ -421,7 +421,7 @@ describe('visual billing document', () => {
       ok: false,
     })
     document.root.condition = condition
-    if (document.root.yes.kind !== 'tier') throw new Error('Expected peak tier')
+    if (document.root.yes.kind !== 'tier') {throw new Error('Expected peak tier')}
     document.root.yes.prices[0].value = ''
     expect(serializeVisualBillingDocument(document)).toMatchObject({
       ok: false,

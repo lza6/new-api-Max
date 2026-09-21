@@ -49,7 +49,7 @@ function resolveContentSettings(
   settings: ContentSettings,
   raw: SystemOption[] | undefined
 ): ContentSettings {
-  if (!raw || raw.length === 0) return settings
+  if (!raw || raw.length === 0) {return settings}
 
   const optionMap = new Map(raw.map((item) => [item.key, item.value]))
   const next = { ...settings }

@@ -26,12 +26,12 @@ function debounce(
   let timeoutId: ReturnType<typeof setTimeout> | null = null
 
   const debounced = ((value: string[]) => {
-    if (timeoutId) clearTimeout(timeoutId)
+    if (timeoutId) {clearTimeout(timeoutId)}
     timeoutId = setTimeout(() => fn(value), delay)
   }) as ((value: string[]) => void) & { cancel: () => void }
 
   debounced.cancel = () => {
-    if (timeoutId) clearTimeout(timeoutId)
+    if (timeoutId) {clearTimeout(timeoutId)}
   }
 
   return debounced

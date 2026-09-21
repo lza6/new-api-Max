@@ -195,7 +195,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
   const enabledModelsErrorMessage = enabledModelsQuery.data?.message
 
   useEffect(() => {
-    if (!enabledModelsError) return
+    if (!enabledModelsError) {return}
     handleServerError(
       enabledModelsQuery.error ?? enabledModelsQuery.data,
       t('Failed to load enabled models')
@@ -225,7 +225,7 @@ export const ModelRatioForm = memo(function ModelRatioForm({
   const handleSave = useCallback(async () => {
     if (editMode === 'visual') {
       const committed = await visualEditorRef.current?.commitOpenEditor()
-      if (committed === false) return
+      if (committed === false) {return}
     }
 
     await form.handleSubmit(onSave)()

@@ -38,7 +38,7 @@ export function encodeChannelConnectionInfo(key: string, url: string): string {
 export function parseChannelConnectionInfo(
   text: string | null | undefined
 ): ChannelConnectionInfo | null {
-  if (!text || typeof text !== 'string') return null
+  if (!text || typeof text !== 'string') {return null}
 
   try {
     const parsed: unknown = JSON.parse(text.trim())

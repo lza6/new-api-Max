@@ -124,17 +124,17 @@ export function CheckinCalendarCard({
   const todayAward = checkinRecordsMap[todayString]
 
   useEffect(() => {
-    if (initialLoaded) return
-    if (isLoading) return
-    if (!checkinData) return
+    if (initialLoaded) {return}
+    if (isLoading) {return}
+    if (!checkinData) {return}
     setCollapsed(checkedToday)
     setInitialLoaded(true)
   }, [checkinData, checkedToday, initialLoaded, isLoading])
 
   const shouldTriggerTurnstile = useCallback(
     (message?: string) => {
-      if (!turnstileEnabled) return false
-      if (typeof message !== 'string') return true
+      if (!turnstileEnabled) {return false}
+      if (typeof message !== 'string') {return true}
       return message.includes('Turnstile')
     },
     [turnstileEnabled]

@@ -77,7 +77,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
   }, [props.open, props.epayMethods])
 
   const plan = props.plan?.plan
-  if (!plan) return null
+  if (!plan) {return null}
 
   const hasStripe = props.enableStripe && !!plan.stripe_price_id
   const hasCreem = props.enableCreem && !!plan.creem_product_id

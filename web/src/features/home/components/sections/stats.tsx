@@ -40,20 +40,20 @@ function Counter(props: CounterProps) {
 
   const animate = useCallback(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {return}
     const start = performance.now()
     const step = (now: number) => {
       const progress = Math.min((now - start) / duration, 1)
       const eased = 1 - Math.pow(1 - progress, 3)
       el.textContent = `${prefix}${formatValue(eased * end)}${suffix}`
-      if (progress < 1) requestAnimationFrame(step)
+      if (progress < 1) {requestAnimationFrame(step)}
     }
     requestAnimationFrame(step)
   }, [end, duration, prefix, suffix, formatValue])
 
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {return}
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (mq.matches) {

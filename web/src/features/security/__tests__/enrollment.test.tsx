@@ -72,7 +72,7 @@ afterEach(() => {
   vi.unstubAllGlobals()
   if (credentialsDescriptor) {
     Object.defineProperty(navigator, 'credentials', credentialsDescriptor)
-  } else Reflect.deleteProperty(navigator, 'credentials')
+  } else {Reflect.deleteProperty(navigator, 'credentials')}
 })
 
 it.each(['2fa', 'passkey'] as const)(
@@ -185,7 +185,7 @@ it('refreshes Telegram bindings from the server result after the callback popup 
     </QueryClientProvider>
   )
   const telegram = (await screen.findByText('Telegram')).closest('li')
-  if (!telegram) throw new Error('Telegram binding entry is missing')
+  if (!telegram) {throw new Error('Telegram binding entry is missing')}
   await user.click(within(telegram).getByRole('button', { name: 'Bind' }))
   const verification = await screen.findByRole('dialog', {
     name: 'Security verification',

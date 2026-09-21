@@ -414,7 +414,7 @@ export function PluginsTable(props: PluginsTableProps) {
       <ConfirmDialog
         open={Boolean(statusConfirmation)}
         onOpenChange={(open) => {
-          if (!open && !statusMutation.isPending) setStatusConfirmation(null)
+          if (!open && !statusMutation.isPending) {setStatusConfirmation(null)}
         }}
         title={
           statusConfirmation?.enabled
@@ -439,7 +439,7 @@ export function PluginsTable(props: PluginsTableProps) {
         isLoading={statusMutation.isPending}
         confirmText={statusConfirmation?.enabled ? t('Enable') : t('Disable')}
         handleConfirm={() => {
-          if (!statusConfirmation || statusMutation.isPending) return
+          if (!statusConfirmation || statusMutation.isPending) {return}
           setStatusTarget(statusConfirmation.plugin)
           statusMutation.mutate({
             key: statusConfirmation.plugin.meta.key,
@@ -450,14 +450,14 @@ export function PluginsTable(props: PluginsTableProps) {
       <ConfirmDialog
         open={Boolean(rejectTarget)}
         onOpenChange={(open) => {
-          if (!open) setRejectTarget(null)
+          if (!open) {setRejectTarget(null)}
         }}
         title={t('Reject plugin version?')}
         destructive
         isLoading={approvalMutation.isPending}
         confirmText={t('Reject')}
         handleConfirm={() => {
-          if (!rejectTarget) return
+          if (!rejectTarget) {return}
           approvalMutation.mutate({
             key: rejectTarget.meta.key,
             version: rejectTarget.meta.version,
@@ -471,14 +471,14 @@ export function PluginsTable(props: PluginsTableProps) {
       <ConfirmDialog
         open={Boolean(deleteTarget)}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null)
+          if (!open) {setDeleteTarget(null)}
         }}
         title={t('Delete plugin version?')}
         destructive
         isLoading={deleteMutation.isPending}
         confirmText={t('Delete')}
         handleConfirm={() => {
-          if (deleteTarget) deleteMutation.mutate(deleteTarget)
+          if (deleteTarget) {deleteMutation.mutate(deleteTarget)}
         }}
         desc={
           hasFactoryFallback

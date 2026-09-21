@@ -77,7 +77,7 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
     )
   }
 
-  if (!profile) return null
+  if (!profile) {return null}
 
   const displayName = getDisplayName(profile)
   const avatarName = profile.username || displayName

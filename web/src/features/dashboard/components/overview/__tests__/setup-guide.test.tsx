@@ -55,7 +55,7 @@ beforeEach(() => {
   vi.spyOn(api, 'get').mockImplementation(async (url) => {
     switch (url) {
       case '/api/token/?p=1&size=10':
-        if (keyLookupError) throw keyLookupError
+        if (keyLookupError) {throw keyLookupError}
         return {
           data: {
             success: true,

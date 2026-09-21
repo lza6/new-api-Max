@@ -51,9 +51,9 @@ type ToolPriceRow = {
 }
 
 function parseToolPrice(value: string): number | null {
-  if (value.trim() === '') return null
+  if (value.trim() === '') {return null}
   const price = Number(value)
-  if (!Number.isFinite(price) || price < 0) return null
+  if (!Number.isFinite(price) || price < 0) {return null}
   return price
 }
 
@@ -61,9 +61,9 @@ function rowsToObject(rows: ToolPriceRow[]): Record<string, number> {
   const prices: Record<string, number> = {}
   for (const row of rows) {
     const k = row.key.trim()
-    if (!k) continue
+    if (!k) {continue}
     const price = parseToolPrice(row.price)
-    if (price === null) continue
+    if (price === null) {continue}
     prices[k] = price
   }
   return prices
@@ -80,7 +80,7 @@ function objectToRows(prices: Record<string, number>): ToolPriceRow[] {
 function parseInitialPrices(
   rawValue: string | undefined
 ): Record<string, number> {
-  if (!rawValue) return { ...DEFAULT_PRICES }
+  if (!rawValue) {return { ...DEFAULT_PRICES }}
   try {
     const parsed = JSON.parse(rawValue) as unknown
     if (

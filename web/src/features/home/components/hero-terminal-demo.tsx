@@ -176,7 +176,7 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
 
   useEffect(() => {
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    if (mq.matches) return
+    if (mq.matches) {return}
 
     intervalRef.current = setInterval(() => {
       setTransitioning(true)
@@ -187,15 +187,15 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
     }, CYCLE_INTERVAL)
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current)
-      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      if (intervalRef.current) {clearInterval(intervalRef.current)}
+      if (timeoutRef.current) {clearTimeout(timeoutRef.current)}
     }
   }, [])
 
   const handleSelect = (index: number) => {
-    if (index === activeIndex) return
-    if (intervalRef.current) clearInterval(intervalRef.current)
-    if (timeoutRef.current) clearTimeout(timeoutRef.current)
+    if (index === activeIndex) {return}
+    if (intervalRef.current) {clearInterval(intervalRef.current)}
+    if (timeoutRef.current) {clearTimeout(timeoutRef.current)}
     setTransitioning(true)
     timeoutRef.current = setTimeout(() => {
       setActiveIndex(index)
@@ -227,6 +227,7 @@ export function HeroTerminalDemo(props: HeroTerminalDemoProps) {
             const isActive = index === activeIndex
             return (
               <button
+                type='button'
                 key={item.id}
                 onClick={() => handleSelect(index)}
                 className={cn(
@@ -392,18 +393,18 @@ const STRING_RE = /"[^"]*"/g
 const PLACEHOLDER_RE = /<[a-z]+>/gi
 
 function renderJsonLine(line: string): ReactNode {
-  if (!line.trim()) return <Muted> </Muted>
+  if (!line.trim()) {return <Muted> </Muted>}
   return tokenize(line)
 }
 
 function renderResponseLine(line: string, demo: ApiDemoConfig): ReactNode {
-  if (!line.trim()) return <Muted> </Muted>
+  if (!line.trim()) {return <Muted> </Muted>}
 
   const segments: ReactNode[] = []
   let cursor = 0
   const matches = [...line.matchAll(PLACEHOLDER_RE)]
 
-  if (matches.length === 0) return tokenize(line)
+  if (matches.length === 0) {return tokenize(line)}
 
   matches.forEach((match, idx) => {
     const start = match.index ?? 0

@@ -39,7 +39,7 @@ export function useTwoFA(enabled = true) {
   const [error, setError] = useState<string>()
 
   const fetchStatus = useCallback(async () => {
-    if (!enabled) return
+    if (!enabled) {return}
 
     try {
       setLoading(true)

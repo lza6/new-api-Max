@@ -48,7 +48,7 @@ export function isBreakdownTierMatched(
   fixedPrice?: number
 ): boolean {
   if (!('unitPrices' in tier) && billingUnit) {
-    if ((tier.billingUnit ?? 'token') !== billingUnit) return false
+    if ((tier.billingUnit ?? 'token') !== billingUnit) {return false}
     if (
       billingUnit === 'request' &&
       fixedPrice !== undefined &&

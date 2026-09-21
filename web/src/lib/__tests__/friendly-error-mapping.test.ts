@@ -38,7 +38,7 @@ function apiError(data: unknown): unknown {
 describe('getFriendlyErrorMessage (B6-2)', () => {
   beforeAll(() => {
     const resources: Record<string, string> = {}
-    for (const key of FRIENDLY_KEYS) resources[key] = key
+    for (const key of FRIENDLY_KEYS) {resources[key] = key}
     i18next.addResourceBundle('en', 'translation', resources)
   })
 

@@ -57,7 +57,7 @@ function simpleAverage(
 
   for (const row of rows) {
     const value = Number(row[metric])
-    if (!isValid(value)) continue
+    if (!isValid(value)) {continue}
     total += value
     count++
   }

@@ -170,7 +170,7 @@ export function AutoGroupOrderEditor(props: AutoGroupOrderEditorProps) {
   )
 
   const handleAdd = (group: string) => {
-    if (atLimit || props.value.includes(group)) return
+    if (atLimit || props.value.includes(group)) {return}
     props.onChange({
       groups: [...props.value, group],
       mode: 'custom',
@@ -186,7 +186,7 @@ export function AutoGroupOrderEditor(props: AutoGroupOrderEditorProps) {
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1
-    if (targetIndex < 0 || targetIndex >= props.value.length) return
+    if (targetIndex < 0 || targetIndex >= props.value.length) {return}
     const next = [...props.value]
     ;[next[index], next[targetIndex]] = [next[targetIndex], next[index]]
     props.onChange({ groups: next, mode: 'custom' })

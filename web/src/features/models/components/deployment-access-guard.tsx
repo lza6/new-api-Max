@@ -37,8 +37,8 @@ type LoadingPhase = 'idle' | 'settings' | 'connection' | 'done'
 type StepStatus = 'pending' | 'loading' | 'done'
 
 function getSettingsStatus(phase: LoadingPhase): StepStatus {
-  if (phase === 'settings') return 'loading'
-  if (phase === 'connection' || phase === 'done') return 'done'
+  if (phase === 'settings') {return 'loading'}
+  if (phase === 'connection' || phase === 'done') {return 'done'}
   return 'pending'
 }
 
@@ -46,8 +46,8 @@ function getConnectionStatus(
   phase: LoadingPhase,
   connectionOk: boolean | null
 ): StepStatus {
-  if (phase === 'connection') return 'loading'
-  if (phase === 'done' && connectionOk) return 'done'
+  if (phase === 'connection') {return 'loading'}
+  if (phase === 'done' && connectionOk) {return 'done'}
   return 'pending'
 }
 
@@ -199,5 +199,5 @@ export function DeploymentAccessGuard({
     )
   }
 
-  return <>{children}</>
+  return children
 }

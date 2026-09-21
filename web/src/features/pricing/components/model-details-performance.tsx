@@ -82,7 +82,7 @@ type PerformanceRow = {
 }
 
 function toUptimePct(value: number): number {
-  if (!Number.isFinite(value)) return 0
+  if (!Number.isFinite(value)) {return 0}
   const clamped = Math.min(100, Math.max(0, value))
   return Math.round(clamped * 100) / 100
 }
@@ -91,7 +91,7 @@ function toLatencySeries(groups: PerformanceGroup[]) {
   const byTs = new Map<number, number[]>()
   for (const group of groups) {
     for (const point of group.series) {
-      if (point.avg_ttft_ms <= 0) continue
+      if (point.avg_ttft_ms <= 0) {continue}
       const current = byTs.get(point.ts) ?? []
       current.push(point.avg_ttft_ms)
       byTs.set(point.ts, current)
@@ -117,7 +117,7 @@ function toUptimeSeries(groups: PerformanceGroup[]): UptimeDayPoint[] {
       if (Number.isFinite(point.success_rate)) {
         const successRate = toUptimePct(point.success_rate)
         current.rates.push(successRate)
-        if (successRate < 100) current.incidents += 1
+        if (successRate < 100) {current.incidents += 1}
       }
       byTs.set(point.ts, current)
     }
@@ -156,7 +156,7 @@ function average(
   field: 'avg_ttft_ms' | 'avg_latency_ms'
 ) {
   const values = rows.map((row) => row[field]).filter((value) => value > 0)
-  if (values.length === 0) return 0
+  if (values.length === 0) {return 0}
   return Math.round(
     values.reduce((sum, value) => sum + value, 0) / values.length
   )

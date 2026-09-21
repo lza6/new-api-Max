@@ -47,7 +47,7 @@ function getBucketIndex(
   end: number,
   bucketCount: number
 ): number {
-  if (end <= start) return 0
+  if (end <= start) {return 0}
   const ratio = (timestamp - start) / (end - start)
   return Math.min(bucketCount - 1, Math.max(0, Math.floor(ratio * bucketCount)))
 }
@@ -95,8 +95,8 @@ function getSummarySparkline(
   key: string,
   sparklineData: Record<SummarySparklineKey, number[]>
 ): number[] | undefined {
-  if (key === 'usage') return sparklineData.usage
-  if (key === 'requests') return sparklineData.requests
+  if (key === 'usage') {return sparklineData.usage}
+  if (key === 'requests') {return sparklineData.requests}
   return undefined
 }
 
@@ -104,18 +104,18 @@ function getRunwayDays(
   remainQuota: number,
   recentUsage: number
 ): number | null {
-  if (remainQuota <= 0 || recentUsage <= 0) return null
+  if (remainQuota <= 0 || recentUsage <= 0) {return null}
   const days = remainQuota / recentUsage
-  if (!Number.isFinite(days)) return null
+  if (!Number.isFinite(days)) {return null}
   return days
 }
 
 type HealthLevel = 'healthy' | 'caution' | 'critical'
 
 function getHealthLevel(remainQuota: number, recentUsage: number): HealthLevel {
-  if (remainQuota <= 0) return 'critical'
+  if (remainQuota <= 0) {return 'critical'}
   const days = getRunwayDays(remainQuota, recentUsage)
-  if (days !== null && days < 3) return 'caution'
+  if (days !== null && days < 3) {return 'caution'}
   return 'healthy'
 }
 

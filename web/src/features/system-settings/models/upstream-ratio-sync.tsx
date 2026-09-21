@@ -69,9 +69,9 @@ import {
 import { UpstreamRatioSyncTable } from './upstream-ratio-sync-table'
 
 function getDefaultEndpointForChannel(channel: UpstreamChannel): string {
-  if (channel.id === MODELS_DEV_PRESET_ID) return MODELS_DEV_PRESET_ENDPOINT
-  if (channel.id === OFFICIAL_CHANNEL_ID) return OFFICIAL_CHANNEL_ENDPOINT
-  if (channel.type === OPENROUTER_CHANNEL_TYPE) return OPENROUTER_ENDPOINT
+  if (channel.id === MODELS_DEV_PRESET_ID) {return MODELS_DEV_PRESET_ENDPOINT}
+  if (channel.id === OFFICIAL_CHANNEL_ID) {return OFFICIAL_CHANNEL_ENDPOINT}
+  if (channel.type === OPENROUTER_CHANNEL_TYPE) {return OPENROUTER_ENDPOINT}
   return DEFAULT_ENDPOINT
 }
 
@@ -99,7 +99,7 @@ export function UpstreamRatioSync() {
   })
   const channels = useMemo(() => channelsData?.data ?? [], [channelsData?.data])
   useEffect(() => {
-    if (!channels.length) return
+    if (!channels.length) {return}
     setChannelEndpoints((previous) => {
       const next = { ...previous }
       for (const channel of channels) {
@@ -172,7 +172,7 @@ export function UpstreamRatioSync() {
   })
   const syncMutation = useMutation({
     mutationFn: async () => {
-      if (!pricingBaseline) throw new Error(t('Reload pricing'))
+      if (!pricingBaseline) {throw new Error(t('Reload pricing'))}
       const after = applyPriceSyncSelections(
         pricingBaseline.options,
         resolutions
@@ -255,7 +255,7 @@ export function UpstreamRatioSync() {
   const handleUnselectPrices = useCallback((models: string[]) => {
     setSelectedSources((previous) => {
       const next = { ...previous }
-      for (const name of models) delete next[name]
+      for (const name of models) {delete next[name]}
       return next
     })
   }, [])
@@ -264,7 +264,7 @@ export function UpstreamRatioSync() {
       ([model, source]) => {
         const row = prices[model]
         const selected: PricingSyncValues | undefined = row?.upstreams[source]
-        if (!row || !selected) return []
+        if (!row || !selected) {return []}
         return [
           {
             model,
@@ -362,7 +362,7 @@ export function UpstreamRatioSync() {
       <ConflictConfirmDialog
         open={conflictDialogOpen}
         onOpenChange={(open) => {
-          if (!syncMutation.isPending) setConflictDialogOpen(open)
+          if (!syncMutation.isPending) {setConflictDialogOpen(open)}
         }}
         conflicts={conflictItems}
         onConfirm={() => syncMutation.mutate()}

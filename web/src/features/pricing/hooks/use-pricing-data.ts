@@ -45,7 +45,7 @@ export function usePricingData(enabled = true) {
   )
 
   const models = useMemo(() => {
-    if (!data?.data || !data?.vendors) return []
+    if (!data?.data || !data?.vendors) {return []}
 
     const vendorMap = new Map(data.vendors.map((v) => [v.id, v]))
 

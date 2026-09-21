@@ -37,7 +37,7 @@ const STORAGE_KEYS = {
  * Get affiliate code from localStorage
  */
 export function getAffiliateCode(): string {
-  if (typeof window === 'undefined') return ''
+  if (typeof window === 'undefined') {return ''}
   try {
     return window.localStorage.getItem(STORAGE_KEYS.AFFILIATE) ?? ''
   } catch (error) {
@@ -51,7 +51,7 @@ export function getAffiliateCode(): string {
  * Save affiliate code to localStorage
  */
 export function saveAffiliateCode(code: string): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') {return}
   try {
     window.localStorage.setItem(STORAGE_KEYS.AFFILIATE, code)
   } catch (error) {

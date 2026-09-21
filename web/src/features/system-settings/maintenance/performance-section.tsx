@@ -136,13 +136,13 @@ const normalizeFormValues = (values: PerfFormValues): FlatPerfDefaults => ({
 })
 
 function formatBytes(bytes: number, decimals = 2): string {
-  if (!bytes || Number.isNaN(bytes)) return '0 Bytes'
-  if (bytes === 0) return '0 Bytes'
-  if (bytes < 0) return `-${formatBytes(-bytes, decimals)}`
+  if (!bytes || Number.isNaN(bytes)) {return '0 Bytes'}
+  if (bytes === 0) {return '0 Bytes'}
+  if (bytes < 0) {return `-${formatBytes(-bytes, decimals)}`}
   const k = 1024
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k))
-  if (i < 0 || i >= sizes.length) return `${bytes} Bytes`
+  if (i < 0 || i >= sizes.length) {return `${bytes} Bytes`}
   return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${
     sizes[i]
   }`
@@ -207,7 +207,7 @@ export function PerformanceSection(props: Props) {
 
   useEffect(() => {
     const serialized = JSON.stringify(props.defaultValues)
-    if (serialized === baselineSerializedRef.current) return
+    if (serialized === baselineSerializedRef.current) {return}
     baselineRef.current = props.defaultValues
     baselineSerializedRef.current = serialized
     form.reset(buildFormDefaults(props.defaultValues))

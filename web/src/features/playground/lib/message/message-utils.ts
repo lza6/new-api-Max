@@ -165,7 +165,7 @@ export function formatMessageForAPI(message: Message): ChatCompletionMessage {
  * Excludes loading/streaming assistant messages and empty content
  */
 export function isValidMessage(message: Message): boolean {
-  if (!message || !message.from || !message.versions.length) return false
+  if (!message || !message.from || !message.versions.length) {return false}
 
   // Exclude empty assistant messages (loading/streaming placeholders)
   if (message.from === MESSAGE_ROLES.ASSISTANT && !hasMessageContent(message)) {

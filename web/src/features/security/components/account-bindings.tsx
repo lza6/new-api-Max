@@ -98,7 +98,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
   )
 
   const fetchCustomBindings = useCallback(async () => {
-    if (!customProviders || customProviders.length === 0) return
+    if (!customProviders || customProviders.length === 0) {return}
     try {
       const res = await getSelfOAuthBindings()
       if (res.success && res.data) {
@@ -114,7 +114,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
   }, [fetchCustomBindings])
 
   const handleUnbindCustom = async () => {
-    if (!unbindTarget) return
+    if (!unbindTarget) {return}
     const target = unbindTarget
     setUnbindTarget(null)
     const result = await security.run(async (signal) => {
@@ -162,13 +162,13 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
         notification_warning: false,
       }
     })
-    if (prepared) setPreparedBinding(prepared)
+    if (prepared) {setPreparedBinding(prepared)}
   }
 
   // A separate user click opens the provider popup. Opening it after an async
   // verification response would otherwise be blocked by browsers such as Safari.
   const completeOAuthBinding = async () => {
-    if (!preparedBinding) return
+    if (!preparedBinding) {return}
     const prepared = preparedBinding
     setPreparedBinding(null)
     const result = await security.run(async (signal) => {
@@ -223,7 +223,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
     closeDialogs()
   }, [security.sessionKey, closeDialogs])
 
-  if (!profile || !status || loading) return null
+  if (!profile || !status || loading) {return null}
 
   const bindings: BindingItem[] = [
     {
@@ -437,7 +437,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
       <ConfirmDialog
         open={preparedBinding !== null}
         onOpenChange={(open) => {
-          if (!open) setPreparedBinding(null)
+          if (!open) {setPreparedBinding(null)}
         }}
         title={t('Continue account binding')}
         desc={t(

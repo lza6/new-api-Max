@@ -84,7 +84,7 @@ function readStaticString(token: string): string | typeof unresolved {
     }
     i += 1
     const escape = token[i]
-    if (escape === undefined) return unresolved
+    if (escape === undefined) {return unresolved}
     const escapes: Record<string, string> = {
       b: '\b',
       f: '\f',
@@ -98,7 +98,7 @@ function readStaticString(token: string): string | typeof unresolved {
     } else if (escape === '\n' || escape === '\u2028' || escape === '\u2029') {
       continue
     } else if (escape === '\r') {
-      if (token[i + 1] === '\n') i += 1
+      if (token[i + 1] === '\n') {i += 1}
     } else if (escape === '0' && !/[0-9]/.test(token[i + 1] ?? '')) {
       result += '\0'
     } else if (escape === 'u' || escape === 'x') {
@@ -108,9 +108,9 @@ function readStaticString(token: string): string | typeof unresolved {
         ? token.indexOf('}', start)
         : start + (escape === 'x' ? 2 : 4)
       const digits = token.slice(start, end)
-      if (end < start || !/^[0-9a-f]+$/i.test(digits)) return unresolved
+      if (end < start || !/^[0-9a-f]+$/i.test(digits)) {return unresolved}
       const code = Number.parseInt(digits, 16)
-      if (code > 0x10ffff) return unresolved
+      if (code > 0x10ffff) {return unresolved}
       result += String.fromCodePoint(code)
       i = braced ? end : end - 1
     } else if (/[0-9]/.test(escape)) {
@@ -127,7 +127,7 @@ function staticObjectProperties(
   source: string,
   node: SyntaxNode
 ): Map<string, SyntaxNode | null> | null {
-  if (node.name !== 'ObjectExpression') return null
+  if (node.name !== 'ObjectExpression') {return null}
   const fields = new Map<string, SyntaxNode | null>()
   for (const property of node.getChildren('Property')) {
     const keyNode = property.firstChild
@@ -142,7 +142,7 @@ function staticObjectProperties(
     const namedKey = ['get', 'set'].includes(keyNode.name)
       ? property.getChild('PropertyDefinition')
       : keyNode
-    if (!namedKey) return null
+    if (!namedKey) {return null}
     const token = source.slice(namedKey.from, namedKey.to)
     const key = namedKey.name === 'String' ? readStaticString(token) : token
     if (key === unresolved || key.includes('\\') || key === '__proto__') {
@@ -163,9 +163,9 @@ function readStaticValue(
   node: SyntaxNode,
   depth = 0
 ): StaticValue | typeof unresolved {
-  if (depth > 64) return unresolved
+  if (depth > 64) {return unresolved}
   const token = source.slice(node.from, node.to)
-  if (node.name === 'String') return readStaticString(token)
+  if (node.name === 'String') {return readStaticString(token)}
   if (node.name === 'TemplateString' && !node.getChild('Interpolation')) {
     return readStaticString(token)
   }
@@ -173,16 +173,16 @@ function readStaticValue(
     const number = Number(token.replaceAll('_', ''))
     return Number.isFinite(number) ? number : unresolved
   }
-  if (node.name === 'BooleanLiteral') return token === 'true'
-  if (node.name === 'null') return null
+  if (node.name === 'BooleanLiteral') {return token === 'true'}
+  if (node.name === 'null') {return null}
   if (node.name === 'UnaryExpression') {
     const operand = node.lastChild
     const operator = node.firstChild
-    if (!operand || !operator || operand.name !== 'Number') return unresolved
+    if (!operand || !operator || operand.name !== 'Number') {return unresolved}
     const sign = source.slice(operator.from, operator.to)
-    if (sign !== '-' && sign !== '+') return unresolved
+    if (sign !== '-' && sign !== '+') {return unresolved}
     const value = readStaticValue(source, operand, depth + 1)
-    if (typeof value !== 'number') return unresolved
+    if (typeof value !== 'number') {return unresolved}
     return sign === '-' ? -value : value
   }
   if (node.name === 'ArrayExpression') {
@@ -193,13 +193,13 @@ function readStaticValue(
         continue
       }
       if (child.name === ',') {
-        if (expectsValue) return unresolved
+        if (expectsValue) {return unresolved}
         expectsValue = true
         continue
       }
-      if (!expectsValue) return unresolved
+      if (!expectsValue) {return unresolved}
       const value = readStaticValue(source, child, depth + 1)
-      if (value === unresolved) return unresolved
+      if (value === unresolved) {return unresolved}
       values.push(value)
       expectsValue = false
     }
@@ -207,12 +207,12 @@ function readStaticValue(
   }
   if (node.name === 'ObjectExpression') {
     const properties = staticObjectProperties(source, node)
-    if (!properties) return unresolved
+    if (!properties) {return unresolved}
     const result: { [key: string]: StaticValue } = Object.create(null)
     for (const [key, valueNode] of properties) {
-      if (!valueNode) return unresolved
+      if (!valueNode) {return unresolved}
       const value = readStaticValue(source, valueNode, depth + 1)
-      if (value === unresolved) return unresolved
+      if (value === unresolved) {return unresolved}
       result[key] = value
     }
     return result
@@ -226,27 +226,27 @@ export function parsePluginMetaPreview(source: string): PluginMetaPreview {
     Object.keys(previewSchemas).map((key) => [key, { state: 'unknown' }])
   ) as PluginMetaPreview['fields']
   const result: PluginMetaPreview = { status: 'unavailable', fields }
-  if (pluginSourceByteLength(source) > MAX_PLUGIN_SOURCE_BYTES) return result
+  if (pluginSourceByteLength(source) > MAX_PLUGIN_SOURCE_BYTES) {return result}
   const tree = javascriptLanguage.parser.parse(source)
   let invalid = false
   tree.iterate({
     enter: (node) => {
-      if (node.type.isError) invalid = true
+      if (node.type.isError) {invalid = true}
     },
   })
-  if (invalid) return result
+  if (invalid) {return result}
   let meta: SyntaxNode | null = null
   for (const exported of tree.topNode.getChildren('ExportDeclaration')) {
     const declaration = exported.getChild('VariableDeclaration')
-    if (!declaration?.getChild('const')) continue
+    if (!declaration?.getChild('const')) {continue}
     for (const variable of declaration.getChildren('VariableDefinition')) {
-      if (source.slice(variable.from, variable.to) !== 'meta') continue
-      if (meta) return result
+      if (source.slice(variable.from, variable.to) !== 'meta') {continue}
+      if (meta) {return result}
       let next = variable.nextSibling
       while (next && ['LineComment', 'BlockComment'].includes(next.name)) {
         next = next.nextSibling
       }
-      if (next?.name !== 'Equals') return result
+      if (next?.name !== 'Equals') {return result}
       next = next.nextSibling
       while (next && ['LineComment', 'BlockComment'].includes(next.name)) {
         next = next.nextSibling
@@ -254,7 +254,7 @@ export function parsePluginMetaPreview(source: string): PluginMetaPreview {
       meta = next
     }
   }
-  if (!meta) return result
+  if (!meta) {return result}
   // A reference elsewhere may mutate or pass the object to arbitrary code.
   // Do not present the initial literal as complete when that is possible.
   tree.iterate({
@@ -267,9 +267,9 @@ export function parsePluginMetaPreview(source: string): PluginMetaPreview {
       }
     },
   })
-  if (invalid) return result
+  if (invalid) {return result}
   const properties = staticObjectProperties(source, meta)
-  if (!properties) return result
+  if (!properties) {return result}
   result.status = 'parsed'
   for (const key of Object.keys(
     previewSchemas

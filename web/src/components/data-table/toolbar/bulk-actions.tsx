@@ -89,7 +89,7 @@ export function DataTableBulkActions<TData>({
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
     const buttons = buttonsRef.current
-    if (buttons.length === 0) return
+    if (buttons.length === 0) {return}
 
     const currentIndex = buttons.indexOf(
       document.activeElement as HTMLButtonElement

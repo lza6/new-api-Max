@@ -104,7 +104,7 @@ function parseOptionValueSafe<T>(
 export function getOptionValue<
   T extends Record<string, string | number | boolean | unknown[]>,
 >(options: Array<{ key: string; value: string }> | undefined, defaults: T): T {
-  if (!options) return defaults
+  if (!options) {return defaults}
 
   const result = { ...defaults }
   const errors: Array<{ key: string; error: string }> = []

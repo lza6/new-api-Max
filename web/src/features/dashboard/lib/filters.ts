@@ -38,7 +38,7 @@ function isTimeGranularity(value: unknown): value is TimeGranularity {
 }
 
 function getLegacySavedGranularity(): TimeGranularity {
-  if (typeof window === 'undefined') return DEFAULT_TIME_GRANULARITY
+  if (typeof window === 'undefined') {return DEFAULT_TIME_GRANULARITY}
   const saved = localStorage.getItem(TIME_GRANULARITY_STORAGE_KEY)
   return isTimeGranularity(saved) ? saved : DEFAULT_TIME_GRANULARITY
 }
@@ -64,10 +64,10 @@ export function cleanFilters<T extends Record<string, unknown>>(
 ): Partial<T> {
   const cleaned: Partial<T> = {}
   for (const [key, value] of Object.entries(filters)) {
-    if (value === undefined || value === null) continue
+    if (value === undefined || value === null) {continue}
     if (typeof value === 'string') {
       const trimmed = value.trim()
-      if (trimmed) cleaned[key as keyof T] = trimmed as T[keyof T]
+      if (trimmed) {cleaned[key as keyof T] = trimmed as T[keyof T]}
       continue
     }
     cleaned[key as keyof T] = value as T[keyof T]
@@ -78,12 +78,12 @@ export function cleanFilters<T extends Record<string, unknown>>(
 export function getSavedGranularity(
   override?: TimeGranularity
 ): TimeGranularity {
-  if (override) return override
+  if (override) {return override}
   return getSavedChartPreferences().defaultTimeGranularity
 }
 
 export function saveGranularity(granularity: TimeGranularity): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') {return}
   saveChartPreferences({
     ...getSavedChartPreferences(),
     defaultTimeGranularity: granularity,
@@ -92,7 +92,7 @@ export function saveGranularity(granularity: TimeGranularity): void {
 }
 
 export function getSavedChartPreferences(): DashboardChartPreferences {
-  if (typeof window === 'undefined') return DEFAULT_DASHBOARD_CHART_PREFERENCES
+  if (typeof window === 'undefined') {return DEFAULT_DASHBOARD_CHART_PREFERENCES}
 
   const fallbackPreferences = {
     ...DEFAULT_DASHBOARD_CHART_PREFERENCES,
@@ -101,7 +101,7 @@ export function getSavedChartPreferences(): DashboardChartPreferences {
 
   try {
     const raw = localStorage.getItem(DASHBOARD_CHART_PREFERENCES_STORAGE_KEY)
-    if (!raw) return fallbackPreferences
+    if (!raw) {return fallbackPreferences}
 
     const parsed = JSON.parse(raw) as Partial<DashboardChartPreferences>
     return {
@@ -128,7 +128,7 @@ export function getSavedChartPreferences(): DashboardChartPreferences {
 export function saveChartPreferences(
   preferences: DashboardChartPreferences
 ): void {
-  if (typeof window === 'undefined') return
+  if (typeof window === 'undefined') {return}
   localStorage.setItem(
     DASHBOARD_CHART_PREFERENCES_STORAGE_KEY,
     JSON.stringify(preferences)
@@ -136,7 +136,7 @@ export function saveChartPreferences(
 }
 
 export function getDefaultDays(granularity?: TimeGranularity): number {
-  if (!granularity) return getSavedChartPreferences().defaultTimeRangeDays
+  if (!granularity) {return getSavedChartPreferences().defaultTimeRangeDays}
   // Minute granularity shows the last hour of data by default (0.0417 day);
   // hour stays at 1 day, day at 7 days, week at 30 days.
   return TIME_RANGE_BY_GRANULARITY[getSavedGranularity(granularity)]

@@ -30,7 +30,7 @@ export type InterfaceLanguageCode =
   (typeof INTERFACE_LANGUAGE_OPTIONS)[number]['code']
 
 export function normalizeInterfaceLanguage(value?: string | null): string {
-  if (!value) return 'en'
+  if (!value) {return 'en'}
 
   let normalized = value.trim().replaceAll('_', '-').toLowerCase()
   if (
@@ -62,7 +62,7 @@ export function normalizeInterfaceLanguage(value?: string | null): string {
  */
 export function convertDetectedLanguage(value: string): string {
   const lower = value.trim().replaceAll('_', '-').toLowerCase()
-  if (!lower.startsWith('zh')) return value
+  if (!lower.startsWith('zh')) {return value}
   if (
     lower === 'zh-tw' ||
     lower === 'zh-hk' ||
@@ -84,7 +84,7 @@ export function convertDetectedLanguage(value: string): string {
  * to `undefined`, which makes `Intl` use the runtime default locale.
  */
 export function toIntlLocale(value?: string | null): string | undefined {
-  if (!value) return undefined
+  if (!value) {return undefined}
   switch (value) {
     case 'zhCN':
       return 'zh-CN'

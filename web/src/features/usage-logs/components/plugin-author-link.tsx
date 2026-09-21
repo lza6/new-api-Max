@@ -33,7 +33,7 @@ interface PluginAuthorLinkProps {
 export function PluginAuthorLink(props: PluginAuthorLinkProps) {
   const authorUrl = getSafePluginAuthorUrl(props.author)
   const authorName = props.author.name.trim()
-  if (!authorName) return null
+  if (!authorName) {return null}
 
   if (!authorUrl) {
     return <span className={props.className}>{authorName}</span>

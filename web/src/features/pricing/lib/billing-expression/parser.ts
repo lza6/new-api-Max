@@ -74,7 +74,7 @@ class BillingParser {
         detail: version[0],
       })
     }
-    if (version) this.cursor = version[0].length
+    if (version) {this.cursor = version[0].length}
     this.current = this.next()
   }
 
@@ -93,7 +93,7 @@ class BillingParser {
     }
     const start = this.cursor
     const rest = this.source.slice(start)
-    if (!rest) return { kind: 'end', text: '', start, end: start }
+    if (!rest) {return { kind: 'end', text: '', start, end: start }}
     const number = rest.match(/^(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?/)
     if (number) {
       const value = Number(number[0])
@@ -137,7 +137,7 @@ class BillingParser {
             end: this.cursor,
           }
         }
-        if (char === '\n' || char === '\r') break
+        if (char === '\n' || char === '\r') {break}
         if (char !== '\\') {
           value += char
           continue
@@ -162,7 +162,7 @@ class BillingParser {
         if (escaped === 'u' || escaped === 'x') {
           const length = escaped === 'u' ? 4 : 2
           const hex = this.source.slice(this.cursor, this.cursor + length)
-          if (hex.length !== length || !/^[\da-f]+$/i.test(hex)) break
+          if (hex.length !== length || !/^[\da-f]+$/i.test(hex)) {break}
           value += String.fromCharCode(Number.parseInt(hex, 16))
           this.cursor += length
           continue
@@ -306,7 +306,7 @@ class BillingParser {
         position: token.start,
       })
     }
-    if (token.text === 'nil') return { kind: 'literal', value: null, ...span }
+    if (token.text === 'nil') {return { kind: 'literal', value: null, ...span }}
     if (token.text === 'true' || token.text === 'false') {
       return { kind: 'literal', value: token.text === 'true', ...span }
     }
@@ -331,7 +331,7 @@ class BillingParser {
     const args: ExpressionNode[] = []
     while (!this.is(')')) {
       args.push(this.expression())
-      if (!this.is(',')) break
+      if (!this.is(',')) {break}
       this.take()
     }
     const end = this.expect(')').end
@@ -366,11 +366,11 @@ function checkExpressionTypes(ast: ExpressionNode): void {
     }
     let result: ExpressionType = 'dynamic'
     if (node.kind === 'literal') {
-      if (node.value === null) result = 'nil'
-      else if (typeof node.value === 'number') result = 'number'
-      else if (typeof node.value === 'string') result = 'string'
-      else result = 'boolean'
-    } else if (node.kind === 'variable') result = 'number'
+      if (node.value === null) {result = 'nil'}
+      else if (typeof node.value === 'number') {result = 'number'}
+      else if (typeof node.value === 'string') {result = 'string'}
+      else {result = 'boolean'}
+    } else if (node.kind === 'variable') {result = 'number'}
     else if (node.kind === 'unary') {
       result = node.operator === '!' ? 'boolean' : 'number'
       requireType(node.operand, result)
@@ -401,7 +401,7 @@ function checkExpressionTypes(ast: ExpressionNode): void {
       if (['param', 'header', 'u', ...TIME_FUNCTIONS].includes(node.name)) {
         requireType(node.args[0], 'string')
       }
-      if (node.name === 'header') result = 'string'
+      if (node.name === 'header') {result = 'string'}
       else if (node.name === 'has') {
         requireType(node.args[1], 'string')
         result = 'boolean'
@@ -470,7 +470,7 @@ function validateFixedPricingTree(
       ) {
         return
       }
-    } else if (!containsPricingMarker(price)) return
+    } else if (!containsPricingMarker(price)) {return}
   }
   throw new BillingExpressionError({
     code: 'type',
@@ -482,7 +482,7 @@ function validateFixedPricingTree(
 
 export function compileBillingExpression(source: string): CompilationResult {
   const cached = compiledCache.get(source)
-  if (cached) return cached
+  if (cached) {return cached}
   let result: CompilationResult
   try {
     const ast = new BillingParser(source).parse()

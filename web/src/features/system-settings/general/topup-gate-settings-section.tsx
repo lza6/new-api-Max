@@ -81,7 +81,7 @@ export function TopUpGateSettingsSection({
       }
     }
 
-    if (updates.length === 0) return
+    if (updates.length === 0) {return}
 
     for (const update of updates) {
       await updateOption.mutateAsync(update)

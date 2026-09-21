@@ -52,14 +52,14 @@ export function assessBaseUrlTrust(
   value: string | undefined
 ): BaseUrlTrust | null {
   const trimmed = value?.trim()
-  if (!trimmed) return null
+  if (!trimmed) {return null}
   let parsed: URL
   try {
     parsed = new URL(trimmed)
   } catch {
     return null
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {return null}
   const host = parsed.hostname.toLowerCase()
   const singleLabel = !host.includes('.') && !host.includes(':')
   return {
@@ -87,11 +87,11 @@ export function nextTaskPluginBaseUrl(
   previousDefault: string | undefined,
   nextDefault: string | undefined
 ): string | null {
-  if (!nextDefault) return null
+  if (!nextDefault) {return null}
   const current = normalizeBaseUrlValue(currentValue)
   if (current && current !== normalizeBaseUrlValue(previousDefault)) {
     return null
   }
-  if (current === normalizeBaseUrlValue(nextDefault)) return null
+  if (current === normalizeBaseUrlValue(nextDefault)) {return null}
   return nextDefault
 }

@@ -314,13 +314,13 @@ export const ModelPricingEditorPanel = forwardRef<
   }, [editData, form])
 
   useEffect(() => {
-    if (!editData) return
-    if (editData.billingMode === 'tiered_expr') return
-    if (editData.price || editData.ratio) return
+    if (!editData) {return}
+    if (editData.billingMode === 'tiered_expr') {return}
+    if (editData.price || editData.ratio) {return}
 
     const schema = usageSchema ?? usageSchemaByModel.get(editData.name)
-    if (!schema || Object.keys(schema).length === 0) return
-    if (autoSwitchedForRef.current === editData.name) return
+    if (!schema || Object.keys(schema).length === 0) {return}
+    if (autoSwitchedForRef.current === editData.name) {return}
 
     setPricingMode('tiered_expr')
     autoSwitchedForRef.current = editData.name
@@ -328,8 +328,8 @@ export const ModelPricingEditorPanel = forwardRef<
 
   useEffect(() => {
     let originalMode: PricingMode = 'per-token'
-    if (editData?.billingMode === 'tiered_expr') originalMode = 'tiered_expr'
-    else if (editData?.price) originalMode = 'per-request'
+    if (editData?.billingMode === 'tiered_expr') {originalMode = 'tiered_expr'}
+    else if (editData?.price) {originalMode = 'per-request'}
     onDirtyChange?.(
       form.formState.isDirty ||
         pricingMode !== originalMode ||
@@ -359,16 +359,16 @@ export const ModelPricingEditorPanel = forwardRef<
     nextLanePrices = lanePrices
   ) => {
     const priceNumber = toNumberOrNull(price)
-    if (priceNumber === null) return ''
+    if (priceNumber === null) {return ''}
 
     if (lane === 'audioOutput') {
       const audioInputPrice = toNumberOrNull(nextLanePrices.audioInput)
-      if (audioInputPrice === null || audioInputPrice === 0) return ''
+      if (audioInputPrice === null || audioInputPrice === 0) {return ''}
       return formatPricingNumber(priceNumber / audioInputPrice)
     }
 
     const inputPrice = toNumberOrNull(nextPromptPrice)
-    if (inputPrice === null || inputPrice === 0) return ''
+    if (inputPrice === null || inputPrice === 0) {return ''}
     return formatPricingNumber(priceNumber / inputPrice)
   }
 
@@ -622,7 +622,7 @@ export const ModelPricingEditorPanel = forwardRef<
           return null
         }
         const isValid = await form.trigger()
-        if (!isValid || !validatePricingValues()) return null
+        if (!isValid || !validatePricingValues()) {return null}
         return buildSubmitData(form.getValues())
       },
     }),

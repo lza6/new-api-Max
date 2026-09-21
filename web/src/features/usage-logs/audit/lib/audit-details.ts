@@ -171,7 +171,7 @@ function buildTokenAuditOperation(
   t: TFunction
 ) {
   const operation = TOKEN_AUDIT_OPERATIONS[action]
-  if (!operation) return null
+  if (!operation) {return null}
 
   const fields: AuditDetailField[] = []
   let headline = t(operation.labelKey)
@@ -231,7 +231,7 @@ function buildTokenAuditOperation(
       '4': t('Exhausted'),
     }
     const states = [params.from, params.to].map((value) => {
-      if (typeof value !== 'number' && typeof value !== 'string') return ''
+      if (typeof value !== 'number' && typeof value !== 'string') {return ''}
       const status = String(value)
       return statuses[status] || status
     })
@@ -285,14 +285,14 @@ function buildTokenAuditOperation(
       }
     }
     for (const key of ['requested_ids', 'returned_ids']) {
-      if (key === 'returned_ids' && !success) continue
+      if (key === 'returned_ids' && !success) {continue}
       const ids = params[key]
-      if (ids === undefined) continue
+      if (ids === undefined) {continue}
       const valid =
         Array.isArray(ids) &&
         ids.every((id) => typeof id === 'number' || typeof id === 'string')
       let value = t('Not recorded')
-      if (valid) value = ids.length ? ids.join(', ') : t('None')
+      if (valid) {value = ids.length ? ids.join(', ') : t('None')}
       fields.push({
         label: auditFieldLabel(key, t),
         value,
@@ -367,9 +367,9 @@ export function buildAuditDetails(entry: AuditLog, t: TFunction) {
   }
 
   let fallback = t('Operation audit')
-  if (entry.category === 'login') fallback = t('Login')
-  if (entry.category === 'security') fallback = t('Account security')
-  if (entry.category === 'access_token') fallback = t('Access Token')
+  if (entry.category === 'login') {fallback = t('Login')}
+  if (entry.category === 'security') {fallback = t('Account security')}
+  if (entry.category === 'access_token') {fallback = t('Access Token')}
   const summary =
     renderAuditContent(
       {
@@ -407,13 +407,13 @@ export function buildAuditDetails(entry: AuditLog, t: TFunction) {
     entry.auth_method ||
     (typeof admin.auth_method === 'string' ? admin.auth_method : '')
   let authentication = authMethod
-  if (authMethod === 'session') authentication = t('Session')
-  else if (authMethod === 'access_token') authentication = t('Access Token')
-  else if (authMethod) authentication = loginMethodLabel(authMethod, t)
+  if (authMethod === 'session') {authentication = t('Session')}
+  else if (authMethod === 'access_token') {authentication = t('Access Token')}
+  else if (authMethod) {authentication = loginMethodLabel(authMethod, t)}
 
   let targetName = ''
-  if (typeof params.name === 'string') targetName = params.name
-  else if (typeof params.username === 'string') targetName = params.username
+  if (typeof params.name === 'string') {targetName = params.name}
+  else if (typeof params.username === 'string') {targetName = params.username}
   const targetId =
     typeof params.id === 'number' || typeof params.id === 'string'
       ? params.id
@@ -446,9 +446,9 @@ export function buildAuditDetails(entry: AuditLog, t: TFunction) {
     delete params.changed_fields
   }
   if (action.startsWith('channel.') && typeof params.status === 'number') {
-    if (params.status === 1) params.status = t('Enabled')
-    else if (params.status === 2) params.status = t('Disabled')
-    else if (params.status === 3) params.status = t('Auto Disabled')
+    if (params.status === 1) {params.status = t('Enabled')}
+    else if (params.status === 2) {params.status = t('Disabled')}
+    else if (params.status === 3) {params.status = t('Auto Disabled')}
   }
   if (
     typeof params.role === 'number' &&
@@ -499,13 +499,13 @@ export function buildAuditDetails(entry: AuditLog, t: TFunction) {
   ]) {
     delete adminExtra[key]
   }
-  if (Object.keys(adminExtra).length) extra.admin_info = adminExtra
+  if (Object.keys(adminExtra).length) {extra.admin_info = adminExtra}
   if (isAuditDetailObject(metadata.audit_info)) {
     const auditExtra = { ...metadata.audit_info }
     for (const key of ['method', 'route', 'path', 'status', 'success']) {
       delete auditExtra[key]
     }
-    if (Object.keys(auditExtra).length) extra.audit_info = auditExtra
+    if (Object.keys(auditExtra).length) {extra.audit_info = auditExtra}
   }
   return {
     summary: operation?.summary ?? summary,

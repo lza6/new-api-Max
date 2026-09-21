@@ -104,7 +104,7 @@ export function PlaygroundChat({
   }
 
   useEffect(() => {
-    if (!editingKey) return
+    if (!editingKey) {return}
     const content = getEditingMessageContent(messages, editingKey)
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setEditText(content)

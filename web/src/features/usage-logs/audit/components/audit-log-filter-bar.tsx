@@ -42,7 +42,7 @@ function AuditFilterSelect(props: {
 options={props.options}
 value={props.value}
 onValueChange={(value) => {
-          if (value !== null) props.onChange(value)
+          if (value !== null) {props.onChange(value)}
         }}
 aria-label={props.label}
 className='w-full'

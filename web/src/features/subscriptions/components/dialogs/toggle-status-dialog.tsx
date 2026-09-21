@@ -31,7 +31,7 @@ export function ToggleStatusDialog() {
   const { open, setOpen, currentRow, triggerRefresh } = useSubscriptions()
   const [loading, setLoading] = useState(false)
 
-  if (open !== 'toggle-status' || !currentRow) return null
+  if (open !== 'toggle-status' || !currentRow) {return null}
 
   const isEnabled = currentRow.plan.enabled
   const title = isEnabled ? t('Confirm disable') : t('Confirm enable')

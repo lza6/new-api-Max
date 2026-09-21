@@ -71,8 +71,8 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
   }
 
   const handleConfirm = async () => {
-    if (!amount && mode !== 'override') return
-    if (quotaValue <= 0 && mode !== 'override') return
+    if (!amount && mode !== 'override') {return}
+    if (quotaValue <= 0 && mode !== 'override') {return}
 
     setLoading(true)
     try {
@@ -170,7 +170,7 @@ export function UserQuotaDialog(props: UserQuotaDialogProps) {
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleConfirm()
+              if (e.key === 'Enter') {handleConfirm()}
             }}
           />
         </div>

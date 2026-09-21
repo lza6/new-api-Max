@@ -21,7 +21,7 @@ import { useEffect, useState } from 'react'
 export function resolveThemeRadiusPx(
   cssVariable = '--radius-md'
 ): number | undefined {
-  if (typeof document === 'undefined') return undefined
+  if (typeof document === 'undefined') {return undefined}
 
   const probe = document.createElement('div')
   probe.style.borderRadius = `var(${cssVariable})`

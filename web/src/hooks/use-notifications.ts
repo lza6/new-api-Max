@@ -26,7 +26,7 @@ import { useNotificationStore } from '@/stores/notification-store'
 
 function hashString(input: string): string {
   let hash = 0
-  if (!input) return '0'
+  if (!input) {return '0'}
 
   for (let i = 0; i < input.length; i += 1) {
     const chr = input.charCodeAt(i)
@@ -42,7 +42,7 @@ function hashString(input: string): string {
  * Prefer backend id, fall back to a content hash so edits register
  */
 function getAnnouncementKey(item: Record<string, unknown>): string {
-  if (!item) return ''
+  if (!item) {return ''}
 
   if (item.id !== undefined && item.id !== null) {
     return `id:${item.id}`
@@ -84,7 +84,7 @@ export function useNotifications() {
   const { status, loading: statusLoading } = useStatus()
   const announcementsEnabled = status?.announcements_enabled ?? false
   const announcements = useMemo<Record<string, unknown>[]>(() => {
-    if (!announcementsEnabled) return []
+    if (!announcementsEnabled) {return []}
     return ((status?.announcements || []) as Record<string, unknown>[]).slice(
       0,
       20

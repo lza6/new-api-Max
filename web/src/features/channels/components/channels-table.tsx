@@ -124,7 +124,7 @@ export function ChannelsTable() {
         searchKey: 'status',
         type: 'array',
         deserialize: (value) => {
-          if (value !== undefined) return value
+          if (value !== undefined) {return value}
           const stored = localStorage.getItem(
             CHANNELS_STATUS_FILTER_STORAGE_KEY
           )

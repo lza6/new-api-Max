@@ -20,7 +20,7 @@ const NON_REDIRECTABLE_STATUS_CODES = new Set([504, 524])
 
 function parseStatusCodeKey(rawKey: string): number | null {
   const normalized = rawKey.trim()
-  if (!/^[1-5]\d{2}$/.test(normalized)) return null
+  if (!/^[1-5]\d{2}$/.test(normalized)) {return null}
   return Number.parseInt(normalized, 10)
 }
 
@@ -30,7 +30,7 @@ function parseStatusCodeMappingTarget(rawValue: unknown): number | null {
   }
   if (typeof rawValue === 'string') {
     const normalized = rawValue.trim()
-    if (!/^[1-5]\d{2}$/.test(normalized)) return null
+    if (!/^[1-5]\d{2}$/.test(normalized)) {return null}
     const code = Number.parseInt(normalized, 10)
     return code >= 100 && code <= 599 ? code : null
   }
@@ -40,7 +40,7 @@ function parseStatusCodeMappingTarget(rawValue: unknown): number | null {
 export function collectInvalidStatusCodeEntries(
   statusCodeMappingStr: string
 ): string[] {
-  if (!statusCodeMappingStr?.trim()) return []
+  if (!statusCodeMappingStr?.trim()) {return []}
 
   let parsed: Record<string, unknown>
   try {
@@ -49,7 +49,7 @@ export function collectInvalidStatusCodeEntries(
     return []
   }
 
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return []
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {return []}
 
   const invalid: string[] = []
   for (const [rawKey, rawValue] of Object.entries(parsed)) {
@@ -65,7 +65,7 @@ export function collectInvalidStatusCodeEntries(
 export function collectDisallowedStatusCodeRedirects(
   statusCodeMappingStr: string
 ): string[] {
-  if (!statusCodeMappingStr?.trim()) return []
+  if (!statusCodeMappingStr?.trim()) {return []}
 
   let parsed: Record<string, unknown>
   try {
@@ -74,15 +74,15 @@ export function collectDisallowedStatusCodeRedirects(
     return []
   }
 
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return []
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {return []}
 
   const riskyMappings: string[] = []
   for (const [rawFrom, rawTo] of Object.entries(parsed)) {
     const fromCode = parseStatusCodeKey(rawFrom)
     const toCode = parseStatusCodeMappingTarget(rawTo)
-    if (fromCode === null || toCode === null) continue
-    if (!NON_REDIRECTABLE_STATUS_CODES.has(fromCode)) continue
-    if (fromCode === toCode) continue
+    if (fromCode === null || toCode === null) {continue}
+    if (!NON_REDIRECTABLE_STATUS_CODES.has(fromCode)) {continue}
+    if (fromCode === toCode) {continue}
     riskyMappings.push(`${fromCode} -> ${toCode}`)
   }
 
@@ -94,7 +94,7 @@ export function collectNewDisallowedStatusCodeRedirects(
   currentStr: string
 ): string[] {
   const currentRisky = collectDisallowedStatusCodeRedirects(currentStr)
-  if (currentRisky.length === 0) return []
+  if (currentRisky.length === 0) {return []}
 
   const originalRiskySet = new Set(
     collectDisallowedStatusCodeRedirects(originalStr)

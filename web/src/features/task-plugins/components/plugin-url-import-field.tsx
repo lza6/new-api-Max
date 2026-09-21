@@ -110,9 +110,9 @@ export function PluginUrlImportField(props: PluginUrlImportFieldProps) {
             props.onError('')
           }}
           onKeyDown={(event) => {
-            if (event.key !== 'Enter') return
+            if (event.key !== 'Enter') {return}
             event.preventDefault()
-            if (props.value.trim()) importMutation.mutate()
+            if (props.value.trim()) {importMutation.mutate()}
           }}
         />
         <InputGroupAddon align='inline-end'>

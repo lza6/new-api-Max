@@ -53,7 +53,7 @@ export function formatQuotaShort(quota: number): string {
 export function formatCurrency(amount: number | string): string {
   const numeric =
     typeof amount === 'number' ? amount : Number.parseFloat(String(amount))
-  if (!Number.isFinite(numeric)) return '-'
+  if (!Number.isFinite(numeric)) {return '-'}
 
   return new Intl.NumberFormat(undefined, {
     minimumFractionDigits: 0,

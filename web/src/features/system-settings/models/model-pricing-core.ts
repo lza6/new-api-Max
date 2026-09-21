@@ -154,14 +154,14 @@ export function hasValue(value: unknown): boolean {
 }
 
 export function toNumberOrNull(value: unknown): number | null {
-  if (!hasValue(value) && value !== 0) return null
+  if (!hasValue(value) && value !== 0) {return null}
   const num = Number(value)
   return Number.isFinite(num) ? num : null
 }
 
 function ratioToBasePrice(ratio: unknown): string {
   const num = toNumberOrNull(ratio)
-  if (num === null) return ''
+  if (num === null) {return ''}
   return formatPricingNumber(num * 2)
 }
 
@@ -172,7 +172,7 @@ function deriveLanePrice(
 ): string {
   const ratioNumber = toNumberOrNull(ratio)
   const denominatorNumber = toNumberOrNull(denominator)
-  if (ratioNumber === null || denominatorNumber === null) return fallback
+  if (ratioNumber === null || denominatorNumber === null) {return fallback}
   return formatPricingNumber(ratioNumber * denominatorNumber)
 }
 

@@ -126,9 +126,9 @@ export function FetchModelsDialog({
   const removedModels = useMemo(() => {
     const kw = searchKeyword.toLowerCase().trim()
     return normalizeModelNameList(selectedModels).filter((model) => {
-      if (fetchedModelSet.has(model)) return false
-      if (redirectSourceKeysSet.has(model)) return false
-      if (!kw) return true
+      if (fetchedModelSet.has(model)) {return false}
+      if (redirectSourceKeysSet.has(model)) {return false}
+      if (!kw) {return true}
       return model.toLowerCase().includes(kw)
     })
   }, [fetchedModelSet, redirectSourceKeysSet, searchKeyword, selectedModels])
@@ -141,7 +141,7 @@ export function FetchModelsDialog({
   }, [open, activeChannel?.id, customFetcher])
 
   const handleFetchModels = async () => {
-    if (!activeChannel && !customFetcher) return
+    if (!activeChannel && !customFetcher) {return}
 
     setIsFetching(true)
     try {
@@ -180,7 +180,7 @@ export function FetchModelsDialog({
     }
 
     // Otherwise, directly save to API (standalone mode)
-    if (!activeChannel) return
+    if (!activeChannel) {return}
     setIsSaving(true)
     try {
       const modelsString = selectedModels.join(',')
@@ -210,7 +210,7 @@ export function FetchModelsDialog({
 
   // Filter models by search
   const filteredModels = useMemo(() => {
-    if (!searchKeyword) return fetchedModels
+    if (!searchKeyword) {return fetchedModels}
     return fetchedModels.filter((model) =>
       model.toLowerCase().includes(searchKeyword.toLowerCase())
     )
@@ -246,8 +246,8 @@ export function FetchModelsDialog({
     categories: Record<string, string[]>
   ): [string, string[]][] =>
     Object.entries(categories).sort(([a], [b]) => {
-      if (a === 'Other') return 1
-      if (b === 'Other') return -1
+      if (a === 'Other') {return 1}
+      if (b === 'Other') {return -1}
       return a.localeCompare(b, undefined, { sensitivity: 'base' })
     })
 

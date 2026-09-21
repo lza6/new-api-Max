@@ -98,14 +98,14 @@ export function useChatHandler({
 
   const flushStreamUpdates = useCallback(
     (generation: number) => {
-      if (generation !== requestGenerationRef.current) return
+      if (generation !== requestGenerationRef.current) {return}
       if (streamFlushTimerRef.current !== null) {
         window.clearTimeout(streamFlushTimerRef.current)
         streamFlushTimerRef.current = null
       }
 
       const pendingChunks = pendingStreamChunksRef.current
-      if (pendingChunks.generation !== generation) return
+      if (pendingChunks.generation !== generation) {return}
       if (!pendingChunks.reasoning && !pendingChunks.content) {
         return
       }
@@ -116,7 +116,7 @@ export function useChatHandler({
         reasoning: '',
       }
       onMessageUpdate((prev) => {
-        if (generation !== requestGenerationRef.current) return prev
+        if (generation !== requestGenerationRef.current) {return prev}
         return updateLastAssistantMessage(prev, (message) => {
           let updatedMessage = message
 
@@ -145,7 +145,7 @@ export function useChatHandler({
 
   const scheduleStreamFlush = useCallback(
     (generation: number) => {
-      if (generation !== requestGenerationRef.current) return
+      if (generation !== requestGenerationRef.current) {return}
       if (streamFlushTimerRef.current !== null) {
         return
       }
@@ -190,8 +190,8 @@ export function useChatHandler({
   // Handle stream update
   const handleStreamUpdate = useCallback(
     (generation: number, type: 'reasoning' | 'content', chunk: string) => {
-      if (generation !== requestGenerationRef.current) return
-      if (pendingStreamChunksRef.current.generation !== generation) return
+      if (generation !== requestGenerationRef.current) {return}
+      if (pendingStreamChunksRef.current.generation !== generation) {return}
       pendingStreamChunksRef.current[type] = mergePendingStreamChunk(
         pendingStreamChunksRef.current[type],
         chunk
@@ -204,11 +204,11 @@ export function useChatHandler({
   // Handle stream complete
   const handleStreamComplete = useCallback(
     (generation: number) => {
-      if (generation !== requestGenerationRef.current) return
+      if (generation !== requestGenerationRef.current) {return}
       flushStreamUpdates(generation)
       setIsRequesting(false)
       onMessageUpdate((prev) => {
-        if (generation !== requestGenerationRef.current) return prev
+        if (generation !== requestGenerationRef.current) {return prev}
         return updateLastAssistantMessage(prev, (message) =>
           isAssistantMessageFinal(message)
             ? message
@@ -222,14 +222,14 @@ export function useChatHandler({
   // Handle stream error
   const handleStreamError = useCallback(
     (generation: number, error: string, errorCode?: string) => {
-      if (generation !== requestGenerationRef.current) return
+      if (generation !== requestGenerationRef.current) {return}
       flushStreamUpdates(generation)
       setIsRequesting(false)
       const displayError = getDisplayError(error)
       handleServerError(new Error(displayError))
       const errorTitle = t(ERROR_MESSAGES.API_REQUEST_ERROR)
       onMessageUpdate((prev) => {
-        if (generation !== requestGenerationRef.current) return prev
+        if (generation !== requestGenerationRef.current) {return prev}
         return updateAssistantMessageWithError(
           prev,
           displayError,
@@ -309,7 +309,7 @@ export function useChatHandler({
         }
 
         onMessageUpdate((prev) => {
-          if (requestGenerationRef.current !== generation) return prev
+          if (requestGenerationRef.current !== generation) {return prev}
           return updateLastAssistantMessage(prev, (message) => {
             const updatedMessage = applyChatCompletionResponse(
               message,
@@ -370,7 +370,7 @@ export function useChatHandler({
     abortControllerRef.current = null
     setIsRequesting(false)
     onMessageUpdate((prev) => {
-      if (requestGenerationRef.current !== idleGeneration) return prev
+      if (requestGenerationRef.current !== idleGeneration) {return prev}
       return updateLastAssistantMessage(prev, (message) =>
         isAssistantMessagePending(message)
           ? completeAssistantMessage(message)

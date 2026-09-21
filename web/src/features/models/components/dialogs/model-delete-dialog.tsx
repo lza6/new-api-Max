@@ -74,7 +74,7 @@ export function ModelDeleteDialog(props: ModelDeleteDialogProps) {
     },
     onSuccess: async (result) => {
       await invalidateVendorData(client)
-      if (removePricing) await invalidateModelPricing(client)
+      if (removePricing) {await invalidateModelPricing(client)}
       if (removeFromChannels) {
         await client.invalidateQueries({ queryKey: ['channels'] })
       }
@@ -99,7 +99,7 @@ export function ModelDeleteDialog(props: ModelDeleteDialogProps) {
     <ConfirmDialog
       open
       onOpenChange={(open) => {
-        if (!open && !mutation.isPending) props.onClose()
+        if (!open && !mutation.isPending) {props.onClose()}
       }}
       title={t('Delete Models?')}
       desc={description}

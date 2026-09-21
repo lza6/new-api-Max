@@ -161,7 +161,7 @@ async function rsaOaepEncrypt(
       tagLength: 128,
     })
     cipher.update(forge.util.createBuffer(plaintext))
-    if (!cipher.finish()) throw new Error('Password encryption failed')
+    if (!cipher.finish()) {throw new Error('Password encryption failed')}
     const ciphertext = cipher.output.getBytes() + cipher.mode.tag.getBytes()
     return [
       'v2',

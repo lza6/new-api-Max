@@ -87,7 +87,7 @@ export function BasicAuthSection({ defaultValues }: BasicAuthSectionProps) {
 
     Object.entries(data).forEach(([key, value]) => {
       if (key === 'EmailDomainWhitelist') {
-        if (typeof value !== 'string') return
+        if (typeof value !== 'string') {return}
         const domains = value
           .split('\n')
           .map((domain) => domain.trim())

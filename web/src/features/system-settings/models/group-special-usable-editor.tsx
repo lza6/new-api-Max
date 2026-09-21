@@ -79,7 +79,7 @@ function toRawKey(visible: boolean, groupName: string): string {
 }
 
 function safeParseJson(str: string): Record<string, Record<string, string>> {
-  if (!str || !str.trim()) return {}
+  if (!str || !str.trim()) {return {}}
   try {
     return JSON.parse(str) as Record<string, Record<string, string>>
   } catch {
@@ -90,7 +90,7 @@ function safeParseJson(str: string): Record<string, Record<string, string>> {
 function flattenRules(nested: Record<string, Record<string, string>>): Rule[] {
   const rules: Rule[] = []
   for (const [userGroup, inner] of Object.entries(nested)) {
-    if (typeof inner !== 'object' || inner === null) continue
+    if (typeof inner !== 'object' || inner === null) {continue}
     for (const [rawKey, desc] of Object.entries(inner)) {
       const { visible, groupName } = parseRawKey(rawKey)
       let description = ''
@@ -114,8 +114,8 @@ function flattenRules(nested: Record<string, Record<string, string>>): Rule[] {
 function serializeRules(rules: Rule[]): string {
   const result: Record<string, Record<string, string>> = {}
   for (const { userGroup, visible, targetGroup, description } of rules) {
-    if (!userGroup || !targetGroup) continue
-    if (!result[userGroup]) result[userGroup] = {}
+    if (!userGroup || !targetGroup) {continue}
+    if (!result[userGroup]) {result[userGroup] = {}}
     result[userGroup][toRawKey(visible, targetGroup)] = description
   }
   return Object.keys(result).length === 0
@@ -143,7 +143,7 @@ function GroupSelect(props: GroupSelectProps) {
     <Combobox
   options={knownOptions.map((name) => ({ value: name, label: name }))}
   value={props.value}
-  onValueChange={(value) => { if (value) props.onValueChange(value) }}
+  onValueChange={(value) => { if (value) {props.onValueChange(value)} }}
   className={props.className}
   placeholder={props.placeholder}
   aria-label={props.placeholder}
@@ -327,12 +327,12 @@ export function GroupSpecialUsableRulesEditor(
     (id: string, field: keyof Rule, val: string | boolean) => {
       emitChange(
         rules.map((r) => {
-          if (r._id !== id) return r
+          if (r._id !== id) {return r}
           const updated = { ...r, [field]: val }
           if (field === 'visible' && val === false) {
             updated.description = 'remove'
           } else if (field === 'visible' && val === true && !r.visible) {
-            if (updated.description === 'remove') updated.description = ''
+            if (updated.description === 'remove') {updated.description = ''}
           }
           return updated
         })
@@ -372,7 +372,7 @@ export function GroupSpecialUsableRulesEditor(
     const map: Record<string, Rule[]> = {}
     const order: string[] = []
     for (const r of rules) {
-      if (!r.userGroup) continue
+      if (!r.userGroup) {continue}
       if (!map[r.userGroup]) {
         map[r.userGroup] = []
         order.push(r.userGroup)

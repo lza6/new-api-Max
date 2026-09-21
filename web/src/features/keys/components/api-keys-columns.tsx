@@ -50,7 +50,7 @@ function useGroupRatios(): Record<string, number | string> {
     queryFn: async () => requireServerSuccess(await getUserGroups()),
     staleTime: 0,
     select: (res) => {
-      if (!res.success || !res.data) return {}
+      if (!res.success || !res.data) {return {}}
       const ratios: Record<string, number | string> = {}
       for (const [group, info] of Object.entries(res.data)) {
         if (typeof info.ratio === 'number' || typeof info.ratio === 'string') {
@@ -111,7 +111,7 @@ export function useApiKeysColumns(now: number): ColumnDef<ApiKey>[] {
       header: t('Status'),
       cell: ({ row }) => {
         const statusConfig = API_KEY_STATUSES[row.getValue('status') as number]
-        if (!statusConfig) return null
+        if (!statusConfig) {return null}
         return (
           <StatusBadge
             label={t(statusConfig.label)}

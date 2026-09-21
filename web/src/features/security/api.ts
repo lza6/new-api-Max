@@ -52,7 +52,7 @@ export async function createAccessToken(
     }),
     'Failed to generate token'
   )
-  if (!token) throw new AuthOperationError('Failed to generate token')
+  if (!token) {throw new AuthOperationError('Failed to generate token')}
   return token
 }
 

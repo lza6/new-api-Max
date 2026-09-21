@@ -37,7 +37,7 @@ const filterBySelectedValues = (
   rowValue: unknown,
   filterValue: unknown
 ): boolean => {
-  if (!Array.isArray(filterValue) || filterValue.length === 0) return true
+  if (!Array.isArray(filterValue) || filterValue.length === 0) {return true}
   return filterValue.includes(String(rowValue))
 }
 
@@ -150,7 +150,7 @@ export function buildModelRatioColumns({
         />
       ),
       filterFn: (row, id, value) => {
-        if (filterBySelectedValues(row.getValue(id), value)) return true
+        if (filterBySelectedValues(row.getValue(id), value)) {return true}
         if (!Array.isArray(value) || !value.includes(TASK_PRICING_MODE_FILTER)) {
           return false
         }

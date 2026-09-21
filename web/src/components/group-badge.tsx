@@ -72,9 +72,9 @@ function getGroupLabel(params: {
   isEmptyGroup: boolean
   t: (key: string) => string
 }): string {
-  if (params.labelOverride) return params.labelOverride
-  if (params.isEmptyGroup) return params.t('User Group')
-  if (params.isAutoGroup) return params.t('Auto')
+  if (params.labelOverride) {return params.labelOverride}
+  if (params.isEmptyGroup) {return params.t('User Group')}
+  if (params.isAutoGroup) {return params.t('Auto')}
   return params.groupName ?? ''
 }
 

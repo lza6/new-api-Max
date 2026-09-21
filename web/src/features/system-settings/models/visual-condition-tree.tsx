@@ -64,8 +64,8 @@ const OPERATORS: VisualComparison['operator'][] = [
 function conditionRange(
   node: VisualCondition
 ): [VisualComparison, VisualComparison] | null {
-  if (node.kind !== 'all' && node.kind !== 'any') return null
-  if (node.children.length !== 2) return null
+  if (node.kind !== 'all' && node.kind !== 'any') {return null}
+  if (node.children.length !== 2) {return null}
   const [start, end] = node.children
   if (
     start.kind !== 'comparison' ||
@@ -96,7 +96,7 @@ function conditionRows(
     if (node.kind === 'all' && next && conditionRange(pair)) {
       rows.push({ node: pair, index, count: 2 })
       index++
-    } else rows.push({ node: child, index, count: 1 })
+    } else {rows.push({ node: child, index, count: 1 })}
   }
   return rows
 }
@@ -244,7 +244,7 @@ function ConditionFields(props: ConditionProps) {
   const node = props.node
   const range = conditionRange(node)
   const comparison = node.kind === 'comparison' ? node : range?.[0]
-  if (!comparison) return null
+  if (!comparison) {return null}
   const ids = range ? range.map((bound) => bound.id) : [comparison.id]
   const errors = props.issues.filter((issue) => ids.includes(issue.id))
   return (

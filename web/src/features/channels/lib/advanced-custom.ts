@@ -351,7 +351,7 @@ export function replaceAdvancedCustomManagementRoute(
     (candidate) => candidate.incoming_path?.trim() === path
   )
   if (route === null) {
-    if (index >= 0) routes.splice(index, 1)
+    if (index >= 0) {routes.splice(index, 1)}
   } else {
     const managementRoute: AdvancedCustomRoute = {
       incoming_path: path,
@@ -360,8 +360,8 @@ export function replaceAdvancedCustomManagementRoute(
       models: [],
       auth: route.auth,
     }
-    if (index >= 0) routes[index] = managementRoute
-    else routes.push(managementRoute)
+    if (index >= 0) {routes[index] = managementRoute}
+    else {routes.push(managementRoute)}
   }
   return { advanced_routes: routes }
 }
@@ -531,7 +531,7 @@ export function getAdvancedCustomIncomingPathLabel(value: string): string {
 export function parseAdvancedCustomConfig(
   value: string | undefined
 ): AdvancedCustomConfig | null {
-  if (!value?.trim()) return null
+  if (!value?.trim()) {return null}
   try {
     const parsed = JSON.parse(value)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -636,8 +636,8 @@ export function validateAdvancedCustomConfig(
           message: `Only one ${routeLabel} route is allowed`,
         }
       }
-      if (isModelListRoute) modelListRouteIndex = index
-      else balanceRouteIndex = index
+      if (isModelListRoute) {modelListRouteIndex = index}
+      else {balanceRouteIndex = index}
       if (routeModels.length > 0) {
         return {
           routeIndex: index,
@@ -698,7 +698,7 @@ export function validateAdvancedCustomConfig(
 export function hasValidAdvancedCustomModelListRoute(
   config: AdvancedCustomConfig | null
 ): boolean {
-  if (!config || validateAdvancedCustomConfig(config)) return false
+  if (!config || validateAdvancedCustomConfig(config)) {return false}
   const normalized = normalizeAdvancedCustomConfig(config)
   return (normalized.advanced_routes || []).some(
     (route) => route.incoming_path?.trim() === ADVANCED_CUSTOM_MODEL_LIST_PATH
@@ -708,7 +708,7 @@ export function hasValidAdvancedCustomModelListRoute(
 export function advancedCustomConfigUsesRelativeUpstreamPath(
   config: AdvancedCustomConfig | null
 ): boolean {
-  if (!config) return false
+  if (!config) {return false}
   const normalized = normalizeAdvancedCustomConfig(config)
   return (normalized.advanced_routes || []).some((route) =>
     getAdvancedCustomRouteUpstreamPath(route).startsWith('/')
@@ -731,7 +731,7 @@ export function getAdvancedCustomStats(value: string | undefined): {
 
   for (const route of routes) {
     const label = getAdvancedCustomRouteSummaryLabel(route)
-    if (!label || seenRouteTypeLabels.has(label)) continue
+    if (!label || seenRouteTypeLabels.has(label)) {continue}
     routeTypeLabels.push(label)
     seenRouteTypeLabels.add(label)
   }
@@ -753,8 +753,8 @@ export function buildAdvancedCustomAuth(
   mode: AdvancedCustomAuthMode,
   previousAuth: AdvancedCustomRouteAuth | undefined
 ): AdvancedCustomRouteAuth | undefined {
-  if (mode === 'default') return undefined
-  if (mode === 'none') return { type: 'none' }
+  if (mode === 'default') {return undefined}
+  if (mode === 'none') {return { type: 'none' }}
   if (mode === 'header') {
     return {
       type: 'header',
@@ -794,7 +794,7 @@ function normalizeAdvancedCustomRoute(
 function normalizeAdvancedCustomRouteModels(
   models: string[] | undefined
 ): string[] {
-  if (!Array.isArray(models)) return []
+  if (!Array.isArray(models)) {return []}
   return models.map((model) => model.trim()).filter(Boolean)
 }
 
@@ -865,7 +865,7 @@ function getAdvancedCustomRouteSummaryLabel(
   route: AdvancedCustomRoute
 ): string | null {
   const incomingPath = route.incoming_path?.trim() || ''
-  if (!incomingPath) return null
+  if (!incomingPath) {return null}
   return (
     ADVANCED_CUSTOM_ROUTE_SUMMARY_LABELS[incomingPath] ||
     getAdvancedCustomIncomingPathLabel(incomingPath)
@@ -873,7 +873,7 @@ function getAdvancedCustomRouteSummaryLabel(
 }
 
 function isFullHttpURLOrAbsolutePath(value: string): boolean {
-  if (value.startsWith('/')) return !value.startsWith('//')
+  if (value.startsWith('/')) {return !value.startsWith('//')}
 
   try {
     const parsed = new URL(value)
@@ -898,8 +898,8 @@ function isConverterPathAllowed(
   incomingPath: string,
   converter: AdvancedCustomConverter
 ): boolean {
-  if (converter === 'none') return true
-  if (incomingPath === '/v1/alpha/search') return false
+  if (converter === 'none') {return true}
+  if (incomingPath === '/v1/alpha/search') {return false}
   if (converter === 'anthropic_messages_to_openai_chat_completions') {
     return incomingPath === '/v1/messages'
   }
@@ -925,8 +925,8 @@ function isConverterPathAllowed(
 function validateRouteAuth(
   auth: AdvancedCustomRouteAuth | undefined
 ): string | null {
-  if (!auth) return null
-  if (auth.type === 'none') return null
+  if (!auth) {return null}
+  if (auth.type === 'none') {return null}
   if (auth.type !== 'header' && auth.type !== 'query') {
     return 'Auth type is invalid'
   }

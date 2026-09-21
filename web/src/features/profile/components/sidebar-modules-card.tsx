@@ -146,7 +146,7 @@ export function SidebarModulesCard() {
         const defaults: SidebarModulesConfig = {}
         for (const sec of sectionDefs) {
           defaults[sec.key] = { enabled: true }
-          for (const mod of sec.modules) defaults[sec.key][mod.key] = true
+          for (const mod of sec.modules) {defaults[sec.key][mod.key] = true}
         }
         setConfig(defaults)
       }
@@ -206,7 +206,7 @@ export function SidebarModulesCard() {
     const defaults: SidebarModulesConfig = {}
     for (const sec of sectionDefs) {
       defaults[sec.key] = { enabled: true }
-      for (const mod of sec.modules) defaults[sec.key][mod.key] = true
+      for (const mod of sec.modules) {defaults[sec.key][mod.key] = true}
     }
     setConfig(defaults)
     toast.success(t('Reset to default configuration'))

@@ -34,7 +34,7 @@ let connectionCache: {
 } | null = null
 
 function getCachedConnection(): boolean | null {
-  if (!connectionCache) return null
+  if (!connectionCache) {return null}
   if (Date.now() - connectionCache.timestamp > CONNECTION_CACHE_TTL) {
     connectionCache = null
     return null

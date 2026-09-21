@@ -72,7 +72,7 @@ function QuotaLogPreview(props: { log: UsageLog }) {
     .getRowModel()
     .rows[0].getAllCells()
     .find((item) => item.column.id === 'content')
-  if (!cell) throw new Error('The quota log must have a content column')
+  if (!cell) {throw new Error('The quota log must have a content column')}
 
   return (
     <>

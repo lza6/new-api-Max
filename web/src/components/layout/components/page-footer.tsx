@@ -36,6 +36,6 @@ export function PageFooterProvider(props: PageFooterProviderProps) {
 
 export function PageFooterPortal(props: { children: ReactNode }) {
   const container = useContext(PageFooterContext)
-  if (!container) return null
+  if (!container) {return null}
   return createPortal(props.children, container)
 }

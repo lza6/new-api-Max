@@ -67,7 +67,7 @@ export function useAccessToken() {
 
   const performOperation = useCallback(
     async (operation: 'generate' | 'revoke') => {
-      if (currentOperation.current) return
+      if (currentOperation.current) {return}
       const controller = new AbortController()
       currentOperation.current = controller
       setPending(true)
@@ -75,18 +75,18 @@ export function useAccessToken() {
         const proof = await requestVerification({
           scope: `access_token.${operation}`,
         })
-        if (currentOperation.current !== controller || !proof) return
+        if (currentOperation.current !== controller || !proof) {return}
         // Proofs and plaintext stay local to this action, outside React Query caches.
         if (operation === 'generate') {
           const generated = await createAccessToken(
             proof.proof_token,
             controller.signal
           )
-          if (currentOperation.current !== controller) return
+          if (currentOperation.current !== controller) {return}
           setGeneratedToken({ value: generated, userId, sessionId })
         } else {
           await revokeAccessToken(proof.proof_token, controller.signal)
-          if (currentOperation.current !== controller) return
+          if (currentOperation.current !== controller) {return}
           setGeneratedToken(null)
           toast.success(t('Access token revoked'))
         }
@@ -94,9 +94,9 @@ export function useAccessToken() {
           queryKey: ['security', 'access-token', 'status', userId],
         })
       } catch (error) {
-        if (currentOperation.current !== controller) return
+        if (currentOperation.current !== controller) {return}
         const failure = AuthOperationError.from(error)
-        if (failure.code !== 'AUTH_CANCELLED') handleServerError(failure)
+        if (failure.code !== 'AUTH_CANCELLED') {handleServerError(failure)}
         void client.invalidateQueries({
           queryKey: ['security', 'access-token', 'status', userId],
         })

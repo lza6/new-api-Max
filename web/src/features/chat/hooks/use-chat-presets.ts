@@ -28,10 +28,10 @@ import {
 } from '../lib/chat-links'
 
 function getStoredStatusChats(): RawChatConfig {
-  if (typeof window === 'undefined') return undefined
+  if (typeof window === 'undefined') {return undefined}
   try {
     const raw = window.localStorage.getItem('status')
-    if (!raw) return undefined
+    if (!raw) {return undefined}
     const parsed = JSON.parse(raw)
     return parsed?.chats ?? parsed?.Chats
   } catch {

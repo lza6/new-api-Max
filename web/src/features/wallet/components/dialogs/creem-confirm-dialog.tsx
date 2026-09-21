@@ -43,7 +43,7 @@ export function CreemConfirmDialog({
 }: CreemConfirmDialogProps) {
   const { t } = useTranslation()
 
-  if (!product) return null
+  if (!product) {return null}
 
   return (
     <Dialog

@@ -183,7 +183,7 @@ function chartRecordValue(value: unknown): Record<string, unknown> | undefined {
 
 function looksLikeFlowDatum(value: unknown): boolean {
   const record = chartRecordValue(value)
-  if (!record) return false
+  if (!record) {return false}
   return (
     (record.key !== undefined && record.kind !== undefined) ||
     (record.source !== undefined && record.target !== undefined)
@@ -194,15 +194,15 @@ function chartGraphicDatum(value: unknown): unknown {
   const record = chartRecordValue(value)
   const context = chartRecordValue(record?.context)
   const data = context?.data
-  if (Array.isArray(data)) return data[0]
+  if (Array.isArray(data)) {return data[0]}
   return data
 }
 
 function flowChartEventDatum(event: FlowChartPointerEvent): unknown {
   const record = chartRecordValue(event)
-  if (!record) return undefined
+  if (!record) {return undefined}
 
-  if (record.datum !== undefined && record.datum !== null) return record.datum
+  if (record.datum !== undefined && record.datum !== null) {return record.datum}
 
   const itemRecord = chartRecordValue(record.item)
   if (itemRecord?.datum !== undefined && itemRecord.datum !== null) {
@@ -210,11 +210,11 @@ function flowChartEventDatum(event: FlowChartPointerEvent): unknown {
   }
 
   const graphicDatum = chartGraphicDatum(record.item)
-  if (graphicDatum !== undefined && graphicDatum !== null) return graphicDatum
+  if (graphicDatum !== undefined && graphicDatum !== null) {return graphicDatum}
 
   const itemData = itemRecord?.data
-  if (Array.isArray(itemData)) return itemData[0]
-  if (itemData !== undefined && itemData !== null) return itemData
+  if (Array.isArray(itemData)) {return itemData[0]}
+  if (itemData !== undefined && itemData !== null) {return itemData}
 
   return looksLikeFlowDatum(record) ? record : undefined
 }
@@ -305,7 +305,7 @@ export function FlowCharts(props: FlowChartsProps) {
         hidden.delete(stage)
       } else {
         const remaining = stages.filter((item) => !hidden.has(item)).length
-        if (remaining <= MIN_VISIBLE_STAGES) return prev
+        if (remaining <= MIN_VISIBLE_STAGES) {return prev}
         hidden.add(stage)
       }
       return stages.filter((item) => hidden.has(item))

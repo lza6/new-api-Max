@@ -215,7 +215,7 @@ export function Hero(props: HeroProps) {
                     // Fallback to a styled text avatar if the remote favicon fails to load in sandbox or local environments
                     e.currentTarget.style.display = 'none'
                     const fallback = e.currentTarget.nextSibling as HTMLElement
-                    if (fallback) fallback.style.display = 'flex'
+                    if (fallback) {fallback.style.display = 'flex'}
                   }}
                 />
                 <span

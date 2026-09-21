@@ -212,7 +212,7 @@ export function getChannelTypeHints(type: number) {
  */
 export function validateKeyFormat(type: number, key: string): boolean {
   const config = CHANNEL_TYPE_CONFIGS[type]
-  if (!config?.validation) return true
+  if (!config?.validation) {return true}
 
   const { keyFormat, keyMinLength } = config.validation
 

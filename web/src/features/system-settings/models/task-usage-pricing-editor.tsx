@@ -161,7 +161,7 @@ function TaskBillingPreview(props: TaskBillingPreviewProps) {
               const example = props.usageExamples?.find(
                 (item) => item.label === label
               )
-              if (example) props.onSampleReplace({ ...example.facts })
+              if (example) {props.onSampleReplace({ ...example.facts })}
             }}
             className='w-full'
             placeholder={t('Example spec')}
@@ -310,7 +310,7 @@ export const TaskUsagePricingEditor = memo(function TaskUsagePricingEditor(
       { tiers: visualTiers },
       props.usageSchema
     )
-    if (generatedExpression) previewConfig = { tiers: visualTiers }
+    if (generatedExpression) {previewConfig = { tiers: visualTiers }}
     const nextMatchedRowIndex = combinations.findIndex((combination) =>
       Object.entries(combination).every(
         ([field, value]) => previewSample[field] === value
@@ -348,7 +348,7 @@ export const TaskUsagePricingEditor = memo(function TaskUsagePricingEditor(
 
   const handleFillColumn = (priceKey: string, value: number) => {
     const nextRows = matrixRows.map((row) => {
-      if (priceKey === 'constant') return { ...row, constant: value }
+      if (priceKey === 'constant') {return { ...row, constant: value }}
       return {
         ...row,
         unitPrices: { ...row.unitPrices, [priceKey]: value },

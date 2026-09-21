@@ -42,7 +42,7 @@ function createFakeTimers() {
     fireAll() {
       const callbacks = [...pending.values()]
       pending.clear()
-      for (const callback of callbacks) callback()
+      for (const callback of callbacks) {callback()}
     },
     get pendingCount() {
       return pending.size

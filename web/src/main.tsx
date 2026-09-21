@@ -70,18 +70,18 @@ if (!rootElement) {
 // Set document.title and favicon from cached status, then refresh from network
 ;(function initSystemBranding() {
   try {
-    if (typeof window === 'undefined' || typeof document === 'undefined') return
+    if (typeof window === 'undefined' || typeof document === 'undefined') {return}
     const apply = (name: string) => {
       document.title = name
       const metaTitle = document.querySelector(
         'meta[name="title"]'
       ) as HTMLMetaElement | null
-      if (metaTitle) metaTitle.setAttribute('content', name)
+      if (metaTitle) {metaTitle.setAttribute('content', name)}
     }
     // Cache-first
     const cached = readCachedStatus()
-    if (cached?.system_name) apply(cached.system_name as string)
-    if (cached?.logo) applyFaviconToDom(cached.logo as string)
+    if (cached?.system_name) {apply(cached.system_name as string)}
+    if (cached?.logo) {applyFaviconToDom(cached.logo as string)}
 
     // Background refresh through the shared cache. This primes ['status']
     // before React mounts, so the root guard and every status consumer reuse
@@ -90,8 +90,8 @@ if (!rootElement) {
     queryClient
       .ensureQueryData(statusQueryOptions)
       .then((s) => {
-        if (s?.system_name) apply(s.system_name as string)
-        if (s?.logo) applyFaviconToDom(s.logo as string)
+        if (s?.system_name) {apply(s.system_name as string)}
+        if (s?.logo) {applyFaviconToDom(s.logo as string)}
       })
       .catch(() => {
         /* empty */

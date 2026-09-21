@@ -89,7 +89,7 @@ export function OllamaModelsDialog({
   const [isDeleting, setIsDeleting] = useState(false)
 
   const filteredModels = useMemo(() => {
-    if (!search.trim()) return models
+    if (!search.trim()) {return models}
     const keyword = search.trim().toLowerCase()
     return models.filter((m) => m.id.toLowerCase().includes(keyword))
   }, [models, search])
@@ -119,7 +119,7 @@ export function OllamaModelsDialog({
   }, [open, isOllamaChannel, channelId])
 
   const fetchOllamaModels = useCallback(async () => {
-    if (!channelId) return
+    if (!channelId) {return}
     setIsFetching(true)
     try {
       let normalized: OllamaModel[] = []
@@ -161,7 +161,7 @@ export function OllamaModelsDialog({
 
       setModels(normalized)
       setSelected((prev) => {
-        if (!prev.length) return normalized.map((m) => m.id)
+        if (!prev.length) {return normalized.map((m) => m.id)}
         const stillAvailable = prev.filter((id) =>
           normalized.some((m) => m.id === id)
         )
@@ -179,7 +179,7 @@ export function OllamaModelsDialog({
 
   const toggleSelected = (modelId: string, checked: boolean) => {
     setSelected((prev) => {
-      if (checked) return prev.includes(modelId) ? prev : [...prev, modelId]
+      if (checked) {return prev.includes(modelId) ? prev : [...prev, modelId]}
       return prev.filter((id) => id !== modelId)
     })
   }
@@ -195,7 +195,7 @@ export function OllamaModelsDialog({
   const clearSelection = () => setSelected([])
 
   const applySelection = async (mode: 'append' | 'replace') => {
-    if (!currentRow) return
+    if (!currentRow) {return}
     if (!selected.length) {
       toast.info(t('No models selected'))
       return
@@ -224,7 +224,7 @@ export function OllamaModelsDialog({
   }
 
   const pullModel = async () => {
-    if (!channelId) return
+    if (!channelId) {return}
     if (!pullName.trim()) {
       toast.error(t('Please enter model name'))
       return
@@ -268,16 +268,16 @@ export function OllamaModelsDialog({
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {break}
 
         buffer += decoder.decode(value, { stream: true })
         const lines = buffer.split('\n')
         buffer = lines.pop() || ''
 
         for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
+          if (!line.startsWith('data: ')) {continue}
           const eventData = line.slice(6)
-          if (!eventData) continue
+          if (!eventData) {continue}
 
           if (eventData === '[DONE]') {
             setIsPulling(false)
@@ -336,7 +336,7 @@ export function OllamaModelsDialog({
   }
 
   const deleteModel = async (modelName: string) => {
-    if (!channelId) return
+    if (!channelId) {return}
     try {
       setIsDeleting(true)
       const payload = await deleteOllamaModel({
@@ -365,7 +365,7 @@ export function OllamaModelsDialog({
     onOpenChange(false)
   }
 
-  if (!open) return null
+  if (!open) {return null}
 
   return (
     <Dialog
@@ -570,7 +570,7 @@ export function OllamaModelsDialog({
         open={deleteOpen}
         onOpenChange={(v) => {
           setDeleteOpen(v)
-          if (!v) setDeleteTarget(null)
+          if (!v) {setDeleteTarget(null)}
         }}
       >
         <AlertDialogContent>
@@ -590,7 +590,7 @@ export function OllamaModelsDialog({
               variant='destructive'
               disabled={isDeleting || !deleteTarget}
               onClick={() => {
-                if (!deleteTarget) return
+                if (!deleteTarget) {return}
                 void deleteModel(deleteTarget)
               }}
             >

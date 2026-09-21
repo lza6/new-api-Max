@@ -57,7 +57,7 @@ const DATABASE_META: Record<
 }
 
 function resolveDatabaseMeta(type?: string) {
-  if (!type) return null
+  if (!type) {return null}
   const normalized = type.toLowerCase()
   return (
     DATABASE_META[normalized] ?? {

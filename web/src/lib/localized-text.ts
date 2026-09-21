@@ -37,22 +37,22 @@ export function resolveLocalizedText(
   value: LocalizedTextValue | undefined | null,
   language: string
 ): string {
-  if (value == null) return ''
-  if (typeof value === 'string') return value
-  if (typeof value !== 'object' || Array.isArray(value)) return ''
+  if (value == null) {return ''}
+  if (typeof value === 'string') {return value}
+  if (typeof value !== 'object' || Array.isArray(value)) {return ''}
 
   const texts = new Map<string, string>()
   for (const [key, text] of Object.entries(value)) {
-    if (typeof text !== 'string' || text.trim() === '') continue
+    if (typeof text !== 'string' || text.trim() === '') {continue}
     const locale = key.trim().replaceAll('_', '-').toLowerCase()
-    if (!locale) continue
+    if (!locale) {continue}
     texts.set(locale, text)
   }
-  if (texts.size === 0) return ''
+  if (texts.size === 0) {return ''}
 
   for (const candidate of localeFallbackKeys(language)) {
     const hit = texts.get(candidate)
-    if (hit !== undefined) return hit
+    if (hit !== undefined) {return hit}
   }
 
   const firstKey = [...texts.keys()].sort((left, right) =>
@@ -65,12 +65,12 @@ function localeFallbackKeys(language: string): string[] {
   const normalized = language.trim().replaceAll('_', '-').toLowerCase()
   const keys: string[] = []
   const add = (tag: string) => {
-    if (tag && !keys.includes(tag)) keys.push(tag)
+    if (tag && !keys.includes(tag)) {keys.push(tag)}
   }
 
   add(normalized)
-  if (normalized === 'zhcn') add('zh-cn')
-  if (normalized === 'zhtw') add('zh-tw')
+  if (normalized === 'zhcn') {add('zh-cn')}
+  if (normalized === 'zhtw') {add('zh-tw')}
 
   if (normalized.includes('-')) {
     add(normalized.slice(0, normalized.indexOf('-')))

@@ -40,7 +40,7 @@ export function PresetSelector(props: PresetSelectorProps) {
   const handlePresetChange = (presetKey: string) => {
     setSelectedPreset(presetKey)
     const preset = OAUTH_PRESETS.find((p) => p.key === presetKey)
-    if (!preset) return
+    if (!preset) {return}
 
     // Auto-fill name, slug, icon, and field mappings immediately
     props.form.setValue('name', preset.name, { shouldDirty: true })
@@ -74,10 +74,10 @@ export function PresetSelector(props: PresetSelectorProps) {
 
   const handleBaseUrlChange = (url: string) => {
     setBaseUrl(url)
-    if (!selectedPreset) return
+    if (!selectedPreset) {return}
 
     const preset = OAUTH_PRESETS.find((p) => p.key === selectedPreset)
-    if (!preset) return
+    if (!preset) {return}
 
     applyEndpoints(preset, url)
   }
@@ -111,7 +111,7 @@ export function PresetSelector(props: PresetSelectorProps) {
           <Combobox
  options={OAUTH_PRESETS.map((preset) => ({ value: preset.key, label: preset.name }))}
  value={selectedPreset}
- onValueChange={(value) => { if (value !== null) handlePresetChange(value) }}
+ onValueChange={(value) => { if (value !== null) {handlePresetChange(value)} }}
  aria-label={t('Select preset')}
  placeholder={t('Select preset')}
  className='w-full'

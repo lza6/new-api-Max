@@ -37,7 +37,7 @@ export function filterBySearch(
   models: PricingModel[],
   query: string
 ): PricingModel[] {
-  if (!query) return models
+  if (!query) {return models}
 
   const lowerQuery = query.toLowerCase()
   return models.filter(
@@ -56,7 +56,7 @@ export function filterByVendor(
   models: PricingModel[],
   vendor: string
 ): PricingModel[] {
-  if (vendor === FILTER_ALL) return models
+  if (vendor === FILTER_ALL) {return models}
   return models.filter((m) => m.vendor_name === vendor)
 }
 
@@ -67,7 +67,7 @@ export function filterByGroup(
   models: PricingModel[],
   group: string
 ): PricingModel[] {
-  if (group === FILTER_ALL) return models
+  if (group === FILTER_ALL) {return models}
   return models.filter((m) => m.enable_groups?.includes(group))
 }
 
@@ -78,7 +78,7 @@ export function filterByQuotaType(
   models: PricingModel[],
   quotaType: string
 ): PricingModel[] {
-  if (quotaType === QUOTA_TYPES.ALL) return models
+  if (quotaType === QUOTA_TYPES.ALL) {return models}
   // Task-usage models form their own bucket, disjoint from token/request.
   if (quotaType === QUOTA_TYPES.TASK) {
     return models.filter((m) => hasTaskUsageSchema(m))
@@ -99,7 +99,7 @@ export function filterByEndpointType(
   models: PricingModel[],
   endpointType: string
 ): PricingModel[] {
-  if (endpointType === ENDPOINT_TYPES.ALL) return models
+  if (endpointType === ENDPOINT_TYPES.ALL) {return models}
   return models.filter((m) =>
     m.supported_endpoint_types?.includes(endpointType)
   )
@@ -168,7 +168,7 @@ export function filterAndSortModels(
  * Parse tags from comma-separated string
  */
 export function parseTags(tagsString?: string): string[] {
-  if (!tagsString) return []
+  if (!tagsString) {return []}
   return tagsString
     .split(/[,;|\s]+/)
     .map((t) => t.trim())
@@ -190,7 +190,7 @@ export function extractAllTags(models: PricingModel[]): string[] {
     }
   })
 
-  return Array.from(tagSet).sort((a, b) => a.localeCompare(b))
+  return [...tagSet].sort((a, b) => a.localeCompare(b))
 }
 
 /**
@@ -200,11 +200,11 @@ export function filterByTag(
   models: PricingModel[],
   tag: string
 ): PricingModel[] {
-  if (tag === FILTER_ALL) return models
+  if (tag === FILTER_ALL) {return models}
 
   const tagLower = tag.toLowerCase()
   return models.filter((m) => {
-    if (!m.tags) return false
+    if (!m.tags) {return false}
     const modelTags = parseTags(m.tags).map((t) => t.toLowerCase())
     return modelTags.includes(tagLower)
   })

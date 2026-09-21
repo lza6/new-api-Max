@@ -48,17 +48,17 @@ import { useUpdateOption } from '../hooks/use-update-option'
 import { RateLimitVisualEditor } from './rate-limit-visual-editor'
 
 const isValidJSON = (value: string | undefined) => {
-  if (!value || value.trim() === '') return true
+  if (!value || value.trim() === '') {return true}
   try {
     const parsed = JSON.parse(value)
     if (typeof parsed !== 'object' || Array.isArray(parsed)) {
       return false
     }
     for (const [, val] of Object.entries(parsed)) {
-      if (!Array.isArray(val) || val.length !== 2) return false
-      if (typeof val[0] !== 'number' || typeof val[1] !== 'number') return false
-      if (val[0] < 0 || val[1] < 1) return false
-      if (val[0] > 2147483647 || val[1] > 2147483647) return false
+      if (!Array.isArray(val) || val.length !== 2) {return false}
+      if (typeof val[0] !== 'number' || typeof val[1] !== 'number') {return false}
+      if (val[0] < 0 || val[1] < 1) {return false}
+      if (val[0] > 2147483647 || val[1] > 2147483647) {return false}
     }
     return true
   } catch {

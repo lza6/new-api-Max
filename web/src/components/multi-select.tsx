@@ -164,7 +164,7 @@ export function MultiSelect(props: MultiSelectProps) {
     if (canCreate) {
       set.add(trimmedInput)
     }
-    return Array.from(set)
+    return [...set]
   }, [props.options, props.selected, canCreate, trimmedInput])
 
   const addValues = React.useCallback(
@@ -173,12 +173,12 @@ export function MultiSelect(props: MultiSelectProps) {
       const seen = new Set<string>(props.selected)
       for (const raw of values) {
         const value = raw.trim()
-        if (!value) continue
-        if (seen.has(value)) continue
+        if (!value) {continue}
+        if (seen.has(value)) {continue}
         seen.add(value)
         next.push(value)
       }
-      if (next.length === 0) return
+      if (next.length === 0) {return}
       props.onChange([...props.selected, ...next])
     },
     [props]

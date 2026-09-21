@@ -28,7 +28,7 @@ import {
 import { Input } from '@/components/ui/input'
 
 function formatNumberDraft(value: number | string): string {
-  if (value === '') return ''
+  if (value === '') {return ''}
   if (typeof value === 'number') {
     return Number.isFinite(value) ? String(value) : '0'
   }
@@ -36,7 +36,7 @@ function formatNumberDraft(value: number | string): string {
 }
 
 function parseNumberDraft(value: string): number {
-  if (value.trim() === '') return 0
+  if (value.trim() === '') {return 0}
   const next = Number(value)
   return Number.isFinite(next) ? next : 0
 }

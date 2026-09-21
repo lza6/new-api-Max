@@ -134,7 +134,7 @@ export function PaymentMethodsVisualEditor({
   }, [value])
 
   const filteredMethods = useMemo(() => {
-    if (!searchText) return paymentMethods
+    if (!searchText) {return paymentMethods}
     const lowerSearch = searchText.toLowerCase()
     return paymentMethods.filter(
       (method) =>

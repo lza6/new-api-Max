@@ -38,7 +38,7 @@ export function FormDirtyIndicator({
   message,
 }: FormDirtyIndicatorProps) {
   const { t } = useTranslation()
-  if (!isDirty) return null
+  if (!isDirty) {return null}
 
   return (
     <SettingsPageTitleStatusPortal>

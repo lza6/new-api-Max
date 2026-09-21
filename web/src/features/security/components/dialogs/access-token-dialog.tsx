@@ -33,7 +33,7 @@ export function AccessTokenDialog(props: {
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) props.onClose()
+        if (!open) {props.onClose()}
       }}
       title={t('Access Token')}
       description={t(

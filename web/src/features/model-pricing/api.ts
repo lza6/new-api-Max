@@ -65,7 +65,7 @@ export async function getModelPricing(
   names: string[] = []
 ): Promise<ModelPricingConfig> {
   const params = new URLSearchParams()
-  for (const name of names) params.append('model', name)
+  for (const name of names) {params.append('model', name)}
   const res = await api.get('/api/option/model_pricing', { params })
   if (!res.data.success) {
     throw createServerError(res.data, t('Failed to load model pricing'))
@@ -93,7 +93,7 @@ export async function invalidateModelPricing(client: QueryClient) {
 }
 
 export async function saveModelPricing(changes: ModelPricingChange[]) {
-  if (!changes.length) return
+  if (!changes.length) {return}
   const res = await api.patch('/api/option/model_pricing', { changes })
   if (!res.data.success) {
     throw createServerError(res.data, t('Failed to save model pricing'))
@@ -127,12 +127,12 @@ export function buildPricingChanges(
     const dirty = PRICING_KEYS.filter(
       (key) => oldValues[key] !== newValues[key]
     )
-    if (!dirty.length) continue
+    if (!dirty.length) {continue}
     const entry = entries.get(name)
     const pricing = { ...entry?.configured }
     for (const key of dirty) {
       delete pricing[key]
-      if (newValues[key] !== undefined) pricing[key] = newValues[key]
+      if (newValues[key] !== undefined) {pricing[key] = newValues[key]}
     }
     if (newValues['billing_setting.billing_mode'] === 'tiered_expr') {
       pricing['billing_setting.billing_mode'] = 'tiered_expr'

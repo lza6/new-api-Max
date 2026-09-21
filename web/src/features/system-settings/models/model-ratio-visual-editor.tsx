@@ -343,7 +343,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         requestRuleExpr: editableModel.requestRuleExpr,
       })
       setEditorOpen(true)
-      if (isMobile) setSheetOpen(true)
+      if (isMobile) {setSheetOpen(true)}
     },
     [isMobile]
   )
@@ -351,7 +351,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
   const handleAdd = useCallback(() => {
     setEditData(null)
     setEditorOpen(true)
-    if (isMobile) setSheetOpen(true)
+    if (isMobile) {setSheetOpen(true)}
   }, [isMobile])
 
   const handleGlobalFilterChange = useCallback<OnChangeFn<string>>(
@@ -525,7 +525,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
         BillingExpr: billingExpr,
       })
       const updated = applyPricingDraft(options, data, targetNames)
-      for (const [key, value] of Object.entries(updated)) onChange(key, value)
+      for (const [key, value] of Object.entries(updated)) {onChange(key, value)}
     },
     [
       modelPrice,
@@ -551,7 +551,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
     let sourceData = editData
     if (editorOpen && editorPanelRef.current) {
       const committed = await editorPanelRef.current.commitDraft()
-      if (!committed) return
+      if (!committed) {return}
       sourceData = committed
       setEditData(committed)
     }
@@ -583,9 +583,9 @@ const ModelRatioVisualEditorComponent = forwardRef<
     ref,
     () => ({
       commitOpenEditor: async () => {
-        if (!editorOpen || !editorPanelRef.current) return true
+        if (!editorOpen || !editorPanelRef.current) {return true}
         const data = await editorPanelRef.current.commitDraft()
-        if (!data) return false
+        if (!data) {return false}
         persistPricingData(data)
         setEditData(data)
         return true
@@ -701,7 +701,7 @@ const ModelRatioVisualEditorComponent = forwardRef<
                   }
                   onClick={(event) => {
                     const target = event.target as HTMLElement
-                    if (target.closest('button, [role="checkbox"]')) return
+                    if (target.closest('button, [role="checkbox"]')) {return}
                     handleEdit(row.original)
                   }}
                 />

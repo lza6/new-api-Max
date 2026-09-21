@@ -150,7 +150,7 @@ export function expressionFailure(error: unknown): ExpressionFailure {
           detail: error instanceof Error ? error.message : String(error),
         }
   let status: ExpressionFailure['status'] = 'invalid'
-  if (diagnostic.code === 'missing_context') status = 'missing_context'
+  if (diagnostic.code === 'missing_context') {status = 'missing_context'}
   if (diagnostic.code === 'unsupported' || diagnostic.code === 'limit') {
     status = 'unsupported'
   }
@@ -166,7 +166,7 @@ export function visitExpression(
   const stack = [{ node, visited: false, depth: 0 }]
   while (stack.length > 0) {
     const entry = stack.pop()
-    if (!entry) break
+    if (!entry) {break}
     if (entry.depth > 256) {
       throw new BillingExpressionError({
         code: 'limit',
@@ -179,8 +179,8 @@ export function visitExpression(
     }
     stack.push({ ...entry, visited: true })
     const children: ExpressionNode[] = []
-    if (entry.node.kind === 'call') children.push(...entry.node.args)
-    if (entry.node.kind === 'unary') children.push(entry.node.operand)
+    if (entry.node.kind === 'call') {children.push(...entry.node.args)}
+    if (entry.node.kind === 'unary') {children.push(entry.node.operand)}
     if (entry.node.kind === 'binary') {
       children.push(entry.node.left, entry.node.right)
     }
@@ -200,8 +200,8 @@ export function expressionDependencies(node: ExpressionNode): {
   const variables = new Set<TokenVariable>()
   const functions = new Set<string>()
   visitExpression(node, (part) => {
-    if (part.kind === 'variable') variables.add(part.name)
-    if (part.kind === 'call') functions.add(part.name)
+    if (part.kind === 'variable') {variables.add(part.name)}
+    if (part.kind === 'call') {functions.add(part.name)}
   })
   return { variables, functions }
 }

@@ -62,8 +62,8 @@ export function formatPricingAmount(
   value: string | number,
   currency = USD_PRICING_CURRENCY
 ): string {
-  if (value === '') return ''
+  if (value === '') {return ''}
   const amount = Number(value) * currency.exchangeRate
-  if (!Number.isFinite(amount)) return '—'
+  if (!Number.isFinite(amount)) {return '—'}
   return `${currency.symbol}${formatPricingNumber(amount)}`
 }

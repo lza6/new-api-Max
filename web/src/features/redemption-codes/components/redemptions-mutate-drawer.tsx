@@ -133,7 +133,7 @@ export function RedemptionsMutateDrawer({
 
     void getRedemption(redemptionId)
       .then((result) => {
-        if (ignoreResult) return
+        if (ignoreResult) {return}
 
         if (
           !result.success ||
@@ -150,7 +150,7 @@ export function RedemptionsMutateDrawer({
         setRedemptionLoadState('ready')
       })
       .catch((error: unknown) => {
-        if (ignoreResult) return
+        if (ignoreResult) {return}
 
         setRedemptionLoadState('error')
         handleServerError(error)

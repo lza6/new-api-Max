@@ -148,7 +148,7 @@ it('only reports a query failure after retries are exhausted and stays silent wh
   let attempts = 0
   api.defaults.adapter = async (config) => {
     attempts++
-    if (attempts <= 2) throw new AxiosError('Offline', 'ERR_NETWORK', config)
+    if (attempts <= 2) {throw new AxiosError('Offline', 'ERR_NETWORK', config)}
     return {
       data: { success: true },
       status: 200,

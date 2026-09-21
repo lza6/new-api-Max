@@ -35,26 +35,40 @@ const STATUS_TONE: Record<TimelinePhase['status'], string> = {
 function PhaseRow(props: { phase: TimelinePhase }) {
   const { t } = useTranslation()
   const { phase } = props
-  const label =
-    phase.key === 'inbound'
-      ? t('Inbound')
-      : phase.key === 'auth'
-        ? t('Auth')
-        : phase.key === 'channel'
-          ? t('Channel selection')
-          : phase.key === 'upstream'
-            ? t('Upstream call')
-            : phase.key === 'first_token'
-              ? t('First token')
-              : t('Complete')
-  const statusLabel =
-    phase.status === 'failed'
-      ? t('Failed')
-      : phase.status === 'skipped'
-        ? t('Skipped')
-        : phase.status === 'info'
-          ? t('Info')
-          : t('Done')
+  let label: string
+  switch (phase.key) {
+    case 'inbound':
+      label = t('Inbound')
+      break
+    case 'auth':
+      label = t('Auth')
+      break
+    case 'channel':
+      label = t('Channel selection')
+      break
+    case 'upstream':
+      label = t('Upstream call')
+      break
+    case 'first_token':
+      label = t('First token')
+      break
+    default:
+      label = t('Complete')
+  }
+  let statusLabel: string
+  switch (phase.status) {
+    case 'failed':
+      statusLabel = t('Failed')
+      break
+    case 'skipped':
+      statusLabel = t('Skipped')
+      break
+    case 'info':
+      statusLabel = t('Info')
+      break
+    default:
+      statusLabel = t('Done')
+  }
   return (
     <div className='flex min-w-0 items-start gap-2'>
       <span className={cn('mt-0.5 h-2 w-2 shrink-0 rounded-full', phase.status === 'done' && 'bg-emerald-500', phase.status === 'failed' && 'bg-red-500', phase.status === 'skipped' && 'bg-muted-foreground/50', phase.status === 'info' && 'bg-sky-500')} aria-hidden='true' />
@@ -97,8 +111,8 @@ export function RequestTimelineCard(props: {
       label={t('Request timeline')}
     >
       <div className='space-y-1.5'>
-        {timeline.phases.map((phase, index) => (
-          <PhaseRow key={`${phase.key}-${index}`} phase={phase} />
+        {timeline.phases.map((phase) => (
+          <PhaseRow key={phase.key} phase={phase} />
         ))}
       </div>
       <div className='mt-2 flex justify-end'>

@@ -83,7 +83,7 @@ import {
 
 function isHttpOriginUrl(value: string) {
   const trimmed = value.trim()
-  if (!trimmed) return true
+  if (!trimmed) {return true}
 
   try {
     const url = new URL(trimmed)
@@ -98,7 +98,7 @@ function isHttpOriginUrl(value: string) {
 const paymentSchema = z.object({
   PayAddress: z.string().refine((value) => {
     const trimmed = value.trim()
-    if (!trimmed) return true
+    if (!trimmed) {return true}
     return /^https?:\/\//.test(trimmed)
   }, 'Provide a valid callback URL starting with http:// or https://'),
   EpayId: z.string(),

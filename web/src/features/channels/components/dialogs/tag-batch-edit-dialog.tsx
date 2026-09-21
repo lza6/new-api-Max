@@ -73,7 +73,7 @@ export function TagBatchEditDialog({
 
   // Transform groups to multi-select options
   const groupOptions = useMemo(() => {
-    if (!groupsData?.data) return []
+    if (!groupsData?.data) {return []}
     const allGroups = new Set([...groupsData.data, ...groups])
     return [...allGroups].map((group) => ({
       value: group,
@@ -89,7 +89,7 @@ export function TagBatchEditDialog({
   }, [open, currentTag])
 
   const loadTagData = async () => {
-    if (!currentTag) return
+    if (!currentTag) {return}
 
     setIsLoading(true)
     try {
@@ -116,7 +116,7 @@ export function TagBatchEditDialog({
   }
 
   const handleSave = async () => {
-    if (!currentTag) return
+    if (!currentTag) {return}
 
     // Validate model mapping JSON if provided
     if (modelMapping.trim()) {
@@ -181,7 +181,7 @@ export function TagBatchEditDialog({
     onOpenChange(false)
   }
 
-  if (!currentTag) return null
+  if (!currentTag) {return null}
 
   return (
     <Dialog

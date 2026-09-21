@@ -59,13 +59,13 @@ const inFlightGet = new Map<string, Promise<unknown>>()
 const originalGet = api.get.bind(api)
 
 api.get = ((url: string, config: ApiRequestConfig = {}) => {
-  if (config.disableDuplicate) return originalGet(url, config)
+  if (config.disableDuplicate) {return originalGet(url, config)}
 
   const params = config.params ? JSON.stringify(config.params) : '{}'
   const sessionSID = useAuthStore.getState().auth.session?.sid || 'anonymous'
   const key = `${sessionSID}:${url}?${params}`
   const existingRequest = inFlightGet.get(key)
-  if (existingRequest) return existingRequest
+  if (existingRequest) {return existingRequest}
 
   const request = originalGet(url, config).finally(() => {
     inFlightGet.delete(key)
@@ -139,7 +139,7 @@ api.interceptors.response.use(
         })
       }
     }
-    if (axios.isAxiosError(error)) error.message = getServerErrorMessage(error)
+    if (axios.isAxiosError(error)) {error.message = getServerErrorMessage(error)}
     throw error
   }
 )

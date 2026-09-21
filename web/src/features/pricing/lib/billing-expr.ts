@@ -294,11 +294,11 @@ function mapTokenTier(
 }
 
 export function parseTiersFromExpr(exprStr: string): ParsedTier[] {
-  if (!exprStr) return []
+  if (!exprStr) {return []}
   const compiled = compileBillingExpression(exprStr)
-  if (compiled.status !== 'ready') return []
+  if (compiled.status !== 'ready') {return []}
   const canonical = readTokenTierChain(compiled.ast)
-  if (canonical) return canonical.map(mapTokenTier)
+  if (canonical) {return canonical.map(mapTokenTier)}
   return readTimeTokenPricing(exprStr)?.tiers.map(mapTokenTier) ?? []
 }
 
@@ -317,15 +317,15 @@ export function parseTaskTiersFromExpr(
   schema: BillingUsageSchema | null | undefined,
   includeBooleanConditions = false
 ): ParsedTaskTier[] {
-  if (!exprStr || !schema || Object.keys(schema).length === 0) return []
+  if (!exprStr || !schema || Object.keys(schema).length === 0) {return []}
   const { billingExpr } = splitBillingExprAndRequestRules(exprStr)
   const compiled = compileBillingExpression(billingExpr)
-  if (compiled.status !== 'ready') return []
+  if (compiled.status !== 'ready') {return []}
   return readTaskTierChain(compiled.ast, schema, includeBooleanConditions) ?? []
 }
 
 export function normalizeTierLabel(label: string | undefined): string {
-  if (!label) return ''
+  if (!label) {return ''}
   return label
     .replaceAll(/<[=＝]?|≤|＜[=＝]?/g, '<')
     .replaceAll(/>[=＝]?|≥|＞[=＝]?/g, '>')
@@ -347,8 +347,8 @@ function splitTopLevelAnd(expr: string): string[] {
 
 function parseExprLiteral(raw: string): string | null {
   const text = raw.trim()
-  if (text === 'true' || text === 'false') return text
-  if (NUMERIC_LITERAL_REGEX.test(text)) return text
+  if (text === 'true' || text === 'false') {return text}
+  if (NUMERIC_LITERAL_REGEX.test(text)) {return text}
   try {
     return JSON.parse(text) as string
   } catch {
@@ -368,9 +368,9 @@ const TIME_FUNC_RANGES: Record<TimeFunc, [number, number]> = {
 }
 
 function isTimeValueInRange(timeFunc: TimeFunc, text: string): boolean {
-  if (!NUMERIC_LITERAL_REGEX.test(text)) return false
+  if (!NUMERIC_LITERAL_REGEX.test(text)) {return false}
   const value = Number(text)
-  if (!Number.isInteger(value)) return false
+  if (!Number.isInteger(value)) {return false}
   const [min, max] = TIME_FUNC_RANGES[timeFunc]
   return value >= min && value <= max
 }
@@ -408,7 +408,7 @@ function tryParseTimeCondition(expr: string): RequestCondition | null {
     /^(hour|minute|weekday|month|day)\("([^"]+)"\) (==|>=|<) ([\d.eE+-]+)$/
   )
   if (m) {
-    if (!isTimeValueInRange(m[1] as TimeFunc, m[4])) return null
+    if (!isTimeValueInRange(m[1] as TimeFunc, m[4])) {return null}
     const opMap: Record<string, string> = {
       '==': MATCH_EQ,
       '>=': MATCH_GTE,
@@ -429,13 +429,13 @@ function tryParseTimeCondition(expr: string): RequestCondition | null {
 
 function tryParseRequestCondition(expr: string): RequestCondition | null {
   const tc = tryParseTimeCondition(expr)
-  if (tc) return tc
+  if (tc) {return tc}
 
   let m = expr.match(/^header\("([^"]+)"\) != ""$/)
-  if (m) return { source: 'header', path: m[1], mode: MATCH_EXISTS, value: '' }
+  if (m) {return { source: 'header', path: m[1], mode: MATCH_EXISTS, value: '' }}
 
   m = expr.match(/^param\("([^"]+)"\) != nil$/)
-  if (m) return { source: 'param', path: m[1], mode: MATCH_EXISTS, value: '' }
+  if (m) {return { source: 'param', path: m[1], mode: MATCH_EXISTS, value: '' }}
 
   m = expr.match(/^has\(header\("([^"]+)"\), ((?:"(?:[^"\\]|\\.)*"))\)$/)
   if (m) {
@@ -475,7 +475,7 @@ function tryParseRequestCondition(expr: string): RequestCondition | null {
   m = expr.match(/^(param|header)\("([^"]+)"\) == (.+)$/)
   if (m) {
     const parsedValue = parseExprLiteral(m[3])
-    if (parsedValue === null) return null
+    if (parsedValue === null) {return null}
     return {
       source: m[1] as 'param' | 'header',
       path: m[2],
@@ -493,11 +493,11 @@ function tryParseTimeRangePair(
 ): RequestCondition | null {
   const a = tryParseTimeCondition(lower)
   const b = tryParseTimeCondition(upper)
-  if (!a || !b || a.source !== 'time' || b.source !== 'time') return null
+  if (!a || !b || a.source !== 'time' || b.source !== 'time') {return null}
   const ta = a as TimeCondition
   const tb = b as TimeCondition
-  if (ta.timeFunc !== tb.timeFunc || ta.timezone !== tb.timezone) return null
-  if (ta.mode !== MATCH_GTE || tb.mode !== MATCH_LT) return null
+  if (ta.timeFunc !== tb.timeFunc || ta.timezone !== tb.timezone) {return null}
+  if (ta.mode !== MATCH_GTE || tb.mode !== MATCH_LT) {return null}
   return {
     source: 'time',
     timeFunc: ta.timeFunc,
@@ -515,7 +515,7 @@ function tryParseRequestConditions(
   // A single time range like hour(tz) >= 9 && hour(tz) < 12 must stay one
   // MATCH_RANGE condition instead of being split into two scalar conditions.
   const wholeTimeCond = tryParseTimeCondition(conditionStr.trim())
-  if (wholeTimeCond) return [wholeTimeCond]
+  if (wholeTimeCond) {return [wholeTimeCond]}
 
   const andParts = splitTopLevelAnd(conditionStr)
   const conditions: RequestCondition[] = []
@@ -532,7 +532,7 @@ function tryParseRequestConditions(
       continue
     }
     const condition = tryParseRequestCondition(part)
-    if (!condition) return null
+    if (!condition) {return null}
     conditions.push(condition)
   }
   return conditions.length > 0 ? conditions : null
@@ -540,10 +540,10 @@ function tryParseRequestConditions(
 
 function tryParseRuleGroupFactor(part: string): RequestRuleGroup | null {
   const m = part.match(/^\((.+) \? ([\d.eE+-]+) : 1\)$/s)
-  if (!m) return null
+  if (!m) {return null}
 
   const conditions = tryParseRequestConditions(m[1])
-  if (!conditions) return null
+  if (!conditions) {return null}
   return { conditions, multiplier: m[2] }
 }
 
@@ -565,13 +565,13 @@ export function tryParseRequestRuleExpr(
   expr: string
 ): RequestRuleGroup[] | null {
   const trimmed = (expr || '').trim()
-  if (!trimmed) return []
+  if (!trimmed) {return []}
 
   const parts = splitTopLevelMultiply(trimmed)
   const groups: RequestRuleGroup[] = []
   for (const part of parts) {
     const group = tryParseRuleGroupFactor(part)
-    if (!group) return null
+    if (!group) {return null}
     groups.push(group)
   }
   return groups
@@ -590,10 +590,10 @@ export function splitBillingExprAndRequestRules(expr: string): {
   requestRuleExpr: string
 } {
   const trimmed = (expr || '').trim()
-  if (!trimmed) return { billingExpr: '', requestRuleExpr: '' }
+  if (!trimmed) {return { billingExpr: '', requestRuleExpr: '' }}
 
   const parts = splitTopLevelMultiply(trimmed)
-  if (parts.length <= 1) return { billingExpr: trimmed, requestRuleExpr: '' }
+  if (parts.length <= 1) {return { billingExpr: trimmed, requestRuleExpr: '' }}
 
   const ruleParts: string[] = []
   const baseParts: string[] = []
@@ -623,8 +623,8 @@ export function combineBillingExpr(
 ): string {
   const base = (baseExpr || '').trim()
   const rules = (requestRuleExpr || '').trim()
-  if (!base) return ''
-  if (!rules) return base
+  if (!base) {return ''}
+  if (!rules) {return base}
   return `(${base}) * ${rules}`
 }
 
@@ -676,7 +676,7 @@ export function getRequestRuleMatchOptions(source: string): MatchOption[] {
     { value: MATCH_CONTAINS, labelKey: 'Contains' },
     { value: MATCH_EXISTS, labelKey: 'Exists' },
   ]
-  if (source === SOURCE_HEADER) return base
+  if (source === SOURCE_HEADER) {return base}
   return [
     ...base,
     { value: MATCH_GT, labelKey: 'Greater than' },
@@ -744,9 +744,9 @@ export function normalizeCondition(
 
 function buildExprLiteral(mode: string, value: string): string {
   const text = String(value || '').trim()
-  if (mode === MATCH_CONTAINS) return JSON.stringify(text)
-  if (text === 'true' || text === 'false') return text
-  if (NUMERIC_LITERAL_REGEX.test(text)) return text
+  if (mode === MATCH_CONTAINS) {return JSON.stringify(text)}
+  if (text === 'true' || text === 'false') {return text}
+  if (NUMERIC_LITERAL_REGEX.test(text)) {return text}
   return JSON.stringify(text)
 }
 
@@ -773,7 +773,7 @@ function buildTimeConditionExpr(cond: TimeCondition): string {
     return `${fn} >= ${s} && ${fn} < ${e}`
   }
   const v = normalized.value.trim()
-  if (!isTimeValueInRange(timeFunc, v)) return ''
+  if (!isTimeValueInRange(timeFunc, v)) {return ''}
   const opMap: Record<string, string> = {
     [MATCH_EQ]: '==',
     [MATCH_GTE]: '>=',
@@ -783,10 +783,10 @@ function buildTimeConditionExpr(cond: TimeCondition): string {
 }
 
 function buildRequestConditionExpr(cond: RequestCondition): string {
-  if (cond.source === 'time') return buildTimeConditionExpr(cond)
+  if (cond.source === 'time') {return buildTimeConditionExpr(cond)}
   const normalized = normalizeCondition(cond) as ParamHeaderCondition
   const path = normalized.path.trim()
-  if (!path) return ''
+  if (!path) {return ''}
 
   const sourceExpr =
     normalized.source === 'header'
@@ -813,7 +813,7 @@ function buildRequestConditionExpr(cond: RequestCondition): string {
         [MATCH_LTE]: '<=',
       }
       const numText = String(normalized.value).trim()
-      if (!NUMERIC_LITERAL_REGEX.test(numText)) return ''
+      if (!NUMERIC_LITERAL_REGEX.test(numText)) {return ''}
       return `${sourceExpr} != nil && ${sourceExpr} ${opMap[normalized.mode]} ${numText}`
     }
     case MATCH_EQ:
@@ -824,11 +824,11 @@ function buildRequestConditionExpr(cond: RequestCondition): string {
 
 function buildRuleGroupFactor(group: RequestRuleGroup): string {
   const multiplier = (group.multiplier || '').trim()
-  if (!NUMERIC_LITERAL_REGEX.test(multiplier)) return ''
+  if (!NUMERIC_LITERAL_REGEX.test(multiplier)) {return ''}
   const condExprs = (group.conditions || [])
     .map(buildRequestConditionExpr)
     .filter(Boolean)
-  if (condExprs.length === 0) return ''
+  if (condExprs.length === 0) {return ''}
 
   const combined =
     condExprs.length === 1

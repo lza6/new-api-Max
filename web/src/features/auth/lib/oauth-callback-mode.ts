@@ -23,7 +23,7 @@ export function rememberOAuthLoginRedirect(
   state: string,
   redirect?: string
 ): void {
-  if (!redirect) return
+  if (!redirect) {return}
   try {
     window.sessionStorage.setItem(`oauth_login_redirect:${state}`, redirect)
   } catch {
@@ -89,7 +89,7 @@ export function markOAuthPopup(
   state: string,
   intent: 'bind' | 'verify'
 ): boolean {
-  if (!storage || !provider || !state) return false
+  if (!storage || !provider || !state) {return false}
 
   try {
     const key = `${OAUTH_POPUP_FLOW_KEY_PREFIX}${provider}`
@@ -114,11 +114,11 @@ export function resolveOAuthCallbackMode(
   state: string,
   { opener, storage }: OAuthCallbackModeContext
 ): OAuthCallbackMode {
-  if (!opener || opener.closed || !storage || !state) return 'login'
+  if (!opener || opener.closed || !storage || !state) {return 'login'}
 
   try {
     const value = storage.getItem(`${OAUTH_POPUP_FLOW_KEY_PREFIX}${provider}`)
-    if (!value) return 'login'
+    if (!value) {return 'login'}
     const marker: unknown = JSON.parse(value)
     if (
       !marker ||
@@ -128,7 +128,7 @@ export function resolveOAuthCallbackMode(
     ) {
       return 'login'
     }
-    if (marker.state !== state) return 'login'
+    if (marker.state !== state) {return 'login'}
     if (marker.intent === 'bind' || marker.intent === 'verify') {
       return marker.intent
     }

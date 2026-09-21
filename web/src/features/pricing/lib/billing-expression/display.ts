@@ -48,7 +48,7 @@ export function flattenBinary(
   node: ExpressionNode,
   operator: string
 ): ExpressionNode[] {
-  if (node.kind !== 'binary' || node.operator !== operator) return [node]
+  if (node.kind !== 'binary' || node.operator !== operator) {return [node]}
   return [
     ...flattenBinary(node.left, operator),
     ...flattenBinary(node.right, operator),
@@ -138,7 +138,7 @@ function tokenTier(
     }
     prices[term.left.name] = nonnegativePriceLiteral(term.right) ?? 0
   }
-  if (Object.keys(prices).length === 0) return null
+  if (Object.keys(prices).length === 0) {return null}
   return { label: node.args[0].value, conditions, prices }
 }
 
@@ -148,14 +148,14 @@ export function readTokenTierChain(node: ExpressionNode): TokenTier[] | null {
   let remaining = node
   while (remaining.kind === 'conditional') {
     const conditions = tokenConditions(remaining.condition)
-    if (!conditions) return null
+    if (!conditions) {return null}
     const tier = tokenTier(remaining.yes, conditions)
-    if (!tier) return null
+    if (!tier) {return null}
     tiers.push(tier)
     remaining = remaining.no
   }
   const fallback = tokenTier(remaining, [])
-  if (!fallback) return null
+  if (!fallback) {return null}
   return [...tiers, fallback]
 }
 
@@ -186,11 +186,11 @@ function timeTierBranches(
       ...path,
       { condition: node.condition, matches: false },
     ])
-    if (!yes || !no) return null
+    if (!yes || !no) {return null}
     return [...yes, ...no]
   }
   const tiers = readTokenTierChain(node)
-  if (!tiers || path.length === 0) return null
+  if (!tiers || path.length === 0) {return null}
   const timeDescription = path
     .map(({ condition, matches }) => {
       const source = compiled.source.slice(condition.start, condition.end)
@@ -214,9 +214,9 @@ export function readTimeTokenPricing(
   now?: Date
 ): { tiers: TimeTokenTier[]; currentTiers: TimeTokenTier[] } | null {
   const compiled = compileBillingExpression(source)
-  if (compiled.status !== 'ready') return null
+  if (compiled.status !== 'ready') {return null}
   const tiers = timeTierBranches(compiled, compiled.ast, [])
-  if (!tiers) return null
+  if (!tiers) {return null}
   const currentTiers = now
     ? tiers.filter((tier) =>
         tier.timeConditions.every(
@@ -257,7 +257,7 @@ function taskConditions(
     const definition = schema[field]
     const value = term.right.value
     if (definition?.type === 'boolean') {
-      if (!includeBoolean || typeof value !== 'boolean') return null
+      if (!includeBoolean || typeof value !== 'boolean') {return null}
     } else if (
       typeof value !== 'string' ||
       !definition?.enum?.includes(value)
@@ -288,7 +288,7 @@ function taskTier(
   for (let term of flattenBinary(node.args[1], '+')) {
     const literal = nonnegativePriceLiteral(term)
     if (literal !== null) {
-      if (hasConstant) return null
+      if (hasConstant) {return null}
       hasConstant = true
       constant = literal
       continue
@@ -320,10 +320,10 @@ function taskTier(
     ) {
       return null
     }
-    if ((definition.unit === 'token') !== scaled) return null
+    if ((definition.unit === 'token') !== scaled) {return null}
     unitPrices[field] = nonnegativePriceLiteral(term.right) ?? 0
   }
-  if (Object.keys(unitPrices).length === 0) return null
+  if (Object.keys(unitPrices).length === 0) {return null}
   return { label: node.args[0].value, conditions, constant, unitPrices }
 }
 
@@ -341,13 +341,13 @@ export function readTaskTierChain(
       schema,
       includeBoolean
     )
-    if (!conditions) return null
+    if (!conditions) {return null}
     const tier = taskTier(remaining.yes, conditions, schema)
-    if (!tier) return null
+    if (!tier) {return null}
     tiers.push(tier)
     remaining = remaining.no
   }
   const fallback = taskTier(remaining, [], schema)
-  if (!fallback) return null
+  if (!fallback) {return null}
   return [...tiers, fallback]
 }

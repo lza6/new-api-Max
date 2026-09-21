@@ -67,7 +67,7 @@ type SystemInfoSectionProps = {
 }
 
 function normalizeValue(value: unknown): string {
-  if (value === undefined || value === null) return ''
+  if (value === undefined || value === null) {return ''}
   return typeof value === 'string' ? value : String(value)
 }
 

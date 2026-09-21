@@ -320,11 +320,11 @@ const PRESET_GROUPS: PresetGroup[] = [
 ]
 
 function formatTokenHint(n: number | string | null | undefined): string {
-  if (n == null || n === '' || Number.isNaN(Number(n))) return ''
+  if (n == null || n === '' || Number.isNaN(Number(n))) {return ''}
   const v = Number(n)
-  if (v === 0) return '= 0'
-  if (v >= 1_000_000) return `= ${(v / 1_000_000).toLocaleString()}M tokens`
-  if (v >= 1_000) return `= ${(v / 1_000).toLocaleString()}K tokens`
+  if (v === 0) {return '= 0'}
+  if (v >= 1_000_000) {return `= ${(v / 1_000_000).toLocaleString()}M tokens`}
+  if (v >= 1_000) {return `= ${(v / 1_000).toLocaleString()}K tokens`}
   return `= ${v.toLocaleString()} tokens`
 }
 
@@ -613,7 +613,7 @@ function VisualEditor({ visualConfig, onChange, currency }: VisualEditorProps) {
 
   const handleAddCondition = (index: number) => {
     const tier = config.tiers[index]
-    if (tier.conditions.length >= 2) return
+    if (tier.conditions.length >= 2) {return}
     // Prefer `len` (input length) over `p`/`c` for tier conditions because
     // `p` is subject to auto-exclusion when sub-categories like `cr` are
     // priced separately, which can misroute long-input requests into shorter
@@ -757,8 +757,8 @@ function RuleConditionRow({
     }
   }
   let sourceLabel = t('Time')
-  if (condition.source === SOURCE_PARAM) sourceLabel = t('Body param')
-  else if (condition.source === SOURCE_HEADER) sourceLabel = t('Header')
+  if (condition.source === SOURCE_PARAM) {sourceLabel = t('Body param')}
+  else if (condition.source === SOURCE_HEADER) {sourceLabel = t('Header')}
 
   const handleSourceChange = (source: string) => {
     if (source === SOURCE_TIME) {
@@ -1117,7 +1117,7 @@ function CostEstimator({ effectiveExpr, fullExpr, currency }: EstimatorProps) {
 
   const tokens = useMemo(() => {
     const values = buildEstimatorTokens(promptTokens, completionTokens, extras)
-    if (lengthOverride.trim()) values.len = Number(lengthOverride)
+    if (lengthOverride.trim()) {values.len = Number(lengthOverride)}
     return values
   }, [promptTokens, completionTokens, extras, lengthOverride])
 
@@ -1183,7 +1183,7 @@ function CostEstimator({ effectiveExpr, fullExpr, currency }: EstimatorProps) {
             // BILLING_EXTRA_VARS only contains pricing variables; they are
             // guaranteed to have a non-null `field` (the `len` condition-only
             // variable is filtered out). Narrow the type here for safety.
-            if (!variable.field) return null
+            if (!variable.field) {return null}
             const stateKey = variable.field.replace(
               'Price',
               'Tokens'
@@ -1411,9 +1411,9 @@ type EditorMode = 'visual' | 'raw'
 // Keep that API unchanged for synchronization callers; route explicit zero to the document form.
 function parseTierEditorConfig(source: string): VisualConfig | null {
   const config = tryParseVisualConfig(source)
-  if (!config) return null
+  if (!config) {return null}
   const document = parseVisualBillingDocument(source)
-  if (!document) return null
+  if (!document) {return null}
   if (
     document.root.kind === 'tier' &&
     document.root.prices.some(
@@ -1465,7 +1465,7 @@ export const TieredPricingEditor = memo(function TieredPricingEditor({
   >(() => tryParseRequestRuleExpr(currentRequestRuleExpr) || [])
   const loadedModel = useRef(modelName)
   useEffect(() => {
-    if (loadedModel.current === modelName) return
+    if (loadedModel.current === modelName) {return}
     loadedModel.current = modelName
     const config = parseTierEditorConfig(currentExpr)
     const document = config ? null : parseVisualBillingDocument(currentExpr)
@@ -1541,8 +1541,8 @@ export const TieredPricingEditor = memo(function TieredPricingEditor({
 
   const handleModeChange = useCallback(
     (next: EditorMode) => {
-      if (next === editorMode) return
-      if (invalidDraft) return
+      if (next === editorMode) {return}
+      if (invalidDraft) {return}
       if (next === 'visual') {
         const parsed = parseTierEditorConfig(baseExpr)
         const document = parsed ? null : parseVisualBillingDocument(baseExpr)

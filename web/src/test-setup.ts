@@ -94,7 +94,7 @@ Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
 // vitest's jsdom environment does not replace globals that already exist.
 // Provide an in-memory Storage so tests see the same API as in a browser.
 for (const name of ['localStorage', 'sessionStorage'] as const) {
-  if (typeof globalThis[name]?.setItem === 'function') continue
+  if (typeof globalThis[name]?.setItem === 'function') {continue}
   const entries = new Map<string, string>()
   const storage: Storage = {
     get length() {

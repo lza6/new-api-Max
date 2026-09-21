@@ -80,7 +80,7 @@ export function hasSimpleTaskPricing(model: PricingModel): boolean {
     return false
   }
   const split = splitBillingExprAndRequestRules(model.billing_expr)
-  if (split.requestRuleExpr?.trim()) return false
+  if (split.requestRuleExpr?.trim()) {return false}
   const tiers = getTaskPricingDisplayTiers(
     split.billingExpr,
     model.billing_usage_schema

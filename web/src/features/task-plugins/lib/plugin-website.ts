@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 /** Accept only explicit HTTPS links; never let URL repair malformed input. */
 export function getPluginWebsite(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined
+  if (typeof value !== 'string') {return undefined}
   const website = value.trim()
   if (!/^https:\/\/[^/?#]+/i.test(website) || /[\s\p{Cc}\\]/u.test(website)) {
     return undefined

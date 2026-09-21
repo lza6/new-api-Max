@@ -160,7 +160,7 @@ function getLatestChannelTestCachePatch(
         result.responseTime,
         completedAt
       )
-      if (!patch) return latestPatch
+      if (!patch) {return latestPatch}
       if (!latestPatch || completedAt >= latestPatch.completedAt) {
         return { patch, completedAt }
       }
@@ -355,7 +355,7 @@ function ChannelTestDialogContent({
   )
 
   const dismissBatchProgressToast = useCallback(() => {
-    if (batchProgressToastIdRef.current === null) return
+    if (batchProgressToastIdRef.current === null) {return}
 
     toast.dismiss(batchProgressToastIdRef.current)
     batchProgressToastIdRef.current = null
@@ -409,7 +409,7 @@ function ChannelTestDialogContent({
   const effectiveStreamTest = !streamDisabled && isStreamTest
 
   const handleEndpointTypeChange = useCallback((value: string | null) => {
-    if (value === null) return
+    if (value === null) {return}
 
     setEndpointType(value)
     if (STREAM_INCOMPATIBLE_ENDPOINTS.has(value)) {
@@ -431,7 +431,7 @@ function ChannelTestDialogContent({
   const defaultTestModel = currentRow.test_model?.trim()
 
   const baseModels = useMemo(() => {
-    if (!modelsValue) return []
+    if (!modelsValue) {return []}
     return modelsValue
       .split(',')
       .map((model) => model.trim())
@@ -454,7 +454,7 @@ function ChannelTestDialogContent({
   )
 
   const filteredModels = useMemo(() => {
-    if (!searchTerm) return models
+    if (!searchTerm) {return models}
     const keyword = searchTerm.toLowerCase()
     return models.filter((model) => model.toLowerCase().includes(keyword))
   }, [models, searchTerm])
@@ -486,17 +486,17 @@ function ChannelTestDialogContent({
 
   const updateChannelTestCache = useCallback(
     (patch?: ChannelTestCachePatch) => {
-      if (!patch) return
+      if (!patch) {return}
 
       queryClient.setQueriesData<ChannelListCache>(
         { queryKey: channelsQueryKeys.lists() },
         (oldData) => {
           const data = oldData?.data
-          if (!oldData || !data?.items.length) return oldData
+          if (!oldData || !data?.items.length) {return oldData}
 
           let changed = false
           const nextItems = data.items.map((channel) => {
-            if (channel.id !== currentChannelId) return channel
+            if (channel.id !== currentChannelId) {return channel}
 
             changed = true
             return {
@@ -506,7 +506,7 @@ function ChannelTestDialogContent({
             }
           })
 
-          if (!changed) return oldData
+          if (!changed) {return oldData}
 
           return {
             ...oldData,
@@ -538,7 +538,7 @@ function ChannelTestDialogContent({
       silent = false,
       refreshList = true
     ): Promise<TestResult | undefined> => {
-      if (!currentRow) return
+      if (!currentRow) {return}
 
       markModelTesting(model, true)
       updateTestResult(model, { status: 'testing' })
@@ -598,7 +598,7 @@ function ChannelTestDialogContent({
   )
 
   const handleStopBatchTest = useCallback(() => {
-    if (!isBatchTesting || isBatchStopRequested) return
+    if (!isBatchTesting || isBatchStopRequested) {return}
 
     batchStopRequestedRef.current = true
     setIsBatchStopRequested(true)
@@ -609,7 +609,7 @@ function ChannelTestDialogContent({
       const uniqueModels = [
         ...new Set(modelsToTest.map((model) => model.trim()).filter(Boolean)),
       ]
-      if (!uniqueModels.length) return
+      if (!uniqueModels.length) {return}
 
       batchStopRequestedRef.current = false
       setIsBatchTesting(true)
@@ -774,17 +774,17 @@ function ChannelTestDialogContent({
       if (response.success) {
         setRemovedModels((prev) => {
           const next = new Set(prev)
-          for (const model of failed) next.add(model)
+          for (const model of failed) {next.add(model)}
           return next
         })
         setTestResults((prev) => {
           const next = { ...prev }
-          for (const model of failed) delete next[model]
+          for (const model of failed) {delete next[model]}
           return next
         })
         setRowSelection((prev) => {
           const next = { ...prev }
-          for (const model of failed) delete next[model]
+          for (const model of failed) {delete next[model]}
           return next
         })
         toast.success(
@@ -1361,7 +1361,7 @@ function TestModelsBulkActions({ table }: { table: TanStackTable<ModelRow> }) {
   const selectedModels = selectedRows.map((row) => row.original.model)
 
   const handleCopySelected = useCallback(() => {
-    if (selectedModels.length === 0) return
+    if (selectedModels.length === 0) {return}
     void copyToClipboard(selectedModels.join(','))
   }, [copyToClipboard, selectedModels])
 

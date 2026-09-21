@@ -56,7 +56,7 @@ export function BillingTimeProbeFields(props: {
 }) {
   const { t } = useTranslation()
   const probes: VisualComparison['probe'][] = [...TIME_FUNCS]
-  if (props.includeTokens) probes.push('len', 'p', 'c')
+  if (props.includeTokens) {probes.push('len', 'p', 'c')}
   const isTime = (TIME_FUNCS as readonly string[]).includes(props.probe)
   const zones = COMMON_TIMEZONES.map((zone) => ({
     value: zone.value,

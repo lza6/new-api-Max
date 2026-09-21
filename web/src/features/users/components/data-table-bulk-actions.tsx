@@ -137,7 +137,7 @@ export function DataTableBulkActions(props: DataTableBulkActionsProps) {
       ...(value !== undefined ? { value } : {}),
     }
     const result = await batchManageUsers(payload)
-    if (!result.success) throw createServerError(result)
+    if (!result.success) {throw createServerError(result)}
     return result.data ?? { processed: 0, total: 0 }
   }
 
@@ -201,8 +201,8 @@ export function DataTableBulkActions(props: DataTableBulkActionsProps) {
   const hasDeletable = deletableUsers.length > 0
 
   const handleQuotaConfirm = () => {
-    if (quotaMode !== 'override' && quotaValue <= 0) return
-    if (quota.isPending) return
+    if (quotaMode !== 'override' && quotaValue <= 0) {return}
+    if (quota.isPending) {return}
     quota.mutate()
   }
 
@@ -287,7 +287,7 @@ export function DataTableBulkActions(props: DataTableBulkActionsProps) {
         destructive
         open={deleteTargets !== null}
         onOpenChange={(open) => {
-          if (!open && !deletion.isPending) setDeleteTargets(null)
+          if (!open && !deletion.isPending) {setDeleteTargets(null)}
         }}
         title={t('Delete {{count}} users?', { count: deleteTargets?.length ?? 0 })}
         desc={t('This action cannot be undone.')}
@@ -369,7 +369,7 @@ export function DataTableBulkActions(props: DataTableBulkActionsProps) {
               value={quotaAmount}
               onChange={(e) => setQuotaAmount(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleQuotaConfirm()
+                if (e.key === 'Enter') {handleQuotaConfirm()}
               }}
             />
           </div>

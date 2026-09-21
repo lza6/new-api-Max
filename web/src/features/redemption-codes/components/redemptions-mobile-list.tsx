@@ -79,7 +79,7 @@ export function RedemptionsMobileList(props: RedemptionsMobileListProps) {
   const { t } = useTranslation()
   const rows = props.table.getRowModel().rows
 
-  if (props.isLoading) return <RedemptionsMobileSkeleton />
+  if (props.isLoading) {return <RedemptionsMobileSkeleton />}
 
   if (!rows.length) {
     return (

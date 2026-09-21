@@ -50,7 +50,7 @@ export function TelegramLoginDialog(props: TelegramLoginDialogProps) {
   useEffect(() => {
     const container = widgetContainer.current
     const botName = props.botName.trim()
-    if (!props.open || !container || !botName) return
+    if (!props.open || !container || !botName) {return}
 
     setWidgetState('loading')
     const callback = (authorization: unknown) => {

@@ -48,14 +48,14 @@ const SECTION_HEADING_LINE_PATTERN = /^#{2,6}\s+\d+\.\s+.+$/gm
 
 function readStoredValue(key: string): unknown | null {
   const saved = localStorage.getItem(key)
-  if (!saved) return null
+  if (!saved) {return null}
 
   return JSON.parse(saved) as unknown
 }
 
 function readStoredMessagesValue(): unknown | null {
   const saved = localStorage.getItem(STORAGE_KEYS.MESSAGES)
-  if (!saved) return null
+  if (!saved) {return null}
 
   if (saved.length > MAX_STORED_MESSAGES_BYTES) {
     localStorage.removeItem(STORAGE_KEYS.MESSAGES)
@@ -281,7 +281,7 @@ function trimMessagesByContentSize(messages: Message[]): Message[] {
 export function loadConfig(): Partial<PlaygroundConfig> {
   try {
     const saved = readStoredValue(STORAGE_KEYS.CONFIG)
-    if (!saved) return {}
+    if (!saved) {return {}}
 
     return playgroundConfigSchema.parse(unwrapStoredValue(saved))
   } catch (error) {
@@ -310,7 +310,7 @@ export function saveConfig(config: Partial<PlaygroundConfig>): void {
 export function loadParameterEnabled(): Partial<ParameterEnabled> {
   try {
     const saved = readStoredValue(STORAGE_KEYS.PARAMETER_ENABLED)
-    if (!saved) return {}
+    if (!saved) {return {}}
 
     return parameterEnabledSchema.parse(unwrapStoredValue(saved))
   } catch (error) {
@@ -341,7 +341,7 @@ export function saveParameterEnabled(
 export function loadMessages(): Message[] | null {
   try {
     const saved = readStoredMessagesValue()
-    if (!saved) return null
+    if (!saved) {return null}
 
     const parsed = messagesSchema.parse(unwrapStoredValue(saved)) as Message[]
     const normalized = parsed.map(normalizeStoredMessageForLoad)

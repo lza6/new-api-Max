@@ -40,7 +40,7 @@ const CUSTOM_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
  * @returns Parsed value (boolean, number, or string)
  */
 function parseValue(raw: string | undefined | null): string | number | boolean {
-  if (raw == null) return true
+  if (raw == null) {return true}
 
   let v = String(raw).trim()
 
@@ -58,11 +58,11 @@ function parseValue(raw: string | undefined | null): string | number | boolean {
   }
 
   // Boolean
-  if (v === 'true') return true
-  if (v === 'false') return false
+  if (v === 'true') {return true}
+  if (v === 'false') {return false}
 
   // Number
-  if (/^-?\d+(?:\.\d+)?$/.test(v)) return Number(v)
+  if (/^-?\d+(?:\.\d+)?$/.test(v)) {return Number(v)}
 
   // Return as string
   return v
@@ -153,7 +153,7 @@ export function getLobeIcon(
 
   for (let i = propStartIndex; i < segments.length; i++) {
     const seg = segments[i]
-    if (!seg) continue
+    if (!seg) {continue}
 
     const eqIdx = seg.indexOf('=')
     if (eqIdx === -1) {

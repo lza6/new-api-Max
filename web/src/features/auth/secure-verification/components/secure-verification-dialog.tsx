@@ -52,7 +52,7 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
   const { t } = useTranslation()
   const inputId = useId()
   const state = props.state
-  if (state.phase === 'idle') return null
+  if (state.phase === 'idle') {return null}
   const ready =
     state.phase === 'ready' || state.phase === 'verifying' ? state : null
   const input = ready?.input
@@ -97,7 +97,7 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open) props.onCancel()
+        if (!open) {props.onCancel()}
       }}
       title={
         <>
@@ -149,7 +149,7 @@ export function SecureVerificationDialog(props: SecureVerificationDialogProps) {
           id={formId}
           onSubmit={(event) => {
             event.preventDefault()
-            if (canVerify) void props.onVerify()
+            if (canVerify) {void props.onVerify()}
           }}
           className='space-y-4 py-2'
         >

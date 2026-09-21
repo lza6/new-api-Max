@@ -35,7 +35,7 @@ export {
 export function getAvailableOAuthProviders(
   status: SystemStatus | null
 ): OAuthProvider[] {
-  if (!status) return []
+  if (!status) {return []}
 
   const providers: OAuthProvider[] = []
 
@@ -91,7 +91,7 @@ export function getAvailableOAuthProviders(
  * Check if any OAuth provider is available
  */
 export function hasOAuthProviders(status: SystemStatus | null): boolean {
-  if (!status) return false
+  if (!status) {return false}
   return !!(
     status.github_oauth ||
     status.discord_oauth ||

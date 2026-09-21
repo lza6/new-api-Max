@@ -89,7 +89,7 @@ function UsageLogsContent() {
     () =>
       (filteredTabGroups[0]?.items ?? [])
         .map((item) => {
-          if (!('url' in item) || typeof item.url !== 'string') return null
+          if (!('url' in item) || typeof item.url !== 'string') {return null}
           return item.url.split('/').pop() ?? null
         })
         .filter((section): section is UsageLogsSectionId =>

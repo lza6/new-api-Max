@@ -32,7 +32,7 @@ import { getConfiguredGroupRatio, getDisplayGroupRatio } from './model-helpers'
 export function stripTrailingZeros(formatted: string): string {
   // Match currency symbol at start, number, and potential 'k' suffix
   const match = formatted.match(/^([^\d-]*)([-\d,]+\.?\d*)(k?)$/)
-  if (!match) return formatted
+  if (!match) {return formatted}
 
   const [, symbol, number, suffix] = match
 
@@ -41,7 +41,7 @@ export function stripTrailingZeros(formatted: string): string {
 
   // Convert to number and back to remove trailing zeros
   const parsed = Number.parseFloat(cleanNumber)
-  if (Number.isNaN(parsed)) return formatted
+  if (Number.isNaN(parsed)) {return formatted}
 
   // Convert to string, which automatically removes trailing zeros
   let result = parsed.toString()
@@ -134,7 +134,7 @@ function applyRechargeRate(
   priceRate: number,
   usdExchangeRate: number
 ): number {
-  if (!showWithRecharge) return price
+  if (!showWithRecharge) {return price}
   return (price * priceRate) / usdExchangeRate
 }
 

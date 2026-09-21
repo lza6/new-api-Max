@@ -32,20 +32,20 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function readTelegramNumber(value: unknown): string | number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value
-  if (typeof value === 'string' && value.trim()) return value
+  if (typeof value === 'number' && Number.isFinite(value)) {return value}
+  if (typeof value === 'string' && value.trim()) {return value}
   return null
 }
 
 export function pickTelegramAuthorization(
   value: unknown
 ): TelegramAuthorization | null {
-  if (!isRecord(value)) return null
+  if (!isRecord(value)) {return null}
 
   const id = readTelegramNumber(value.id)
   const authDate = readTelegramNumber(value.auth_date)
   const hash = typeof value.hash === 'string' ? value.hash.trim() : ''
-  if (id === null || authDate === null || !hash) return null
+  if (id === null || authDate === null || !hash) {return null}
 
   const authorization: TelegramAuthorization = {
     id,

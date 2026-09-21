@@ -92,7 +92,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isAuthUser(value: unknown): value is AuthUser {
-  if (!isRecord(value)) return false
+  if (!isRecord(value)) {return false}
   return (
     Number.isInteger(value.id) &&
     Number(value.id) > 0 &&
@@ -102,7 +102,7 @@ function isAuthUser(value: unknown): value is AuthUser {
 }
 
 function isLoginSession(value: unknown): value is LoginSession {
-  if (!isRecord(value)) return false
+  if (!isRecord(value)) {return false}
   return (
     typeof value.sid === 'string' &&
     value.sid.length > 0 &&
@@ -129,7 +129,7 @@ function hasValidTokenFields(value: Record<string, unknown>): boolean {
 }
 
 export function isAuthBundle(value: unknown): value is AuthBundle {
-  if (!isRecord(value)) return false
+  if (!isRecord(value)) {return false}
   return (
     hasValidTokenFields(value) &&
     isAuthUser(value.user) &&
@@ -219,9 +219,9 @@ export function createRefreshRunner(
     raceAttempt: number,
     allowMismatchRetry: boolean
   ): Promise<RefreshOutcome> => {
-    if (runtime.isCurrent && !runtime.isCurrent()) return superseded()
+    if (runtime.isCurrent && !runtime.isCurrent()) {return superseded()}
     const response = await runtime.request(runtime.getExpectedSID())
-    if (runtime.isCurrent && !runtime.isCurrent()) return superseded()
+    if (runtime.isCurrent && !runtime.isCurrent()) {return superseded()}
     const responseData = isRecord(response.data) ? response.data : undefined
     const code =
       typeof responseData?.code === 'string' ? responseData.code : undefined
@@ -286,7 +286,7 @@ async function requestRefresh(
     )
     return { status: response.status, data: response.data }
   } catch (error: unknown) {
-    if (!axios.isAxiosError(error)) return { status: 0, error }
+    if (!axios.isAxiosError(error)) {return { status: 0, error }}
     return {
       status: error.response?.status ?? 0,
       data: error.response?.data,

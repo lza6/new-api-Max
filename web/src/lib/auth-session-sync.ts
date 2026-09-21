@@ -38,7 +38,7 @@ const authSyncSource = randomIdentifier()
 let authSyncPublisher: BroadcastChannel | null = null
 
 function isAuthSessionSyncEvent(value: unknown): value is AuthSessionSyncEvent {
-  if (!value || typeof value !== 'object') return false
+  if (!value || typeof value !== 'object') {return false}
   const event = value as Partial<AuthSessionSyncEvent>
   return (
     (event.kind === 'authenticated' || event.kind === 'signed_out') &&
@@ -54,7 +54,7 @@ export function publishAuthSessionEvent(
   kind: AuthSessionSyncEvent['kind'],
   sid: string
 ): void {
-  if (typeof window === 'undefined' || !sid) return
+  if (typeof window === 'undefined' || !sid) {return}
   const event: AuthSessionSyncEvent = {
     kind,
     sid,
@@ -80,7 +80,7 @@ export function publishAuthSessionEvent(
 export function subscribeAuthSessionEvents(
   listener: (event: AuthSessionSyncEvent) => void
 ): () => void {
-  if (typeof window === 'undefined') return () => undefined
+  if (typeof window === 'undefined') {return () => undefined}
 
   const deliver = (value: unknown) => {
     if (
@@ -105,7 +105,7 @@ export function subscribeAuthSessionEvents(
   }
 
   const handleStorage = (event: StorageEvent) => {
-    if (event.key !== AUTH_SYNC_STORAGE_KEY || !event.newValue) return
+    if (event.key !== AUTH_SYNC_STORAGE_KEY || !event.newValue) {return}
     try {
       deliver(JSON.parse(event.newValue))
     } catch {

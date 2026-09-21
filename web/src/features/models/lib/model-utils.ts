@@ -31,7 +31,7 @@ import type { NameRule, Model } from '../types'
  * Format timestamp to standard date string (YYYY-MM-DD HH:mm:ss)
  */
 export function formatTimestamp(timestamp: number): string {
-  if (!timestamp || timestamp === 0) return '-'
+  if (!timestamp || timestamp === 0) {return '-'}
   return formatTimestampToDate(timestamp)
 }
 
@@ -39,7 +39,7 @@ export function formatTimestamp(timestamp: number): string {
  * Format relative time
  */
 export function formatRelativeTime(timestamp: number): string {
-  if (!timestamp || timestamp === 0) return 'Never'
+  if (!timestamp || timestamp === 0) {return 'Never'}
 
   const now = Date.now()
   const time = timestamp * 1000
@@ -50,9 +50,9 @@ export function formatRelativeTime(timestamp: number): string {
   const hours = Math.floor(minutes / 60)
   const days = Math.floor(hours / 24)
 
-  if (days > 0) return `${days} day${days > 1 ? 's' : ''} ago`
-  if (hours > 0) return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  if (minutes > 0) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`
+  if (days > 0) {return `${days} day${days > 1 ? 's' : ''} ago`}
+  if (hours > 0) {return `${hours} hour${hours > 1 ? 's' : ''} ago`}
+  if (minutes > 0) {return `${minutes} minute${minutes > 1 ? 's' : ''} ago`}
   return `${seconds} second${seconds !== 1 ? 's' : ''} ago`
 }
 
@@ -64,7 +64,7 @@ export function formatRelativeTime(timestamp: number): string {
  * Parse tags string to array
  */
 export function parseModelTags(tags: string | undefined): string[] {
-  if (!tags) return []
+  if (!tags) {return []}
   return tags
     .split(',')
     .map((tag) => tag.trim())
@@ -88,7 +88,7 @@ export function formatTagsString(tags: string[]): string {
 export function parseEndpoints(
   endpoints: string | undefined
 ): Record<string, unknown> | unknown[] | null {
-  if (!endpoints || endpoints.trim() === '') return null
+  if (!endpoints || endpoints.trim() === '') {return null}
 
   try {
     return JSON.parse(endpoints)
@@ -104,7 +104,7 @@ export function formatEndpointsDisplay(
   endpoints: string | undefined
 ): string[] {
   const parsed = parseEndpoints(endpoints)
-  if (!parsed) return []
+  if (!parsed) {return []}
 
   if (typeof parsed === 'object' && !Array.isArray(parsed)) {
     return Object.keys(parsed)
@@ -148,7 +148,7 @@ export function formatQuotaTypes(
   quotaTypes: number[] | undefined,
   t: TFunction
 ): string {
-  if (!quotaTypes || quotaTypes.length === 0) return '-'
+  if (!quotaTypes || quotaTypes.length === 0) {return '-'}
   const config = getQuotaTypeConfig(t)
   return quotaTypes.map((qt) => config[qt]?.label || String(qt)).join(', ')
 }
@@ -168,7 +168,7 @@ export function validateModelName(name: string): boolean {
  * Validate endpoints JSON
  */
 export function validateEndpointsJSON(endpoints: string): boolean {
-  if (!endpoints || endpoints.trim() === '') return true
+  if (!endpoints || endpoints.trim() === '') {return true}
 
   try {
     JSON.parse(endpoints)

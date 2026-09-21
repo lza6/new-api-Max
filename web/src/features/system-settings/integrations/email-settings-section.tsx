@@ -50,13 +50,13 @@ const createEmailSchema = (t: (key: string) => string) =>
     SMTPServer: z.string(),
     SMTPPort: z.string().refine((value) => {
       const trimmed = value.trim()
-      if (!trimmed) return true
+      if (!trimmed) {return true}
       return /^\d+$/.test(trimmed)
     }, t('Port must be a positive integer')),
     SMTPAccount: z.string(),
     SMTPFrom: z.string().refine((value) => {
       const trimmed = value.trim()
-      if (!trimmed) return true
+      if (!trimmed) {return true}
       return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
     }, t('Enter a valid email or leave blank')),
     SMTPToken: z.string(),
@@ -78,8 +78,8 @@ function getSmtpSecurityMode(values: {
   SMTPSSLEnabled: boolean
   SMTPStartTLSEnabled: boolean
 }): SmtpSecurityMode {
-  if (values.SMTPSSLEnabled) return 'ssl_tls'
-  if (values.SMTPStartTLSEnabled) return 'starttls'
+  if (values.SMTPSSLEnabled) {return 'ssl_tls'}
+  if (values.SMTPStartTLSEnabled) {return 'starttls'}
   return 'none'
 }
 

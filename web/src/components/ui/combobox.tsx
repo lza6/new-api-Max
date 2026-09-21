@@ -73,7 +73,7 @@ function Combobox(
     | LegacyComboboxProps
 ) {
   if ('options' in props) {
-    if (!props.allowCustomValue) return <OptionCombobox {...props} />
+    if (!props.allowCustomValue) {return <OptionCombobox {...props} />}
     return (
       <LegacyComboboxInput
         id={props.id}
@@ -112,14 +112,14 @@ function OptionCombobox(props: LegacyComboboxProps) {
       open={open && !props.disabled}
       inputValue={open ? search : displayedValue}
       onInputValueChange={(value, details) => {
-        if (details.reason === 'input-change') setSearch(value)
+        if (details.reason === 'input-change') {setSearch(value)}
       }}
       onOpenChange={(nextOpen) => {
         setOpen(nextOpen)
         setSearch('')
       }}
       onValueChange={(option) => {
-        if (option) props.onValueChange?.(option.value)
+        if (option) {props.onValueChange?.(option.value)}
       }}
       filter={(option, query) => {
         const term = query.trim().toLowerCase()
@@ -138,7 +138,7 @@ function OptionCombobox(props: LegacyComboboxProps) {
           onBlur={props.onBlur}
           onKeyDown={props.onKeyDown}
           onFocus={() => {
-            if (props.openOnFocus !== false) setOpen(true)
+            if (props.openOnFocus !== false) {setOpen(true)}
           }}
           aria-label={props['aria-label']}
           aria-labelledby={props['aria-labelledby']}

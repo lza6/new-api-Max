@@ -30,9 +30,9 @@ function orderCardCells<TData>(
     const aOrder = a.column.columnDef.meta?.mobileOrder
     const bOrder = b.column.columnDef.meta?.mobileOrder
 
-    if (aOrder == null && bOrder == null) return 0
-    if (aOrder == null) return 1
-    if (bOrder == null) return -1
+    if (aOrder == null && bOrder == null) {return 0}
+    if (aOrder == null) {return 1}
+    if (bOrder == null) {return -1}
     return aOrder - bOrder
   })
 }

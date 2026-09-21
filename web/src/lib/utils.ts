@@ -36,7 +36,7 @@ export function sleep(ms: number = 1000) {
 export function sanitizeCssVariableName(name: string): string {
   // 将点号、空格、斜杠替换为连字符
   // 移除其他不允许在 CSS 变量名中的特殊字符
-  return name.replace(/[.\s/]/g, '-').replace(/[^\w-]/g, '')
+  return name.replaceAll(/[.\s/]/g, '-').replaceAll(/[^\w-]/g, '')
 }
 
 /**
@@ -82,7 +82,7 @@ export function getPageNumbers(currentPage: number, totalPages: number) {
  * Truncate text to a maximum length with ellipsis
  */
 export function truncateText(text: string, maxLength: number): string {
-  if (!text || text.length <= maxLength) return text
+  if (!text || text.length <= maxLength) {return text}
   return text.slice(0, maxLength) + '...'
 }
 
@@ -93,7 +93,7 @@ export function truncateText(text: string, maxLength: number): string {
  */
 export function tryPrettyJson(text: string): string {
   const raw = (text ?? '').toString().trim()
-  if (!raw) return ''
+  if (!raw) {return ''}
   try {
     return JSON.stringify(JSON.parse(raw), null, 2)
   } catch {

@@ -327,7 +327,7 @@ export function CommonLogMobileCard<TData>(props: {
       <Dialog
         open={!!activeField}
         onOpenChange={(open) => {
-          if (!open) setSelectedField(null)
+          if (!open) {setSelectedField(null)}
         }}
         title={activeField?.label ?? t('Details')}
         contentClassName='max-sm:top-auto max-sm:bottom-0 max-sm:max-h-[85dvh] max-sm:max-w-full max-sm:translate-y-0 max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:pb-[max(1rem,env(safe-area-inset-bottom))] [&_[data-slot=dialog-close]]:size-11'

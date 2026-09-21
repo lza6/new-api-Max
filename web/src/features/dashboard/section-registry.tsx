@@ -70,7 +70,7 @@ export function getDashboardSectionNavItems(
   options?: { isAdmin?: boolean }
 ) {
   const all = dashboardRegistry.getSectionNavItems(t)
-  if (options?.isAdmin) return all
+  if (options?.isAdmin) {return all}
   return all.filter(
     (_, idx) => !ADMIN_ONLY_SECTIONS.has(DASHBOARD_SECTIONS[idx].id)
   )

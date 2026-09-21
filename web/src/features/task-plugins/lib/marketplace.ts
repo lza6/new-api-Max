@@ -41,7 +41,7 @@ export function resolvePluginSourceUrl(
   path: string
 ): string | null {
   const trimmed = path.trim()
-  if (!trimmed) return null
+  if (!trimmed) {return null}
   let base: URL
   try {
     base = new URL(indexUrl)
@@ -60,7 +60,7 @@ export function resolvePluginSourceUrl(
   // A relative path in an index must stay on the host that served the index;
   // an index that redirects source downloads elsewhere is not a source we can
   // reason about for integrity.
-  if (resolved.origin !== base.origin) return null
+  if (resolved.origin !== base.origin) {return null}
   return resolved.toString()
 }
 
@@ -86,7 +86,7 @@ export function parseMarketplaceIndex(payload: unknown): MarketplaceIndex {
   if (Array.isArray(raw.plugins)) {
     for (const entry of raw.plugins) {
       const plugin = parseMarketplacePlugin(entry)
-      if (plugin) plugins.push(plugin)
+      if (plugin) {plugins.push(plugin)}
     }
   }
   return {
@@ -94,32 +94,32 @@ export function parseMarketplaceIndex(payload: unknown): MarketplaceIndex {
     name: typeof raw.name === 'string' ? raw.name : '',
     plugins: plugins.sort((left, right) => {
       const difference = (right.sortPriority ?? 0) - (left.sortPriority ?? 0)
-      if (difference !== 0) return difference
-      if (left.key === right.key) return 0
+      if (difference !== 0) {return difference}
+      if (left.key === right.key) {return 0}
       return left.key < right.key ? -1 : 1
     }),
   }
 }
 
 function parseMarketplacePlugin(entry: unknown): MarketplacePlugin | null {
-  if (!entry || typeof entry !== 'object') return null
+  if (!entry || typeof entry !== 'object') {return null}
   const raw = entry as Record<string, unknown>
   const key = typeof raw.key === 'string' ? raw.key.trim() : ''
-  if (!key) return null
+  if (!key) {return null}
 
   const versions: MarketplaceIndexVersion[] = []
   if (Array.isArray(raw.versions)) {
     for (const candidate of raw.versions) {
-      if (!candidate || typeof candidate !== 'object') continue
+      if (!candidate || typeof candidate !== 'object') {continue}
       const rawVersion = candidate as Record<string, unknown>
       const version =
         typeof rawVersion.version === 'string' ? rawVersion.version.trim() : ''
       const path =
         typeof rawVersion.path === 'string' ? rawVersion.path.trim() : ''
-      if (!version || !path) continue
+      if (!version || !path) {continue}
       const kind =
         typeof rawVersion.kind === 'string' ? rawVersion.kind.trim() : ''
-      if (kind && kind !== SUPPORTED_PLUGIN_KIND) continue
+      if (kind && kind !== SUPPORTED_PLUGIN_KIND) {continue}
       versions.push({
         version,
         path,
@@ -140,7 +140,7 @@ function parseMarketplacePlugin(entry: unknown): MarketplacePlugin | null {
       })
     }
   }
-  if (versions.length === 0) return null
+  if (versions.length === 0) {return null}
 
   const declaredLatest = typeof raw.latest === 'string' ? raw.latest.trim() : ''
   const latest = versions.some((entry) => entry.version === declaredLatest)
@@ -204,7 +204,7 @@ function parseMarketplacePlugin(entry: unknown): MarketplacePlugin | null {
 function parseMarketplaceDescription(
   value: unknown
 ): string | Record<string, string> | undefined {
-  if (typeof value === 'string') return value
+  if (typeof value === 'string') {return value}
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return undefined
   }
@@ -212,13 +212,13 @@ function parseMarketplaceDescription(
   for (const [locale, text] of Object.entries(
     value as Record<string, unknown>
   )) {
-    if (typeof text === 'string') mapped[locale] = text
+    if (typeof text === 'string') {mapped[locale] = text}
   }
   return Object.keys(mapped).length > 0 ? mapped : undefined
 }
 
 function stringArray(value: unknown): string[] | undefined {
-  if (!Array.isArray(value)) return undefined
+  if (!Array.isArray(value)) {return undefined}
   if (!value.every((item) => typeof item === 'string' && item.length > 0)) {
     return undefined
   }
@@ -226,7 +226,7 @@ function stringArray(value: unknown): string[] | undefined {
 }
 
 function numberArray(value: unknown): number[] | undefined {
-  if (!Array.isArray(value)) return undefined
+  if (!Array.isArray(value)) {return undefined}
   const items = value.filter(
     (item): item is number => typeof item === 'number' && Number.isFinite(item)
   )
@@ -259,7 +259,7 @@ export function deriveInstallState(
   installed: TaskPluginListItem[]
 ): InstallState {
   const match = installed.find((item) => item.meta.key === plugin.key)
-  if (!match) return { status: 'not_installed' }
+  if (!match) {return { status: 'not_installed' }}
 
   const installedVersion = match.meta.version
   if (installedVersion === plugin.latest) {
@@ -290,8 +290,8 @@ export function deriveInstallState(
 export function marketplaceBuiltInVersion(
   installed?: TaskPluginListItem
 ): string | undefined {
-  if (!installed) return undefined
-  if (installed.source === 'factory') return installed.meta.version
+  if (!installed) {return undefined}
+  if (installed.source === 'factory') {return installed.meta.version}
   return installed.factory_meta?.version
 }
 

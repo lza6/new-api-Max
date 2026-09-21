@@ -117,8 +117,8 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
       defaultValues,
       onSubmit: async (_data, changedFields) => {
         for (const [key, value] of Object.entries(changedFields)) {
-          if (value === undefined || value === null) continue
-          if (typeof value === 'object') continue
+          if (value === undefined || value === null) {continue}
+          if (typeof value === 'object') {continue}
 
           let serialized: string | boolean = value as string | boolean
 

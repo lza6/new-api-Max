@@ -48,7 +48,7 @@ export function DataTableTagRowActions({ row }: DataTableTagRowActionsProps) {
   const { setOpen, setCurrentTag } = useChannels()
   const queryClient = useQueryClient()
 
-  if (!tag) return null
+  if (!tag) {return null}
 
   const handleEnableAll = () => {
     handleEnableTagChannels(tag, queryClient)

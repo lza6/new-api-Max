@@ -17,12 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 export function applyFaviconToDom(url: string) {
-  if (typeof document === 'undefined' || !url) return
+  if (typeof document === 'undefined' || !url) {return}
   try {
     const next = new URL(url, window.location.href).href
     const existing =
       document.querySelectorAll<HTMLLinkElement>('link[rel~="icon"]')
-    if (existing.length === 1 && existing[0].href === next) return
+    if (existing.length === 1 && existing[0].href === next) {return}
     const link = document.createElement('link')
     link.rel = 'icon'
     link.href = url

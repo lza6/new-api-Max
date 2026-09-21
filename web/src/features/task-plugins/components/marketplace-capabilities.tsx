@@ -97,7 +97,7 @@ export function MarketplaceCapabilities(props: MarketplaceCapabilitiesProps) {
   )
   const fields = resolvePluginMetaPreview(props.plugin, props.version, parsed)
   let channels = t('Information unavailable')
-  if (fields.channelTypes.state === 'missing') channels = t('Task Plugin')
+  if (fields.channelTypes.state === 'missing') {channels = t('Task Plugin')}
   if (fields.channelTypes.state === 'value') {
     channels = fields.channelTypes.value.length
       ? fields.channelTypes.value
@@ -122,7 +122,7 @@ export function MarketplaceCapabilities(props: MarketplaceCapabilitiesProps) {
     if (!authentication) {
       authentication = t('Not declared; an API key may still be required.')
     }
-    if (authentication === 'api_key') authentication = t('API Key')
+    if (authentication === 'api_key') {authentication = t('API Key')}
     if (authentication === 'none') {
       authentication = t('None (plugin declaration)')
     }

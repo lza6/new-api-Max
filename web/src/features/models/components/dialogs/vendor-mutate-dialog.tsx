@@ -85,7 +85,7 @@ export function VendorMutateDialog(props: {
   const query = useQuery({
     queryKey: vendorsQueryKeys.detail(id ?? 0),
     queryFn: async () => {
-      if (!id) throw new Error(t('Select a saved vendor.'))
+      if (!id) {throw new Error(t('Select a saved vendor.'))}
       const response = await getVendor(id)
       if (!response.success || !response.data) {
         throw createServerError(response, t('Failed to load vendor'))
@@ -100,7 +100,7 @@ export function VendorMutateDialog(props: {
       return
     }
     const key = String(id ?? 'new')
-    if (loadedKey.current === key || (id && !query.data)) return
+    if (loadedKey.current === key || (id && !query.data)) {return}
     const value = query.data
     form.reset({
       name: id ? (value?.name ?? '') : '',
@@ -132,7 +132,7 @@ export function VendorMutateDialog(props: {
   })
   const isDirty = form.formState.isDirty
   const close = (open: boolean) => {
-    if (open || save.isPending) return false
+    if (open || save.isPending) {return false}
     if (isDirty) {
       setConfirmClose(true)
       return false
@@ -311,7 +311,7 @@ export function VendorMutateDialog(props: {
         open={confirmClose}
         onOpenChange={(open) => {
           setConfirmClose(open)
-          if (!open) pendingNavigation.current = null
+          if (!open) {pendingNavigation.current = null}
         }}
         title={t('Discard unsaved changes?')}
         desc={t('Your changes have not been saved.')}

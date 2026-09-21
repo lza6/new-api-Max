@@ -140,7 +140,7 @@ const TIME_FUNC_LABELS: Record<string, string> = {
 
 function formatTokenHint(value: string | number): string {
   const n = Number(value)
-  if (!Number.isFinite(n) || n === 0) return ''
+  if (!Number.isFinite(n) || n === 0) {return ''}
   if (n >= 1_000_000) {
     return `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M`
   }
@@ -202,13 +202,13 @@ function formatBreakdownPrice(
     field.labelKind === 'schema' || field.unit === 'request'
       ? formatTaskUsageUnitPrice(value, { tokenUnit: 'M', ...taskPriceOptions })
       : `${symbol}${(value * rate).toFixed(4)}`
-  if (field.unit === 'second') return `${amount}/${t('s')}`
-  if (field.unit === 'count') return `${amount}/${t('unit')}`
-  if (field.unit === 'credit') return `${amount}/${t('credit')}`
+  if (field.unit === 'second') {return `${amount}/${t('s')}`}
+  if (field.unit === 'count') {return `${amount}/${t('unit')}`}
+  if (field.unit === 'credit') {return `${amount}/${t('credit')}`}
   if (field.unit === 'token' && field.labelKind === 'schema') {
     return `${amount}/${t('1M token')}`
   }
-  if (field.unit === 'request') return `${amount}/${t('request')}`
+  if (field.unit === 'request') {return `${amount}/${t('request')}`}
   return amount
 }
 
@@ -231,7 +231,7 @@ function describeCondition(
   }
   const src = cond.source === 'header' ? t('Header') : t('Body param')
   const path = cond.path || ''
-  if (cond.mode === MATCH_EXISTS) return `${src} ${path} ${t('Exists')}`
+  if (cond.mode === MATCH_EXISTS) {return `${src} ${path} ${t('Exists')}`}
   if (cond.mode === MATCH_CONTAINS) {
     return `${src} ${path} ${t('Contains')} "${cond.value}"`
   }
@@ -252,7 +252,7 @@ function describeGroup(
 ): string {
   if (group.conditionText) {
     const formatted = formatBillingCondition(group.conditionText, t, locale)
-    if (formatted) return formatted
+    if (formatted) {return formatted}
   }
   const description = (group.conditions || [])
     .map((condition) => describeCondition(condition, t))
@@ -316,7 +316,7 @@ export function DynamicPricingBreakdown({
   const hasTiers = tiers.length > 0
   const hasRules = ruleGroups.length > 0
 
-  if (!expr) return null
+  if (!expr) {return null}
 
   if (!hasTiers) {
     return (
@@ -347,7 +347,7 @@ export function DynamicPricingBreakdown({
   }
 
   const visiblePriceFields: BreakdownPriceField[] = (() => {
-    if (!hasTiers) return []
+    if (!hasTiers) {return []}
     if (usageSchema) {
       const fields: BreakdownPriceField[] = Object.entries(usageSchema)
         .filter(
@@ -385,7 +385,7 @@ export function DynamicPricingBreakdown({
     }
     const fields: BreakdownPriceField[] = BILLING_PRICING_VARS.filter(
       (variable) => {
-        if (hideCacheColumns && variable.group === 'cache') return false
+        if (hideCacheColumns && variable.group === 'cache') {return false}
         return tiers.some(
           (tier) =>
             !isTaskBreakdownTier(tier) &&
@@ -407,7 +407,7 @@ export function DynamicPricingBreakdown({
         (tier) => !isTaskBreakdownTier(tier) && tier.billingUnit === 'request'
       )
     ) {
-      for (const field of fields) field.showTokenUnit = true
+      for (const field of fields) {field.showTokenUnit = true}
       fields.push({
         id: 'fixedPrice',
         label: 'Price per request',

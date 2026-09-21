@@ -111,8 +111,8 @@ export function VendorOperationDialog(props: {
     },
   })
   let title = t('Change model vendor')
-  if (action === 'merge') title = t('Merge vendors')
-  if (action === 'delete') title = t('Delete vendors')
+  if (action === 'merge') {title = t('Merge vendors')}
+  if (action === 'delete') {title = t('Delete vendors')}
   const busy = preview.isPending || apply.isPending
   const valid =
     action === 'delete' ||
@@ -122,7 +122,7 @@ export function VendorOperationDialog(props: {
     <Dialog
       open
       onOpenChange={(open) => {
-        if (!open && !busy) props.onClose()
+        if (!open && !busy) {props.onClose()}
       }}
       title={title}
       description={t(
@@ -169,7 +169,7 @@ export function VendorOperationDialog(props: {
               options={vendorOptions}
               value={target}
               onValueChange={(value) => {
-                if (busy) return
+                if (busy) {return}
                 setTarget(value ?? '')
                 preview.reset()
                 apply.reset()

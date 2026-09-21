@@ -45,7 +45,7 @@ export function TwoFADisableDialog(props: TwoFADisableDialogProps) {
 
   useEffect(() => {
     setConfirmed(false)
-    if (!props.open) cancel()
+    if (!props.open) {cancel()}
   }, [props.open, security.sessionKey, cancel])
 
   const handleOpenChange = (open: boolean) => {
@@ -56,12 +56,12 @@ export function TwoFADisableDialog(props: TwoFADisableDialogProps) {
     props.onOpenChange(open)
   }
   const handleDisable = async () => {
-    if (!confirmed) return
+    if (!confirmed) {return}
     const result = await security.run(async (signal) => {
       const proof = await security.verify({ scope: '2fa.disable' }, signal)
       return disable2FA(proof, signal)
     })
-    if (!result) return
+    if (!result) {return}
     toast.success(t('Two-factor authentication disabled'))
     props.onOpenChange(false)
     props.onSuccess()

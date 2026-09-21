@@ -17,19 +17,19 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 export function formatThroughput(tps: number): string {
-  if (!Number.isFinite(tps) || tps <= 0) return '—'
-  if (tps >= 1_000) return `${(tps / 1_000).toFixed(1)}K t/s`
+  if (!Number.isFinite(tps) || tps <= 0) {return '—'}
+  if (tps >= 1_000) {return `${(tps / 1_000).toFixed(1)}K t/s`}
   return `${tps.toFixed(tps < 10 ? 2 : 1)} t/s`
 }
 
 export function formatLatency(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return '—'
-  if (ms >= 1_000) return `${(ms / 1_000).toFixed(2)}s`
+  if (!Number.isFinite(ms) || ms <= 0) {return '—'}
+  if (ms >= 1_000) {return `${(ms / 1_000).toFixed(2)}s`}
   return `${Math.round(ms)}ms`
 }
 
 export function formatUptimePct(pct: number): string {
-  if (!Number.isFinite(pct)) return '—'
+  if (!Number.isFinite(pct)) {return '—'}
   return `${pct.toFixed(2)}%`
 }
 
@@ -53,10 +53,10 @@ const SUCCESS_RATE_WARNING_MIN = 70
  * - unknown: non-finite values
  */
 export function getSuccessRateLevel(rate: number): SuccessRateLevel {
-  if (!Number.isFinite(rate)) return 'unknown'
-  if (rate >= SUCCESS_RATE_EXCELLENT_MIN) return 'excellent'
-  if (rate >= SUCCESS_RATE_GOOD_MIN) return 'good'
-  if (rate >= SUCCESS_RATE_WARNING_MIN) return 'warning'
+  if (!Number.isFinite(rate)) {return 'unknown'}
+  if (rate >= SUCCESS_RATE_EXCELLENT_MIN) {return 'excellent'}
+  if (rate >= SUCCESS_RATE_GOOD_MIN) {return 'good'}
+  if (rate >= SUCCESS_RATE_WARNING_MIN) {return 'warning'}
   return 'critical'
 }
 

@@ -40,8 +40,8 @@ export const SESSION_HINT_COOKIE_NAME = 'new_api_has_session'
 export function readCookie(cookieHeader: string, name: string): string | null {
   for (const part of cookieHeader.split(';')) {
     const separator = part.indexOf('=')
-    if (separator < 0) continue
-    if (part.slice(0, separator).trim() !== name) continue
+    if (separator < 0) {continue}
+    if (part.slice(0, separator).trim() !== name) {continue}
     return part.slice(separator + 1).trim()
   }
   return null
@@ -55,7 +55,7 @@ export function readCookie(cookieHeader: string, name: string): string | null {
  * absence, and the safe direction is to let the refresh proceed.
  */
 export function hasSessionHint(): boolean {
-  if (typeof document === 'undefined') return true
+  if (typeof document === 'undefined') {return true}
   return (
     readCookie(document.cookie, SESSION_HINT_COOKIE_NAME) !== null
   )

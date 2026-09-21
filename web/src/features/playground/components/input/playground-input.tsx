@@ -87,7 +87,7 @@ export function PlaygroundInput({
   const handleSubmit = (message: PromptInputMessage) => {
     const submittableText = getSubmittableInputText(message, disabled)
 
-    if (!submittableText) return
+    if (!submittableText) {return}
     onSubmit(submittableText)
     setText('')
   }

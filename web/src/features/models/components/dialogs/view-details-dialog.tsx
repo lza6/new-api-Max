@@ -134,7 +134,7 @@ export function ViewDetailsDialog({
   }
 
   const payloadJson = useMemo(() => {
-    if (!details) return ''
+    if (!details) {return ''}
     try {
       return JSON.stringify(details, null, 2)
     } catch {

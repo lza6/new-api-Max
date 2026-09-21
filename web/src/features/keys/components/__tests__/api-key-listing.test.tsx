@@ -187,7 +187,7 @@ it.each([
     const button = screen.getByRole('button')
     const progress = screen.getByRole('progressbar')
     expect(progress).toHaveAttribute('aria-valuenow', String(percentage))
-    if (color) expect(progress).toHaveClass(color)
+    if (color) {expect(progress).toHaveClass(color)}
     if (remaining < 0) {
       expect(
         within(button).getByText(remaining === -500000 ? '-1' : '-0.1')

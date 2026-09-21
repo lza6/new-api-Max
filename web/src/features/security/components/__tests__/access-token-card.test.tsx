@@ -146,7 +146,7 @@ describe('system access token management', () => {
       complete = resolve
     })
     const post = vi.mocked(api.post).mockImplementation(async (url) => {
-      if (url === '/api/verify') return pending
+      if (url === '/api/verify') {return pending}
       throw new Error(`Unexpected POST ${url}`)
     })
     renderCard()

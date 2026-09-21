@@ -59,7 +59,7 @@ function getServerAddress(): string {
     const raw = localStorage.getItem('status')
     if (raw) {
       const status = JSON.parse(raw)
-      if (status.server_address) return status.server_address
+      if (status.server_address) {return status.server_address}
     }
   } catch {
     /* empty */
@@ -82,7 +82,7 @@ function buildCCSwitchURL(
   params.set('endpoint', endpoint)
   params.set('apiKey', apiKey)
   for (const [k, v] of Object.entries(models)) {
-    if (v) params.set(k, v)
+    if (v) {params.set(k, v)}
   }
   params.set('homepage', serverAddress)
   params.set('enabled', 'true')

@@ -57,7 +57,7 @@ export function useAccountSecurity() {
     async <T extends AccountSecurityResult>(
       action: (signal: AbortSignal) => Promise<T>
     ): Promise<T | undefined> => {
-      if (current.current) return undefined
+      if (current.current) {return undefined}
       const controller = new AbortController()
       current.current = controller
       setPending(true)

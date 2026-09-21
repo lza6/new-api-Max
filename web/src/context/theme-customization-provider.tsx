@@ -55,9 +55,9 @@ function readCookie<T extends string>(
 }
 
 function applyAttribute(name: string, value: string | null) {
-  if (typeof document === 'undefined') return
+  if (typeof document === 'undefined') {return}
   const body = document.body
-  if (!body) return
+  if (!body) {return}
   if (value === null) {
     body.removeAttribute(name)
   } else {

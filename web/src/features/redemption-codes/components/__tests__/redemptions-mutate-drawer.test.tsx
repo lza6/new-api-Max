@@ -289,8 +289,8 @@ describe('redemption drawer', () => {
     const updates: Array<Record<string, unknown>> = []
     apiClient.get = (url) => {
       requestedUrls.push(url)
-      if (url === '/api/redemption/1') return firstRequest.promise
-      if (url === '/api/redemption/2') return secondRequest.promise
+      if (url === '/api/redemption/1') {return firstRequest.promise}
+      if (url === '/api/redemption/2') {return secondRequest.promise}
       throw new Error(`Unexpected GET ${url}`)
     }
     apiClient.put = async (_url, data) => {

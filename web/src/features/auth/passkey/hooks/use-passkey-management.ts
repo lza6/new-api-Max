@@ -53,7 +53,7 @@ export function usePasskeyManagement() {
           response.message || 'Failed to load Passkey status'
         )
       }
-      if (!mounted.current) return
+      if (!mounted.current) {return}
       setStatus(response.data)
       setStatusError(null)
     } catch (error) {
@@ -61,7 +61,7 @@ export function usePasskeyManagement() {
         setStatusError(AuthOperationError.from(error).message)
       }
     } finally {
-      if (mounted.current) setLoading(false)
+      if (mounted.current) {setLoading(false)}
     }
   }, [])
 
@@ -69,7 +69,7 @@ export function usePasskeyManagement() {
     mounted.current = true
     void fetchStatus()
     void isPasskeySupported().then((value) => {
-      if (mounted.current) setSupported(value)
+      if (mounted.current) {setSupported(value)}
     })
     return () => {
       mounted.current = false
@@ -123,7 +123,7 @@ export function usePasskeyManagement() {
         controller.signal.throwIfAborted()
         await fetchStatus()
       } catch (error) {
-        if (mounted.current && !controller.signal.aborted) await fetchStatus()
+        if (mounted.current && !controller.signal.aborted) {await fetchStatus()}
         if (
           controller.signal.aborted ||
           (error instanceof DOMException && error.name === 'NotAllowedError')
@@ -136,8 +136,8 @@ export function usePasskeyManagement() {
         }
         throw AuthOperationError.from(error, 'Failed to register Passkey')
       } finally {
-        if (operation.current === controller) operation.current = null
-        if (mounted.current) setRegistering(false)
+        if (operation.current === controller) {operation.current = null}
+        if (mounted.current) {setRegistering(false)}
       }
     },
     [fetchStatus, supported]
@@ -158,7 +158,7 @@ export function usePasskeyManagement() {
         controller.signal.throwIfAborted()
         await fetchStatus()
       } catch (error) {
-        if (mounted.current && !controller.signal.aborted) await fetchStatus()
+        if (mounted.current && !controller.signal.aborted) {await fetchStatus()}
         if (controller.signal.aborted) {
           throw new AuthOperationError(
             'Operation cancelled',
@@ -168,8 +168,8 @@ export function usePasskeyManagement() {
         }
         throw AuthOperationError.from(error, 'Failed to remove Passkey')
       } finally {
-        if (operation.current === controller) operation.current = null
-        if (mounted.current) setRemoving(false)
+        if (operation.current === controller) {operation.current = null}
+        if (mounted.current) {setRemoving(false)}
       }
     },
     [fetchStatus]

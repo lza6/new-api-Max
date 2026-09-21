@@ -157,7 +157,7 @@ export function UserAuthForm({
       return
     }
 
-    if (!validateTurnstile()) return
+    if (!validateTurnstile()) {return}
 
     const submittedTurnstileToken = turnstileToken
     if (isTurnstileEnabled) {

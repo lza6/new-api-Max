@@ -149,7 +149,7 @@ export function DeploymentsTable() {
   const totalCount = data?.data?.total || 0
 
   const handleDelete = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget) {return}
     setIsDeleting(true)
     try {
       const res = await deleteDeployment(deleteTarget.id)
@@ -252,7 +252,7 @@ export function DeploymentsTable() {
         open={logsOpen}
         onOpenChange={(open) => {
           setLogsOpen(open)
-          if (!open) setLogsDeploymentId(null)
+          if (!open) {setLogsDeploymentId(null)}
         }}
         deploymentId={logsDeploymentId}
       />
@@ -261,7 +261,7 @@ export function DeploymentsTable() {
         open={detailsOpen}
         onOpenChange={(open) => {
           setDetailsOpen(open)
-          if (!open) setDetailsDeploymentId(null)
+          if (!open) {setDetailsDeploymentId(null)}
         }}
         deploymentId={detailsDeploymentId}
       />
@@ -270,7 +270,7 @@ export function DeploymentsTable() {
         open={updateOpen}
         onOpenChange={(open) => {
           setUpdateOpen(open)
-          if (!open) setUpdateDeploymentId(null)
+          if (!open) {setUpdateDeploymentId(null)}
         }}
         deploymentId={updateDeploymentId}
       />
@@ -279,7 +279,7 @@ export function DeploymentsTable() {
         open={extendOpen}
         onOpenChange={(open) => {
           setExtendOpen(open)
-          if (!open) setExtendDeploymentId(null)
+          if (!open) {setExtendDeploymentId(null)}
         }}
         deploymentId={extendDeploymentId}
       />
@@ -288,7 +288,7 @@ export function DeploymentsTable() {
         open={renameOpen}
         onOpenChange={(open) => {
           setRenameOpen(open)
-          if (!open) setRenameDeploymentId(null)
+          if (!open) {setRenameDeploymentId(null)}
         }}
         deploymentId={renameDeploymentId}
         currentName={renameCurrentName}

@@ -315,21 +315,21 @@ const SENSITIVE_FORM_FIELDS = [
 ] satisfies (keyof ChannelFormValues)[]
 
 function readAdvancedSettingsPreference(): boolean {
-  if (typeof window === 'undefined') return false
+  if (typeof window === 'undefined') {return false}
   return window.localStorage.getItem(ADVANCED_SETTINGS_EXPANDED_KEY) === 'true'
 }
 
 function hasConfiguredOverrideValue(value: unknown): boolean {
-  if (typeof value !== 'string') return false
+  if (typeof value !== 'string') {return false}
 
   const trimmed = value.trim()
-  if (!trimmed || trimmed === 'null') return false
+  if (!trimmed || trimmed === 'null') {return false}
 
   try {
     const parsed = JSON.parse(trimmed)
-    if (parsed === null) return false
-    if (Array.isArray(parsed)) return parsed.length > 0
-    if (typeof parsed === 'object') return Object.keys(parsed).length > 0
+    if (parsed === null) {return false}
+    if (Array.isArray(parsed)) {return parsed.length > 0}
+    if (typeof parsed === 'object') {return Object.keys(parsed).length > 0}
   } catch {
     return true
   }
@@ -366,7 +366,7 @@ function hasAdvancedSettingsValues(values: ChannelFormValues): boolean {
 function parseSettingsRecord(
   settings: string | undefined
 ): Record<string, unknown> {
-  if (!settings?.trim()) return {}
+  if (!settings?.trim()) {return {}}
   try {
     const parsed = JSON.parse(settings)
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -380,7 +380,7 @@ function parseSettingsRecord(
 
 function formatUnixTime(timestamp: unknown): string {
   const seconds = Number(timestamp)
-  if (!Number.isFinite(seconds) || seconds <= 0) return '-'
+  if (!Number.isFinite(seconds) || seconds <= 0) {return '-'}
   return new Date(seconds * 1000).toLocaleString()
 }
 
@@ -445,8 +445,8 @@ function getCompletionStatus(
   hasErrors: boolean,
   isComplete: boolean
 ): ChannelEditorSectionStatus {
-  if (hasErrors) return 'error'
-  if (isComplete) return 'complete'
+  if (hasErrors) {return 'error'}
+  if (isComplete) {return 'complete'}
   return 'idle'
 }
 
@@ -454,8 +454,8 @@ function getSectionStatusLabel(
   status: ChannelEditorSectionStatus,
   t: (key: string) => string
 ): string {
-  if (status === 'error') return t('Error')
-  if (status === 'complete' || status === 'configured') return t('Ready')
+  if (status === 'error') {return t('Error')}
+  if (status === 'complete' || status === 'configured') {return t('Ready')}
   return t('Incomplete')
 }
 
@@ -807,7 +807,7 @@ export function ChannelMutateDrawer({
     void navigator.clipboard
       .readText()
       .then((text) => {
-        if (cancelled) return
+        if (cancelled) {return}
         setClipboardConnectionInfo(parseChannelConnectionInfo(text))
       })
       .catch(() => {
@@ -858,7 +858,7 @@ export function ChannelMutateDrawer({
 
   // Get basic models for the current channel type
   const basicModels = useMemo(() => {
-    if (!allModelsList.length) return []
+    if (!allModelsList.length) {return []}
     // Filter models based on common patterns for specific types
     if (currentType === 1) {
       return allModelsList.filter(
@@ -876,7 +876,7 @@ export function ChannelMutateDrawer({
 
   // Transform groups to multi-select options
   const groupOptions = useMemo(() => {
-    if (!groupsData?.data) return []
+    if (!groupsData?.data) {return []}
     const allGroups = new Set([...groupsData.data, ...(currentGroups || [])])
     return [...allGroups].map((group) => ({
       value: group,
@@ -1261,7 +1261,7 @@ export function ChannelMutateDrawer({
 
   // Handle type change - set default values for specific types
   useEffect(() => {
-    if (isEditing) return // Don't auto-set defaults when editing
+    if (isEditing) {return} // Don't auto-set defaults when editing
 
     // Type 45 (VolcEngine) - set default base_url
     if (currentType === 45) {
@@ -1281,7 +1281,7 @@ export function ChannelMutateDrawer({
   }, [currentType, isEditing, form])
 
   useEffect(() => {
-    if (currentType !== 45 || currentBaseUrl !== 'doubao-coding-plan') return
+    if (currentType !== 45 || currentBaseUrl !== 'doubao-coding-plan') {return}
 
     form.setValue('base_url', 'https://ark.cn-beijing.volces.com', {
       shouldDirty: false,
@@ -1290,7 +1290,7 @@ export function ChannelMutateDrawer({
   }, [currentBaseUrl, currentType, form])
 
   useEffect(() => {
-    if (isEditing || supportsMultiKeyAddMode) return
+    if (isEditing || supportsMultiKeyAddMode) {return}
     if (multiKeyMode && multiKeyMode !== 'single') {
       form.setValue('multi_key_mode', 'single', {
         shouldDirty: true,
@@ -1301,7 +1301,7 @@ export function ChannelMutateDrawer({
 
   // Validate base_url - warn if it ends with /v1
   useEffect(() => {
-    if (!currentBaseUrl || !currentBaseUrl.endsWith('/v1')) return
+    if (!currentBaseUrl || !currentBaseUrl.endsWith('/v1')) {return}
 
     // Show warning toast
     const timer = setTimeout(() => {
@@ -1345,7 +1345,7 @@ export function ChannelMutateDrawer({
   }
 
   const handleRefreshCodexCredential = useCallback(async () => {
-    if (!channelId) return
+    if (!channelId) {return}
     setIsCodexCredentialRefreshing(true)
     try {
       const res = await refreshCodexCredential(channelId)
@@ -1617,7 +1617,7 @@ export function ChannelMutateDrawer({
         )
         if (riskyRedirects.length > 0) {
           const confirmed = await confirmStatusCodeRisk(riskyRedirects)
-          if (!confirmed) return
+          if (!confirmed) {return}
         }
       }
 
@@ -1734,7 +1734,7 @@ export function ChannelMutateDrawer({
 
   const updateActiveEditorSection = useCallback(() => {
     const formElement = channelFormRef.current
-    if (!formElement) return
+    if (!formElement) {return}
 
     const activationY = formElement.getBoundingClientRect().top + 80
     let nextActiveSectionId: string = CHANNEL_EDITOR_SECTION_IDS.identity
@@ -1743,7 +1743,7 @@ export function ChannelMutateDrawer({
       const sectionElement = document.querySelector<HTMLElement>(
         `#${sectionId}`
       )
-      if (!sectionElement) continue
+      if (!sectionElement) {continue}
       if (sectionElement.getBoundingClientRect().top <= activationY) {
         nextActiveSectionId = sectionId
       } else {
@@ -1767,9 +1767,9 @@ export function ChannelMutateDrawer({
   }, [advancedSettingsOpen, handleAdvancedSettingsOpenChange])
 
   useEffect(() => {
-    if (!open || isChannelDetailLoading) return
+    if (!open || isChannelDetailLoading) {return}
     const formElement = channelFormRef.current
-    if (!formElement) return
+    if (!formElement) {return}
 
     updateActiveEditorSection()
     formElement.addEventListener('scroll', updateActiveEditorSection, {
@@ -4958,7 +4958,7 @@ export function ChannelMutateDrawer({
       <StatusCodeRiskDialog
         open={statusCodeRiskOpen}
         onOpenChange={(v) => {
-          if (!v) handleStatusCodeRiskAction(false)
+          if (!v) {handleStatusCodeRiskAction(false)}
         }}
         detailItems={statusCodeRiskDetailItems}
         onConfirm={() => handleStatusCodeRiskAction(true)}

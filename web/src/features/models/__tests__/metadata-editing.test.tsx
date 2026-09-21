@@ -150,7 +150,7 @@ describe('model pricing entry', () => {
       }
     )
     vi.spyOn(api, 'get').mockImplementation(async (url) => {
-      if (url === '/api/models/7') return detail
+      if (url === '/api/models/7') {return detail}
       if (url === '/api/option/model_pricing') {
         return {
           data: {

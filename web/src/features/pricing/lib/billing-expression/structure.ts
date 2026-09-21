@@ -32,17 +32,17 @@ export function splitExpressionAtTopLevel(
         i++
         continue
       }
-      if (char === quote) quote = ''
+      if (char === quote) {quote = ''}
       continue
     }
     if (char === '"' || char === "'") {
       quote = char
       continue
     }
-    if (char === '(' || char === '[' || char === '{') depth++
-    if (char === ')' || char === ']' || char === '}') depth--
-    if (depth !== 0) continue
-    if (char === '?') return [source.trim()]
+    if (char === '(' || char === '[' || char === '{') {depth++}
+    if (char === ')' || char === ']' || char === '}') {depth--}
+    if (depth !== 0) {continue}
+    if (char === '?') {return [source.trim()]}
     if (source.startsWith(operator, i)) {
       parts.push(source.slice(start, i).trim())
       start = i + operator.length
@@ -66,21 +66,21 @@ export function unwrapExpressionParens(source: string): string {
           i++
           continue
         }
-        if (char === quote) quote = ''
+        if (char === quote) {quote = ''}
         continue
       }
       if (char === '"' || char === "'") {
         quote = char
         continue
       }
-      if (char === '(') depth++
-      if (char === ')') depth--
+      if (char === '(') {depth++}
+      if (char === ')') {depth--}
       if (depth === 0) {
         closesAtEnd = i === expression.length - 1
         break
       }
     }
-    if (!closesAtEnd) break
+    if (!closesAtEnd) {break}
     expression = expression.slice(1, -1).trim()
   }
   return expression

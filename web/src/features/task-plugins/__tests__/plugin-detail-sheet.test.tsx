@@ -86,12 +86,12 @@ function renderSheet(metaOverrides: Partial<TaskPluginMeta>) {
  */
 function endpointRow(path: string): HTMLElement {
   const row = screen.getByText(path).closest('li')
-  if (!row) throw new Error(`no endpoint row for ${path}`)
+  if (!row) {throw new Error(`no endpoint row for ${path}`)}
   return row
 }
 
 afterEach(() => {
-  for (const queryClient of queryClients) queryClient.clear()
+  for (const queryClient of queryClients) {queryClient.clear()}
   queryClients.length = 0
 })
 
@@ -336,7 +336,7 @@ test('mounts sandbox on first visit and preserves input when switching tabs', as
   await user.click(screen.getByRole('tab', { name: 'Plugin sandbox' }))
   const editor = screen.getByRole('textbox', { name: 'Arguments JSON' })
   const editable = editor.querySelector<HTMLElement>('[contenteditable=true]')
-  if (!editable) throw new Error('Missing editable sandbox input')
+  if (!editable) {throw new Error('Missing editable sandbox input')}
   act(() => editable.focus())
   await user.paste('42')
   expect(editor).toHaveTextContent('42')

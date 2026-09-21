@@ -123,7 +123,7 @@ export function formatTagsArray(tags: string[]): string {
  * Validate JSON string
  */
 export function validateJSON(value: string): boolean {
-  if (!value || value.trim() === '') return true
+  if (!value || value.trim() === '') {return true}
 
   try {
     JSON.parse(value)

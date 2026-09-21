@@ -73,32 +73,32 @@ export function checkIsActive(
     // Check if any sub-item matches
     if (
       items.some((i) => {
-        if (!i?.url) return false
+        if (!i?.url) {return false}
         const subItemUrl = urlToString(i.url)
-        if (!subItemUrl) return false
-        if (href === subItemUrl) return true
+        if (!subItemUrl) {return false}
+        if (href === subItemUrl) {return true}
         const subItemUrlWithoutQuery = subItemUrl.split('?')[0]
         const subItemUrlHasQuery = subItemUrl.includes('?')
         if (subItemUrlWithoutQuery === hrefWithoutQuery) {
           // If sub-item URL has no query params, pathname match is enough (href may have query params)
-          if (!subItemUrlHasQuery) return true
+          if (!subItemUrlHasQuery) {return true}
           // If sub-item URL has query params, they must match exactly
-          if (subItemUrlHasQuery && href === subItemUrl) return true
+          if (subItemUrlHasQuery && href === subItemUrl) {return true}
         }
         return false
       })
     )
-      return true
+      {return true}
   }
 
   // For regular link items, check the item's URL
-  if (!item.url) return false
+  if (!item.url) {return false}
 
   const itemUrl = urlToString(item.url)
-  if (!itemUrl) return false
+  if (!itemUrl) {return false}
 
   // Exact match
-  if (href === itemUrl) return true
+  if (href === itemUrl) {return true}
 
   const itemUrlWithoutQuery = itemUrl.split('?')[0]
   const itemUrlHasQuery = itemUrl.includes('?')
@@ -106,9 +106,9 @@ export function checkIsActive(
   // If both URLs have the same base path
   if (hrefWithoutQuery === itemUrlWithoutQuery) {
     // If item.url has no query params, pathname match is enough (current URL may have query params)
-    if (!itemUrlHasQuery) return true
+    if (!itemUrlHasQuery) {return true}
     // If item.url has query params, they must match exactly
-    if (itemUrlHasQuery && href === itemUrl) return true
+    if (itemUrlHasQuery && href === itemUrl) {return true}
   }
 
   // Main navigation match (matches first-level path)

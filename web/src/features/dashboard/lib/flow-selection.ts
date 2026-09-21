@@ -46,10 +46,10 @@ export function flowDisplayState(options: {
   linkCount: number
   themeReady: boolean
 }): FlowDisplayState {
-  if (options.isLoading) return 'loading'
-  if (options.isError) return 'error'
-  if (options.linkCount === 0) return 'empty'
-  if (!options.themeReady) return 'loading'
+  if (options.isLoading) {return 'loading'}
+  if (options.isError) {return 'error'}
+  if (options.linkCount === 0) {return 'empty'}
+  if (!options.themeReady) {return 'loading'}
   return 'chart'
 }
 
@@ -61,7 +61,7 @@ export function visibleFlowUsers(
   users: FlowUserFilterOption[],
   selectedUsers: string[]
 ): FlowUserFilterOption[] {
-  if (selectedUsers.length === 0) return users
+  if (selectedUsers.length === 0) {return users}
   const selected = new Set(selectedUsers)
   return users.filter((user) => selected.has(user.value))
 }

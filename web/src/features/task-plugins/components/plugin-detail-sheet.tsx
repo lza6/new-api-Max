@@ -120,7 +120,7 @@ function PluginDetailContent(props: { plugin: TaskPluginListItem }) {
     i18n.language
   )
   let detailState = null
-  if (detailQuery.isPending) detailState = <LoadingState />
+  if (detailQuery.isPending) {detailState = <LoadingState />}
   else if (detailQuery.isError) {
     detailState = (
       <ErrorState
@@ -128,10 +128,10 @@ function PluginDetailContent(props: { plugin: TaskPluginListItem }) {
         onRetry={() => void detailQuery.refetch()}
       />
     )
-  } else if (!detail) detailState = <EmptyState />
+  } else if (!detail) {detailState = <EmptyState />}
 
   let versionsState = null
-  if (versionsQuery.isPending) versionsState = <LoadingState />
+  if (versionsQuery.isPending) {versionsState = <LoadingState />}
   else if (versionsQuery.isError) {
     versionsState = (
       <ErrorState
@@ -202,7 +202,7 @@ function PluginDetailContent(props: { plugin: TaskPluginListItem }) {
         value={activeTab}
         onValueChange={(value) => {
           setActiveTab(String(value))
-          if (value === 'sandbox') setSandboxVisited(true)
+          if (value === 'sandbox') {setSandboxVisited(true)}
         }}
         className='min-h-0 min-w-0 flex-1 gap-0'
       >

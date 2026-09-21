@@ -205,7 +205,7 @@ export function UsersMutateDrawer({
   }
 
   const refreshUserData = async () => {
-    if (!currentRow) return
+    if (!currentRow) {return}
     try {
       const result = requireServerSuccess(await getUser(currentRow.id))
       if (result.success && result.data) {

@@ -68,7 +68,7 @@ interface NotificationPopoverProps {
  * Get relative time string from a date
  */
 function getRelativeTime(publishDate: string | Date, t: TFunction): string {
-  if (!publishDate) return ''
+  if (!publishDate) {return ''}
 
   const now = new Date()
   const pubDate = new Date(publishDate)
@@ -88,10 +88,10 @@ function getRelativeTime(publishDate: string | Date, t: TFunction): string {
   const diffYears = Math.floor(diffDays / 365)
 
   // If future time, show specific date
-  if (diffMs < 0) return formatDateTimeObject(pubDate)
+  if (diffMs < 0) {return formatDateTimeObject(pubDate)}
 
   // Return relative time based on difference
-  if (diffSeconds < 60) return t('Just now')
+  if (diffSeconds < 60) {return t('Just now')}
   if (diffMinutes < 60) {
     return diffMinutes === 1
       ? t('1 minute ago')
@@ -117,7 +117,7 @@ function getRelativeTime(publishDate: string | Date, t: TFunction): string {
       ? t('1 month ago')
       : t('{{count}} months ago', { count: diffMonths })
   }
-  if (diffYears < 2) return t('1 year ago')
+  if (diffYears < 2) {return t('1 year ago')}
 
   // Over 2 years, show specific date
   return formatDateTimeObject(pubDate)

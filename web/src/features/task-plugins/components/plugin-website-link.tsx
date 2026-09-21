@@ -27,7 +27,7 @@ import { getPluginWebsite } from '../lib/plugin-website'
 export function PluginWebsiteLink(props: { website?: string }) {
   const { t } = useTranslation()
   const website = getPluginWebsite(props.website)
-  if (!website) return null
+  if (!website) {return null}
 
   return (
     <Button

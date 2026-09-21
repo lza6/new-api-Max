@@ -87,7 +87,7 @@ const STATUS_DOT_CLASS_NAME: Record<SystemInstanceStatus, string> = {
 }
 
 function roleLabel(instance: SystemInstance) {
-  if (instance.info?.role?.is_master) return 'master'
+  if (instance.info?.role?.is_master) {return 'master'}
   return 'worker'
 }
 
@@ -100,7 +100,7 @@ function roleDescriptionKey(instance: SystemInstance) {
 
 function runtimeLabel(instance: SystemInstance) {
   const runtime = instance.info?.runtime
-  if (!runtime?.goos && !runtime?.goarch) return '-'
+  if (!runtime?.goos && !runtime?.goarch) {return '-'}
 
   const parts: string[] = []
   if (runtime.goos || runtime.goarch) {
@@ -114,16 +114,16 @@ function getNodeName(instance: SystemInstance) {
 }
 
 function formatPercent(value?: number) {
-  if (typeof value !== 'number' || Number.isNaN(value)) return '-'
+  if (typeof value !== 'number' || Number.isNaN(value)) {return '-'}
   return `${new Intl.NumberFormat(undefined, {
     maximumFractionDigits: 1,
   }).format(value)}%`
 }
 
 function formatBytes(bytes?: number): string {
-  if (typeof bytes !== 'number' || Number.isNaN(bytes)) return '-'
-  if (bytes === 0) return '0 B'
-  if (bytes < 0) return `-${formatBytes(-bytes)}`
+  if (typeof bytes !== 'number' || Number.isNaN(bytes)) {return '-'}
+  if (bytes === 0) {return '0 B'}
+  if (bytes < 0) {return `-${formatBytes(-bytes)}`}
 
   const units = ['B', 'KB', 'MB', 'GB', 'TB']
   const index = Math.min(
@@ -137,9 +137,9 @@ function formatBytes(bytes?: number): string {
 }
 
 function ringColorClass(percent: number | null) {
-  if (percent === null) return 'text-muted-foreground/40'
-  if (percent >= 90) return 'text-red-500'
-  if (percent >= 70) return 'text-amber-500'
+  if (percent === null) {return 'text-muted-foreground/40'}
+  if (percent >= 90) {return 'text-red-500'}
+  if (percent >= 70) {return 'text-amber-500'}
   return 'text-emerald-500'
 }
 
@@ -213,7 +213,7 @@ function ResourceCell(props: ResourceCellProps) {
     </div>
   )
 
-  if (!props.tooltip) return content
+  if (!props.tooltip) {return content}
 
   return (
     <TooltipProvider delay={100}>
@@ -721,7 +721,7 @@ export function SystemInstancesPanel() {
       <ConfirmDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
-          if (!open) setDeleteTarget(null)
+          if (!open) {setDeleteTarget(null)}
         }}
         title={t('Delete stale instance')}
         desc={
@@ -738,7 +738,7 @@ export function SystemInstancesPanel() {
           deleteStaleInstanceMutation.isPending ? t('Deleting...') : t('Delete')
         }
         handleConfirm={() => {
-          if (!deleteTarget) return
+          if (!deleteTarget) {return}
           deleteStaleInstanceMutation.mutate(deleteTarget.node_name)
         }}
       />

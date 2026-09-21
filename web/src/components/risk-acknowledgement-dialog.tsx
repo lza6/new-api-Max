@@ -65,7 +65,7 @@ type RiskAcknowledgementDialogProps = {
 }
 
 function getRequiredTextRows(text: string) {
-  return Math.max(1, Math.ceil(Array.from(text).length / 42))
+  return Math.max(1, Math.ceil([...text].length / 42))
 }
 
 export function RiskAcknowledgementDialog({
@@ -124,7 +124,7 @@ export function RiskAcknowledgementDialog({
     : requiredText
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {return}
     const timer = window.setTimeout(() => {
       setCheckedItems(Array(checklist.length).fill(false))
       setTypedText('')
@@ -134,7 +134,7 @@ export function RiskAcknowledgementDialog({
   }, [open, checklist.length, requiredTextInputCount])
 
   const allChecked = useMemo(() => {
-    if (checklist.length === 0) return true
+    if (checklist.length === 0) {return true}
     return (
       checkedItems.length === checklist.length &&
       checkedItems.every((checked) => checked)
@@ -144,11 +144,11 @@ export function RiskAcknowledgementDialog({
   const typedMatched = useMemo(() => {
     if (hasSegmentedRequiredText) {
       return normalizedRequiredTextParts.every((part) => {
-        if (part.type === 'static') return true
+        if (part.type === 'static') {return true}
         return typedTextParts[part.inputIndex ?? 0]?.trim() === part.text.trim()
       })
     }
-    if (!requiredText) return true
+    if (!requiredText) {return true}
     return typedText.trim() === requiredText.trim()
   }, [
     hasSegmentedRequiredText,

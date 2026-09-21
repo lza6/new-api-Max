@@ -18,13 +18,13 @@ For commercial licensing, please contact support@quantumnous.com
 */
 export function removeTrailingSlash(value: string) {
   const trimmed = value.trim()
-  if (!trimmed) return ''
+  if (!trimmed) {return ''}
   return trimmed.replace(/\/+$/, '')
 }
 
 export function formatJsonForEditor(value: string) {
   const trimmed = value.trim()
-  if (!trimmed) return ''
+  if (!trimmed) {return ''}
   try {
     return JSON.stringify(JSON.parse(trimmed), null, 2)
   } catch {
@@ -34,7 +34,7 @@ export function formatJsonForEditor(value: string) {
 
 export function normalizeJsonForComparison(value: string) {
   const trimmed = value.trim()
-  if (!trimmed) return ''
+  if (!trimmed) {return ''}
   try {
     return JSON.stringify(JSON.parse(trimmed))
   } catch {
@@ -46,7 +46,7 @@ function extractErrorPosition(
   error: unknown,
   jsonString: string
 ): { line?: number; column?: number } {
-  if (!(error instanceof Error)) return {}
+  if (!(error instanceof Error)) {return {}}
 
   const message = error.message
   const positionMatch = message.match(/at position (\d+)/i)
@@ -56,7 +56,7 @@ function extractErrorPosition(
     const lines = jsonString.substring(0, position).split('\n')
     return {
       line: lines.length,
-      column: lines[lines.length - 1].length + 1,
+      column: (lines.at(-1) ?? '').length + 1,
     }
   }
 
@@ -72,7 +72,7 @@ function extractErrorPosition(
 }
 
 function formatJsonError(error: unknown, jsonString: string): string {
-  if (!(error instanceof Error)) return 'Invalid JSON'
+  if (!(error instanceof Error)) {return 'Invalid JSON'}
 
   const position = extractErrorPosition(error, jsonString)
   const message = error.message
@@ -98,7 +98,7 @@ export function isValidJson(
   predicate?: (parsed: unknown) => boolean
 ): boolean {
   const trimmed = value.trim()
-  if (!trimmed) return true
+  if (!trimmed) {return true}
   try {
     const parsed = JSON.parse(trimmed)
     if (predicate && !predicate(parsed)) {
@@ -115,7 +115,7 @@ export function getJsonError(
   predicate?: (parsed: unknown) => boolean
 ): string | null {
   const trimmed = value.trim()
-  if (!trimmed) return null
+  if (!trimmed) {return null}
   try {
     const parsed = JSON.parse(trimmed)
     if (predicate && !predicate(parsed)) {

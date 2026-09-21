@@ -39,7 +39,7 @@ function Table({
     />
   )
 
-  if (!withContainer) return table
+  if (!withContainer) {return table}
 
   return (
     <div

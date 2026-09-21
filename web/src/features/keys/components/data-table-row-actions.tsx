@@ -64,7 +64,7 @@ function getServerAddress(): string {
     const raw = localStorage.getItem('status')
     if (raw) {
       const status = JSON.parse(raw)
-      if (status.server_address) return status.server_address as string
+      if (status.server_address) {return status.server_address as string}
     }
   } catch {
     /* empty */
@@ -100,7 +100,7 @@ export function DataTableRowActions<TData>({
   const handleOpenChatPreset = useCallback(
     async (preset: ChatPreset) => {
       const realKey = await resolveRealKey(apiKey.id)
-      if (!realKey) return
+      if (!realKey) {return}
 
       if (preset.type === 'fluent') {
         const success = sendToFluent(realKey, serverAddress)
@@ -127,7 +127,7 @@ export function DataTableRowActions<TData>({
         return
       }
 
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined') {return}
 
       try {
         window.open(resolvedUrl, '_blank', 'noopener')
@@ -224,9 +224,9 @@ export function DataTableRowActions<TData>({
           disabled={isRealKeyLoading}
           onClick={async () => {
             const realKey = await resolveRealKey(apiKey.id)
-            if (!realKey) return
+            if (!realKey) {return}
             const ok = await copyToClipboard(realKey)
-            if (ok) toast.success(t('Copied'))
+            if (ok) {toast.success(t('Copied'))}
           }}
         >
           {t('Copy Key')}
@@ -238,13 +238,13 @@ export function DataTableRowActions<TData>({
           disabled={isRealKeyLoading}
           onClick={async () => {
             const realKey = await resolveRealKey(apiKey.id)
-            if (!realKey) return
+            if (!realKey) {return}
             const connStr = encodeChannelConnectionInfo(
               realKey,
               getServerAddress()
             )
             const ok = await copyToClipboard(connStr)
-            if (ok) toast.success(t('Copied'))
+            if (ok) {toast.success(t('Copied'))}
           }}
         >
           {t('Copy Connection Info')}
@@ -256,7 +256,7 @@ export function DataTableRowActions<TData>({
         <DropdownMenuItem
           onClick={async () => {
             const realKey = await resolveRealKey(apiKey.id)
-            if (!realKey) return
+            if (!realKey) {return}
             setResolvedKey(realKey)
             setCurrentRow(apiKey)
             setOpen('cc-switch')

@@ -92,7 +92,7 @@ function describeTimeRange(
         break
     }
   }
-  if (start >= end) return null
+  if (start >= end) {return null}
   let text: string
   let kind: Description['kind'] = 'calendar'
   if (first.name === 'hour') {
@@ -135,7 +135,7 @@ function describeBillingCondition(
 ): Description | null {
   if (node.kind === 'unary' && node.operator === '!') {
     const description = describeBillingCondition(node.operand, t, locale)
-    if (!description) return null
+    if (!description) {return null}
     return {
       ...description,
       text: t('Outside these times: {{condition}}', {
@@ -157,7 +157,7 @@ function describeBillingCondition(
       len: 'Full input length',
     }
     const label = labels[node.left.name]
-    if (!label) return null
+    if (!label) {return null}
     return {
       text: `${t(label)} ${node.operator} ${node.right.value.toLocaleString(locale === 'zhCN' ? 'zh-CN' : locale)}`,
       kind: 'combined',
@@ -165,7 +165,7 @@ function describeBillingCondition(
     }
   }
   const single = timeComparison(node)
-  if (single) return describeTimeRange([single], t, locale)
+  if (single) {return describeTimeRange([single], t, locale)}
   if (node.kind !== 'binary' || !['&&', '||'].includes(node.operator)) {
     return null
   }
@@ -182,26 +182,26 @@ function describeBillingCondition(
         ranges.set(key, range)
       } else {
         const description = describeBillingCondition(part, t, locale)
-        if (!description) return null
+        if (!description) {return null}
         parts.push(description)
       }
     }
     for (const range of ranges.values()) {
       const description = describeTimeRange(range, t, locale)
-      if (!description) return null
+      if (!description) {return null}
       parts.push(description)
     }
   } else {
     for (const part of nodes) {
       const description = describeBillingCondition(part, t, locale)
-      if (!description) return null
+      if (!description) {return null}
       parts.push(description)
     }
   }
   const zones = [...new Set(parts.map((part) => part.timezone).filter(Boolean))]
-  if (parts.length === 0 || zones.length > 1) return null
+  if (parts.length === 0 || zones.length > 1) {return null}
   const timezone = zones[0] ?? ''
-  if (parts.length === 1) return parts[0]
+  if (parts.length === 1) {return parts[0]}
   const calendars = parts.filter((part) => part.kind === 'calendar')
   const clocks = parts.filter((part) => part.kind === 'clock')
   if (
@@ -244,7 +244,7 @@ export function formatBillingCondition(
   locale = 'en'
 ): string | null {
   const compiled = compileBillingExpression(source)
-  if (compiled.status !== 'ready') return null
+  if (compiled.status !== 'ready') {return null}
   try {
     // The returned value is rendered as React text, never as HTML.
     const translate: Translate = (key, options) =>
@@ -254,8 +254,8 @@ export function formatBillingCondition(
       translate,
       locale
     )
-    if (!description) return null
-    if (!description.timezone) return description.text
+    if (!description) {return null}
+    if (!description.timezone) {return description.text}
     return translate('{{condition}} ({{timezone}})', {
       condition: description.text,
       timezone: description.timezone,

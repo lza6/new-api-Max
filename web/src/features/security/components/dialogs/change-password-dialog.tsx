@@ -132,7 +132,7 @@ export function ChangePasswordDialog(props: ChangePasswordDialogProps) {
         signal
       )
     })
-    if (!result) return
+    if (!result) {return}
     form.reset(emptyPasswordForm)
     toast.success(
       t(

@@ -135,7 +135,7 @@ export function ModelMutateDrawer(props: {
   const modelQuery = useQuery({
     queryKey: modelsQueryKeys.detail(currentRow?.id ?? 0),
     queryFn: async () => {
-      if (!currentRow?.id) throw new Error(t('Model ID is required'))
+      if (!currentRow?.id) {throw new Error(t('Model ID is required'))}
       const response = await getModel(currentRow.id)
       if (!response.success || !response.data) {
         throw createServerError(response, t('Failed to load model'))
@@ -147,7 +147,7 @@ export function ModelMutateDrawer(props: {
   const savedModel = modelQuery.data ?? currentRow
 
   useEffect(() => {
-    if (!props.open) return
+    if (!props.open) {return}
     setSection(props.initialSection ?? 'metadata')
     setPricingVisited(props.initialSection === 'pricing')
     setPricingName('')
@@ -170,7 +170,7 @@ export function ModelMutateDrawer(props: {
     const key = currentRow?.id
       ? `metadata:${currentRow.id}`
       : `channel:${currentRow?.model_name ?? ''}`
-    if (loadedKey.current === key || (isEditing && !modelQuery.data)) return
+    if (loadedKey.current === key || (isEditing && !modelQuery.data)) {return}
     form.reset(
       transformModelToFormDefaults(
         (isEditing
@@ -221,7 +221,7 @@ export function ModelMutateDrawer(props: {
         queryClient.invalidateQueries({ queryKey: vendorsQueryKeys.all }),
       ])
       toast.success(t('Model metadata saved'))
-      if (!pricingDirty) props.onOpenChange(false)
+      if (!pricingDirty) {props.onOpenChange(false)}
     },
     onError: (error) => {
       form.setError('root.server', {
@@ -240,7 +240,7 @@ export function ModelMutateDrawer(props: {
   }
   const metadataDirty = form.formState.isDirty
   const close = (open: boolean) => {
-    if (!open && isSubmitting) return
+    if (!open && isSubmitting) {return}
     if (!open && (metadataDirty || pricingDirty)) {
       setCloseConfirm(true)
       return
@@ -268,7 +268,7 @@ export function ModelMutateDrawer(props: {
             value={section}
             onValueChange={(value) => {
               setSection(value)
-              if (value === 'pricing') setPricingVisited(true)
+              if (value === 'pricing') {setPricingVisited(true)}
             }}
             className='shrink-0 px-4'
           >
@@ -497,7 +497,7 @@ export function ModelMutateDrawer(props: {
                             (key) => ({ value: key, label: key })
                           )}
                           onValueChange={(value: string | null) => {
-                            if (value) handleFillEndpointTemplate(value)
+                            if (value) {handleFillEndpointTemplate(value)}
                           }}
                           className='w-[200px]'
                           placeholder={t('Load template...')}

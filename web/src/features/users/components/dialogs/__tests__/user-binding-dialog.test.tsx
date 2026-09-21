@@ -213,8 +213,8 @@ describe('UserBindingDialog shared status updates', () => {
       resolveStatus = resolve
     })
     apiClient.get = async (url) => {
-      if (url === '/api/status') return response
-      if (url === '/api/user/7') return { data: { success: true, data: user } }
+      if (url === '/api/status') {return response}
+      if (url === '/api/user/7') {return { data: { success: true, data: user } }}
       if (url === '/api/user/7/oauth/bindings') {
         return { data: { success: true, data: [] } }
       }
@@ -256,7 +256,7 @@ describe('UserBindingDialog shared status updates', () => {
         rejectStatus = reject
       })
       const get = vi.fn(async (url: string) => {
-        if (url === '/api/status') return response
+        if (url === '/api/status') {return response}
         if (url === '/api/user/7') {
           return { data: { success: true, data: user } }
         }
@@ -276,7 +276,7 @@ describe('UserBindingDialog shared status updates', () => {
           resolveStatus({
             data: { success: true, data: { github_oauth: true } },
           })
-        } else rejectStatus(new Error('Status unavailable'))
+        } else {rejectStatus(new Error('Status unavailable'))}
       })
       await screen.findByText('bound-user (ID: 7)')
       expect(screen.getByText('github-user')).toBeInTheDocument()
@@ -291,8 +291,8 @@ describe('UserBindingDialog shared status updates', () => {
       { updatedAt: Date.now() - 600_000 }
     )
     apiClient.get = async (url) => {
-      if (url === '/api/status') throw new Error('Status unavailable')
-      if (url === '/api/user/7') return { data: { success: true, data: user } }
+      if (url === '/api/status') {throw new Error('Status unavailable')}
+      if (url === '/api/user/7') {return { data: { success: true, data: user } }}
       if (url === '/api/user/7/oauth/bindings') {
         return { data: { success: true, data: [] } }
       }

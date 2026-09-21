@@ -41,7 +41,7 @@ const originalColumnVisibility = localStorage.getItem(
 
 afterEach(() => {
   cleanup()
-  for (const client of clients) client.clear()
+  for (const client of clients) {client.clear()}
   clients.length = 0
   if (originalColumnVisibility === null) {
     localStorage.removeItem('model-ratio-column-visibility')

@@ -83,8 +83,8 @@ it.each(['switch', 'close'] as const)(
       data: { success: boolean; data: { key: string } }
     }>()
     const post = vi.spyOn(api, 'post').mockImplementation((url) => {
-      if (url === '/api/verify') return Promise.resolve(proof)
-      if (url === '/api/channel/123/key') return keyReply.promise
+      if (url === '/api/verify') {return Promise.resolve(proof)}
+      if (url === '/api/channel/123/key') {return keyReply.promise}
       throw new Error(`Unexpected POST ${url}`)
     })
     const user = userEvent.setup()

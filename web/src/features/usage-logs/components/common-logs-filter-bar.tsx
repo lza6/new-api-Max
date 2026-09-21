@@ -256,7 +256,7 @@ export function CommonLogsFilterBar<TData>(
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') handleApply()
+      if (e.key === 'Enter') {handleApply()}
     },
     [handleApply]
   )

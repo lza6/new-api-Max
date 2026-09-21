@@ -59,7 +59,7 @@ export function useTwoFASetup(refreshStatus: () => void | Promise<void>) {
       current.setup = undefined
       setState({ phase: 'authorizing' })
       const proof = await requestVerification({ scope: '2fa.setup' })
-      if (currentFlow.current !== current) return
+      if (currentFlow.current !== current) {return}
       if (!proof) {
         cancel()
         return
@@ -70,11 +70,11 @@ export function useTwoFASetup(refreshStatus: () => void | Promise<void>) {
           proof.proof_token,
           current.controller.signal
         )
-        if (currentFlow.current !== current) return
+        if (currentFlow.current !== current) {return}
         current.setup = setup
         setState({ phase: 'ready', setup })
       } catch (error) {
-        if (currentFlow.current !== current) return
+        if (currentFlow.current !== current) {return}
         handleServerError(AuthOperationError.from(error))
         cancel()
         await refreshStatus()
@@ -84,7 +84,7 @@ export function useTwoFASetup(refreshStatus: () => void | Promise<void>) {
   )
 
   const start = useCallback(() => {
-    if (currentFlow.current) return
+    if (currentFlow.current) {return}
     const current: SetupFlow = {
       controller: new AbortController(),
       submitting: false,
@@ -113,12 +113,12 @@ export function useTwoFASetup(refreshStatus: () => void | Promise<void>) {
           return
         }
         await enable2FA(code, setup.flow_token, current.controller.signal)
-        if (currentFlow.current !== current) return
+        if (currentFlow.current !== current) {return}
         cancel()
         toast.success(t('Two-factor authentication enabled successfully!'))
         await refreshStatus()
       } catch (error) {
-        if (currentFlow.current !== current) return
+        if (currentFlow.current !== current) {return}
         const failure = AuthOperationError.from(error)
         if (failure.code === 'TWOFA_SETUP_INVALID') {
           toast.info(

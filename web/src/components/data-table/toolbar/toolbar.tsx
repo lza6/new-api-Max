@@ -258,7 +258,7 @@ export function DataTableToolbar<TData>(props: DataTableToolbarProps<TData>) {
     () =>
       filters.map((filter) => {
         const column = props.table.getColumn(filter.columnId)
-        if (!column) return null
+        if (!column) {return null}
         return (
           <DataTableFacetedFilter
             key={filter.columnId}

@@ -95,7 +95,7 @@ function normalizeStringList(text: string): string[] {
 
 function normalizeKeySource(src: Partial<KeySource>): KeySource {
   const type = (src?.type || 'gjson') as KeySource['type']
-  if (type === 'gjson') return { type, key: '', path: src?.path || '' }
+  if (type === 'gjson') {return { type, key: '', path: src?.path || '' }}
   return { type, key: src?.key || '', path: '' }
 }
 
@@ -161,11 +161,11 @@ export function RuleEditorDialog(props: Props) {
         ? sources.map(createKeySourceRow)
         : [createKeySourceRow()]
     )
-    if (r.param_override_template) setAdvancedOpen(true)
+    if (r.param_override_template) {setAdvancedOpen(true)}
   }
 
   useEffect(() => {
-    if (!props.open) return
+    if (!props.open) {return}
 
     if (props.rule) {
       resetFromRule(props.rule)
@@ -336,7 +336,7 @@ export function RuleEditorDialog(props: Props) {
                   items={KEY_SOURCE_TYPES.map((t) => ({ value: t, label: t }))}
                   value={src.type}
                   onValueChange={(v) => {
-                    if (v === null) return
+                    if (v === null) {return}
                     const next = [...keySources]
                     next[idx] = {
                       ...normalizeKeySource({

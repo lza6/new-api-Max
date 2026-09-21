@@ -382,7 +382,7 @@ export interface TaskStructuredProgress {
 export function readTaskStructuredProgress(
   data: unknown
 ): TaskStructuredProgress | null {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {return null}
   const progress = (data as Record<string, unknown>).progress
   if (!progress || typeof progress !== 'object' || Array.isArray(progress)) {
     return null
@@ -390,8 +390,8 @@ export function readTaskStructuredProgress(
   const record = progress as Record<string, unknown>
   const current = Number(record.current)
   const total = Number(record.total)
-  if (!Number.isFinite(current) || !Number.isFinite(total)) return null
-  if (total <= 0) return null
+  if (!Number.isFinite(current) || !Number.isFinite(total)) {return null}
+  if (total <= 0) {return null}
   const step = typeof record.step === 'string' ? record.step : undefined
   const eventType =
     typeof record.event_type === 'string' ? record.event_type : undefined

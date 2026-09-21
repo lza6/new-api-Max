@@ -113,7 +113,7 @@ export function PublicHeader(props: PublicHeaderProps) {
   }, [mobileOpen])
 
   useEffect(() => {
-    if (!authPromptTarget) return
+    if (!authPromptTarget) {return}
 
     const intervalId = window.setInterval(() => {
       setAuthPromptSecondsLeft((seconds) => Math.max(seconds - 1, 0))

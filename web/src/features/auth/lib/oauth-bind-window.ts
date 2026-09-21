@@ -59,7 +59,7 @@ export function parseTelegramBindCallback(
   if (search.telegram_bind !== 'success' && search.telegram_bind !== 'error') {
     return null
   }
-  if (!search.flow_token) return { kind: 'invalid' }
+  if (!search.flow_token) {return { kind: 'invalid' }}
 
   if (search.telegram_bind === 'success') {
     return {
@@ -81,7 +81,7 @@ export function postTelegramBindResult(
   opener: Pick<Window, 'closed' | 'postMessage'> | null,
   targetOrigin: string
 ): boolean {
-  if (callback?.kind !== 'result' || !opener || opener.closed) return false
+  if (callback?.kind !== 'result' || !opener || opener.closed) {return false}
 
   opener.postMessage(
     {
@@ -102,12 +102,12 @@ export function startOAuthBindResponseDeadline(
 ): () => void {
   let active = true
   const handle = runtime.schedule(() => {
-    if (!active) return
+    if (!active) {return}
     active = false
     onTimeout()
   }, delay)
   return () => {
-    if (!active) return
+    if (!active) {return}
     active = false
     runtime.cancel(handle)
   }
@@ -121,13 +121,13 @@ export function watchOAuthPopupClosed(
 ): () => void {
   let active = true
   const handle = runtime.schedule(() => {
-    if (!active || !popup.closed) return
+    if (!active || !popup.closed) {return}
     active = false
     runtime.cancel(handle)
     onClosed()
   }, interval)
   return () => {
-    if (!active) return
+    if (!active) {return}
     active = false
     runtime.cancel(handle)
   }

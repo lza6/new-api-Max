@@ -43,7 +43,7 @@ export function AnimateInView(props: AnimateInViewProps) {
 
   useEffect(() => {
     const el = ref.current
-    if (!el) return
+    if (!el) {return}
 
     const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
     if (mq.matches) {
@@ -57,7 +57,7 @@ export function AnimateInView(props: AnimateInViewProps) {
         if (entry.isIntersecting) {
           el.classList.remove('opacity-0')
           el.classList.add(`landing-animate-${animation}`)
-          if (once) observer.unobserve(el)
+          if (once) {observer.unobserve(el)}
         } else if (!once) {
           el.classList.add('opacity-0')
           el.classList.remove(`landing-animate-${animation}`)

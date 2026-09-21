@@ -50,7 +50,7 @@ import type { AffinityRule, CacheStats, ChannelAffinitySettings } from './types'
 function parseRules(jsonStr: string): AffinityRule[] {
   try {
     const arr = JSON.parse(jsonStr || '[]')
-    if (!Array.isArray(arr)) return []
+    if (!Array.isArray(arr)) {return []}
     return arr.map(
       (r: Record<string, unknown>, i: number) =>
         ({ id: i, ...r }) as AffinityRule
@@ -373,7 +373,7 @@ export function ChannelAffinitySection(props: Props) {
   }
 
   const handleClearRule = async () => {
-    if (!clearRuleName) return
+    if (!clearRuleName) {return}
     try {
       const res = await clearRuleCache(clearRuleName)
       if (res.success) {
@@ -621,7 +621,7 @@ export function ChannelAffinitySection(props: Props) {
                     rule.include_model_name && t('Model'),
                     rule.include_rule_name && t('Rule'),
                   ].filter(Boolean) as string[]
-                  if (scopeItems.length === 0) return '-'
+                  if (scopeItems.length === 0) {return '-'}
                   return <RuleBadgeList items={scopeItems} />
                 },
               },

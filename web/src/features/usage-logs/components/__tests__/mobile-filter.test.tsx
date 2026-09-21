@@ -117,7 +117,7 @@ afterEach(async () => {
       'setPointerCapture',
       captureDescriptor
     )
-  } else Reflect.deleteProperty(HTMLElement.prototype, 'setPointerCapture')
+  } else {Reflect.deleteProperty(HTMLElement.prototype, 'setPointerCapture')}
   cleanup()
   vi.restoreAllMocks()
   vi.useRealTimers()

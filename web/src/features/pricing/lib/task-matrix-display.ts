@@ -38,11 +38,11 @@ export function getTaskMatrixDisplayTiers(
   expression: string | null | undefined,
   schema: BillingUsageSchema | null | undefined
 ): ParsedTaskTier[] | null {
-  if (!schema) return null
-  if (getTaskEnumFields(schema).length === 0) return null
+  if (!schema) {return null}
+  if (getTaskEnumFields(schema).length === 0) {return null}
 
   const matrix = tryParseTaskMatrixConfig(expression, schema)
-  if (!matrix) return null
+  if (!matrix) {return null}
 
   return matrix.rows.map((row) => ({
     label: taskMatrixRowLabel(row.combination),
@@ -63,7 +63,7 @@ export function getTaskPricingDisplayTiers(
 ): ParsedTaskTier[] {
   const tiers = parseTaskTiersFromExpr(expression || '', schema, true)
   const fallback = tiers.at(-1)
-  if (!schema || tiers.length < 2 || !fallback) return tiers
+  if (!schema || tiers.length < 2 || !fallback) {return tiers}
   const previous = tiers.slice(0, -1)
   const fields = [
     ...new Set(
@@ -96,6 +96,6 @@ export function getTaskPricingDisplayTiers(
         )
       )
   )
-  if (remaining.length !== 1) return tiers
+  if (remaining.length !== 1) {return tiers}
   return [...previous, { ...fallback, conditions: remaining[0] }]
 }

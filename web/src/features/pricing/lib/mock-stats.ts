@@ -228,12 +228,12 @@ const APP_TEMPLATES: Array<
 
 const PROFILE_BY_NAME = (name: string) => {
   const n = name.toLowerCase()
-  if (/embed|rerank/.test(n)) return 'embedding'
-  if (/image|sora|veo|kling|pika|jimeng|dalle|imagen/.test(n)) return 'image'
-  if (/whisper|tts|voice|audio/.test(n)) return 'audio'
-  if (/o1|o3|o4|reasoning|thinking|deepseek-r/.test(n)) return 'reasoning'
-  if (/flash|haiku|mini|small|nano|fast/.test(n)) return 'fast'
-  if (/gpt-5|opus|ultra|405|70b/.test(n)) return 'large'
+  if (/embed|rerank/.test(n)) {return 'embedding'}
+  if (/image|sora|veo|kling|pika|jimeng|dalle|imagen/.test(n)) {return 'image'}
+  if (/whisper|tts|voice|audio/.test(n)) {return 'audio'}
+  if (/o1|o3|o4|reasoning|thinking|deepseek-r/.test(n)) {return 'reasoning'}
+  if (/flash|haiku|mini|small|nano|fast/.test(n)) {return 'fast'}
+  if (/gpt-5|opus|ultra|405|70b/.test(n)) {return 'large'}
   return 'standard'
 }
 
@@ -315,8 +315,7 @@ export function buildGroupPerformance(model: PricingModel): GroupPerformance[] {
   const spec = PROFILE_SPECS[profile]
   const baseSeed = hashStringToSeed(model.model_name)
 
-  return targets
-    .slice()
+  return [...targets]
     .sort((a, b) => a.localeCompare(b))
     .map<GroupPerformance>((group) => {
       const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
@@ -354,7 +353,7 @@ export function buildLatencyTimeSeries(
   model: PricingModel
 ): LatencyTimePoint[] {
   const performances = buildGroupPerformance(model)
-  if (performances.length === 0) return []
+  if (performances.length === 0) {return []}
 
   const now = new Date()
   now.setMinutes(0, 0, 0)
@@ -390,7 +389,7 @@ export function buildUptimeSeries(
   group?: string
 ): UptimeDayPoint[] {
   const performances = buildGroupPerformance(model)
-  if (performances.length === 0) return []
+  if (performances.length === 0) {return []}
 
   const target = group ? performances.find((p) => p.group === group) : null
   const baseUptime = target
@@ -484,10 +483,10 @@ export function aggregateUptime(points: UptimeDayPoint[]): {
 
 /** Compact integer formatter for token counts in apps tab. */
 export function formatTokenVolume(n: number): string {
-  if (!Number.isFinite(n) || n <= 0) return '0'
-  if (n >= 1_000_000_000) return `${(n / 1_000_000_000).toFixed(1)}B`
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}K`
+  if (!Number.isFinite(n) || n <= 0) {return '0'}
+  if (n >= 1_000_000_000) {return `${(n / 1_000_000_000).toFixed(1)}B`}
+  if (n >= 1_000_000) {return `${(n / 1_000_000).toFixed(1)}M`}
+  if (n >= 1_000) {return `${(n / 1_000).toFixed(1)}K`}
   return n.toString()
 }
 
@@ -773,7 +772,7 @@ type ApiCategory = 'reasoning' | 'embedding' | 'image' | 'video' | 'chat'
  */
 function apiCategoryOf(model: PricingModel): ApiCategory {
   const profile = PROFILE_BY_NAME(model.model_name)
-  if (profile === 'embedding' || profile === 'reasoning') return profile
+  if (profile === 'embedding' || profile === 'reasoning') {return profile}
   if (profile === 'image') {
     return /sora|veo|kling|pika|video|wan-|hunyuanvideo/i.test(model.model_name)
       ? 'video'
@@ -791,10 +790,10 @@ export function buildSupportedParameters(
   model: PricingModel
 ): SupportedParameter[] {
   const cat = apiCategoryOf(model)
-  if (cat === 'reasoning') return REASONING_PARAMS
-  if (cat === 'embedding') return EMBEDDING_PARAMS
-  if (cat === 'image') return IMAGE_PARAMS
-  if (cat === 'video') return VIDEO_PARAMS
+  if (cat === 'reasoning') {return REASONING_PARAMS}
+  if (cat === 'embedding') {return EMBEDDING_PARAMS}
+  if (cat === 'image') {return IMAGE_PARAMS}
+  if (cat === 'video') {return VIDEO_PARAMS}
   return COMMON_CHAT_PARAMS
 }
 
@@ -813,12 +812,20 @@ export function buildRateLimits(model: PricingModel): RateLimit[] {
   const baseSeed = hashStringToSeed(`${model.model_name}:rl`)
   const isHeavy = cat === 'image' || cat === 'video'
   const isLight = cat === 'embedding'
-  const baseRpm = isHeavy ? 60 : isLight ? 5_000 : 500
-  const baseTpm = isHeavy ? 0 : isLight ? 1_000_000 : 200_000
-  const baseRpd = isHeavy ? 1_000 : isLight ? 100_000 : 10_000
+  let baseRpm = 500
+  let baseTpm = 200_000
+  let baseRpd = 10_000
+  if (isHeavy) {
+    baseRpm = 60
+    baseTpm = 0
+    baseRpd = 1_000
+  } else if (isLight) {
+    baseRpm = 5_000
+    baseTpm = 1_000_000
+    baseRpd = 100_000
+  }
 
-  return targets
-    .slice()
+  return [...targets]
     .sort((a, b) => a.localeCompare(b))
     .map((group) => {
       const rand = seededRandom(baseSeed ^ hashStringToSeed(group))
@@ -834,9 +841,9 @@ export function buildRateLimits(model: PricingModel): RateLimit[] {
 
 /** Format an integer rate-limit value compactly. */
 export function formatRateLimit(value: number): string {
-  if (value <= 0) return '—'
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`
+  if (value <= 0) {return '—'}
+  if (value >= 1_000_000) {return `${(value / 1_000_000).toFixed(1)}M`}
   if (value >= 1_000)
-    return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`
+    {return `${(value / 1_000).toFixed(value >= 10_000 ? 0 : 1)}K`}
   return value.toLocaleString()
 }

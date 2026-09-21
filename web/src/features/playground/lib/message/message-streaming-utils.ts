@@ -226,7 +226,7 @@ export function sanitizeMessagesOnLoad(messages: Message[]): Message[] {
     }
   }
 
-  if (targetIndex === -1) return messages
+  if (targetIndex === -1) {return messages}
 
   const finalized = finalizeMessage(messages[targetIndex])
   const hasContent = hasMessageContent(finalized)

@@ -67,8 +67,8 @@ export function useOAuthLogin(
   }
 
   const handleGitHubLogin = async () => {
-    if (!status?.github_client_id) return
-    if (githubButtonDisabled) return
+    if (!status?.github_client_id) {return}
+    if (githubButtonDisabled) {return}
 
     setIsLoading(true)
     setGithubButtonDisabled(true)
@@ -107,7 +107,7 @@ export function useOAuthLogin(
   }
 
   const handleDiscordLogin = async () => {
-    if (!status?.discord_client_id) return
+    if (!status?.discord_client_id) {return}
 
     setIsLoading(true)
     try {
@@ -127,7 +127,7 @@ export function useOAuthLogin(
   }
 
   const handleOIDCLogin = async () => {
-    if (!status?.oidc_authorization_endpoint || !status?.oidc_client_id) return
+    if (!status?.oidc_authorization_endpoint || !status?.oidc_client_id) {return}
 
     setIsLoading(true)
     try {
@@ -151,7 +151,7 @@ export function useOAuthLogin(
   }
 
   const handleLinuxDOLogin = async () => {
-    if (!status?.linuxdo_client_id) return
+    if (!status?.linuxdo_client_id) {return}
 
     setIsLoading(true)
     try {
@@ -196,7 +196,7 @@ export function useOAuthLogin(
   }
 
   const handleCustomOAuthLogin = async (provider: CustomOAuthProviderInfo) => {
-    if (!provider.authorization_endpoint || !provider.client_id) return
+    if (!provider.authorization_endpoint || !provider.client_id) {return}
 
     setIsLoading(true)
     try {

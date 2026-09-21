@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
@@ -30,9 +30,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { handleServerError } from "@/lib/handle-server-error"
 
 import {
-  BannedIPRow,
-  WebProtectionSettings,
-  WebRequestLogRow,
+  type BannedIPRow,
+  type WebProtectionSettings,
+  type WebRequestLogRow,
   banIP,
   formatBytes,
   getBannedIPs,
@@ -42,7 +42,7 @@ import {
   getWebRequestLogs,
   unbanIP,
   unbanIPsBatch,
-  ServerStats,
+  type ServerStats,
   updateWebProtectionSettings,
 } from "./api"
 
@@ -56,12 +56,12 @@ function ServerStatsCard({ t }: { t: (k: string) => string }) {
   const [s, setS] = useState<ServerStats | null>(null)
   useEffect(() => {
     let alive = true
-    const load = () => { getServerStats().then((d) => { if (alive) setS(d) }).catch(() => undefined) }
+    const load = () => { getServerStats().then((d) => { if (alive) {setS(d)} }).catch(() => undefined) }
     load()
     const timer = setInterval(load, 1500)
     return () => { alive = false; clearInterval(timer) }
   }, [])
-  if (!s) return null
+  if (!s) {return null}
   const inst = s.instance
   const res = inst?.resources
   const cpu = res?.cpu?.usage_percent
@@ -105,7 +105,7 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
   const set = (patch: Partial<WebProtectionSettings>) => setS((prev) => (prev ? { ...prev, ...patch } : prev))
 
   const save = async () => {
-    if (!s) return
+    if (!s) {return}
     setSaving(true)
     try {
       const res = await updateWebProtectionSettings({
@@ -122,7 +122,7 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
     } catch (e) { handleServerError(e) } finally { setSaving(false) }
   }
 
-  if (!s) return null
+  if (!s) {return null}
   return (
     <Card>
       <CardHeader>
@@ -175,13 +175,13 @@ function LogsTab({ t }: { t: (k: string) => string }) {
   const [detail, setDetail] = useState<Record<string, string[]>>({})
   const [banMinutes, setBanMinutes] = useState(1440)
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       const d = await getWebRequestLogs({ page: 1, size: 50, ip: filter || undefined, sort, order })
       setRows(d.items); setTotal(d.total);
     } catch (e) { handleServerError(e) }
-  }
-  useEffect(() => { void load() }, [sort, order, filter])
+  }, [filter, sort, order])
+  useEffect(() => { void load() }, [load])
 
   const toggleDetail = async (row: WebRequestLogRow) => {
     if (detail[row.ip]) { const n = { ...detail }; delete n[row.ip]; setDetail(n); return }
@@ -197,7 +197,7 @@ function LogsTab({ t }: { t: (k: string) => string }) {
 
   const sortBtn = (key: string, label: string) => (
     <Button type="button" size="sm" variant={sort === key ? "default" : "outline"}
-      onClick={() => { if (sort === key) setOrder(order === "desc" ? "asc" : "desc"); else { setSort(key); setOrder("desc") } }}>
+      onClick={() => { if (sort === key) {setOrder(order === "desc" ? "asc" : "desc");} else { setSort(key); setOrder("desc") } }}>
       {t(label)}{sort === key ? (order === "desc" ? " ↓" : " ↑") : null}
     </Button>
   )
@@ -256,8 +256,8 @@ function BannedTab({ t }: { t: (k: string) => string }) {
   const toggleSelect = (target: string) => {
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(target)) next.delete(target)
-      else next.add(target)
+      if (next.has(target)) {next.delete(target)}
+      else {next.add(target)}
       return next
     })
   }
@@ -270,7 +270,7 @@ function BannedTab({ t }: { t: (k: string) => string }) {
   }
   // B1-3 批量解封：勾选多个 IP 一键解封。
   const doUnbanSelected = async () => {
-    if (selected.size === 0) return
+    if (selected.size === 0) {return}
     try {
       await unbanIPsBatch([...selected])
       toast.success(t("IPs unbanned"))
@@ -278,7 +278,7 @@ function BannedTab({ t }: { t: (k: string) => string }) {
     } catch (e) { handleServerError(e) }
   }
   const doBan = async () => {
-    if (!ip) return
+    if (!ip) {return}
     try { await banIP(ip, Number(minutes) || 1440, reason); toast.success(t("IP banned")); setIp(""); void load() } catch (e) { handleServerError(e) }
   }
 

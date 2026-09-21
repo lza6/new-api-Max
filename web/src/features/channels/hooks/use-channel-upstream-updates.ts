@@ -41,7 +41,7 @@ function getManualIgnoredModelCount(settings: unknown): number {
       parsed = null
     }
   }
-  if (!parsed) return 0
+  if (!parsed) {return 0}
   return normalizeModelList(
     (parsed.upstream_model_update_ignored_models as unknown[]) || []
   ).length
@@ -105,7 +105,7 @@ export function useChannelUpstreamUpdates(refresh: () => Promise<void>) {
       addModels?: string[]
       removeModels?: string[]
     } = {}) => {
-      if (applyRef.current) return
+      if (applyRef.current) {return}
       if (!channel?.id) {
         closeModal()
         return
@@ -157,7 +157,7 @@ export function useChannelUpstreamUpdates(refresh: () => Promise<void>) {
   )
 
   const applyAllUpdates = useCallback(async () => {
-    if (applyAllRef.current) return
+    if (applyAllRef.current) {return}
     applyAllRef.current = true
     setApplyAllLoading(true)
     try {
@@ -194,7 +194,7 @@ export function useChannelUpstreamUpdates(refresh: () => Promise<void>) {
 
   const detectChannelUpdates = useCallback(
     async (ch: { id: number; [key: string]: unknown } | null) => {
-      if (detectRef.current || !ch?.id) return
+      if (detectRef.current || !ch?.id) {return}
       detectRef.current = true
       try {
         const res = await api.post(
@@ -225,7 +225,7 @@ export function useChannelUpstreamUpdates(refresh: () => Promise<void>) {
   )
 
   const detectAllUpdates = useCallback(async () => {
-    if (detectAllRef.current) return
+    if (detectAllRef.current) {return}
     detectAllRef.current = true
     setDetectAllLoading(true)
     try {

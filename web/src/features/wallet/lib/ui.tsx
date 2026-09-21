@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import i18next from 'i18next'
 import { CreditCard, Landmark } from 'lucide-react'
-import { type ReactNode } from 'react'
+import type { ReactNode } from 'react'
 import { SiAlipay, SiWechat, SiStripe } from 'react-icons/si'
 
 import { ReactIconByName } from '@/components/react-icon-by-name'
@@ -35,10 +35,10 @@ import { PAYMENT_TYPES, PAYMENT_ICON_COLORS } from '../constants'
  * or ambiguous in <img src/>.
  */
 function normalizeHttpIconUrl(raw: string | undefined | null): string | null {
-  if (!raw) return null
+  if (!raw) {return null}
   const s = raw.trim()
-  if (!s) return null
-  if (!/^https:\/\//i.test(s)) return null
+  if (!s) {return null}
+  if (!/^https:\/\//i.test(s)) {return null}
 
   let url: URL
   try {

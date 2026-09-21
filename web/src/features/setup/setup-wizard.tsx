@@ -126,7 +126,7 @@ export function SetupWizard() {
   })
 
   useEffect(() => {
-    if (!statusResponse) return
+    if (!statusResponse) {return}
 
     if (!statusResponse.success) {
       handleServerError(statusResponse, t('Failed to load setup status'))
@@ -134,7 +134,7 @@ export function SetupWizard() {
     }
 
     const status = statusResponse.data
-    if (!status) return
+    if (!status) {return}
 
     if (status.status) {
       navigate({ to: '/' })
@@ -168,7 +168,7 @@ export function SetupWizard() {
   }, [statusResponse, navigate, form])
 
   useEffect(() => {
-    if (!setupStatus) return
+    if (!setupStatus) {return}
 
     // Reset admin fields when backend reports they are already initialized
     if (setupStatus.root_init) {
@@ -209,7 +209,7 @@ export function SetupWizard() {
   }, [currentStep, setupStatus, form, watchedValues])
 
   const validateAdminStep = () => {
-    if (setupStatus?.root_init) return true
+    if (setupStatus?.root_init) {return true}
 
     const username = form.getValues('username')?.trim()
     const password = form.getValues('password')
@@ -259,8 +259,8 @@ export function SetupWizard() {
   }
 
   const handleNextStep = () => {
-    if (currentStep === 1 && !validateAdminStep()) return
-    if (currentStep === 2 && !validateUsageModeStep()) return
+    if (currentStep === 1 && !validateAdminStep()) {return}
+    if (currentStep === 2 && !validateUsageModeStep()) {return}
 
     setCurrentStep((step) => Math.min(step + 1, STEPS.length - 1))
   }
@@ -272,7 +272,7 @@ export function SetupWizard() {
   const handleSubmit = async () => {
     const adminValid = validateAdminStep()
     const usageValid = validateUsageModeStep()
-    if (!adminValid || !usageValid) return
+    if (!adminValid || !usageValid) {return}
 
     const payload = buildSetupPayload(
       form.getValues(),

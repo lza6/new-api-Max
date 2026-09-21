@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Code, Plus, Table, Trash2 } from 'lucide-react'
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { JsonCodeEditor } from '@/components/json-code-editor'
@@ -48,7 +48,7 @@ function getDuplicateSources(rows: MappingRow[]): string[] {
 
   for (const row of rows) {
     const source = row.from.trim()
-    if (!source) continue
+    if (!source) {continue}
     if (seen.has(source)) {
       duplicates.add(source)
     } else {
@@ -56,7 +56,7 @@ function getDuplicateSources(rows: MappingRow[]): string[] {
     }
   }
 
-  return Array.from(duplicates)
+  return [...duplicates]
 }
 
 export function ModelMappingEditor(props: ModelMappingEditorProps) {
@@ -75,7 +75,7 @@ export function ModelMappingEditor(props: ModelMappingEditorProps) {
     return `mapping-${nextRowIdRef.current}`
   }
 
-  const parseJsonToRows = (json: string): boolean => {
+  const parseJsonToRows = useCallback((json: string): boolean => {
     try {
       if (!json.trim()) {
         setRows([])
@@ -120,18 +120,18 @@ export function ModelMappingEditor(props: ModelMappingEditorProps) {
       })
       setJsonError(null)
       return true
-    } catch (_error) {
+    } catch {
       setJsonError(t('Model mapping must be valid JSON format'))
       return false
     }
-  }
+  }, [t])
 
   // Parse JSON to rows when value changes externally
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setJsonValue(props.value)
     parseJsonToRows(props.value)
-  }, [props.value])
+  }, [props.value, parseJsonToRows])
 
   const convertRowsToJson = (updatedRows: MappingRow[]): string => {
     if (updatedRows.length === 0) {
@@ -204,7 +204,7 @@ export function ModelMappingEditor(props: ModelMappingEditorProps) {
   }
 
   const handleModeChange = (nextMode: string) => {
-    if (nextMode !== 'visual' && nextMode !== 'json') return
+    if (nextMode !== 'visual' && nextMode !== 'json') {return}
     if (nextMode === 'json') {
       const duplicates = getDuplicateSources(rows)
       if (duplicates.length === 0) {

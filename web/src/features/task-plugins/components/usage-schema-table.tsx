@@ -37,8 +37,8 @@ type UsageSchemaTableProps = {
 function getUsageTypeLabelKey(
   type: BillingUsageSchema[string]['type']
 ): string {
-  if (type === 'number') return 'Number'
-  if (type === 'boolean') return 'Boolean'
+  if (type === 'number') {return 'Number'}
+  if (type === 'boolean') {return 'Boolean'}
   return 'Enum'
 }
 
@@ -46,10 +46,10 @@ function formatUsageUnit(
   unit: BillingUsageSchema[string]['unit'],
   t: (key: string) => string
 ): string {
-  if (unit === 'second') return t('Second')
-  if (unit === 'count') return t('Count')
-  if (unit === 'token') return t('token (unit)')
-  if (unit === 'credit') return t('credit')
+  if (unit === 'second') {return t('Second')}
+  if (unit === 'count') {return t('Count')}
+  if (unit === 'token') {return t('token (unit)')}
+  if (unit === 'credit') {return t('credit')}
   return '—'
 }
 

@@ -59,8 +59,8 @@ export type VisualConfig = {
 export function getTierCacheMode(
   tier: Partial<VisualTier> | null | undefined
 ): CacheMode {
-  if (tier?.cache_mode === CACHE_MODE_TIMED) return CACHE_MODE_TIMED
-  if (tier?.cache_mode === CACHE_MODE_GENERIC) return CACHE_MODE_GENERIC
+  if (tier?.cache_mode === CACHE_MODE_TIMED) {return CACHE_MODE_TIMED}
+  if (tier?.cache_mode === CACHE_MODE_GENERIC) {return CACHE_MODE_GENERIC}
   return Number(tier?.cache_create_1h_unit_cost) > 0
     ? CACHE_MODE_TIMED
     : CACHE_MODE_GENERIC
@@ -113,7 +113,7 @@ export function normalizeVisualConfig(
 }
 
 function buildConditionStr(conditions: TierConditionInput[]): string {
-  if (!conditions || conditions.length === 0) return ''
+  if (!conditions || conditions.length === 0) {return ''}
   return conditions
     .filter((c) => c.var && c.op && c.value != null && c.value !== '')
     .map((c) => `${c.var} ${c.op} ${c.value}`)
@@ -121,7 +121,7 @@ function buildConditionStr(conditions: TierConditionInput[]): string {
 }
 
 function buildTierBodyExpr(tier: VisualTier): string {
-  if (tier.billing_unit === 'request') return `fixed(${tier.fixed_price ?? ''})`
+  if (tier.billing_unit === 'request') {return `fixed(${tier.fixed_price ?? ''})`}
   const parts: string[] = []
   const ic = Number(tier.input_unit_cost) || 0
   const oc = Number(tier.output_unit_cost) || 0
@@ -129,7 +129,7 @@ function buildTierBodyExpr(tier: VisualTier): string {
   parts.push(`c * ${oc}`)
   for (const cv of BILLING_CACHE_VAR_MAP) {
     const v = Number((tier as Record<string, unknown>)[cv.field]) || 0
-    if (v !== 0) parts.push(`${cv.exprVar} * ${v}`)
+    if (v !== 0) {parts.push(`${cv.exprVar} * ${v}`)}
   }
   return parts.join(' + ')
 }
@@ -172,11 +172,11 @@ export function generateExprFromVisualConfig(
 export function tryParseVisualConfig(
   exprStr: string | null | undefined
 ): VisualConfig | null {
-  if (!exprStr) return null
+  if (!exprStr) {return null}
   try {
     let body = exprStr
     const versionMatch = body.match(/^v\d+:([\s\S]*)$/)
-    if (versionMatch) body = versionMatch[1]
+    if (versionMatch) {body = versionMatch[1]}
     const cacheVarNames = BILLING_CACHE_VAR_MAP.map((cv) => cv.exprVar)
     const optCacheStr = cacheVarNames
       .map((v) => `(?:\\s*\\+\\s*${v}\\s*\\*\\s*([\\d.eE+-]+))?`)
@@ -195,7 +195,7 @@ export function tryParseVisualConfig(
       }
       BILLING_CACHE_VAR_MAP.forEach((cv, i) => {
         const val = simple[4 + i]
-        if (val != null) tier[cv.field] = Number(val)
+        if (val != null) {tier[cv.field] = Number(val)}
       })
       return normalizeVisualConfig({
         tiers: [normalizeVisualTier(tier as Partial<VisualTier>)],
@@ -235,11 +235,11 @@ export function tryParseVisualConfig(
       const m = match
       BILLING_CACHE_VAR_MAP.forEach((cv, i) => {
         const val = m[5 + i]
-        if (val != null) tier[cv.field] = Number(val)
+        if (val != null) {tier[cv.field] = Number(val)}
       })
       tiers.push(normalizeVisualTier(tier as Partial<VisualTier>))
     }
-    if (tiers.length === 0) return null
+    if (tiers.length === 0) {return null}
 
     const cfg = normalizeVisualConfig({ tiers })
     const regenerated = generateExprFromVisualConfig(cfg)
@@ -285,7 +285,7 @@ export function evalExprLocally(
   extraTokenValues: ExtraTokenValues,
   context?: BillingSimulationContext
 ): EvalResult {
-  if (!exprStr.trim()) return { cost: 0, matchedTier: '', error: null }
+  if (!exprStr.trim()) {return { cost: 0, matchedTier: '', error: null }}
   const result = evaluateBillingExpression(exprStr, {
     ...context,
     tokens: {
@@ -329,9 +329,9 @@ export function buildEstimatorTokens(
 }
 
 export function exprUsesExtraVars(exprStr: string): boolean {
-  if (!exprStr) return false
+  if (!exprStr) {return false}
   const compiled = compileBillingExpression(exprStr)
-  if (compiled.status !== 'ready') return false
+  if (compiled.status !== 'ready') {return false}
   return ESTIMATOR_VARS.some((field) => compiled.variables.has(field.var))
 }
 

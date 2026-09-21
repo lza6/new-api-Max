@@ -47,7 +47,7 @@ export function CacheTooltip({
   label: string
   color: string
 }) {
-  if (tokens <= 0) return null
+  if (tokens <= 0) {return null}
 
   return (
     <TooltipProvider>

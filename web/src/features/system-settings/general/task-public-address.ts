@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 export function isValidTaskPublicAddress(value: string): boolean {
-  if (value === '') return true
+  if (value === '') {return true}
   if (
     value !== value.trim() ||
     !/^https?:\/\//i.test(value) ||

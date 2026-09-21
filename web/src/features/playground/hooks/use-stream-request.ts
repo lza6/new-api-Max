@@ -85,7 +85,7 @@ export function createStreamRequestController(
     try {
       headers = await runtime.getHeaders()
     } catch (error: unknown) {
-      if (generation !== requestGeneration) return
+      if (generation !== requestGeneration) {return}
       callbacks.onError(
         error instanceof Error
           ? error.message
@@ -93,7 +93,7 @@ export function createStreamRequestController(
       )
       return
     }
-    if (generation !== requestGeneration) return
+    if (generation !== requestGeneration) {return}
 
     const nextSource = runtime.createSource(payload, headers)
     source = nextSource
@@ -104,14 +104,14 @@ export function createStreamRequestController(
       generation === requestGeneration && source === nextSource
 
     const handleError = (errorMessage: string, errorCode?: string) => {
-      if (!isCurrent() || completed) return
+      if (!isCurrent() || completed) {return}
       completed = true
       callbacks.onError(errorMessage, errorCode)
       closeActiveSource(nextSource)
     }
 
     nextSource.addEventListener('message', (event) => {
-      if (!isCurrent() || completed) return
+      if (!isCurrent() || completed) {return}
       const data = event.data ?? ''
       if (isStreamDoneMessage(data)) {
         completed = true
@@ -134,7 +134,7 @@ export function createStreamRequestController(
     })
 
     nextSource.addEventListener('error', (event) => {
-      if (!isCurrent() || completed) return
+      if (!isCurrent() || completed) {return}
       if (!isStreamClosedReadyState(nextSource.readyState)) {
         // eslint-disable-next-line no-console
         console.error('SSE Error:', event)
@@ -144,7 +144,7 @@ export function createStreamRequestController(
     })
 
     nextSource.addEventListener('readystatechange', (event) => {
-      if (!isCurrent() || completed) return
+      if (!isCurrent() || completed) {return}
       const errorMessage = getStreamReadyStateError(
         event.readyState,
         nextSource
@@ -156,10 +156,10 @@ export function createStreamRequestController(
     })
 
     try {
-      if (!isCurrent()) return
+      if (!isCurrent()) {return}
       nextSource.stream()
     } catch (error: unknown) {
-      if (!isCurrent() || completed) return
+      if (!isCurrent() || completed) {return}
       // eslint-disable-next-line no-console
       console.error('Failed to start SSE stream:', error)
       handleError(ERROR_MESSAGES.STREAM_START_ERROR)
@@ -171,7 +171,7 @@ export function createStreamRequestController(
     const activeSource = source
     source = null
     activeSource?.close()
-    if (notify) runtime.setStreaming(false)
+    if (notify) {runtime.setStreaming(false)}
   }
 
   const stop = () => cancel(true)

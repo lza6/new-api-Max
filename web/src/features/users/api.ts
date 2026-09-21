@@ -75,12 +75,12 @@ export async function searchUsers(
   const queryParams = new URLSearchParams()
   queryParams.set('keyword', keyword)
   queryParams.set('group', group)
-  if (role) queryParams.set('role', role)
-  if (status) queryParams.set('status', status)
+  if (role) {queryParams.set('role', role)}
+  if (status) {queryParams.set('status', status)}
   queryParams.set('p', String(p))
   queryParams.set('page_size', String(page_size))
-  if (sort_by) queryParams.set('sort_by', sort_by)
-  if (sort_order) queryParams.set('sort_order', sort_order)
+  if (sort_by) {queryParams.set('sort_by', sort_by)}
+  if (sort_order) {queryParams.set('sort_order', sort_order)}
   const res = await api.get(`/api/user/search?${queryParams.toString()}`)
   return res.data
 }

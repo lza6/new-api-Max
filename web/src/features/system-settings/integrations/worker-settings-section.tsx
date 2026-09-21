@@ -48,7 +48,7 @@ const createWorkerSchema = (t: (key: string) => string) =>
   z.object({
     WorkerUrl: z.string().refine((value) => {
       const trimmed = value.trim()
-      if (!trimmed) return true
+      if (!trimmed) {return true}
       return /^https?:\/\//.test(trimmed)
     }, t('Provide a valid URL starting with http:// or https://')),
     WorkerValidKey: z.string(),

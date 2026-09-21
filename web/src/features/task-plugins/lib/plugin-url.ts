@@ -35,7 +35,7 @@ export function pluginSourceByteLength(source: string): number {
  */
 export function normalizePluginSourceUrl(input: string): string | null {
   const trimmed = input.trim()
-  if (!trimmed) return null
+  if (!trimmed) {return null}
 
   let parsed: URL
   try {
@@ -43,7 +43,7 @@ export function normalizePluginSourceUrl(input: string): string | null {
   } catch {
     return null
   }
-  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {return null}
 
   // Line anchors (#L12-L20) are page-only and break raw requests.
   parsed.hash = ''
@@ -128,7 +128,7 @@ export async function fetchPluginSourceText(
 export async function computeSourceSha256(
   source: string
 ): Promise<string | null> {
-  if (!globalThis.crypto?.subtle) return null
+  if (!globalThis.crypto?.subtle) {return null}
   const digest = await globalThis.crypto.subtle.digest(
     'SHA-256',
     new TextEncoder().encode(source)

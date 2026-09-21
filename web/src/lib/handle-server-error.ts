@@ -29,7 +29,7 @@ const reportedErrors = new WeakSet<object>()
 
 /** Also used when a failure has already been presented inline. */
 export function markServerErrorHandled(error: unknown): void {
-  for (const source of getServerErrorSources(error)) reportedErrors.add(source)
+  for (const source of getServerErrorSources(error)) {reportedErrors.add(source)}
 }
 
 export function handleServerError(
@@ -37,11 +37,11 @@ export function handleServerError(
   fallbackMessage?: string,
   presentation?: { title: string; description?: string }
 ): void {
-  if (isServerErrorCancelled(error)) return
+  if (isServerErrorCancelled(error)) {return}
   const sources = getServerErrorSources(error)
   const reported = sources.some((source) => reportedErrors.has(source))
   markServerErrorHandled(error)
-  if (reported) return
+  if (reported) {return}
   if (presentation?.description) {
     const message =
       presentation.title || getServerErrorMessage(error, fallbackMessage)

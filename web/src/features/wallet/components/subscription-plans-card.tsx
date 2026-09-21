@@ -205,7 +205,7 @@ export function SubscriptionPlansCard({
     const map = new Map<number, number>()
     for (const sub of allSubscriptions) {
       const planId = sub?.subscription?.plan_id
-      if (!planId) continue
+      if (!planId) {continue}
       map.set(planId, (map.get(planId) || 0) + 1)
     }
     return map
@@ -227,7 +227,7 @@ export function SubscriptionPlansCard({
 
   const getRemainingDays = (sub: UserSubscriptionRecord) => {
     const endTime = sub?.subscription?.end_time || 0
-    if (!endTime) return 0
+    if (!endTime) {return 0}
     const now = Date.now() / 1000
     return Math.max(0, Math.ceil((endTime - now) / 86400))
   }
@@ -235,7 +235,7 @@ export function SubscriptionPlansCard({
   const getUsagePercent = (sub: UserSubscriptionRecord) => {
     const total = Number(sub?.subscription?.amount_total || 0)
     const used = Number(sub?.subscription?.amount_used || 0)
-    if (total <= 0) return 0
+    if (total <= 0) {return 0}
     return Math.round((used / total) * 100)
   }
 
@@ -530,7 +530,7 @@ export function SubscriptionPlansCard({
           <div className='grid grid-cols-1 gap-3 2xl:grid-cols-2 2xl:gap-4'>
             {plans.map((p, index) => {
               const plan = p?.plan
-              if (!plan) return null
+              if (!plan) {return null}
               const totalAmount = Number(plan.total_amount || 0)
               const price = Number(plan.price_amount || 0).toFixed(2)
               const isPopular = index === 0 && plans.length > 1

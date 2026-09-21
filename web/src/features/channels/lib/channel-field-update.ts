@@ -37,14 +37,14 @@ export function createChannelFieldUpdateScheduler(
   let pendingValue: number | undefined
 
   const clearPendingTimer = () => {
-    if (timeoutId === undefined) return
+    if (timeoutId === undefined) {return}
     timers.clearTimeout(timeoutId)
     timeoutId = undefined
   }
 
   const commitPendingValue = () => {
     clearPendingTimer()
-    if (pendingValue === undefined) return
+    if (pendingValue === undefined) {return}
 
     const value = pendingValue
     pendingValue = undefined

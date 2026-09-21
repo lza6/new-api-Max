@@ -170,7 +170,7 @@ export function useTableUrlState(
     const next = typeof updater === 'function' ? updater(pagination) : updater
     const nextPage = next.pageIndex + 1
     const nextPageSize = next.pageSize
-    if (nextPageSize !== pagination.pageSize) setStoredPageSize(nextPageSize)
+    if (nextPageSize !== pagination.pageSize) {setStoredPageSize(nextPageSize)}
     navigate({
       search: (prev) => ({
         ...(prev as SearchRecord),
@@ -181,7 +181,7 @@ export function useTableUrlState(
   }
 
   const [globalFilter, setGlobalFilter] = useState<string | undefined>(() => {
-    if (!globalFilterEnabled) return undefined
+    if (!globalFilterEnabled) {return undefined}
     const raw = (search as SearchRecord)[globalFilterKey]
     return typeof raw === 'string' ? raw : ''
   })
@@ -222,7 +222,7 @@ export function useTableUrlState(
           value.trim() !== '' ? serialize(value) : undefined
       } else {
         const value = Array.isArray(found?.value)
-          ? (found!.value as unknown[])
+          ? (found.value as unknown[])
           : []
         patch[cfg.searchKey] = value.length > 0 ? serialize(value) : undefined
       }

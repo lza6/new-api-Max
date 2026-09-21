@@ -54,8 +54,8 @@ function getFirstFormErrorTarget(
   invalidControl: HTMLElement | null,
   errorMessage: HTMLElement | null
 ): HTMLElement | null {
-  if (!invalidControl) return errorMessage
-  if (!errorMessage) return invalidControl
+  if (!invalidControl) {return errorMessage}
+  if (!errorMessage) {return invalidControl}
 
   const position = invalidControl.compareDocumentPosition(errorMessage)
   return position & Node.DOCUMENT_POSITION_PRECEDING
@@ -70,8 +70,8 @@ function FormValidationFocus() {
   const handledSubmitCountRef = React.useRef(0)
 
   React.useEffect(() => {
-    if (!formContext || submitCount === 0 || !hasFormErrors(errors)) return
-    if (handledSubmitCountRef.current === submitCount) return
+    if (!formContext || submitCount === 0 || !hasFormErrors(errors)) {return}
+    if (handledSubmitCountRef.current === submitCount) {return}
 
     handledSubmitCountRef.current = submitCount
 
@@ -83,7 +83,7 @@ function FormValidationFocus() {
         getFormScopedSelector(formContext.id, '[data-slot="form-message"]')
       )
       const target = getFirstFormErrorTarget(invalidControl, errorMessage)
-      if (!target) return
+      if (!target) {return}
 
       const formItem = target.closest<HTMLElement>(
         getFormScopedSelector(formContext.id, '[data-slot="form-item"]')

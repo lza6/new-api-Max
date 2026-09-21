@@ -42,7 +42,7 @@ export function ApiKeysDeleteDialog() {
   const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDelete = async () => {
-    if (!currentRow) return
+    if (!currentRow) {return}
 
     setIsDeleting(true)
     try {

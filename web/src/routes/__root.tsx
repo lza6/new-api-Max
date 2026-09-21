@@ -76,7 +76,7 @@ function RootComponent() {
         const currentSID = useAuthStore.getState().auth.session?.sid
 
         if (event.kind === 'authenticated') {
-          if (event.sid === currentSID) return
+          if (event.sid === currentSID) {return}
           if (currentSID) {
             clearAuthentication(false)
           }

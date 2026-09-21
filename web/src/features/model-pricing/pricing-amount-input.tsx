@@ -87,8 +87,8 @@ export function PricingAmountInput({
         {...props}
         ref={(element) => {
           element?.setCustomValidity(error)
-          if (typeof props.ref === 'function') return props.ref(element)
-          if (props.ref) props.ref.current = element
+          if (typeof props.ref === 'function') {return props.ref(element)}
+          if (props.ref) {props.ref.current = element}
         }}
         data-pricing-amount=''
         type='text'
@@ -102,7 +102,7 @@ export function PricingAmountInput({
         }
         onChange={(event) => {
           const next = event.target.value
-          if (!/^(\d+(\.\d*)?|\.\d*)?$/.test(next)) return
+          if (!/^(\d+(\.\d*)?|\.\d*)?$/.test(next)) {return}
           const nextAmount = next === '.' || next === '' ? 0 : Number(next)
           const nextUSD = nextAmount / currency.exchangeRate
           if (!Number.isFinite(nextUSD) || !Number.isFinite(nextAmount)) {
@@ -118,7 +118,7 @@ export function PricingAmountInput({
             source: nextSource,
             rate: currency.exchangeRate,
           })
-          if (nextSource !== source) onChange(canonical)
+          if (nextSource !== source) {onChange(canonical)}
         }}
         onFocus={(event) => {
           props.onFocus?.(event)

@@ -126,7 +126,7 @@ export function buildOAuthAuthorizationUrl(
         )
         url.searchParams.set('response_type', 'code')
         url.searchParams.set('state', state)
-        if (custom.scopes) url.searchParams.set('scope', custom.scopes)
+        if (custom.scopes) {url.searchParams.set('scope', custom.scopes)}
         return url.toString()
       }
     }

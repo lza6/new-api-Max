@@ -56,11 +56,11 @@ export function UptimePanel() {
 
     void getUptimeStatus()
       .then((res) => {
-        if (abortController.signal.aborted) return
+        if (abortController.signal.aborted) {return}
         setGroups(res?.data || [])
       })
       .catch(() => {
-        if (abortController.signal.aborted) return
+        if (abortController.signal.aborted) {return}
         setGroups([])
       })
       .finally(() => {
@@ -80,11 +80,11 @@ export function UptimePanel() {
 
     void getUptimeStatus()
       .then((res) => {
-        if (abortController.signal.aborted) return
+        if (abortController.signal.aborted) {return}
         setGroups(res?.data || [])
       })
       .catch(() => {
-        if (abortController.signal.aborted) return
+        if (abortController.signal.aborted) {return}
         setGroups([])
       })
       .finally(() => {

@@ -179,10 +179,10 @@ export function toRateLimitJson(
   concurrency?: number
 ): string {
   const cfg: Record<string, number> = {}
-  if (rpm && rpm > 0) cfg.rpm = rpm
-  if (qbs && qbs > 0) cfg.qbs = qbs
-  if (concurrency && concurrency > 0) cfg.concurrency = concurrency
-  if (Object.keys(cfg).length === 0) return ''
+  if (rpm && rpm > 0) {cfg.rpm = rpm}
+  if (qbs && qbs > 0) {cfg.qbs = qbs}
+  if (concurrency && concurrency > 0) {cfg.concurrency = concurrency}
+  if (Object.keys(cfg).length === 0) {return ''}
   return JSON.stringify(cfg)
 }
 
@@ -231,7 +231,7 @@ export function parseRateLimitForm(rateLimit?: string | null): {
   rate_qbs?: number
   rate_concurrency?: number
 } {
-  if (!rateLimit) return {}
+  if (!rateLimit) {return {}}
   try {
     const cfg = JSON.parse(rateLimit) as {
       rpm?: number

@@ -46,7 +46,7 @@ export function CopyChannelDialog({
   const [resetBalance, setResetBalance] = useState(true)
   const [isCopying, setIsCopying] = useState(false)
 
-  if (!currentRow) return null
+  if (!currentRow) {return null}
 
   const handleCopy = async () => {
     setIsCopying(true)

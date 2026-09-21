@@ -95,7 +95,7 @@ function readVisualCondition(node: ExpressionNode): VisualCondition | null {
   }
   if (node.kind === 'binary' && ['&&', '||'].includes(node.operator)) {
     const children = flattenBinary(node, node.operator).map(readVisualCondition)
-    if (children.some((child) => child === null)) return null
+    if (children.some((child) => child === null)) {return null}
     return {
       ...identity,
       kind: node.operator === '&&' ? 'all' : 'any',
@@ -125,7 +125,7 @@ function readVisualCondition(node: ExpressionNode): VisualCondition | null {
   ) {
     probe = node.left.name as TimeFunction
     timezone = node.left.args[0].value
-  } else return null
+  } else {return null}
   return {
     ...identity,
     kind: 'comparison',
@@ -183,7 +183,7 @@ function readVisualPricing(node: ExpressionNode): VisualPricingNode | null {
       return null
     }
     const variable = term.left.name
-    if (prices.some((price) => price.variable === variable)) return null
+    if (prices.some((price) => price.variable === variable)) {return null}
     prices.push({
       variable: term.left.name,
       value: String(term.right.value),
@@ -204,9 +204,9 @@ export function parseVisualBillingDocument(
   source: string
 ): VisualBillingDocument | null {
   const compiled = compileBillingExpression(source)
-  if (compiled.status !== 'ready') return null
+  if (compiled.status !== 'ready') {return null}
   const root = readVisualPricing(compiled.ast)
-  if (!root) return null
+  if (!root) {return null}
   const document = { source, root }
   return serializeVisualBillingDocument(document).ok ? document : null
 }
@@ -303,7 +303,7 @@ function writeVisualCondition(
         : null
     if (node.timezone !== originalZone) {
       try {
-        if (!node.timezone.trim()) throw new Error('Empty timezone')
+        if (!node.timezone.trim()) {throw new Error('Empty timezone')}
         new Intl.DateTimeFormat('en', {
           timeZone: node.timezone.trim(),
         }).format(0)
@@ -433,7 +433,7 @@ function writeVisualPricing(
       terms.push(
         patchSource(source, price.origin, [{ node: price.origin.right, text }])
       )
-    } else terms.push(`${price.variable} * ${price.value}`)
+    } else {terms.push(`${price.variable} * ${price.value}`)}
   }
   const origin = node.origin
   if (origin?.kind === 'call' && origin.name === 'tier') {
@@ -465,7 +465,7 @@ export function serializeVisualBillingDocument(
 ): VisualBillingSerialization {
   const issues: VisualBillingIssue[] = []
   const body = writeVisualPricing(document.root, document.source, issues)
-  if (issues.length > 0) return { ok: false, issues }
+  if (issues.length > 0) {return { ok: false, issues }}
   const original = compileBillingExpression(document.source)
   if (original.status !== 'ready') {
     return {

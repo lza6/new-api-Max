@@ -36,7 +36,7 @@ export function parseModelsString(modelsStr: string): string[] {
  * Format models array to string
  */
 export function formatModelsArray(models: string[]): string {
-  return Array.from(new Set(models)).join(',')
+  return [...new Set(models)].join(',')
 }
 
 /**
@@ -51,9 +51,9 @@ export function normalizeModelName(model: string): string {
  * (the keys of the mapping object — models being remapped FROM)
  */
 export function extractMappingSourceModels(modelMapping: string): string[] {
-  if (typeof modelMapping !== 'string') return []
+  if (typeof modelMapping !== 'string') {return []}
   const trimmed = modelMapping.trim()
-  if (!trimmed) return []
+  if (!trimmed) {return []}
 
   try {
     const parsed = JSON.parse(trimmed)
@@ -65,7 +65,7 @@ export function extractMappingSourceModels(modelMapping: string): string[] {
       .map((key) => key.trim())
       .filter(Boolean)
 
-    return Array.from(new Set(keys))
+    return [...new Set(keys)]
   } catch {
     return []
   }
@@ -76,9 +76,9 @@ export function extractMappingSourceModels(modelMapping: string): string[] {
  */
 export function extractRedirectModels(modelMapping: string): string[] {
   const mapping = modelMapping
-  if (typeof mapping !== 'string') return []
+  if (typeof mapping !== 'string') {return []}
   const trimmed = mapping.trim()
-  if (!trimmed) return []
+  if (!trimmed) {return []}
 
   try {
     const parsed = JSON.parse(trimmed)
@@ -90,7 +90,7 @@ export function extractRedirectModels(modelMapping: string): string[] {
       .map((value) => (typeof value === 'string' ? value.trim() : undefined))
       .filter((value): value is string => Boolean(value))
 
-    return Array.from(new Set(values))
+    return [...new Set(values)]
   } catch {
     return []
   }
@@ -157,7 +157,7 @@ export function findMissingModelsInMapping(
     .map((key) => normalizeModelName(key))
     .filter((key) => key && !modelSet.has(key))
 
-  return Array.from(new Set(missingModels))
+  return [...new Set(missingModels)]
 }
 
 /**
@@ -203,7 +203,7 @@ export function findExposedTargetModels(
   currentModels: string[]
 ): string[] {
   const redirectModels = extractRedirectModels(modelMapping)
-  if (redirectModels.length === 0) return []
+  if (redirectModels.length === 0) {return []}
 
   const normalizedModels = currentModels.map((m) => normalizeModelName(m))
   const modelSet = new Set(normalizedModels)
@@ -239,7 +239,7 @@ export function categorizeModelsWithRedirect(
   ])
 
   const redirectOnlySet = new Set(
-    Array.from(normalizedRedirectModels).filter(
+    [...normalizedRedirectModels].filter(
       (m) => !normalizedCurrentModels.has(m)
     )
   )

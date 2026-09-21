@@ -79,7 +79,7 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
   }, [queryClient, setLoading])
 
   useEffect(() => {
-    if (autoLoad) loadConfig()
+    if (autoLoad) {loadConfig()}
   }, [autoLoad, loadConfig])
 
   // Preload logo image when URL changes
@@ -87,7 +87,7 @@ export function useSystemConfig(options: UseSystemConfigOptions = {}) {
     const { logo } = config
 
     // Skip if logo is already loaded
-    if (!logo || logo === loadedLogoUrl) return
+    if (!logo || logo === loadedLogoUrl) {return}
 
     // Preload new logo
     return preloadImage(

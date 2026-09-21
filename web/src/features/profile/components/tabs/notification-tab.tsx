@@ -104,7 +104,7 @@ export function NotificationTab({ profile, onUpdate }: NotificationTabProps) {
           value={[notifyType]}
           onValueChange={(value) => {
             const nextValue = value.find((item) => item !== notifyType)
-            if (nextValue) updateField('notify_type', nextValue as NotifyType)
+            if (nextValue) {updateField('notify_type', nextValue as NotifyType)}
           }}
           aria-label={t('Notification Method')}
           variant='outline'

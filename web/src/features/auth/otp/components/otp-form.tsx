@@ -47,7 +47,7 @@ export function OtpForm() {
   const completed = useRef(false)
 
   useEffect(() => {
-    if (completed.current) return
+    if (completed.current) {return}
     if (!pending) {
       redirectToLogin()
       return
@@ -77,7 +77,7 @@ export function OtpForm() {
         await handleLoginSuccess(bundle, pending.redirectTo)
         toast.success(t('Signed in'))
       } catch (error) {
-        if (!active) return
+        if (!active) {return}
         handleServerError(AuthOperationError.from(error))
         redirectToLogin()
       }

@@ -40,7 +40,7 @@ export function createAppQueryClient(
     defaultOptions: {
       queries: {
         retry: (failureCount, error) => {
-          if (import.meta.env.DEV || failureCount > 3) return false
+          if (import.meta.env.DEV || failureCount > 3) {return false}
           return ![401, 403].includes(getServerErrorStatus(error) ?? 0)
         },
         refetchOnWindowFocus: false,
@@ -57,8 +57,8 @@ export function createAppQueryClient(
     }),
     queryCache: new QueryCache({
       onError: (error, query) => {
-        if (query.meta?.errorToast !== false) handleServerError(error)
-        if (getServerErrorStatus(error) === 500) onInternalServerError?.()
+        if (query.meta?.errorToast !== false) {handleServerError(error)}
+        if (getServerErrorStatus(error) === 500) {onInternalServerError?.()}
       },
     }),
   })

@@ -45,7 +45,7 @@ type EditorRow = {
 
 function parseJsonRows(json: string): EditorRow[] {
   try {
-    if (!json.trim()) return []
+    if (!json.trim()) {return []}
     const parsed = JSON.parse(json)
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
       return []
@@ -163,7 +163,7 @@ export function JsonEditor({
   }
 
   const handleFillTemplate = () => {
-    if (!template) return
+    if (!template) {return}
     const templateJson = JSON.stringify(template, null, 2)
     setJsonValue(templateJson)
     onChange(templateJson)

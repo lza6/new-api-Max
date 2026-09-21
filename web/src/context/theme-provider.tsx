@@ -60,7 +60,7 @@ const initialState: ThemeProviderState = {
 const ThemeContext = createContext<ThemeProviderState>(initialState)
 
 function getSystemTheme(): ResolvedTheme {
-  if (typeof window === 'undefined') return 'light'
+  if (typeof window === 'undefined') {return 'light'}
   return window.matchMedia('(prefers-color-scheme: dark)').matches
     ? 'dark'
     : 'light'
@@ -141,7 +141,7 @@ export function ThemeProvider({
 export const useTheme = () => {
   const context = useContext(ThemeContext)
 
-  if (!context) throw new Error('useTheme must be used within a ThemeProvider')
+  if (!context) {throw new Error('useTheme must be used within a ThemeProvider')}
 
   return context
 }

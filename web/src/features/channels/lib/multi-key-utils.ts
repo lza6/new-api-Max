@@ -40,7 +40,7 @@ export function getMultiKeyStatusConfig(status: number) {
 export function getMultiKeyConfirmMessage(
   action: MultiKeyConfirmAction | null
 ): string {
-  if (!action) return ''
+  if (!action) {return ''}
 
   switch (action.type) {
     case 'delete':
@@ -66,7 +66,7 @@ export function getMultiKeyConfirmMessage(
 export function isDestructiveAction(
   action: MultiKeyConfirmAction | null
 ): boolean {
-  if (!action) return false
+  if (!action) {return false}
   return (
     action.type === 'delete' ||
     action.type === 'delete-disabled' ||

@@ -97,7 +97,7 @@ export function UploadDialog(props: UploadDialogProps) {
   }
 
   const handleIconFile = async (file: File | undefined) => {
-    if (!file) return
+    if (!file) {return}
     try {
       setIcon(await encodePluginIconFile(file))
       setIconFileName(file.name)

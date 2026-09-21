@@ -97,7 +97,7 @@ function parseContentUrl(value: unknown): string {
     }
     return contentUrl
   } catch (error) {
-    if (error instanceof TaskArtifactApiError) throw error
+    if (error instanceof TaskArtifactApiError) {throw error}
     throw new TaskArtifactApiError('invalid_content_url')
   }
 }
@@ -179,21 +179,21 @@ export function resolveTaskPreviewMode(
   log: TaskLog,
   hasProjectedArtifacts = false
 ): TaskPreviewMode {
-  if (log.status !== TASK_STATUS.SUCCESS) return 'none'
-  if (hasProjectedArtifacts) return 'plugin'
-  if (log.admin_info?.task_plugin) return 'plugin'
-  if (log.platform === 'suno') return 'legacy-suno'
-  if (log.legacy_video_available) return 'legacy-video'
+  if (log.status !== TASK_STATUS.SUCCESS) {return 'none'}
+  if (hasProjectedArtifacts) {return 'plugin'}
+  if (log.admin_info?.task_plugin) {return 'plugin'}
+  if (log.platform === 'suno') {return 'legacy-suno'}
+  if (log.legacy_video_available) {return 'legacy-video'}
   return 'plugin'
 }
 
 export function getSafePluginAuthorUrl(
   author?: TaskPluginAuthor
 ): string | undefined {
-  if (!author?.url) return undefined
+  if (!author?.url) {return undefined}
   try {
     const url = new URL(author.url)
-    if (url.protocol !== 'https:' && url.protocol !== 'http:') return undefined
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') {return undefined}
     return url.toString()
   } catch {
     return undefined

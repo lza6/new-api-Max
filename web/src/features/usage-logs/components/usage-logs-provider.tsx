@@ -31,7 +31,7 @@ export function resolveLogsViewAccess(
   role: number,
   viewScope: LogsViewScope
 ): LogsViewAccess {
-  if (viewScope !== 'all' || role < ROLE.ADMIN) return 'self'
+  if (viewScope !== 'all' || role < ROLE.ADMIN) {return 'self'}
   return role === ROLE.SUPER_ADMIN ? 'root' : 'admin'
 }
 

@@ -110,7 +110,7 @@ export function EditTagDialog({ open, onOpenChange }: EditTagDialogProps) {
   }, [open, currentTag, tagModelsData])
 
   const handleAddCustomModel = () => {
-    if (!customModel.trim()) return
+    if (!customModel.trim()) {return}
 
     const modelsToAdd = customModel
       .split(',')
@@ -153,8 +153,8 @@ export function EditTagDialog({ open, onOpenChange }: EditTagDialogProps) {
   }
 
   const handleSubmit = async () => {
-    if (!currentTag) return
-    if (!validateForm()) return
+    if (!currentTag) {return}
+    if (!validateForm()) {return}
 
     // Check if anything changed
     const hasChanges =
@@ -210,7 +210,7 @@ export function EditTagDialog({ open, onOpenChange }: EditTagDialogProps) {
     onOpenChange(false)
   }
 
-  if (!currentTag) return null
+  if (!currentTag) {return null}
 
   return (
     <Dialog

@@ -205,7 +205,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = React.memo(
 
     // Filter models by search query
     const filteredModels = useMemo(() => {
-      if (!searchQuery.trim()) return groupedModels
+      if (!searchQuery.trim()) {return groupedModels}
 
       const query = searchQuery.toLowerCase()
       const filtered: Record<string, ModelOption[]> = {}
@@ -398,7 +398,7 @@ export const GroupSelector: React.FC<GroupSelectorProps> = React.memo(
         )}
         filter={(value, search) => {
           const group = groups.find((g) => g.value === value)
-          if (!group || !search) return 1
+          if (!group || !search) {return 1}
 
           const searchTerm = search.toLowerCase()
           const searchableFields = [

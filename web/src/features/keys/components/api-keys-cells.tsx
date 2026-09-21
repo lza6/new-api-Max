@@ -68,10 +68,10 @@ export function ApiKeyCell({ apiKey }: { apiKey: ApiKey }) {
 
   const handleCopy = useCallback(async () => {
     const realKey = resolvedFullKey || (await resolveRealKey(apiKey.id))
-    if (!realKey) return
+    if (!realKey) {return}
 
     const ok = await copyToClipboard(realKey)
-    if (ok) markKeyCopied(apiKey.id)
+    if (ok) {markKeyCopied(apiKey.id)}
   }, [resolvedFullKey, resolveRealKey, apiKey.id, markKeyCopied])
 
   let copyIcon = <Copy className='size-3.5' />

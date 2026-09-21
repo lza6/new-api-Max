@@ -86,7 +86,7 @@ export function AmountDiscountDialog({
   const discountRate = form.watch('discountRate')
 
   const discountPercentage = useMemo(() => {
-    if (!discountRate || discountRate >= 1) return 0
+    if (!discountRate || discountRate >= 1) {return 0}
     return Math.round((1 - discountRate) * 100)
   }, [discountRate])
 

@@ -101,12 +101,12 @@ function FillColumnPopover(props: FillColumnPopoverProps) {
   const [value, setValue] = useState(props.initialValue)
 
   const handleOpenChange = (nextOpen: boolean) => {
-    if (nextOpen) setValue(props.initialValue)
+    if (nextOpen) {setValue(props.initialValue)}
     setOpen(nextOpen)
   }
 
   const handleSubmit = () => {
-    if (inputRef.current && !inputRef.current.reportValidity()) return
+    if (inputRef.current && !inputRef.current.reportValidity()) {return}
     const nextValue = Number(value)
     props.onFillColumn(
       props.priceKey,
@@ -150,7 +150,7 @@ function FillColumnPopover(props: FillColumnPopoverProps) {
             }}
             onChange={(usd) => setValue(Number(usd))}
             onKeyDown={(event) => {
-              if (event.key !== 'Enter') return
+              if (event.key !== 'Enter') {return}
               event.preventDefault()
               handleSubmit()
             }}
@@ -477,7 +477,7 @@ export function TaskPricingMatrix(props: TaskPricingMatrixProps) {
     rowIndex: number,
     priceKey: string
   ) => {
-    if (event.key !== 'Enter' || rowIndex >= props.rows.length - 1) return
+    if (event.key !== 'Enter' || rowIndex >= props.rows.length - 1) {return}
     event.preventDefault()
     const selector = `input[data-matrix-col="${CSS.escape(priceKey)}"][data-matrix-row="${rowIndex + 1}"]`
     const nextInput =
@@ -490,7 +490,7 @@ export function TaskPricingMatrix(props: TaskPricingMatrixProps) {
     const nextGroupValue = firstEnumField
       ? props.rows[rowIndex + 1]?.combination[firstEnumField[0]]
       : undefined
-    if (!shouldGroup || !nextGroupValue) return
+    if (!shouldGroup || !nextGroupValue) {return}
     setOpenGroups((current) =>
       current.includes(nextGroupValue) ? current : [...current, nextGroupValue]
     )
@@ -499,7 +499,7 @@ export function TaskPricingMatrix(props: TaskPricingMatrixProps) {
     })
   }
 
-  if (!firstRow) return null
+  if (!firstRow) {return null}
 
   return (
     <TooltipProvider>

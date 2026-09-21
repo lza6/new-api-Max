@@ -45,14 +45,14 @@ function ChatRouteComponent() {
   const { chatPresets, serverAddress } = useChatPresets()
   const preset = useMemo(() => {
     const index = Number(chatId)
-    if (!Number.isInteger(index)) return undefined
+    if (!Number.isInteger(index)) {return undefined}
     return chatPresets[index]
   }, [chatId, chatPresets])
 
   const isWebLink = preset?.type === 'web'
 
   const requiresActiveKey = useMemo(() => {
-    if (!preset || !isWebLink) return false
+    if (!preset || !isWebLink) {return false}
     return chatLinkRequiresApiKey(preset.url ?? '')
   }, [isWebLink, preset])
 
@@ -64,8 +64,8 @@ function ChatRouteComponent() {
   } = useActiveChatKey(Boolean(preset && requiresActiveKey))
 
   const iframeSrc = useMemo(() => {
-    if (!preset || !isWebLink) return ''
-    if (requiresActiveKey && !activeKey) return ''
+    if (!preset || !isWebLink) {return ''}
+    if (requiresActiveKey && !activeKey) {return ''}
     return resolveChatUrl({
       template: preset.url,
       apiKey: requiresActiveKey ? activeKey : undefined,

@@ -66,7 +66,7 @@ function readEnvRevision(): string | undefined {
       import.meta as unknown as { env?: Record<string, string | undefined> }
     ).env
     const raw = env?.VITE_REACT_APP_VERSION
-    if (typeof raw === 'string' && raw.length > 0) return raw
+    if (typeof raw === 'string' && raw.length > 0) {return raw}
   } catch {
     // import.meta may be unavailable in some test environments.
   }
@@ -86,8 +86,8 @@ let installed = false
  * second invocation is a no-op.
  */
 export function installBuildMetadata(): void {
-  if (installed) return
-  if (typeof window === 'undefined' || typeof document === 'undefined') return
+  if (installed) {return}
+  if (typeof window === 'undefined' || typeof document === 'undefined') {return}
   installed = true
 
   const rev = computeBuildRevision()

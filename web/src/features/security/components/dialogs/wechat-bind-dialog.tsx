@@ -92,7 +92,7 @@ export function WeChatBindDialog(props: WeChatBindDialogProps) {
       )
       return bindWeChat(values.code, proof, signal)
     })
-    if (!result) return
+    if (!result) {return}
     toast.success(t('Binding successful!'))
     handleOpenChange(false)
     props.onSuccess()

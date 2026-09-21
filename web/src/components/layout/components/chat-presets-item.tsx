@@ -97,7 +97,7 @@ function ChatMenuItem({
     <SidebarMenuSubItem>
       <SidebarMenuSubButton
         onClick={() => {
-          if (!loading) void onOpen(preset)
+          if (!loading) {void onOpen(preset)}
         }}
         aria-disabled={loading ? 'true' : undefined}
         isActive={false}
@@ -142,7 +142,7 @@ function DropdownPresetItem({
     <DropdownMenuItem
       disabled={loading}
       onClick={() => {
-        if (!loading) void onOpen(preset)
+        if (!loading) {void onOpen(preset)}
       }}
     >
       {preset.name}
@@ -173,7 +173,7 @@ export function ChatPresetsItem({ item }: { item: NavChatPresets }) {
 
   const handleOpenExternal = useCallback(
     async (preset: ChatPreset) => {
-      if (preset.type === 'web') return
+      if (preset.type === 'web') {return}
 
       const needsKey = chatLinkRequiresApiKey(preset.url)
       let activeKey: string | undefined
@@ -214,7 +214,7 @@ export function ChatPresetsItem({ item }: { item: NavChatPresets }) {
         return
       }
 
-      if (typeof window === 'undefined') return
+      if (typeof window === 'undefined') {return}
 
       window.open(url, '_blank', 'noopener')
       setOpenMobile(false)

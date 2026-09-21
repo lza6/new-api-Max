@@ -53,7 +53,7 @@ function Chat2LinkPage() {
       return
     }
 
-    if (activeKey === undefined && !keyError) return
+    if (activeKey === undefined && !keyError) {return}
 
     if (keyError || !activeKey) {
       const message =

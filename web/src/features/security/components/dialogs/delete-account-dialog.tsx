@@ -48,7 +48,7 @@ export function DeleteAccountDialog(props: DeleteAccountDialogProps) {
 
   useEffect(() => {
     setConfirmation('')
-    if (!props.open) cancel()
+    if (!props.open) {cancel()}
   }, [props.open, props.username, security.sessionKey, cancel])
 
   const handleOpenChange = (open: boolean) => {
@@ -60,7 +60,7 @@ export function DeleteAccountDialog(props: DeleteAccountDialogProps) {
   }
 
   const handleDelete = async () => {
-    if (confirmation !== props.username) return
+    if (confirmation !== props.username) {return}
     const result = await security.run(async (signal) => {
       const proof = await security.verify(
         { scope: 'account.delete', title: t('Delete Account') },
@@ -68,7 +68,7 @@ export function DeleteAccountDialog(props: DeleteAccountDialogProps) {
       )
       return deleteUserAccount(proof, signal)
     })
-    if (!result) return
+    if (!result) {return}
     toast.success(t('Account deleted successfully'))
     props.onOpenChange(false)
     clearAuthentication()

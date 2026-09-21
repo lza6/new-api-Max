@@ -77,13 +77,13 @@ export const comboQueryKeys = {
 
 /** Parse a combo's `models` JSON into candidate rows (safe on malformed JSON). */
 export function parseComboModels(models: string): ComboModelItem[] {
-  if (!models?.trim()) return []
+  if (!models?.trim()) {return []}
   try {
     const parsed: unknown = JSON.parse(models)
-    if (!Array.isArray(parsed)) return []
+    if (!Array.isArray(parsed)) {return []}
     const items: ComboModelItem[] = []
     for (const item of parsed) {
-      if (!item || typeof item !== 'object') continue
+      if (!item || typeof item !== 'object') {continue}
       const candidate = item as Partial<ComboModelItem>
       const channelId = Number(candidate.channel_id)
       const model = typeof candidate.model === 'string' ? candidate.model : ''

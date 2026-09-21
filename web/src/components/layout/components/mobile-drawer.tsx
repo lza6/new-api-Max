@@ -84,7 +84,7 @@ function MobileUserProfile({ user, onNavigate }: MobileUserProfileProps) {
   const { displayName, initials, roleLabel } = useUserDisplay(user)
   const isSecurityVisible = useIsSidebarModuleVisible('/security')
 
-  if (!user) return null
+  if (!user) {return null}
 
   return (
     <>

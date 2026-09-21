@@ -68,7 +68,7 @@ export const isBasePricingUnset = (snapshot?: ModelPricingSnapshot) =>
     !hasPricingValue(snapshot.ratio))
 
 const toNumberOrNull = (value?: string) => {
-  if (!hasPricingValue(value)) return null
+  if (!hasPricingValue(value)) {return null}
   const num = Number(value)
   return Number.isFinite(num) ? num : null
 }
@@ -76,21 +76,21 @@ const toNumberOrNull = (value?: string) => {
 const ratioToPrice = (ratio?: string, denominator?: string) => {
   const ratioNumber = toNumberOrNull(ratio)
   const denominatorNumber = denominator ? toNumberOrNull(denominator) : 2
-  if (ratioNumber === null || denominatorNumber === null) return ''
+  if (ratioNumber === null || denominatorNumber === null) {return ''}
   return formatPricingNumber(ratioNumber * denominatorNumber)
 }
 
 export const getModeLabel = (mode?: string) => {
-  if (mode === 'per-request') return 'Per-request'
-  if (mode === 'tiered_expr') return 'Expression'
+  if (mode === 'per-request') {return 'Per-request'}
+  if (mode === 'tiered_expr') {return 'Expression'}
   return 'Per-token'
 }
 
 export const getModeVariant = (
   mode?: string
 ): 'warning' | 'info' | 'success' => {
-  if (mode === 'per-request') return 'warning'
-  if (mode === 'tiered_expr') return 'info'
+  if (mode === 'per-request') {return 'warning'}
+  if (mode === 'tiered_expr') {return 'info'}
   return 'success'
 }
 
@@ -117,7 +117,7 @@ export const getPriceSummary = (
   }
 
   const inputPrice = ratioToPrice(row.ratio)
-  if (!inputPrice) return t('Unset price')
+  if (!inputPrice) {return t('Unset price')}
 
   return `${t('Input')} $${inputPrice}`
 }
@@ -136,7 +136,7 @@ export const getPriceDetail = (
   }
 
   const inputPrice = ratioToPrice(row.ratio)
-  if (!inputPrice) return t('No base input price')
+  if (!inputPrice) {return t('No base input price')}
 
   const details = [
     row.completionRatio &&
@@ -275,7 +275,7 @@ export const buildModelSnapshots = ({
 }
 
 export const getSnapshotSignature = (snapshot?: ModelPricingSnapshot) => {
-  if (!snapshot) return ''
+  if (!snapshot) {return ''}
   return JSON.stringify({
     price: snapshot.price || '',
     ratio: snapshot.ratio || '',

@@ -33,7 +33,7 @@ export function formatNumber(
   value: number | null | undefined,
   locales?: Intl.LocalesArgument
 ): string {
-  if (value == null || Number.isNaN(value as number)) return '-'
+  if (value == null || Number.isNaN(value as number)) {return '-'}
   return Intl.NumberFormat(locales, { maximumFractionDigits: 2 }).format(
     value as number
   )
@@ -43,7 +43,7 @@ export function formatCompactNumber(
   value: number | null | undefined,
   locales?: Intl.LocalesArgument
 ): string {
-  if (value == null || Number.isNaN(value as number)) return '-'
+  if (value == null || Number.isNaN(value as number)) {return '-'}
   return Intl.NumberFormat(locales, {
     notation: 'compact',
     maximumFractionDigits: 1,
@@ -51,7 +51,7 @@ export function formatCompactNumber(
 }
 
 export function formatPercent(value: number | null | undefined): string {
-  if (value == null || Number.isNaN(value as number)) return '-'
+  if (value == null || Number.isNaN(value as number)) {return '-'}
   return Intl.NumberFormat(undefined, {
     style: 'percent',
     maximumFractionDigits: 2,
@@ -82,7 +82,7 @@ export function formatQuota(quota: number): string {
  * Parse quota from the current display input back to quota units.
  */
 export function parseQuotaFromDollars(amount: number): number {
-  if (!Number.isFinite(amount)) return 0
+  if (!Number.isFinite(amount)) {return 0}
 
   const { config, meta } = getCurrencyDisplay()
 
@@ -246,9 +246,9 @@ export function formatLogQuota(quota: number): string {
  * Format tokens count with K/M suffixes
  */
 export function formatTokens(tokens: number): string {
-  if (tokens === 0) return '-'
-  if (tokens < 1000) return tokens.toString()
-  if (tokens < 1000000) return `${(tokens / 1000).toFixed(1)}K`
+  if (tokens === 0) {return '-'}
+  if (tokens < 1000) {return tokens.toString()}
+  if (tokens < 1000000) {return `${(tokens / 1000).toFixed(1)}K`}
   return `${(tokens / 1000000).toFixed(2)}M`
 }
 
@@ -256,7 +256,7 @@ export function formatTokens(tokens: number): string {
  * Format use time in seconds with appropriate unit
  */
 export function formatUseTime(seconds: number): string {
-  if (seconds < 60) return `${seconds.toFixed(1)}s`
+  if (seconds < 60) {return `${seconds.toFixed(1)}s`}
   const minutes = Math.floor(seconds / 60)
   const remainingSeconds = seconds % 60
   return `${minutes}m ${remainingSeconds.toFixed(0)}s`
@@ -292,7 +292,7 @@ export function parseTimestampFromInput(value: string): number {
  * Uses HSL for better color distribution
  */
 export function stringToColor(str: string): string {
-  if (!str) return 'gray'
+  if (!str) {return 'gray'}
 
   // Generate hash from string
   let hash = 0

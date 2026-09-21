@@ -157,7 +157,7 @@ export function SignUpForm({
       }
     }
 
-    if (!validateTurnstile()) return
+    if (!validateTurnstile()) {return}
 
     setIsLoading(true)
     try {

@@ -59,7 +59,7 @@ export function useFormDirtyGuard(
 
   // Block browser navigation (close tab, refresh, etc.)
   useEffect(() => {
-    if (!isDirty) return
+    if (!isDirty) {return}
 
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault()

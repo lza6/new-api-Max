@@ -47,7 +47,7 @@ test.each([true, false])(
           },
         }
       }
-      if (url === '/api/user/auth/logout') return { data: { success: true } }
+      if (url === '/api/user/auth/logout') {return { data: { success: true } }}
       throw new Error(`Unexpected POST ${url}`)
     })
     const open = vi.spyOn(window, 'open').mockReturnValue(null)
@@ -136,7 +136,7 @@ describe('logout coordination', () => {
       getExpectedSID: () => sid,
       request: async (expectedSID) => {
         requestedSIDs.push(expectedSID)
-        if (requestedSIDs.length === 1) throw mismatchError()
+        if (requestedSIDs.length === 1) {throw mismatchError()}
         return { success: true, message: '' }
       },
       refresh: async () => {

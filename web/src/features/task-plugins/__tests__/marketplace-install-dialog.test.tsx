@@ -128,7 +128,7 @@ test('loading keeps installation disabled and footer outside the bounded scroll 
     element.classList.contains('overflow-y-auto')
   )
   expect(body).toBeDefined()
-  if (!body || !footer) throw new Error('Missing dialog scroll body or footer')
+  if (!body || !footer) {throw new Error('Missing dialog scroll body or footer')}
   expect(body.contains(footer)).toBe(false)
   expect(
     screen.getByRole('button', { name: 'Install and enable' })
@@ -259,7 +259,7 @@ test('shows all four Incho interfaces and explains absent authentication and ext
   const query = within(endpoints)
     .getByText('/v1/responses/{response_id}')
     .closest('li')
-  if (!create || !query) throw new Error('Missing protocol endpoints')
+  if (!create || !query) {throw new Error('Missing protocol endpoints')}
   expect(within(create).getByText('POST')).toBeVisible()
   expect(within(create).getByText('stream')).toBeVisible()
   expect(within(create).getByText('sync')).toBeVisible()

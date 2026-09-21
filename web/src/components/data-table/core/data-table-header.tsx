@@ -261,7 +261,7 @@ function getHeaderSizeStyle<TData>(
 }
 
 function renderHeaderContent<TData>(header: Header<TData, unknown>) {
-  if (header.isPlaceholder) return null
+  if (header.isPlaceholder) {return null}
   const { header: headerDef, meta } = header.column.columnDef
   // A string header means the user wrote e.g. `header: t('Name')` — auto-render
   // with DataTableColumnHeader so sorting works without boilerplate.

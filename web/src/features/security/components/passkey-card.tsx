@@ -76,33 +76,33 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
   const verification = useSecureVerification()
 
   const handleRegister = useCallback(async () => {
-    if (registering || removing || verification.isActive) return
+    if (registering || removing || verification.isActive) {return}
     const proof = await verification.requestVerification({
       scope: 'passkey.register',
     })
-    if (!proof) return
+    if (!proof) {return}
     try {
       await register(proof.proof_token)
       toast.success(t('Passkey registered successfully'))
     } catch (error) {
       const failure = AuthOperationError.from(error)
-      if (failure.code !== 'AUTH_CANCELLED') handleServerError(failure)
+      if (failure.code !== 'AUTH_CANCELLED') {handleServerError(failure)}
     }
   }, [register, registering, removing, t, verification])
 
   const handleRemove = useCallback(async () => {
-    if (registering || removing || verification.isActive) return
+    if (registering || removing || verification.isActive) {return}
     setConfirmOpen(false)
     const proof = await verification.requestVerification({
       scope: 'passkey.delete',
     })
-    if (!proof) return
+    if (!proof) {return}
     try {
       await remove(proof.proof_token)
       toast.success(t('Passkey removed successfully'))
     } catch (error) {
       const failure = AuthOperationError.from(error)
-      if (failure.code !== 'AUTH_CANCELLED') handleServerError(failure)
+      if (failure.code !== 'AUTH_CANCELLED') {handleServerError(failure)}
     }
   }, [registering, remove, removing, t, verification])
 

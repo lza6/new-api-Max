@@ -62,8 +62,8 @@ export function getSyncPriceKind(
   ) {
     return 'expression'
   }
-  if (typeof values?.model_price === 'number') return 'request'
-  if (typeof values?.model_ratio === 'number') return 'token'
+  if (typeof values?.model_price === 'number') {return 'request'}
+  if (typeof values?.model_ratio === 'number') {return 'token'}
   return 'unset'
 }
 
@@ -76,8 +76,8 @@ export function sameSyncPrice(
     const a = left[field as keyof PricingSyncValues]
     const b = right[field as keyof PricingSyncValues]
     if (typeof a === 'number' && typeof b === 'number') {
-      if (Math.abs(a - b) >= 1e-9) return false
-    } else if (a !== b) return false
+      if (Math.abs(a - b) >= 1e-9) {return false}
+    } else if (a !== b) {return false}
   }
   return true
 }
@@ -96,7 +96,7 @@ export function getSyncPriceLines(
       },
     ]
   }
-  if (getSyncPriceKind(values) !== 'token') return []
+  if (getSyncPriceKind(values) !== 'token') {return []}
   const input = Number(values.model_ratio) * 2
   const formattedInput = formatPricingNumber(input)
   const lines = [
@@ -112,7 +112,7 @@ export function getSyncPriceLines(
   ] as const
   for (const [field, label] of multipliers) {
     const ratio = values[field]
-    if (typeof ratio !== 'number') continue
+    if (typeof ratio !== 'number') {continue}
     let price = input * ratio
     if (field === 'audio_completion_ratio') {
       if (typeof values.audio_ratio !== 'number') {
@@ -130,11 +130,11 @@ export function getSyncPriceLines(
 export function getSyncExpressionPricing(expression: string, t: (key: string) => string) {
   const { billingExpr, requestRuleExpr } = splitBillingExprAndRequestRules(expression)
   const config = tryParseVisualConfig(billingExpr)
-  if (!config) return null
+  if (!config) {return null}
   // Do not turn malformed or overflowing upstream numbers into free prices.
-  const body = billingExpr.replace(/"(?:\\.|[^"\\])*"/g, '')
+  const body = billingExpr.replaceAll(/"(?:\\.|[^"\\])*"/g, '')
   for (const match of body.matchAll(/\*\s*([+\-\d.eE]+)/g)) {
-    if (!Number.isFinite(Number(match[1])) || Number(match[1]) < 0) return null
+    if (!Number.isFinite(Number(match[1])) || Number(match[1]) < 0) {return null}
   }
   const fields = BILLING_PRICING_VARS.filter((field) =>
     field.tierField && new RegExp(`\\b${field.key}\\s*\\*`).test(body)
@@ -149,7 +149,7 @@ export function getSyncExpressionPricing(expression: string, t: (key: string) =>
       ).join(' ∧ '),
       lines: fields.map((field) => ({
         label: t(field.shortLabel),
-        value: `$${formatPricingNumber(Number(tier[field.tierField!]))}`,
+        value: `$${formatPricingNumber(Number(tier[field.tierField as string]))}`,
       })),
     })),
   }
@@ -175,7 +175,7 @@ export function describeSyncPrice(
     }
     return `${t('Expression pricing')}\n${values.billing_expr}`
   }
-  if (kind === 'unset') return t('Unset price')
+  if (kind === 'unset') {return t('Unset price')}
   const unit =
     kind === 'request' ? `USD / ${t('request')}` : `USD / ${t('1M token')}`
   return [
@@ -201,6 +201,6 @@ export const SyncPriceContext = createContext<SyncPriceSelectionContext | null>(
 )
 export function useSyncPriceSelection() {
   const context = useContext(SyncPriceContext)
-  if (!context) throw new Error('Sync price selection provider is required')
+  if (!context) {throw new Error('Sync price selection provider is required')}
   return context
 }

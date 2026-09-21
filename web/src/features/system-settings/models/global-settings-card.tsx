@@ -78,7 +78,7 @@ const chatToResponsesPolicyAllChannelsExample = JSON.stringify(
 
 const jsonString = z.string().refine((value) => {
   const trimmed = value.trim()
-  if (!trimmed) return true
+  if (!trimmed) {return true}
   try {
     JSON.parse(trimmed)
     return true

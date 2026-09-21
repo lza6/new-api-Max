@@ -186,7 +186,7 @@ function renderStaticCellContent<TData>(
   const content = column.cell?.(row, index)
   const textContent = getPrimitiveTextContent(content)
 
-  if (!textContent) return content
+  if (!textContent) {return content}
 
   return <TruncatedCell tooltipContent={textContent}>{content}</TruncatedCell>
 }

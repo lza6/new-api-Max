@@ -51,7 +51,7 @@ interface OAuthPopupOptions {
 export function openOAuthPopup(
   options: OAuthPopupOptions
 ): Promise<OAuthPopupExchange> {
-  if (options.signal.aborted) return Promise.reject(options.signal.reason)
+  if (options.signal.aborted) {return Promise.reject(options.signal.reason)}
   const popup = window.open('', '_blank')
   if (!popup) {
     return Promise.reject(new AuthOperationError('OAuth pop-up was blocked'))
@@ -70,17 +70,17 @@ export function openOAuthPopup(
       clearTimeout(deadline)
     }
     const fail = (error: unknown) => {
-      if (finished) return
+      if (finished) {return}
       finished = true
       const failure = AuthOperationError.from(error)
       controller.abort(failure)
       cleanup()
-      if (!popup.closed) popup.close()
+      if (!popup.closed) {popup.close()}
       reject(failure)
     }
     const onAbort = () => fail(options.signal.reason)
     const finish: OAuthPopupExchange['finish'] = (result) => {
-      if (finished) return
+      if (finished) {return}
       finished = true
       cleanup()
       if (!popup.closed) {
@@ -167,7 +167,7 @@ export function openOAuthPopup(
     void options
       .prepare(controller.signal)
       .then((authorization) => {
-        if (finished || popup.closed) return
+        if (finished || popup.closed) {return}
         state = authorization.state
         if (
           !markOAuthPopup(

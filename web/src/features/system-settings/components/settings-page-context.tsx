@@ -75,7 +75,7 @@ export function SettingsPageTitleStatusPortal(
 ) {
   const { titleStatusContainer } = useContext(SettingsPageContext)
 
-  if (!titleStatusContainer) return null
+  if (!titleStatusContainer) {return null}
 
   return createPortal(props.children, titleStatusContainer)
 }
@@ -89,7 +89,7 @@ export function SettingsPageActionsPortal(
 ) {
   const { actionsContainer } = useContext(SettingsPageContext)
 
-  if (!actionsContainer) return null
+  if (!actionsContainer) {return null}
 
   return createPortal(
     <div className='flex flex-wrap items-center justify-end gap-2'>

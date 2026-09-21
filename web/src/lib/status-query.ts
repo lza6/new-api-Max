@@ -49,10 +49,10 @@ export type StatusData = Record<string, unknown>
 
 /** Coerce a status field to a number, keeping `fallback` for unusable values. */
 function toNumber(value: unknown, fallback: number): number {
-  if (typeof value === 'number' && !Number.isNaN(value)) return value
+  if (typeof value === 'number' && !Number.isNaN(value)) {return value}
   if (typeof value === 'string') {
     const parsed = Number(value)
-    if (!Number.isNaN(parsed)) return parsed
+    if (!Number.isNaN(parsed)) {return parsed}
   }
   return fallback
 }
@@ -63,7 +63,7 @@ function toNumber(value: unknown, fallback: number): number {
 export function mapStatusDataToConfig(
   data: StatusData | undefined | null
 ): Partial<SystemConfig> {
-  if (!data) return {}
+  if (!data) {return {}}
 
   const quotaDisplayType =
     (data.quota_display_type as CurrencyDisplayType | undefined) ??
@@ -106,7 +106,7 @@ export function mapStatusDataToConfig(
 /** Read the last known status from localStorage (survives reload, may be stale). */
 export function readCachedStatus(): StatusData | null {
   try {
-    if (typeof window === 'undefined') return null
+    if (typeof window === 'undefined') {return null}
     const raw = window.localStorage.getItem(STATUS_STORAGE_KEY)
     return raw ? (JSON.parse(raw) as StatusData) : null
   } catch {

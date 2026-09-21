@@ -52,10 +52,10 @@ export function updateLastAssistantMessage(
   messages: Message[],
   updater: (message: Message) => Message
 ): Message[] {
-  if (messages.length === 0) return messages
+  if (messages.length === 0) {return messages}
 
   const last = messages.at(-1)
-  if (!last || last.from !== MESSAGE_ROLES.ASSISTANT) return messages
+  if (!last || last.from !== MESSAGE_ROLES.ASSISTANT) {return messages}
 
   const updated = [...messages]
   updated[updated.length - 1] = updater(last)

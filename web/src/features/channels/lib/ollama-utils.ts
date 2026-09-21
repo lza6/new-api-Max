@@ -48,8 +48,8 @@ function getNumber(value: unknown): number | undefined {
 }
 
 function parseMaybeJSON(value: unknown) {
-  if (!value) return null
-  if (typeof value === 'object') return value
+  if (!value) {return null}
+  if (typeof value === 'object') {return value}
   if (typeof value === 'string') {
     try {
       return JSON.parse(value)
@@ -64,11 +64,11 @@ function parseMaybeJSON(value: unknown) {
  * Resolve Ollama base URL from channel fields (supports legacy/alternate fields).
  */
 export function resolveOllamaBaseUrl(channel: Channel | null) {
-  if (!channel) return ''
+  if (!channel) {return ''}
 
   const direct =
     typeof channel.base_url === 'string' ? channel.base_url.trim() : ''
-  if (direct) return direct
+  if (direct) {return direct}
 
   const alt =
     typeof (channel as unknown as { ollama_base_url?: unknown })
@@ -77,27 +77,27 @@ export function resolveOllamaBaseUrl(channel: Channel | null) {
           (channel as unknown as { ollama_base_url?: string }).ollama_base_url
         ).trim()
       : ''
-  if (alt) return alt
+  if (alt) {return alt}
 
   const parsed = parseMaybeJSON(channel.other_info)
   if (isRecord(parsed)) {
     const baseUrl = getString(parsed.base_url)?.trim()
-    if (baseUrl) return baseUrl
+    if (baseUrl) {return baseUrl}
     const publicUrl = getString(parsed.public_url)?.trim()
-    if (publicUrl) return publicUrl
+    if (publicUrl) {return publicUrl}
     const apiUrl = getString(parsed.api_url)?.trim()
-    if (apiUrl) return apiUrl
+    if (apiUrl) {return apiUrl}
   }
 
   return ''
 }
 
 export function normalizeOllamaModels(items: unknown): OllamaModel[] {
-  if (!Array.isArray(items)) return []
+  if (!Array.isArray(items)) {return []}
 
   return items
     .map((item) => {
-      if (!item) return null
+      if (!item) {return null}
 
       if (typeof item === 'string') {
         return { id: item, owned_by: 'ollama' } satisfies OllamaModel
@@ -110,7 +110,7 @@ export function normalizeOllamaModels(items: unknown): OllamaModel[] {
           getString(item.name) ||
           getString(item.model) ||
           getString(item.Model)
-        if (!candidateId) return null
+        if (!candidateId) {return null}
 
         const metadata = item.metadata ?? item.Metadata
         const normalized: OllamaModel = {
@@ -150,12 +150,12 @@ export function normalizeOllamaModels(items: unknown): OllamaModel[] {
 }
 
 export function formatBytes(bytes?: number) {
-  if (typeof bytes !== 'number' || Number.isNaN(bytes)) return '-'
-  if (bytes < 1024) return `${bytes} B`
+  if (typeof bytes !== 'number' || Number.isNaN(bytes)) {return '-'}
+  if (bytes < 1024) {return `${bytes} B`}
   const kb = bytes / 1024
-  if (kb < 1024) return `${kb.toFixed(1)} KB`
+  if (kb < 1024) {return `${kb.toFixed(1)} KB`}
   const mb = kb / 1024
-  if (mb < 1024) return `${mb.toFixed(1)} MB`
+  if (mb < 1024) {return `${mb.toFixed(1)} MB`}
   const gb = mb / 1024
   return `${gb.toFixed(2)} GB`
 }

@@ -133,7 +133,7 @@ export function useDialogs<T extends string>(): DialogsHandlers<T> {
 
   const open = useCallback((key: T) => {
     setOpenDialogs((prev) => {
-      if (prev.has(key)) return prev
+      if (prev.has(key)) {return prev}
       const next = new Set(prev)
       next.add(key)
       return next
@@ -142,7 +142,7 @@ export function useDialogs<T extends string>(): DialogsHandlers<T> {
 
   const close = useCallback((key: T) => {
     setOpenDialogs((prev) => {
-      if (!prev.has(key)) return prev
+      if (!prev.has(key)) {return prev}
       const next = new Set(prev)
       next.delete(key)
       return next

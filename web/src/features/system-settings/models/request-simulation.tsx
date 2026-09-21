@@ -83,7 +83,7 @@ export function RequestSimulation(props: RequestSimulationProps) {
     values: Record<string, boolean>
   }>({ sample: props.usage, values: {} })
   const usage = useMemo(() => {
-    if (!props.usage) return undefined
+    if (!props.usage) {return undefined}
     return {
       ...props.usage,
       ...(booleanInputs.sample === props.usage ? booleanInputs.values : {}),
@@ -100,7 +100,7 @@ export function RequestSimulation(props: RequestSimulationProps) {
   )
 
   const result = useMemo(() => {
-    if (!open) return null
+    if (!open) {return null}
     let requestBody: unknown
     let requestHeaders: unknown
     try {
@@ -183,7 +183,7 @@ export function RequestSimulation(props: RequestSimulationProps) {
   ])
 
   let error = ''
-  if (result && 'inputError' in result) error = t(result.inputError)
+  if (result && 'inputError' in result) {error = t(result.inputError)}
   else if (result && result.status !== 'success') {
     error = `${t(DIAGNOSTIC_LABELS[result.diagnostic.code])} ${result.diagnostic.detail}`
   }
@@ -227,7 +227,7 @@ export function RequestSimulation(props: RequestSimulationProps) {
                     : null
                 }
                 onValueChange={(value) => {
-                  if (value === null) return
+                  if (value === null) {return}
                   setBooleanInputs({
                     sample: props.usage,
                     values: {

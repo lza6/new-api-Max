@@ -165,7 +165,7 @@ function serializeGroupPricingRows(rows: GroupPricingRow[]) {
 
   for (const row of rows) {
     const name = row.name.trim()
-    if (!name) continue
+    if (!name) {continue}
     groupRatio[name] = normalizeRatio(row.ratio)
     if (row.selectable) {
       userUsableGroups[name] = row.description
@@ -234,7 +234,7 @@ function GroupNameSelect(props: GroupNameSelectProps) {
     <Combobox
   options={options.map((name) => ({ value: name, label: name }))}
   value={props.value}
-  onValueChange={(value) => { if (value) props.onValueChange(value) }}
+  onValueChange={(value) => { if (value) {props.onValueChange(value)} }}
   className={props.className ?? 'w-48'}
   placeholder={props.placeholder}
   aria-label={props.placeholder}
@@ -285,7 +285,7 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
 
   const handleAutoGroupAdd = useCallback(
     (name: string) => {
-      if (autoGroupsList.includes(name)) return
+      if (autoGroupsList.includes(name)) {return}
       onChange('AutoGroups', JSON.stringify([...autoGroupsList, name], null, 2))
     },
     [autoGroupsList, onChange]
@@ -303,8 +303,8 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
     (index: number, direction: 'up' | 'down') => {
       const list = [...autoGroupsList]
       const newIndex = direction === 'up' ? index - 1 : index + 1
-      if (newIndex < 0 || newIndex >= list.length) return
-      ;[list[index], list[newIndex]] = [list[newIndex], list[index]]
+      if (newIndex < 0 || newIndex >= list.length) {return
+      ;}[list[index], list[newIndex]] = [list[newIndex], list[index]]
       onChange('AutoGroups', JSON.stringify(list, null, 2))
     },
     [autoGroupsList, onChange]
@@ -396,7 +396,7 @@ export const GroupRatioVisualEditor = memo(function GroupRatioVisualEditor({
       <GroupDetailSheet
         groupName={detailGroup}
         onOpenChange={(open) => {
-          if (!open) setDetailGroup(null)
+          if (!open) {setDetailGroup(null)}
         }}
         registry={registry}
         topupGroupRatio={topupGroupRatio}
@@ -503,7 +503,7 @@ function GroupPricingTable({
     const counts = new Map<string, number>()
     for (const row of rows) {
       const name = row.name.trim()
-      if (!name) continue
+      if (!name) {continue}
       counts.set(name, (counts.get(name) ?? 0) + 1)
     }
     return [...counts.entries()]
@@ -695,7 +695,7 @@ function GroupOverrideRules({
 
   const baseRatioByName = useMemo(() => {
     const map = new Map<string, number>()
-    for (const entry of registry) map.set(entry.name, entry.ratio)
+    for (const entry of registry) {map.set(entry.name, entry.ratio)}
     return map
   }, [registry])
 
@@ -718,7 +718,7 @@ function GroupOverrideRules({
   )
 
   const handleUserGroupSave = useCallback(() => {
-    if (!userGroupInput) return
+    if (!userGroupInput) {return}
     const map = parseNestedRatioMap(groupGroupRatio)
     if (!map[userGroupInput]) {
       map[userGroupInput] = {}
@@ -754,7 +754,7 @@ function GroupOverrideRules({
 
   const handleOverrideSave = useCallback(
     (targetGroup: string, ratio: number, oldTargetGroup?: string) => {
-      if (!overrideUserGroup) return
+      if (!overrideUserGroup) {return}
       const map = parseNestedRatioMap(groupGroupRatio)
       if (!map[overrideUserGroup]) {
         map[overrideUserGroup] = {}
@@ -1027,9 +1027,9 @@ function GroupOverrideDialog({
   const baseRatio = targetGroup ? baseRatioByName.get(targetGroup) : undefined
 
   const handleSave = () => {
-    if (!targetGroup || !ratio.trim()) return
+    if (!targetGroup || !ratio.trim()) {return}
     const parsedRatio = Number.parseFloat(ratio)
-    if (Number.isNaN(parsedRatio)) return
+    if (Number.isNaN(parsedRatio)) {return}
 
     onSave(targetGroup, parsedRatio, editData?.targetGroup)
     setTargetGroup(null)
@@ -1142,7 +1142,7 @@ function GroupDetailSheet(props: GroupDetailSheetProps) {
   const name = props.groupName
 
   const detail = useMemo(() => {
-    if (!name) return null
+    if (!name) {return null}
 
     const entry = props.registry.find((item) => item.name === name)
     const topupMap = parseRatioMap(props.topupGroupRatio)
@@ -1169,10 +1169,10 @@ function GroupDetailSheet(props: GroupDetailSheetProps) {
     // Visibility rules targeting this group
     const visibilityRules: VisibilityRule[] = []
     for (const [userGroup, inner] of Object.entries(specialMap)) {
-      if (typeof inner !== 'object' || inner === null) continue
+      if (typeof inner !== 'object' || inner === null) {continue}
       for (const [rawKey, desc] of Object.entries(inner)) {
         const parsed = parseSpecialGroupKey(rawKey)
-        if (parsed.groupName !== name) continue
+        if (parsed.groupName !== name) {continue}
         visibilityRules.push({
           userGroup,
           visible: parsed.visible,

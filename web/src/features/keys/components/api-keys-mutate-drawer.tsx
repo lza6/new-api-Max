@@ -215,11 +215,11 @@ export function ApiKeysMutateDrawer({
     ) {
       return
     }
-    if (isUpdate && (!apiKeyFetched || apiKeyFetching)) return
-    if (!isUpdate && statusLoading) return
+    if (isUpdate && (!apiKeyFetched || apiKeyFetching)) {return}
+    if (!isUpdate && statusLoading) {return}
 
     const target = isUpdate && currentRow ? `update:${currentRow.id}` : 'create'
-    if (initializedTarget === target) return
+    if (initializedTarget === target) {return}
     if (isUpdate && currentRow) {
       if (apiKeyData?.success && apiKeyData.data) {
         form.reset(
@@ -264,7 +264,7 @@ export function ApiKeysMutateDrawer({
 
   // Correct group after groups load: if the form value is not in available groups, fall back
   useEffect(() => {
-    if (groups.length === 0) return
+    if (groups.length === 0) {return}
     const currentGroup = selectedGroup
     if (currentGroup && !groups.some((g) => g.value === currentGroup)) {
       const fallback =

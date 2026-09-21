@@ -26,9 +26,9 @@ import { handleServerError } from '@/lib/handle-server-error'
 import { getAffinityUsageCache } from './api'
 
 function formatRate(hit: number, total: number): string {
-  if (!total || total <= 0) return '-'
+  if (!total || total <= 0) {return '-'}
   const r = (hit / total) * 100
-  if (!Number.isFinite(r)) return '-'
+  if (!Number.isFinite(r)) {return '-'}
   return `${r.toFixed(2)}%`
 }
 
@@ -64,22 +64,22 @@ export function CacheStatsDialog(props: Props) {
 
     void getAffinityUsageCache(props.target)
       .then((res) => {
-        if (seq !== seqRef.current) return
-        if (res.success) setStats((res.data as Record<string, unknown>) || {})
-        else handleServerError(res, t('Request failed'))
+        if (seq !== seqRef.current) {return}
+        if (res.success) {setStats((res.data as Record<string, unknown>) || {})}
+        else {handleServerError(res, t('Request failed'))}
       })
       .catch((error) => {
-        if (seq !== seqRef.current) return
+        if (seq !== seqRef.current) {return}
         handleServerError(error, t('Request failed'))
       })
       .finally(() => {
-        if (seq !== seqRef.current) return
+        if (seq !== seqRef.current) {return}
         setLoading(false)
       })
   }, [props.open, props.target, t])
 
   const rows = useMemo(() => {
-    if (!stats) return []
+    if (!stats) {return []}
     const s = stats
     const data: { key: string; value: string | number }[] = []
     const hit = Number(s.hit || 0)
@@ -136,7 +136,7 @@ export function CacheStatsDialog(props: Props) {
     if (completionTokens > 0) {
       data.push({ key: 'Completion tokens', value: completionTokens })
     }
-    if (totalTokens > 0) data.push({ key: 'Total tokens', value: totalTokens })
+    if (totalTokens > 0) {data.push({ key: 'Total tokens', value: totalTokens })}
 
     return data
   }, [stats, props.target, t])

@@ -57,7 +57,7 @@ export function TwoFASetupDialog(props: TwoFASetupDialogProps) {
     <Dialog
       open={props.open}
       onOpenChange={(open) => {
-        if (!open) props.onCancel()
+        if (!open) {props.onCancel()}
       }}
       title={t('Setup Two-Factor Authentication')}
       description={

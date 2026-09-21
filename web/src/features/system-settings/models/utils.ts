@@ -61,7 +61,7 @@ function extractErrorPosition(
   error: unknown,
   jsonString: string
 ): { line?: number; column?: number; position?: number } {
-  if (!(error instanceof Error)) return {}
+  if (!(error instanceof Error)) {return {}}
 
   const message = error.message
 
@@ -72,7 +72,7 @@ function extractErrorPosition(
     const lines = jsonString.substring(0, position).split('\n')
     return {
       line: lines.length,
-      column: lines[lines.length - 1].length + 1,
+      column: (lines.at(-1) ?? '').length + 1,
       position,
     }
   }
@@ -121,7 +121,7 @@ function buildSyntaxError(
 }
 
 function formatErrorMessage(error: unknown, jsonString: string): string {
-  if (!(error instanceof Error)) return 'Invalid JSON'
+  if (!(error instanceof Error)) {return 'Invalid JSON'}
 
   const position = extractErrorPosition(error, jsonString)
   const message = error.message

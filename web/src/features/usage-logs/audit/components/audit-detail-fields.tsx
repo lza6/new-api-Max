@@ -30,12 +30,12 @@ export function AuditDetailFields(props: { fields: AuditDetailField[] }) {
   const { t } = useTranslation()
   return props.fields.map((field) => {
     const value = field.value
-    if (value === null || value === undefined || value === '') return null
+    if (value === null || value === undefined || value === '') {return null}
     if (isAuditDetailObject(value) || Array.isArray(value)) {
       const entries = Array.isArray(value)
         ? value.map((item, i) => [String(i + 1), item] as const)
         : Object.entries(value)
-      if (!entries.length) return null
+      if (!entries.length) {return null}
       return (
         <div key={field.label} className='min-w-0 space-y-1'>
           <div className='text-muted-foreground text-xs break-all'>
@@ -53,7 +53,7 @@ export function AuditDetailFields(props: { fields: AuditDetailField[] }) {
       )
     }
     let text = String(value)
-    if (typeof value === 'boolean') text = value ? t('Yes') : t('No')
+    if (typeof value === 'boolean') {text = value ? t('Yes') : t('No')}
     return (
       <DetailRow
         key={field.label}

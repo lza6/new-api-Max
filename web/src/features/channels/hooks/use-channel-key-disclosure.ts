@@ -53,7 +53,7 @@ export function useChannelKeyDisclosure(
   }, [open, channelId, cancelVerification])
 
   const handleRevealKey = useCallback(async () => {
-    if (!channelId || !open || operation.current) return
+    if (!channelId || !open || operation.current) {return}
     const current = new AbortController()
     operation.current = current
     try {
@@ -65,14 +65,14 @@ export function useChannelKeyDisclosure(
           'Use Passkey or 2FA to confirm your identity before revealing this channel key.'
         ),
       })
-      if (!proof || operation.current !== current) return
+      if (!proof || operation.current !== current) {return}
       setIsChannelKeyLoading(true)
       const res = await getChannelKey(
         channelId,
         proof.proof_token,
         current.signal
       )
-      if (operation.current !== current) return
+      if (operation.current !== current) {return}
       if (!res.success) {
         throw createServerError(res, t('Failed to fetch channel key'))
       }

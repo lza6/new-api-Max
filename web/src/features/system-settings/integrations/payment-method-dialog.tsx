@@ -217,7 +217,7 @@ export function PaymentMethodDialog({
                     options={paymentTypeOptions}
                     value={field.value}
                     onValueChange={(value) => {
-                      if (value === null) return
+                      if (value === null) {return}
                       const currentIcon = form.getValues('icon')?.trim()
                       const currentName = form.getValues('name')?.trim()
                       const previousOption = getPaymentTypeOption(field.value)

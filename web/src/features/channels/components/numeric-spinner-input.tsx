@@ -58,14 +58,14 @@ export function NumericSpinnerInput({
 
   const clamp = (v: number) => {
     let result = v
-    if (min !== undefined) result = Math.max(min, result)
-    if (max !== undefined) result = Math.min(max, result)
+    if (min !== undefined) {result = Math.max(min, result)}
+    if (max !== undefined) {result = Math.min(max, result)}
     return result
   }
 
   const handleIncrement = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (disabled) return
+    if (disabled) {return}
     const next = clamp((Number(localValue) || 0) + step)
     setLocalValue(String(next))
     onChange(next)
@@ -73,14 +73,14 @@ export function NumericSpinnerInput({
 
   const handleDecrement = (e: React.MouseEvent) => {
     e.stopPropagation()
-    if (disabled) return
+    if (disabled) {return}
     const next = clamp((Number(localValue) || 0) - step)
     setLocalValue(String(next))
     onChange(next)
   }
 
   const handleStartEdit = () => {
-    if (disabled) return
+    if (disabled) {return}
     setEditing(true)
     requestAnimationFrame(() => inputRef.current?.select())
   }
@@ -91,7 +91,7 @@ export function NumericSpinnerInput({
       setLocalValue(raw)
       return
     }
-    if (!/^-?\d+$/.test(raw)) return
+    if (!/^-?\d+$/.test(raw)) {return}
     setLocalValue(raw)
   }
 

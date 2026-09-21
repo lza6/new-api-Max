@@ -140,7 +140,7 @@ export function PrefillGroupManagementDialog({
   }
 
   const handleDeleteConfirm = async () => {
-    if (!deleteState.group) return
+    if (!deleteState.group) {return}
     setIsDeleting(true)
     try {
       const response = await deletePrefillGroup(deleteState.group.id)

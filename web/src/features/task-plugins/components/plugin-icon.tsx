@@ -58,7 +58,7 @@ function GatewayPluginIcon(props: PluginIconProps) {
   })
   const [image, setImage] = useState<{ blob: Blob; src: string } | null>(null)
   useEffect(() => {
-    if (!query.data) return
+    if (!query.data) {return}
     const src = URL.createObjectURL(query.data)
     setImage({ blob: query.data, src })
     return () => URL.revokeObjectURL(src)

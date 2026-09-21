@@ -49,7 +49,7 @@ export function useHomePageContent(): HomePageContentResult {
         const response = await getHomePageContent()
         const { success, data } = response
 
-        if (!mounted) return
+        if (!mounted) {return}
 
         if (success && data) {
           setContent(data)
@@ -60,7 +60,7 @@ export function useHomePageContent(): HomePageContentResult {
           localStorage.removeItem(STORAGE_KEY)
         }
       } catch (error) {
-        if (!mounted) return
+        if (!mounted) {return}
         handleServerError(error, i18next.t('Failed to load home page content'))
       } finally {
         if (mounted) {

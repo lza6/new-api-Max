@@ -133,7 +133,7 @@ function SummaryField<TData>({
   valueClassName?: string
   primaryOnly?: boolean
 }) {
-  if (!cell) return null
+  if (!cell) {return null}
 
   return (
     <div

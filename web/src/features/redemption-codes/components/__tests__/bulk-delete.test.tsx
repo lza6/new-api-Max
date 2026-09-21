@@ -112,7 +112,7 @@ async function setup() {
 
 afterEach(() => {
   toast.dismiss()
-  for (const client of clients) client.clear()
+  for (const client of clients) {client.clear()}
   clients.length = 0
 })
 
@@ -144,7 +144,7 @@ test('confirmation deletes only selected codes, disables repeat submissions and 
     release = resolve
   })
   const originalDelete = remove.getMockImplementation()
-  if (!originalDelete) throw new Error('Missing batch delete mock')
+  if (!originalDelete) {throw new Error('Missing batch delete mock')}
   remove.mockImplementationOnce(async (url, body) => {
     await pending
     return originalDelete(url, body)

@@ -125,13 +125,13 @@ export function UserSubscriptionsDialog(props: Props) {
   const planTitleMap = useMemo(() => {
     const map = new Map<number, string>()
     plans.forEach((p) => {
-      if (p.plan.id) map.set(p.plan.id, p.plan.title || `#${p.plan.id}`)
+      if (p.plan.id) {map.set(p.plan.id, p.plan.title || `#${p.plan.id}`)}
     })
     return map
   }, [plans])
 
   const loadData = useCallback(async () => {
-    if (!props.user?.id) return
+    if (!props.user?.id) {return}
     setLoading(true)
     try {
       const [plansRes, subsRes] = await Promise.all([
@@ -188,7 +188,7 @@ export function UserSubscriptionsDialog(props: Props) {
   }
 
   const handleConfirmAction = async () => {
-    if (!confirmAction) return
+    if (!confirmAction) {return}
     try {
       if (confirmAction.type === 'invalidate') {
         const res = await invalidateUserSubscription(confirmAction.subId)
@@ -217,7 +217,7 @@ export function UserSubscriptionsDialog(props: Props) {
   }
 
   const handleResetConfirm = async () => {
-    if (!props.user?.id || !resetAction) return
+    if (!props.user?.id || !resetAction) {return}
     setResetting(true)
     try {
       const res = await resetUserSubscriptionsByPlan(props.user.id, {

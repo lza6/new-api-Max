@@ -62,7 +62,7 @@ export function DataTableBulkActions(props: DataTableBulkActionsProps) {
       const result = await batchDeleteRedemptions(
         targets.map((code) => code.id)
       )
-      if (!result.success) throw createServerError(result)
+      if (!result.success) {throw createServerError(result)}
       return result.data ?? 0
     },
     onSuccess: (count, targets) => {
@@ -71,7 +71,7 @@ export function DataTableBulkActions(props: DataTableBulkActionsProps) {
       )
       props.table.setRowSelection((previous) => {
         const next = { ...previous }
-        for (const code of targets) delete next[String(code.id)]
+        for (const code of targets) {delete next[String(code.id)]}
         return next
       })
       setDeleteTargets(null)
@@ -125,7 +125,7 @@ export function DataTableBulkActions(props: DataTableBulkActionsProps) {
         destructive
         open={deleteTargets !== null}
         onOpenChange={(open) => {
-          if (!open && !deletion.isPending) setDeleteTargets(null)
+          if (!open && !deletion.isPending) {setDeleteTargets(null)}
         }}
         title={t('Delete {{count}} redemption codes?', {
           count: deleteTargets?.length ?? 0,

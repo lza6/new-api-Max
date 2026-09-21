@@ -50,13 +50,13 @@ export function AccessTokenCard() {
   let lastUsed = t('Unknown')
   if (status?.last_used_at) {
     lastUsed = dayjs.unix(status.last_used_at).format('YYYY-MM-DD HH:mm:ss')
-  } else if (status?.created_at) lastUsed = t('Not used yet')
+  } else if (status?.created_at) {lastUsed = t('Not used yet')}
   const confirm = () => {
-    if (pending || !confirmation) return
+    if (pending || !confirmation) {return}
     const operation = confirmation
     setConfirmation(null)
-    if (operation === 'revoke') void access.revoke()
-    else void access.generate()
+    if (operation === 'revoke') {void access.revoke()}
+    else {void access.generate()}
   }
   return (
     <>
@@ -167,7 +167,7 @@ export function AccessTokenCard() {
       <ConfirmDialog
         open={confirmation !== null}
         onOpenChange={(open) => {
-          if (!open && !pending) setConfirmation(null)
+          if (!open && !pending) {setConfirmation(null)}
         }}
         title={
           confirmation === 'revoke'

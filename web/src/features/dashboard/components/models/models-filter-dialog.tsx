@@ -65,8 +65,8 @@ interface ModelsFilterProps {
 // range<->granularity pairing), so picking "7 Days" requests daily buckets
 // instead of leaving the granularity on its previous value (e.g. hourly).
 function granularityForRangeDays(days: number): TimeGranularity {
-  if (days <= 1) return 'hour'
-  if (days >= 29) return 'week'
+  if (days <= 1) {return 'hour'}
+  if (days >= 29) {return 'week'}
   return 'day'
 }
 
@@ -77,7 +77,7 @@ function detectQuickRangeDays(
 ): number | null {
   const start = filters?.start_timestamp
   const end = filters?.end_timestamp
-  if (!start || !end) return null
+  if (!start || !end) {return null}
   const days = Math.round((end.getTime() - start.getTime()) / 86_400_000)
   return TIME_RANGE_PRESETS.some((preset) => preset.days === days) ? days : null
 }
@@ -151,7 +151,7 @@ export function ModelsFilter(props: ModelsFilterProps) {
   ) => {
     setFilters((prev) => ({ ...prev, [field]: value }))
     if (field === 'start_timestamp' || field === 'end_timestamp')
-      setSelectedRange(null)
+      {setSelectedRange(null)}
   }
 
   const handleQuickRange = (days: number) => {
@@ -257,12 +257,10 @@ export function ModelsFilter(props: ModelsFilterProps) {
           <div className='grid gap-2'>
             <Label htmlFor='time_granularity'>{t('Time Granularity')}</Label>
             <Select
-              items={[
-                ...TIME_GRANULARITY_OPTIONS.map((option) => ({
+              items={TIME_GRANULARITY_OPTIONS.map((option) => ({
                   value: option.value,
                   label: t(option.label),
-                })),
-              ]}
+                }))}
               value={filters.time_granularity}
               onValueChange={(value) =>
                 handleChange('time_granularity', value as TimeGranularity)

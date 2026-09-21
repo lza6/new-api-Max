@@ -79,8 +79,8 @@ function DrawerContent({
       <DrawerPrimitive.Content
         ref={(node) => {
           content.current = node
-          if (typeof ref === 'function') return ref(node)
-          if (ref) ref.current = node
+          if (typeof ref === 'function') {return ref(node)}
+          if (ref) {ref.current = node}
         }}
         data-slot='drawer-content'
         className={cn(

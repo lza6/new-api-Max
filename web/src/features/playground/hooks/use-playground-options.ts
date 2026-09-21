@@ -92,7 +92,7 @@ export function usePlaygroundOptions({
   })
 
   useEffect(() => {
-    if (!isModelsError) return
+    if (!isModelsError) {return}
 
     handleServerError(
       modelsError,
@@ -104,7 +104,7 @@ export function usePlaygroundOptions({
   }, [isModelsError, modelsError, t])
 
   useEffect(() => {
-    if (!isGroupsError) return
+    if (!isGroupsError) {return}
 
     handleServerError(
       groupsError,
@@ -116,7 +116,7 @@ export function usePlaygroundOptions({
   }, [isGroupsError, groupsError, t])
 
   useEffect(() => {
-    if (!modelsData) return
+    if (!modelsData) {return}
 
     setModels(modelsData)
     const fallback = getModelFallback(modelsData, currentModel)
@@ -132,7 +132,7 @@ export function usePlaygroundOptions({
   }, [modelsData, currentModel, setModels, updateConfig])
 
   useEffect(() => {
-    if (!groupsData) return
+    if (!groupsData) {return}
 
     setGroups(groupsData)
     const fallback = getGroupFallback(groupsData, currentGroup)

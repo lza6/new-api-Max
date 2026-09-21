@@ -89,7 +89,7 @@ interface SparklineBucket {
 }
 
 function normalizeSparkline(values?: number[]): SparklineBucket[] {
-  if (!values?.length) return []
+  if (!values?.length) {return []}
 
   const sanitized = values.map((value) => Math.max(0, Number(value) || 0))
   const max = Math.max(...sanitized)
@@ -104,7 +104,7 @@ function normalizeSparkline(values?: number[]): SparklineBucket[] {
 }
 
 function buildLineSparkline(values?: number[]) {
-  if (!values?.length) return null
+  if (!values?.length) {return null}
 
   const sanitized = values.map((value) => Math.max(0, Number(value) || 0))
   const width = 160
@@ -135,7 +135,7 @@ function buildLineSparkline(values?: number[]) {
     .join(' ')
   const firstPoint = points.at(0)
   const lastPoint = points.at(-1)
-  if (!firstPoint || !lastPoint) return null
+  if (!firstPoint || !lastPoint) {return null}
   const areaPath = `${linePath} L ${lastPoint.x} ${height} L ${firstPoint.x} ${height} Z`
 
   return {
@@ -149,7 +149,7 @@ function LineSparkline(props: { values?: number[]; tone: StatCardTone }) {
   const gradientId = `stat-card-line-${rawGradientId.replaceAll(':', '')}`
   const paths = buildLineSparkline(props.values)
 
-  if (!paths) return <div className='h-8' aria-hidden='true' />
+  if (!paths) {return <div className='h-8' aria-hidden='true' />}
 
   return (
     <div

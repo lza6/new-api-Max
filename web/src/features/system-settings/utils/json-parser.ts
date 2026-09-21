@@ -44,7 +44,7 @@ function extractErrorPosition(
   error: unknown,
   jsonString: string
 ): JsonErrorPosition {
-  if (!(error instanceof Error)) return {}
+  if (!(error instanceof Error)) {return {}}
 
   const message = error.message
 
@@ -76,7 +76,7 @@ function getLineAndColumn(
   const lines = text.substring(0, position).split('\n')
   return {
     line: lines.length,
-    column: lines[lines.length - 1].length + 1,
+    column: (lines.at(-1) ?? '').length + 1,
   }
 }
 
@@ -84,7 +84,7 @@ function formatErrorDescription(
   error: unknown,
   jsonString: string
 ): string | undefined {
-  if (!(error instanceof Error)) return undefined
+  if (!(error instanceof Error)) {return undefined}
 
   const position = extractErrorPosition(error, jsonString)
   const message = error.message

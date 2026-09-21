@@ -28,7 +28,7 @@ import { RoutingReliabilitySection } from './routing-reliability-section'
 
 function formatJsonForEditor(value: string, fallback: string) {
   const raw = (value ?? '').toString().trim()
-  if (!raw) return fallback
+  if (!raw) {return fallback}
   try {
     return JSON.stringify(JSON.parse(raw), null, 2)
   } catch {

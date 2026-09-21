@@ -45,7 +45,7 @@ export function isValidBackupCode(code: string): boolean {
  */
 export function formatBackupCode(value: string): string {
   // Remove all non-alphanumeric characters and convert to uppercase
-  let cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, '')
+  let cleaned = value.toUpperCase().replaceAll(/[^A-Z0-9]/g, '')
 
   // Limit to 8 characters
   if (cleaned.length > 8) {
@@ -64,7 +64,8 @@ export function formatBackupCode(value: string): string {
  * Remove hyphens from backup code before sending to server
  */
 export function cleanBackupCode(code: string): string {
-  return code.replace(/-/g, '')
+  // eslint-disable-next-line unicorn/prefer-string-replace-all -- replaceAll requires a global regex; dropping /g throws a TypeError
+  return code.replaceAll(/-/g, '')
 }
 
 // ============================================================================

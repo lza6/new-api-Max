@@ -30,12 +30,12 @@ export function resolveTaskDetailAccess(
   isAdmin: boolean,
   isRoot: boolean
 ): TaskDetailAccess {
-  if (!isAdmin) return {}
+  if (!isAdmin) {return {}}
 
   const access: TaskDetailAccess = {
     plugin: log.admin_info?.task_plugin,
   }
-  if (!isRoot) return access
+  if (!isRoot) {return access}
 
   access.runtime = log.root_info?.task_plugin
   access.upstreamTaskId = log.root_info?.upstream_task_id

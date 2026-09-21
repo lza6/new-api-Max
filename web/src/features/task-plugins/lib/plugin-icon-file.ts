@@ -30,8 +30,8 @@ export function pluginIconMediaType(
   fileName: string
 ): PluginIconMediaType | null {
   const lower = fileName.toLowerCase()
-  if (lower.endsWith('.svg')) return 'image/svg+xml'
-  if (lower.endsWith('.png')) return 'image/png'
+  if (lower.endsWith('.svg')) {return 'image/svg+xml'}
+  if (lower.endsWith('.png')) {return 'image/png'}
   return null
 }
 
@@ -58,7 +58,7 @@ function bytesToBase64(bytes: Uint8Array): string {
  */
 export async function encodePluginIconFile(file: File): Promise<string> {
   const mediaType = pluginIconMediaType(file.name)
-  if (!mediaType) throw new PluginIconFileError('unsupported_type')
+  if (!mediaType) {throw new PluginIconFileError('unsupported_type')}
   if (file.size > MAX_PLUGIN_ICON_BYTES) {
     throw new PluginIconFileError('too_large')
   }
@@ -69,7 +69,7 @@ export async function encodePluginIconFile(file: File): Promise<string> {
 async function sha256Hex(
   bytes: Uint8Array<ArrayBuffer>
 ): Promise<string | null> {
-  if (!globalThis.crypto?.subtle) return null
+  if (!globalThis.crypto?.subtle) {return null}
   const digest = await globalThis.crypto.subtle.digest('SHA-256', bytes)
   return [...new Uint8Array(digest)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
@@ -96,7 +96,7 @@ export async function fetchPluginIconDataUri(
   options: FetchPluginIconOptions = {}
 ): Promise<string | null> {
   const mediaType = pluginIconMediaType(new URL(url).pathname)
-  if (!mediaType) return null
+  if (!mediaType) {return null}
   const fetchImpl = options.fetchImpl ?? globalThis.fetch
   let response: Response
   try {
@@ -104,13 +104,13 @@ export async function fetchPluginIconDataUri(
   } catch {
     return null
   }
-  if (!response.ok) return null
+  if (!response.ok) {return null}
   const bytes = new Uint8Array(await response.arrayBuffer())
-  if (bytes.length === 0 || bytes.length > MAX_PLUGIN_ICON_BYTES) return null
+  if (bytes.length === 0 || bytes.length > MAX_PLUGIN_ICON_BYTES) {return null}
   const expected = options.sha256?.trim().toLowerCase()
   if (expected) {
     const actual = await sha256Hex(bytes)
-    if (actual !== null && actual !== expected) return null
+    if (actual !== null && actual !== expected) {return null}
   }
   return `data:${mediaType};base64,${bytesToBase64(bytes)}`
 }

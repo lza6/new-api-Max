@@ -118,7 +118,7 @@ describe('API key Auto group form mapping', () => {
 
     const result = getApiKeyFormSchema(t, 2).safeParse(defaults)
     expect(result.success).toBe(false)
-    if (result.success) return
+    if (result.success) {return}
     expect(result.error.issues[0]?.path).toEqual(['auto_groups'])
     expect(result.error.issues[0]?.message).toBe(
       'Select at least one Auto group or restore global Auto.'
@@ -161,7 +161,7 @@ describe('API key Auto group form mapping', () => {
     })
 
     expect(result.success).toBe(false)
-    if (result.success) return
+    if (result.success) {return}
     expect(result.error.issues[0]?.path[0]).toBe('auto_groups')
     expect(result.error.issues[0]?.message).toBe('Select at most 1 Auto groups')
   })
@@ -175,7 +175,7 @@ describe('API key Auto group form mapping', () => {
     })
 
     expect(result.success).toBe(false)
-    if (result.success) return
+    if (result.success) {return}
     expect(result.error.issues[0]?.message).toBe(
       'Auto groups must not contain duplicates'
     )

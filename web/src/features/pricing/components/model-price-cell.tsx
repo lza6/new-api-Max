@@ -111,8 +111,8 @@ export function ModelPriceCell(props: {
         </span>
       )
     }
-    if (dynamic.isTaskUsage || hasRequestPrice) caption = currencyLabel
-    if (dynamic.isTimePricing) caption += ` · ${t('Current period price')}`
+    if (dynamic.isTaskUsage || hasRequestPrice) {caption = currencyLabel}
+    if (dynamic.isTimePricing) {caption += ` · ${t('Current period price')}`}
     if (dynamic.isMixedBilling) {
       caption += ` · ${t('Token or per-call pricing')}`
     }

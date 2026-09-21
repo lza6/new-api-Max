@@ -65,7 +65,7 @@ type Values = z.input<typeof schema>
 const UPDATE_CONFIG_FORM_ID = 'update-config-form'
 
 function normalizeJsonObject(input?: string) {
-  if (!input || !input.trim()) return undefined
+  if (!input || !input.trim()) {return undefined}
   const parsed = JSON.parse(input)
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
     throw new Error('JSON must be an object')
@@ -117,7 +117,7 @@ export function UpdateConfigDialog({
   const details = detailsRes?.data
 
   useEffect(() => {
-    if (!open || !details) return
+    if (!open || !details) {return}
     const containerConfig =
       details.container_config && typeof details.container_config === 'object'
         ? (details.container_config as Record<string, unknown>)
@@ -166,7 +166,7 @@ export function UpdateConfigDialog({
   )
 
   const onSubmit = async (values: Values) => {
-    if (!deploymentId) return
+    if (!deploymentId) {return}
     try {
       const env_variables = normalizeJsonObject(values.env_json)
       const secret_env_variables = normalizeJsonObject(values.secret_env_json)

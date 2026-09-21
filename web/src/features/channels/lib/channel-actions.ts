@@ -75,7 +75,7 @@ function getChannelTestResponseTime(
 }
 
 function formatChannelTestDuration(responseTime?: number): string | undefined {
-  if (responseTime === undefined) return undefined
+  if (responseTime === undefined) {return undefined}
 
   if (responseTime >= 1000) {
     return `${(responseTime / 1000).toFixed(2)} s`

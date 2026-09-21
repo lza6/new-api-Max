@@ -51,10 +51,10 @@ const SUPPORTED_PROXY_PROTOCOLS = new Set([
 
 function isOptionalProxyURL(value: string | undefined): boolean {
   const trimmedValue = value?.trim() || ''
-  if (!trimmedValue) return true
+  if (!trimmedValue) {return true}
 
   const schemeSeparatorIndex = trimmedValue.indexOf('://')
-  if (schemeSeparatorIndex <= 0) return false
+  if (schemeSeparatorIndex <= 0) {return false}
 
   const authorityAndSuffix = trimmedValue.slice(schemeSeparatorIndex + 3)
   const suffixIndex = authorityAndSuffix.search(/[/?#]/)
@@ -106,7 +106,7 @@ export function normalizeHttp2ConnectionShards(
 }
 
 function parseOptionalJson(value: string | undefined): unknown {
-  if (!value?.trim()) return undefined
+  if (!value?.trim()) {return undefined}
   return JSON.parse(value)
 }
 
@@ -126,8 +126,8 @@ function isOptionalJsonObject(value: string | undefined): boolean {
 function isOptionalModelMapping(value: string | undefined): boolean {
   try {
     const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
-    if (!isJsonObjectValue(parsed)) return false
+    if (parsed === undefined) {return true}
+    if (!isJsonObjectValue(parsed)) {return false}
     return Object.values(parsed).every((item) => typeof item === 'string')
   } catch {
     return false
@@ -137,8 +137,8 @@ function isOptionalModelMapping(value: string | undefined): boolean {
 function isOptionalStatusCodeMapping(value: string | undefined): boolean {
   try {
     const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
-    if (!isJsonObjectValue(parsed)) return false
+    if (parsed === undefined) {return true}
+    if (!isJsonObjectValue(parsed)) {return false}
     return Object.entries(parsed).every(([from, to]) => {
       const fromCode = Number(from)
       const toCode = Number(to)
@@ -159,7 +159,7 @@ function isOptionalStatusCodeMapping(value: string | undefined): boolean {
 function isCodexCredential(value: string | undefined): boolean {
   try {
     const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
+    if (parsed === undefined) {return true}
     return (
       isJsonObjectValue(parsed) &&
       typeof parsed.access_token === 'string' &&
@@ -175,7 +175,7 @@ function isCodexCredential(value: string | undefined): boolean {
 function isVertexJsonKey(value: string | undefined): boolean {
   try {
     const parsed = parseOptionalJson(value)
-    if (parsed === undefined) return true
+    if (parsed === undefined) {return true}
     if (Array.isArray(parsed)) {
       return parsed.every((item) => isJsonObjectValue(item))
     }
@@ -905,7 +905,7 @@ export function transformFormDataToUpdatePayload(
  * Validate JSON string
  */
 export function validateJSON(value: string): boolean {
-  if (!value || value.trim() === '') return true
+  if (!value || value.trim() === '') {return true}
   try {
     JSON.parse(value)
     return true
@@ -918,7 +918,7 @@ export function validateJSON(value: string): boolean {
  * Validate model mapping format
  */
 export function validateModelMapping(value: string): boolean {
-  if (!value || value.trim() === '') return true
+  if (!value || value.trim() === '') {return true}
   return validateJSON(value)
 }
 
@@ -926,7 +926,7 @@ export function validateModelMapping(value: string): boolean {
  * Parse models string to array
  */
 export function parseModels(models: string): string[] {
-  if (!models) return []
+  if (!models) {return []}
   return models
     .split(',')
     .map((m) => m.trim())
@@ -937,7 +937,7 @@ export function parseModels(models: string): string[] {
  * Parse groups string to array
  */
 export function parseGroups(groups: string): string[] {
-  if (!groups) return []
+  if (!groups) {return []}
   return groups
     .split(',')
     .map((g) => g.trim())

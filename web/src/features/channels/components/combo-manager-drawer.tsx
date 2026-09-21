@@ -309,7 +309,7 @@ function CandidateRowsEditor({
 
   const moveRow = (index: number, delta: -1 | 1) => {
     const target = index + delta
-    if (target < 0 || target >= items.length) return
+    if (target < 0 || target >= items.length) {return}
     const next = [...items]
     const [moved] = next.splice(index, 1)
     next.splice(target, 0, moved)
@@ -521,7 +521,7 @@ function ComboEditor({
   })
 
   const handleCancel = () => {
-    if (isSubmitting) return
+    if (isSubmitting) {return}
     onSaved()
   }
 
@@ -794,14 +794,14 @@ export function ComboManagerDrawer({
   }, [open])
 
   const handleClose = () => {
-    if (!open) return
+    if (!open) {return}
     onOpenChange(false)
     setEditing(null)
     setDeleteTarget(null)
   }
 
   const handleDeleteConfirm = async () => {
-    if (!deleteTarget) return
+    if (!deleteTarget) {return}
     setDeleteLoading(true)
     try {
       await deleteCombo(deleteTarget.id)

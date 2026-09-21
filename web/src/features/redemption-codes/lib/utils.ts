@@ -26,7 +26,7 @@ For commercial licensing, please contact support@quantumnous.com
  * @returns true if the timestamp is in the past
  */
 export function isTimestampExpired(timestamp: number): boolean {
-  if (timestamp === 0) return false
+  if (timestamp === 0) {return false}
   return timestamp < Date.now() / 1000
 }
 

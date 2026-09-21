@@ -183,7 +183,7 @@ async function renderList(
   )
   if (items.length) {
     await screen.findByRole('button', { name: items[0].model_name })
-  } else await screen.findByText('No Models Found')
+  } else {await screen.findByText('No Models Found')}
   if (options.waitForPricing !== false) {
     await waitFor(() => expect(client.isFetching()).toBe(0))
   }

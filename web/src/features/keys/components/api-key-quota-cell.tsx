@@ -61,9 +61,9 @@ export function ApiKeyQuotaCell(props: ApiKeyQuotaCellProps) {
     (props.apiKey.expired_time !== -1 &&
       props.apiKey.expired_time * 1000 <= props.now)
   let progressColor = 'text-emerald-500'
-  if (isInactive) progressColor = 'text-muted-foreground/60'
-  else if (percentage <= 10) progressColor = 'text-rose-500'
-  else if (percentage <= 30) progressColor = 'text-amber-500'
+  if (isInactive) {progressColor = 'text-muted-foreground/60'}
+  else if (percentage <= 10) {progressColor = 'text-rose-500'}
+  else if (percentage <= 30) {progressColor = 'text-amber-500'}
   const usageDescription = `${t('Used amount')} ${formattedUsed}`
   const remainingDescription = hasProgress
     ? `${t('Remaining')} ${formattedRemaining}; ${t('Remaining percentage')} ${formattedPercentage}%`

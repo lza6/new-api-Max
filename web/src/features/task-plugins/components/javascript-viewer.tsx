@@ -35,7 +35,7 @@ export function JavaScriptViewer(props: JavaScriptViewerProps) {
   const viewRef = useRef<EditorView | null>(null)
 
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current) {return}
     const view = new EditorView({
       parent: containerRef.current,
       state: EditorState.create({

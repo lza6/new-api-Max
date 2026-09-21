@@ -90,7 +90,7 @@ export function TruncatedCell({
 }
 
 function getTextContent(node: React.ReactNode): string {
-  if (typeof node === 'string' || typeof node === 'number') return String(node)
-  if (Array.isArray(node)) return node.map(getTextContent).join('')
+  if (typeof node === 'string' || typeof node === 'number') {return String(node)}
+  if (Array.isArray(node)) {return node.map(getTextContent).join('')}
   return ''
 }

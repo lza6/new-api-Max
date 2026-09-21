@@ -96,30 +96,30 @@ export type DynamicPricingSummary = {
 export function getTaskUsageQuantityUnitLabelKey(
   unit: BillingUsageUnit | undefined
 ): string {
-  if (unit === 'second') return 's'
-  if (unit === 'token') return 'token (unit)'
-  if (unit === 'credit') return 'credit'
+  if (unit === 'second') {return 's'}
+  if (unit === 'token') {return 'token (unit)'}
+  if (unit === 'credit') {return 'credit'}
   return 'unit'
 }
 
 export function getTaskUsagePriceUnitLabelKey(
   unit: BillingUsageUnit | undefined
 ): string {
-  if (unit === 'second') return 'second'
-  if (unit === 'token') return '1M token'
-  if (unit === 'credit') return 'credit'
+  if (unit === 'second') {return 'second'}
+  if (unit === 'token') {return '1M token'}
+  if (unit === 'credit') {return 'credit'}
   return 'unit'
 }
 
 export function getDynamicPriceUnitLabelKey(
   entry: DynamicPriceEntry
 ): string | null {
-  if (entry.unit === 'second') return 's'
-  if (entry.unit === 'count') return 'unit'
-  if (entry.unit === 'credit') return 'credit'
+  if (entry.unit === 'second') {return 's'}
+  if (entry.unit === 'count') {return 'unit'}
+  if (entry.unit === 'credit') {return 'credit'}
   // Chat token entries also use unit 'token' but keep the 1M-token label.
-  if (entry.unit === 'token' && !entry.variable) return '1M token'
-  if (entry.unit === 'request') return 'request'
+  if (entry.unit === 'token' && !entry.variable) {return '1M token'}
+  if (entry.unit === 'request') {return 'request'}
   return null
 }
 
@@ -172,7 +172,7 @@ function applyRechargeRate(
   priceRate: number,
   usdExchangeRate: number
 ): number {
-  if (!showWithRecharge) return price
+  if (!showWithRecharge) {return price}
   return (price * priceRate) / usdExchangeRate
 }
 
@@ -227,7 +227,7 @@ export function formatTaskUsageUnitPrice(
 export function getDynamicPricingTiers(
   model: PricingModel
 ): DynamicPricingTier[] {
-  if (!isDynamicPricingModel(model)) return []
+  if (!isDynamicPricingModel(model)) {return []}
   const { billingExpr } = splitBillingExprAndRequestRules(
     model.billing_expr || ''
   )
@@ -238,7 +238,7 @@ export function getDynamicPricingTiers(
 }
 
 export function hasDynamicRequestRules(model: PricingModel): boolean {
-  if (!isDynamicPricingModel(model)) return false
+  if (!isDynamicPricingModel(model)) {return false}
   const { requestRuleExpr } = splitBillingExprAndRequestRules(
     model.billing_expr || ''
   )
@@ -249,7 +249,7 @@ export function getDynamicPriceEntries(
   tier: DynamicPricingTier | null,
   options: DynamicPriceOptions
 ): DynamicPriceEntry[] {
-  if (!tier) return []
+  if (!tier) {return []}
   if (
     !isTaskPricingTier(tier) &&
     tier.billingUnit === 'request' &&
@@ -274,7 +274,7 @@ export function getDynamicPriceEntries(
       options.usageSchema
     ).flatMap(([field, definition]) => {
       const value = Number(tier.unitPrices[field])
-      if (!Number.isFinite(value) || value < 0 || !definition.unit) return []
+      if (!Number.isFinite(value) || value < 0 || !definition.unit) {return []}
       return [
         {
           key: field,
@@ -305,9 +305,9 @@ export function getDynamicPriceEntries(
   }
 
   return BILLING_PRICING_VARS.flatMap((variable) => {
-    if (!variable.field) return []
+    if (!variable.field) {return []}
     const value = Number((tier as ParsedTier)[variable.field])
-    if (!Number.isFinite(value) || value < 0) return []
+    if (!Number.isFinite(value) || value < 0) {return []}
 
     return [
       {
@@ -325,7 +325,7 @@ export function getDynamicPriceEntries(
   }).sort((a, b) => {
     const aPrimary = PRIMARY_DYNAMIC_FIELDS.has(a.field)
     const bPrimary = PRIMARY_DYNAMIC_FIELDS.has(b.field)
-    if (aPrimary !== bPrimary) return aPrimary ? -1 : 1
+    if (aPrimary !== bPrimary) {return aPrimary ? -1 : 1}
     return 0
   })
 }
@@ -334,7 +334,7 @@ export function getDynamicPricingSummary(
   model: PricingModel,
   options: DynamicPriceOptions
 ): DynamicPricingSummary | null {
-  if (!isDynamicPricingModel(model)) return null
+  if (!isDynamicPricingModel(model)) {return null}
 
   const tiers = getDynamicPricingTiers(model)
   const isTaskUsage = isTaskUsagePricingModel(model)
@@ -374,9 +374,9 @@ export function getDynamicPricingSummary(
       let min = Number.POSITIVE_INFINITY
       let max = Number.NEGATIVE_INFINITY
       for (const taskTier of tiers) {
-        if (!isTaskPricingTier(taskTier)) continue
+        if (!isTaskPricingTier(taskTier)) {continue}
         const value = Number(taskTier.unitPrices[field])
-        if (!Number.isFinite(value) || value < 0) continue
+        if (!Number.isFinite(value) || value < 0) {continue}
         min = Math.min(min, value)
         max = Math.max(max, value)
       }
@@ -386,7 +386,7 @@ export function getDynamicPricingSummary(
     }
     entries = entries.map((entry) => {
       const range = priceRanges.get(entry.field)
-      if (!range || range.min === range.max) return entry
+      if (!range || range.min === range.max) {return entry}
       return {
         ...entry,
         formattedRange: `${formatTaskUsageUnitPrice(range.min, options)} – ${formatTaskUsageUnitPrice(range.max, options)}`,
@@ -425,19 +425,19 @@ export function getCardExamplePrice(
   model: PricingModel,
   options: DynamicPriceOptions
 ): CardExamplePrice | null {
-  if (!isTaskUsagePricingModel(model)) return null
+  if (!isTaskUsagePricingModel(model)) {return null}
   const schema = model.billing_usage_schema
   const firstExample = model.billing_usage_examples?.[0]
-  if (!schema || !firstExample) return null
+  if (!schema || !firstExample) {return null}
 
   const { billingExpr } = splitBillingExprAndRequestRules(
     model.billing_expr || ''
   )
   const config = tryParseTaskVisualConfig(billingExpr, schema)
-  if (!config) return null
+  if (!config) {return null}
 
   const result = evaluateTaskVisualConfig(config, firstExample.facts, schema)
-  if (!result) return null
+  if (!result) {return null}
 
   return {
     label: firstExample.label,

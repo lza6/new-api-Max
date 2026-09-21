@@ -39,7 +39,7 @@ function quotaText(value: unknown, t: Translate): string {
   if (typeof value === 'number' && Number.isFinite(value)) {
     return formatLogQuota(value)
   }
-  if (typeof value === 'string' && value.trim()) return value
+  if (typeof value === 'string' && value.trim()) {return value}
   return t('Not recorded')
 }
 
@@ -53,7 +53,7 @@ export function buildQuotaAuditOperation(
   const operation = unknownMode
     ? { label: 'Adjust user quota', named: 'Adjust quota for user “{{name}}”' }
     : QUOTA_OPERATIONS[action]
-  if (!operation) return null
+  if (!operation) {return null}
   const name =
     typeof params.target_username === 'string'
       ? params.target_username.trim()
@@ -68,7 +68,7 @@ export function buildQuotaAuditOperation(
     id = params.target_user_id.trim()
   }
   let headline = name ? t(operation.named, { name }) : t(operation.label)
-  if (!name && !id) headline = `${headline} · ${t('Target not recorded')}`
+  if (!name && !id) {headline = `${headline} · ${t('Target not recorded')}`}
   const identifier = id ? t('(ID: {{id}})', { id }) : ''
   const summary = id
     ? t('{{operation}} (ID: {{id}})', { operation: headline, id })
@@ -100,7 +100,7 @@ export function buildQuotaAuditOperation(
       params.from === params.to &&
       (typeof params.from === 'string' || typeof params.from === 'number')
     let change = `${before} → ${after}`
-    if (unchanged) change = `${t('Quota unchanged')} · ${change}`
+    if (unchanged) {change = `${t('Quota unchanged')} · ${change}`}
     description = `${description} · ${change}`
     fields.push(
       { label: t('Quota before adjustment'), value: before },
@@ -118,7 +118,7 @@ export function buildQuotaAuditOperation(
       typeof params.failure_reason === 'string'
         ? reasons[params.failure_reason]
         : undefined
-    if (reason) description = `${description} · ${reason}`
+    if (reason) {description = `${description} · ${reason}`}
     fields.push({
       label: t('Failure reason'),
       value: reason || t('Not recorded'),

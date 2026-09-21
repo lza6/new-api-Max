@@ -104,8 +104,8 @@ export function pricingOptions(
   return Object.fromEntries(
     PRICING_KEYS.map((key) => {
       let value = values[key]
-      if (key === 'billing_setting.billing_mode') value ??= values.BillingMode
-      if (key === 'billing_setting.billing_expr') value ??= values.BillingExpr
+      if (key === 'billing_setting.billing_mode') {value ??= values.BillingMode}
+      if (key === 'billing_setting.billing_expr') {value ??= values.BillingExpr}
       return [key, typeof value === 'string' ? value : '{}']
     })
   ) as PricingOptions
@@ -138,8 +138,8 @@ export function pricingRow(
   ) as PricingOptions
   const row = pricingRows(options)[0]
   let billingMode: ModelRatioData['billingMode'] = 'per-token'
-  if (row?.billingMode === 'tiered_expr') billingMode = 'tiered_expr'
-  else if (row?.price) billingMode = 'per-request'
+  if (row?.billingMode === 'tiered_expr') {billingMode = 'tiered_expr'}
+  else if (row?.price) {billingMode = 'per-request'}
   return { ...row, name, billingMode }
 }
 
@@ -150,7 +150,7 @@ export function pricingFromDraft(data: ModelRatioData): PricingValues {
   }
   for (const [field, key] of Object.entries(pricingFieldMap)) {
     const value = data[field as keyof typeof pricingFieldMap]
-    if (value === undefined || value === '') continue
+    if (value === undefined || value === '') {continue}
     const number = Number(value)
     if (!Number.isFinite(number) || number < 0) {
       throw new Error(t('Enter a finite, non-negative price'))
@@ -243,13 +243,13 @@ export function applyPriceSyncSelections(
       next['billing_setting.billing_mode'] = 'ratio'
       const fixed = fields.model_price !== undefined
       for (const [field, value] of Object.entries(fields)) {
-        if (field === 'billing_mode' || field === 'billing_expr') continue
-        if (fixed && field !== 'model_price') continue
+        if (field === 'billing_mode' || field === 'billing_expr') {continue}
+        if (fixed && field !== 'model_price') {continue}
         const key = field
           .split('_')
           .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
           .join('') as PricingKey
-        if (PRICING_KEYS.includes(key)) next[key] = value
+        if (PRICING_KEYS.includes(key)) {next[key] = value}
       }
     }
     const validated = pricingFromDraft(pricingRow(name, next))

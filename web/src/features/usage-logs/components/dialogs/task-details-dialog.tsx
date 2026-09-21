@@ -117,11 +117,11 @@ export function TaskStructuredProgressRow(props: {
  * 后端在 RefundTaskQuota 成功后写入 {refund: {quota, reason, settled_at}}。
  */
 function readTaskRefund(data: unknown): { quota: number; reason?: string } | null {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {return null}
   const refund = (data as Record<string, unknown>).refund
-  if (!refund || typeof refund !== 'object' || Array.isArray(refund)) return null
+  if (!refund || typeof refund !== 'object' || Array.isArray(refund)) {return null}
   const quota = Number((refund as Record<string, unknown>).quota)
-  if (!Number.isFinite(quota) || quota <= 0) return null
+  if (!Number.isFinite(quota) || quota <= 0) {return null}
   const reason = (refund as Record<string, unknown>).reason
   return { quota, reason: typeof reason === 'string' ? reason : undefined }
 }
@@ -138,9 +138,9 @@ function readTaskUnconfirmed(
   resolution?: string
   resolutionAt?: number
 } | null {
-  if (!data || typeof data !== 'object' || Array.isArray(data)) return null
+  if (!data || typeof data !== 'object' || Array.isArray(data)) {return null}
   const record = data as Record<string, unknown>
-  if (record.submit_state !== 'unconfirmed') return null
+  if (record.submit_state !== 'unconfirmed') {return null}
   const failedAt = Number(record.failed_at)
   const resolutionAt = Number(record.resolution_at)
   const hint = record.remote_task_id_hint

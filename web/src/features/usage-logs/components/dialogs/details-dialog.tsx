@@ -108,13 +108,13 @@ const CHANNEL_FIELD_LABELS: Record<string, string> = {
 function timingTextColorClass(
   variant: 'success' | 'warning' | 'danger'
 ): string {
-  if (variant === 'success') return 'text-emerald-600'
-  if (variant === 'warning') return 'text-amber-600'
+  if (variant === 'success') {return 'text-emerald-600'}
+  if (variant === 'warning') {return 'text-amber-600'}
   return 'text-rose-600'
 }
 
 function formatRatio(ratio: number | undefined): string {
-  if (ratio == null) return '-'
+  if (ratio == null) {return '-'}
   return ratio.toFixed(4)
 }
 
@@ -159,8 +159,8 @@ function quotaSaturationKindLabel(
   kind: 'overflow' | 'underflow' | 'nan',
   t: (key: string) => string
 ): string {
-  if (kind === 'overflow') return t('Overflow')
-  if (kind === 'underflow') return t('Underflow')
+  if (kind === 'overflow') {return t('Overflow')}
+  if (kind === 'underflow') {return t('Underflow')}
   return t('Invalid (NaN)')
 }
 
@@ -392,7 +392,7 @@ function TokenBreakdown(props: { log: UsageLog; other: LogOtherData }) {  const 
   const cacheWrite1h = other.cache_creation_tokens_1h || 0
   const hasTokens = promptTokens > 0 || completionTokens > 0
 
-  if (!hasTokens) return null
+  if (!hasTokens) {return null}
 
   const rows: Array<{ label: string; value: string }> = []
 
@@ -459,7 +459,7 @@ function ExplainBreakdown(props: { other: LogOtherData }) {
   const { t } = useTranslation()
   const { other } = props
   const explain = other.explain
-  if (!explain) return null
+  if (!explain) {return null}
   const facts = Array.isArray(explain.facts)
     ? explain.facts.filter(
         (fact) =>
@@ -475,7 +475,7 @@ function ExplainBreakdown(props: { other: LogOtherData }) {
           item != null && typeof item === 'object' && typeof item.text === 'string' && item.text !== ''
       )
     : []
-  if (facts.length === 0 && inferences.length === 0) return null
+  if (facts.length === 0 && inferences.length === 0) {return null}
 
   return (
     <DetailSection label={t('Fee Explanation')}>
@@ -632,20 +632,20 @@ export function DetailsDialog(props: DetailsDialogProps) {
     props.isAdmin &&
     (topupAuditFields.length > 0 || showLegacyTopupWarning)
   const manageOperator = (() => {
-    if (!isManage || !props.isAdmin || !adminInfo) return null
+    if (!isManage || !props.isAdmin || !adminInfo) {return null}
     const username = adminInfo.admin_username
     const id = adminInfo.admin_id
     const hasUsername = username != null && String(username).trim() !== ''
     const hasId = id != null && String(id).trim() !== ''
-    if (!hasUsername && !hasId) return null
-    if (hasUsername && hasId) return `${username} (ID: ${id})`
-    if (hasUsername) return String(username)
+    if (!hasUsername && !hasId) {return null}
+    if (hasUsername && hasId) {return `${username} (ID: ${id})`}
+    if (hasUsername) {return String(username)}
     return `ID: ${id}`
   })()
   const authMethodLabel = (() => {
-    if (!isManage || !props.isAdmin || !adminInfo?.auth_method) return ''
-    if (adminInfo.auth_method === 'access_token') return t('Access Token')
-    if (adminInfo.auth_method === 'session') return t('Session')
+    if (!isManage || !props.isAdmin || !adminInfo?.auth_method) {return ''}
+    if (adminInfo.auth_method === 'access_token') {return t('Access Token')}
+    if (adminInfo.auth_method === 'session') {return t('Session')}
     return String(adminInfo.auth_method)
   })()
 
@@ -1403,7 +1403,7 @@ export function DetailsDialog(props: DetailsDialogProps) {
           >
             {other.po.filter(Boolean).map((line) => {
               const parsed = parseAuditLine(line)
-              if (!parsed) return null
+              if (!parsed) {return null}
               return (
                 <div
                   key={`${parsed.action}-${parsed.content}`}

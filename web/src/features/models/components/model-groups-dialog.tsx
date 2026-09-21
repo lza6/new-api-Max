@@ -54,13 +54,13 @@ export function ModelGroupsDialog({
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    if (open) setSelected(currentGroups)
+    if (open) {setSelected(currentGroups)}
   }, [open, currentGroups])
 
   const options = useMemo(() => {
     const seen = new Set<string>()
     return [...availableGroups, ...currentGroups].filter((g) => {
-      if (!g || seen.has(g)) return false
+      if (!g || seen.has(g)) {return false}
       seen.add(g)
       return true
     })

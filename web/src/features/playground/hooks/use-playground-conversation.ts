@@ -55,7 +55,7 @@ export function usePlaygroundConversation({
   const handleRegenerateMessage = useCallback(
     (message: Message) => {
       const nextMessages = createRegeneratedMessages(messages, message.key)
-      if (!nextMessages) return
+      if (!nextMessages) {return}
 
       updateMessages(nextMessages)
       sendChat(nextMessages)
@@ -75,7 +75,7 @@ export function usePlaygroundConversation({
 
   const applyEdit = useCallback(
     (newContent: string, shouldSubmit: boolean) => {
-      if (!editingMessageKey) return
+      if (!editingMessageKey) {return}
 
       const editResult = applyMessageEdit(
         messages,
@@ -83,7 +83,7 @@ export function usePlaygroundConversation({
         newContent,
         shouldSubmit
       )
-      if (!editResult) return
+      if (!editResult) {return}
 
       setEditingMessageKey(null)
       updateMessages(editResult.messages)

@@ -96,7 +96,7 @@ export function ResetPasswordConfirm({
   }
 
   async function handleCopy() {
-    if (!newPassword) return
+    if (!newPassword) {return}
 
     const copySuccess = await copyToClipboard(newPassword)
     if (copySuccess) {

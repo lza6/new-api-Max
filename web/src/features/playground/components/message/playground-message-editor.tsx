@@ -55,7 +55,7 @@ export function PlaygroundMessageEditor({
   )
 
   useEffect(() => {
-    if (!hasChanged) return
+    if (!hasChanged) {return}
 
     const handleBeforeUnload = (event: BeforeUnloadEvent) => {
       event.preventDefault()
@@ -84,14 +84,14 @@ export function PlaygroundMessageEditor({
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
       event.preventDefault()
-      if (showLeaveDialog) return
+      if (showLeaveDialog) {return}
       handleCancel()
       return
     }
 
     if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
       event.preventDefault()
-      if (!canSave) return
+      if (!canSave) {return}
 
       if (showSaveAndSubmit) {
         onSaveEditAndSubmit?.(editText)
@@ -177,7 +177,7 @@ export function PlaygroundMessageEditor({
         destructive
         handleConfirm={leaveEdit}
         onOpenChange={(open) => {
-          if (!open) setShowLeaveDialog(false)
+          if (!open) {setShowLeaveDialog(false)}
         }}
         open={showLeaveDialog}
         title={t('Unsaved changes')}

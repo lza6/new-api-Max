@@ -20,23 +20,23 @@ export function parseSseChunk(
   let event: string | undefined
   let data: string | undefined
   for (const line of lines) {
-    if (line.startsWith(':')) continue // comment/heartbeat
+    if (line.startsWith(':')) {continue} // comment/heartbeat
     if (line.startsWith('id:')) {
       const v = Number(line.slice(3).trim())
-      if (Number.isFinite(v)) id = v
+      if (Number.isFinite(v)) {id = v}
     } else if (line.startsWith('event:')) {
       event = line.slice(6).trim()
     } else if (line.startsWith('data:')) {
       data = line.slice(5).trim()
     }
   }
-  if (!id && !event && !data) return null
+  if (!id && !event && !data) {return null}
   return { id, event, data }
 }
 
 /** 从事件 payload 提取关键字段摘要；无字段时降级为截断 JSON。 */
 export function summarizePayload(payload: Record<string, unknown>): string {
-  if (!payload) return ''
+  if (!payload) {return ''}
   const parts: string[] = []
   const pick = (key: string) =>
     typeof payload[key] === 'string' || typeof payload[key] === 'number'
@@ -52,9 +52,9 @@ export function summarizePayload(payload: Record<string, unknown>): string {
     'remote_task_id_hint',
   ]) {
     const v = pick(key)
-    if (v !== undefined && v !== '') parts.push(`${key}=${v}`)
+    if (v !== undefined && v !== '') {parts.push(`${key}=${v}`)}
   }
-  if (parts.length > 0) return parts.join(' ')
+  if (parts.length > 0) {return parts.join(' ')}
   const raw = JSON.stringify(payload)
   return raw.length > 120 ? `${raw.slice(0, 120)}…` : raw
 }

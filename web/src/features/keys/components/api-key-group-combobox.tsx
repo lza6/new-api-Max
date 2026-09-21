@@ -74,7 +74,7 @@ export function ApiKeyGroupCombobox({
 
   const filteredOptions = useMemo(() => {
     const search = searchValue.trim().toLowerCase()
-    if (!search) return options
+    if (!search) {return options}
 
     return options.filter((option) => {
       const ratioText = String(option.ratio ?? '').toLowerCase()

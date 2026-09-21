@@ -46,7 +46,7 @@ export function useChartTheme() {
         )
       }
       const ThemeManager = await themeManagerPromise
-      if (cancelled) return
+      if (cancelled) {return}
       themeRef.current = ThemeManager
       ThemeManager.setCurrentTheme(resolvedTheme === 'dark' ? 'dark' : 'light')
       setThemeReady(true)

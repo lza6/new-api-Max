@@ -28,7 +28,7 @@ let timer: ReturnType<typeof setTimeout> | undefined
 function refreshBillingTime(): void {
   timestamp = Date.now()
   listeners.forEach((listener) => listener())
-  if (timer) clearTimeout(timer)
+  if (timer) {clearTimeout(timer)}
   if (listeners.size > 0 && document.visibilityState !== 'hidden') {
     timer = setTimeout(refreshBillingTime, 60000 - (Date.now() % 60000))
   }
@@ -43,7 +43,7 @@ function subscribeBillingTime(listener: () => void): () => void {
   return () => {
     listeners.delete(listener)
     if (listeners.size === 0) {
-      if (timer) clearTimeout(timer)
+      if (timer) {clearTimeout(timer)}
       timer = undefined
       document.removeEventListener('visibilitychange', refreshBillingTime)
     }

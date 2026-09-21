@@ -156,7 +156,7 @@ function parseUserSidebarConfig(
   }
   try {
     const parsed = JSON.parse(value) as SidebarModulesAdminConfig
-    if (!parsed || typeof parsed !== 'object') return null
+    if (!parsed || typeof parsed !== 'object') {return null}
     return parsed
   } catch {
     return null
@@ -185,13 +185,13 @@ function isModuleEnabled(
   const adminAllowed = Boolean(
     adminSection && adminSection.enabled && adminSection[module] === true
   )
-  if (!adminAllowed) return false
+  if (!adminAllowed) {return false}
 
-  if (!userConfig) return true
+  if (!userConfig) {return true}
 
   const userSection = userConfig[section]
-  if (!userSection) return true
-  if (userSection.enabled === false) return false
+  if (!userSection) {return true}
+  if (userSection.enabled === false) {return false}
   return userSection[module] !== false
 }
 
@@ -207,11 +207,11 @@ function isNavItemVisible(
   if ('type' in item && item.type === 'chat-presets') {
     const adminChat = adminConfig.chat
     const adminAllowed = Boolean(adminChat?.enabled && adminChat.chat === true)
-    if (!adminAllowed) return false
-    if (!userConfig) return true
+    if (!adminAllowed) {return false}
+    if (!userConfig) {return true}
     const userChat = userConfig.chat
-    if (!userChat) return true
-    if (userChat.enabled === false) return false
+    if (!userChat) {return true}
+    if (userChat.enabled === false) {return false}
     return userChat.chat !== false
   }
 

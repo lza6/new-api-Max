@@ -108,7 +108,7 @@ export function AmountDiscountVisualEditor({
   }
 
   const formatPercentage = (rate: number) => {
-    if (rate >= 1) return '0%'
+    if (rate >= 1) {return '0%'}
     const discount = Math.round((1 - rate) * 100)
     return `${discount}%`
   }

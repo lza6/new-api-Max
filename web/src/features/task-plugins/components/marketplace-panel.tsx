@@ -76,7 +76,7 @@ export function MarketplacePanel() {
     retry: false,
     meta: { errorToast: false },
     queryFn: async (): Promise<MarketplaceIndex> => {
-      if (!selectedSource) throw new Error('marketplace source is not selected')
+      if (!selectedSource) {throw new Error('marketplace source is not selected')}
       const response = await fetch(selectedSource.index_url)
       if (!response.ok) {
         throw new Error(
@@ -142,7 +142,7 @@ export function MarketplacePanel() {
               const nextSourceUrl = value.find(
                 (item) => item !== selectedSource.index_url
               )
-              if (nextSourceUrl) setSelectedSourceUrl(nextSourceUrl)
+              if (nextSourceUrl) {setSelectedSourceUrl(nextSourceUrl)}
             }}
             aria-label={t('Marketplace sources')}
             variant='outline'
@@ -181,7 +181,7 @@ export function MarketplacePanel() {
         key={`${installTarget?.plugin.key ?? ''}-${installTarget?.version ?? ''}`}
         target={installTarget}
         onOpenChange={(open) => {
-          if (!open) setInstallTarget(null)
+          if (!open) {setInstallTarget(null)}
         }}
       />
     </>

@@ -102,13 +102,13 @@ export function WaffoPancakeSettingsSection({
   React.useEffect(() => {
     const parsed = JSON.parse(defaultsSignature) as WaffoPancakeSettingsValues
     initialRef.current = parsed
-    if (didMountRef.current) return
+    if (didMountRef.current) {return}
     didMountRef.current = true
     lastVerifiedSignature.current = `${parsed.WaffoPancakeMerchantID.trim()}|${parsed.WaffoPancakePrivateKey.trim()}`
   }, [defaultsSignature])
 
   const productsForChosenStore = React.useMemo(() => {
-    if (!chosenStoreID) return []
+    if (!chosenStoreID) {return []}
     return catalog.find((s) => s.id === chosenStoreID)?.onetimeProducts ?? []
   }, [catalog, chosenStoreID])
 
@@ -151,7 +151,7 @@ export function WaffoPancakeSettingsSection({
       let stores: CatalogStore[]
       try {
         const body = await listWaffoPancakeCatalog(merchantID, privateKey)
-        if (serial !== fetchSerialRef.current) return
+        if (serial !== fetchSerialRef.current) {return}
         if (
           body?.message === 'success' &&
           typeof body.data === 'object' &&
@@ -171,7 +171,7 @@ export function WaffoPancakeSettingsSection({
           return
         }
       } catch (err) {
-        if (serial !== fetchSerialRef.current) return
+        if (serial !== fetchSerialRef.current) {return}
         handleServerError(
           err,
           `${t('Credentials verification failed')}: ${
@@ -181,7 +181,7 @@ export function WaffoPancakeSettingsSection({
         setPhase('idle')
         return
       }
-      if (serial !== fetchSerialRef.current) return
+      if (serial !== fetchSerialRef.current) {return}
 
       setCatalog(stores)
       if (preselect) {
@@ -224,9 +224,9 @@ export function WaffoPancakeSettingsSection({
   React.useEffect(() => {
     const m = watchedMerchantID.trim()
     const k = watchedPrivateKey.trim()
-    if (!m || !k) return
+    if (!m || !k) {return}
     const signature = `${m}|${k}`
-    if (signature === lastVerifiedSignature.current) return
+    if (signature === lastVerifiedSignature.current) {return}
     const timer = setTimeout(() => {
       lastVerifiedSignature.current = signature
       setPhase('verifying')
@@ -240,8 +240,8 @@ export function WaffoPancakeSettingsSection({
   // the catalog controller falls back to the persisted OptionMap creds.
   const initialLoadRef = React.useRef(false)
   React.useEffect(() => {
-    if (initialLoadRef.current) return
-    if (!defaultValues.WaffoPancakeMerchantID.trim()) return
+    if (initialLoadRef.current) {return}
+    if (!defaultValues.WaffoPancakeMerchantID.trim()) {return}
     initialLoadRef.current = true
     const timer = window.setTimeout(() => {
       setPhase('verifying')
@@ -259,7 +259,7 @@ export function WaffoPancakeSettingsSection({
     const formKey = (values.WaffoPancakePrivateKey || '').trim()
     const saved = (defaultValues.WaffoPancakeMerchantID || '').trim()
     const edited = formMerchant !== saved || formKey.length > 0
-    if (!edited) return { merchantID: '', privateKey: '' }
+    if (!edited) {return { merchantID: '', privateKey: '' }}
     return { merchantID: formMerchant, privateKey: formKey }
   }
 

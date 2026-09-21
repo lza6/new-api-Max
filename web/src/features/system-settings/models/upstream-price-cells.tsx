@@ -142,7 +142,7 @@ export function SyncSourcePriceCell(props: {
   const context = useSyncPriceSelection()
   const model = props.row.model
   const values = props.row.prices.upstreams[props.source]
-  if (!values) return <span className='text-muted-foreground'>—</span>
+  if (!values) {return <span className='text-muted-foreground'>—</span>}
   const same = sameSyncPrice(values, props.row.prices.current)
   const confident = Object.values(props.row.differences ?? {}).every(
     (diff) => diff?.confidence?.[props.source] !== false

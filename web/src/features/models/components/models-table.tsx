@@ -176,8 +176,8 @@ export function ModelsTable() {
     models.length > 0
   )
   let pricingState: 'loading' | 'error' | undefined
-  if (pricingQuery.isError) pricingState = 'error'
-  else if (pricingQuery.isLoading) pricingState = 'loading'
+  if (pricingQuery.isError) {pricingState = 'error'}
+  else if (pricingQuery.isLoading) {pricingState = 'loading'}
   const columns = useModelsColumns(vendors, pricingQuery.data, pricingState)
 
   // React Table instance

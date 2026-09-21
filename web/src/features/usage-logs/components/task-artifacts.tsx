@@ -121,7 +121,7 @@ function LegacyAudioPreview(props: { data: unknown }) {
   const [open, setOpen] = useState(false)
   const clips = useMemo(() => parseLegacyAudioClips(props.data), [props.data])
 
-  if (clips.length === 0) return null
+  if (clips.length === 0) {return null}
 
   return (
     <>
@@ -318,7 +318,7 @@ function TaskArtifacts(props: TaskArtifactsProps) {
     staleTime: 30_000,
   })
 
-  if (!props.enabled) return null
+  if (!props.enabled) {return null}
 
   if (artifactsQuery.isPending) {
     return (

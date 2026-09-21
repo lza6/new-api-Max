@@ -68,7 +68,7 @@ export function BalanceQueryDialog(props: BalanceQueryDialogProps) {
 
   const handleQueryCodexUsage = async () => {
     const row = currentRow
-    if (!row) return
+    if (!row) {return}
     setIsQuerying(true)
     try {
       const res = await getCodexUsage(row.id)
@@ -84,13 +84,13 @@ export function BalanceQueryDialog(props: BalanceQueryDialogProps) {
   }
 
   useEffect(() => {
-    if (!isCodex) return
-    if (!props.open) return
+    if (!isCodex) {return}
+    if (!props.open) {return}
     handleQueryCodexUsage()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [props.open, isCodex])
 
-  if (!currentRow) return null
+  if (!currentRow) {return null}
 
   const handleQueryBalance = async () => {
     setIsQuerying(true)
@@ -144,7 +144,7 @@ export function BalanceQueryDialog(props: BalanceQueryDialogProps) {
     })
 
   const formatDate = (timestamp: number) => {
-    if (!timestamp) return 'Never'
+    if (!timestamp) {return 'Never'}
     return formatTimestampToDate(timestamp)
   }
 
@@ -153,7 +153,7 @@ export function BalanceQueryDialog(props: BalanceQueryDialogProps) {
       <CodexUsageDialog
         open={props.open}
         onOpenChange={(v) => {
-          if (!v) handleClose()
+          if (!v) {handleClose()}
         }}
         channelName={currentRow.name}
         channelId={currentRow.id}

@@ -67,7 +67,7 @@ export function ModelsSection(props: ModelsSectionProps) {
     )
     return [...props.history.points].sort((a, b) => {
       const tsCmp = a.ts.localeCompare(b.ts)
-      if (tsCmp !== 0) return tsCmp
+      if (tsCmp !== 0) {return tsCmp}
       return (order.get(a.model) ?? 999) - (order.get(b.model) ?? 999)
     })
   }, [props.history])
@@ -78,7 +78,7 @@ export function ModelsSection(props: ModelsSectionProps) {
   )
 
   const spec = useMemo(() => {
-    if (orderedPoints.length === 0) return null
+    if (orderedPoints.length === 0) {return null}
     return {
       type: 'bar' as const,
       data: [{ id: 'models-history', values: orderedPoints }],

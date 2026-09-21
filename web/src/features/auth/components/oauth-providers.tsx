@@ -142,7 +142,7 @@ export function OAuthProviders({
     }
   }
 
-  if (providerButtons.length === 0) return null
+  if (providerButtons.length === 0) {return null}
 
   return (
     <div className={cn('space-y-3', className)}>

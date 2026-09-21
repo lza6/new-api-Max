@@ -76,7 +76,7 @@ export function CreemProductsVisualEditor({
   }, [value, t])
 
   const filteredProducts = useMemo(() => {
-    if (!searchText) return products
+    if (!searchText) {return products}
     const lowerSearch = searchText.toLowerCase()
     return products.filter(
       (product) =>

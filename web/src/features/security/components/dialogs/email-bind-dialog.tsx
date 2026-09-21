@@ -137,10 +137,10 @@ export function EmailBindDialog(props: EmailBindDialogProps) {
         )
         return startEmailBinding(email, proof, signal)
       })
-      if (result) applyFlow(result)
+      if (result) {applyFlow(result)}
       return
     }
-    if (expired) return
+    if (expired) {return}
     const newCode = values.newCode.trim()
     const oldCode = values.oldCode.trim()
     if (!/^\d{6}$/.test(newCode)) {
@@ -162,13 +162,13 @@ export function EmailBindDialog(props: EmailBindDialogProps) {
     const result = await security.run((signal) =>
       bindEmail(flow.flow_token, newCode, oldCode, signal)
     )
-    if (!result) return
+    if (!result) {return}
     toast.success(t('Email bound successfully!'))
     handleOpenChange(false)
     props.onSuccess()
   }
   const resendCodes = async () => {
-    if (!flow || resend.isActive || expired) return
+    if (!flow || resend.isActive || expired) {return}
     const result = await security.run((signal) =>
       resendEmailBinding(flow.flow_token, signal)
     )

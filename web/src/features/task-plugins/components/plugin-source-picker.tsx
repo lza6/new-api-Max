@@ -42,7 +42,7 @@ export function PluginSourcePicker(props: PluginSourcePickerProps) {
   const [isDragActive, setIsDragActive] = useState(false)
 
   const selectFile = (file?: File) => {
-    if (!file) return
+    if (!file) {return}
     props.onSelect(file)
   }
 

@@ -54,7 +54,7 @@ function snapFloatDrift(value: number): number {
 
 export function formatPricingNumber(value: unknown): string {
   const num = toNumberOrNull(value)
-  if (num === null) return ''
+  if (num === null) {return ''}
 
   const normalized = snapFloatDrift(num)
   return Number.parseFloat(normalized.toFixed(DISPLAY_DECIMALS)).toString()

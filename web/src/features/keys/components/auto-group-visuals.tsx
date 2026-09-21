@@ -33,7 +33,7 @@ type AutoGroupFlowBorderProps = {
 }
 
 export function AutoGroupFlowBorder(props: AutoGroupFlowBorderProps) {
-  if (props.shouldReduceMotion) return null
+  if (props.shouldReduceMotion) {return null}
 
   return (
     <span

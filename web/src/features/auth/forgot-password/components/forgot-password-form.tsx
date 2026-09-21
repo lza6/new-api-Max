@@ -74,7 +74,7 @@ export function ForgotPasswordForm({
   const turnstileReady = !isTurnstileEnabled || Boolean(turnstileToken)
 
   async function onSubmit(data: z.infer<typeof forgotPasswordFormSchema>) {
-    if (!validateTurnstile()) return
+    if (!validateTurnstile()) {return}
 
     setIsLoading(true)
     try {

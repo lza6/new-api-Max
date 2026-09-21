@@ -446,8 +446,8 @@ let localIdSeed = 0
 const nextLocalId = () => `po_${Date.now()}_${localIdSeed++}`
 
 const toValueText = (value: unknown): string => {
-  if (value === undefined) return ''
-  if (typeof value === 'string') return value
+  if (value === undefined) {return ''}
+  if (typeof value === 'string') {return value}
   try {
     return JSON.stringify(value)
   } catch {
@@ -457,7 +457,7 @@ const toValueText = (value: unknown): string => {
 
 const parseLooseValue = (valueText: string): unknown => {
   const raw = String(valueText ?? '').trim()
-  if (raw === '') return ''
+  if (raw === '') {return ''}
   try {
     return JSON.parse(raw)
   } catch {
@@ -521,14 +521,14 @@ const reorderOperations = (
   targetId: string,
   position: 'before' | 'after' = 'before'
 ): ParamOverrideOperation[] => {
-  if (!sourceId || !targetId || sourceId === targetId) return ops
+  if (!sourceId || !targetId || sourceId === targetId) {return ops}
   const srcIdx = ops.findIndex((o) => o.id === sourceId)
-  if (srcIdx < 0) return ops
+  if (srcIdx < 0) {return ops}
   const next = [...ops]
   const [moved] = next.splice(srcIdx, 1)
   let insertIdx = next.findIndex((o) => o.id === targetId)
-  if (insertIdx < 0) return ops
-  if (position === 'after') insertIdx += 1
+  if (insertIdx < 0) {return ops}
+  if (position === 'after') {insertIdx += 1}
   next.splice(insertIdx, 0, moved)
   return next
 }
@@ -572,93 +572,93 @@ const getOperationSummary = (
 
 const getModeTagTailwind = (mode: string): string => {
   if (mode.includes('header'))
-    return 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/20'
+    {return 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/20'}
   if (mode.includes('replace') || mode.includes('trim'))
-    return 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20'
+    {return 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/20'}
   if (mode.includes('copy') || mode.includes('move'))
-    return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20'
+    {return 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/20'}
   if (mode.includes('error') || mode.includes('prune'))
-    return 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/20'
+    {return 'bg-red-500/15 text-red-700 dark:text-red-300 border-red-500/20'}
   if (mode.includes('sync'))
-    return 'bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/20'
+    {return 'bg-green-500/15 text-green-700 dark:text-green-300 border-green-500/20'}
   return 'bg-muted text-muted-foreground'
 }
 
 const getModePathLabel = (mode: string): string => {
-  if (mode === 'set_header' || mode === 'delete_header') return 'Header Name'
-  if (mode === 'prune_objects') return 'Target Path (optional)'
+  if (mode === 'set_header' || mode === 'delete_header') {return 'Header Name'}
+  if (mode === 'prune_objects') {return 'Target Path (optional)'}
   return 'Target Field Path'
 }
 
 const getModePathPlaceholder = (mode: string): string => {
-  if (mode === 'set_header') return 'Authorization'
-  if (mode === 'delete_header') return 'X-Debug-Mode'
-  if (mode === 'prune_objects') return 'messages'
+  if (mode === 'set_header') {return 'Authorization'}
+  if (mode === 'delete_header') {return 'X-Debug-Mode'}
+  if (mode === 'prune_objects') {return 'messages'}
   return 'temperature'
 }
 
 const getModeFromLabel = (mode: string): string => {
-  if (mode === 'replace') return 'Match Text'
-  if (mode === 'regex_replace') return 'Regex Pattern'
-  if (mode === 'copy_header' || mode === 'move_header') return 'Source Header'
+  if (mode === 'replace') {return 'Match Text'}
+  if (mode === 'regex_replace') {return 'Regex Pattern'}
+  if (mode === 'copy_header' || mode === 'move_header') {return 'Source Header'}
   return 'Source Field'
 }
 
 const getModeFromPlaceholder = (mode: string): string => {
-  if (mode === 'replace') return 'openai/'
-  if (mode === 'regex_replace') return '^gpt-'
-  if (mode === 'copy_header' || mode === 'move_header') return 'Authorization'
+  if (mode === 'replace') {return 'openai/'}
+  if (mode === 'regex_replace') {return '^gpt-'}
+  if (mode === 'copy_header' || mode === 'move_header') {return 'Authorization'}
   return 'model'
 }
 
 const getModeToLabel = (mode: string): string => {
-  if (mode === 'replace' || mode === 'regex_replace') return 'Replace With'
-  if (mode === 'copy_header' || mode === 'move_header') return 'Target Header'
+  if (mode === 'replace' || mode === 'regex_replace') {return 'Replace With'}
+  if (mode === 'copy_header' || mode === 'move_header') {return 'Target Header'}
   return 'Target Field'
 }
 
 const getModeToPlaceholder = (mode: string): string => {
-  if (mode === 'replace') return '(leave empty to delete)'
-  if (mode === 'regex_replace') return 'openai/gpt-'
-  if (mode === 'copy_header' || mode === 'move_header') return 'X-Upstream-Auth'
+  if (mode === 'replace') {return '(leave empty to delete)'}
+  if (mode === 'regex_replace') {return 'openai/gpt-'}
+  if (mode === 'copy_header' || mode === 'move_header') {return 'X-Upstream-Auth'}
   return 'original_model'
 }
 
 const getModeValueLabel = (mode: string): string => {
   if (mode === 'set_header')
-    return 'Header Value (supports string or JSON mapping)'
+    {return 'Header Value (supports string or JSON mapping)'}
   if (mode === 'pass_headers')
-    return 'Pass-through Headers (comma-separated or JSON array)'
+    {return 'Pass-through Headers (comma-separated or JSON array)'}
   if (
     mode === 'trim_prefix' ||
     mode === 'trim_suffix' ||
     mode === 'ensure_prefix' ||
     mode === 'ensure_suffix'
   )
-    return 'Prefix/Suffix Text'
-  if (mode === 'prune_objects') return 'Prune Rule (string or JSON object)'
+    {return 'Prefix/Suffix Text'}
+  if (mode === 'prune_objects') {return 'Prune Rule (string or JSON object)'}
   return 'Value (supports JSON or plain text)'
 }
 
 const getModeValuePlaceholder = (mode: string): string => {
-  if (mode === 'set_header') return 'Bearer sk-xxx'
-  if (mode === 'pass_headers') return 'Authorization, X-Request-Id'
+  if (mode === 'set_header') {return 'Bearer sk-xxx'}
+  if (mode === 'pass_headers') {return 'Authorization, X-Request-Id'}
   if (
     mode === 'trim_prefix' ||
     mode === 'trim_suffix' ||
     mode === 'ensure_prefix' ||
     mode === 'ensure_suffix'
   )
-    return 'openai/'
-  if (mode === 'prune_objects') return '{"type":"redacted_thinking"}'
+    {return 'openai/'}
+  if (mode === 'prune_objects') {return '{"type":"redacted_thinking"}'}
   return '0.7'
 }
 
 const parseSyncTargetSpec = (spec: string): { type: string; key: string } => {
   const raw = String(spec ?? '').trim()
-  if (!raw) return { type: 'json', key: '' }
+  if (!raw) {return { type: 'json', key: '' }}
   const idx = raw.indexOf(':')
-  if (idx < 0) return { type: 'json', key: raw }
+  if (idx < 0) {return { type: 'json', key: raw }}
   const prefix = raw.slice(0, idx).trim().toLowerCase()
   const key = raw.slice(idx + 1).trim()
   return prefix === 'header' ? { type: 'header', key } : { type: 'json', key }
@@ -667,7 +667,7 @@ const parseSyncTargetSpec = (spec: string): { type: string; key: string } => {
 const buildSyncTargetSpec = (type: string, key: string): string => {
   const normalizedType = type === 'header' ? 'header' : 'json'
   const normalizedKey = String(key ?? '').trim()
-  if (!normalizedKey) return ''
+  if (!normalizedKey) {return ''}
   return `${normalizedType}:${normalizedKey}`
 }
 
@@ -692,7 +692,7 @@ const parseReturnErrorDraft = (valueText: string): ReturnErrorDraft => {
     simpleMode: true,
   }
   const raw = String(valueText ?? '').trim()
-  if (!raw) return defaults
+  if (!raw) {return defaults}
   try {
     const parsed = JSON.parse(raw) as Record<string, unknown>
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
@@ -726,7 +726,7 @@ const buildReturnErrorValueText = (
   draft: Partial<ReturnErrorDraft>
 ): string => {
   const message = String(draft.message || '').trim()
-  if (draft.simpleMode) return message
+  if (draft.simpleMode) {return message}
   const statusCode = Number(draft.statusCode)
   const payload: Record<string, unknown> = {
     message,
@@ -737,9 +737,9 @@ const buildReturnErrorValueText = (
   }
   const code = String(draft.code || '').trim()
   const type = String(draft.type || '').trim()
-  if (code) payload.code = code
-  if (type) payload.type = type
-  if (draft.skipRetry === false) payload.skip_retry = false
+  if (code) {payload.code = code}
+  if (type) {payload.type = type}
+  if (draft.skipRetry === false) {payload.skip_retry = false}
   return JSON.stringify(payload)
 }
 
@@ -782,11 +782,11 @@ const parsePruneObjectsDraft = (valueText: string): PruneObjectsDraft => {
     rules: [],
   }
   const raw = String(valueText ?? '').trim()
-  if (!raw) return defaults
+  if (!raw) {return defaults}
   try {
     const parsed = JSON.parse(raw)
     if (typeof parsed === 'string')
-      return { ...defaults, typeText: parsed.trim() }
+      {return { ...defaults, typeText: parsed.trim() }}
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const rules: PruneRule[] = []
       if (
@@ -803,7 +803,7 @@ const parsePruneObjectsDraft = (valueText: string): PruneObjectsDraft => {
       if (Array.isArray(parsed.conditions)) {
         for (const item of parsed.conditions) {
           if (item && typeof item === 'object')
-            rules.push(normalizePruneRule(item))
+            {rules.push(normalizePruneRule(item))}
         }
       } else if (
         parsed.conditions &&
@@ -843,11 +843,11 @@ const parsePruneObjectsDraft = (valueText: string): PruneObjectsDraft => {
 
 const buildPruneObjectsValueText = (draft: PruneObjectsDraft): string => {
   const typeText = String(draft.typeText || '').trim()
-  if (draft.simpleMode) return typeText
+  if (draft.simpleMode) {return typeText}
   const payload: Record<string, unknown> = {}
-  if (typeText) payload.type = typeText
-  if (String(draft.logic || 'AND').toUpperCase() === 'OR') payload.logic = 'OR'
-  if (draft.recursive === false) payload.recursive = false
+  if (typeText) {payload.type = typeText}
+  if (String(draft.logic || 'AND').toUpperCase() === 'OR') {payload.logic = 'OR'}
+  if (draft.recursive === false) {payload.recursive = false}
   const conditions = (draft.rules || [])
     .filter((rule) => String(rule.path || '').trim())
     .map((rule) => {
@@ -856,14 +856,14 @@ const buildPruneObjectsValueText = (draft: PruneObjectsDraft): string => {
         mode: CONDITION_MODE_VALUES.has(rule.mode) ? rule.mode : 'full',
       }
       const valueRaw = String(rule.value_text || '').trim()
-      if (valueRaw !== '') conditionPayload.value = parseLooseValue(valueRaw)
-      if (rule.invert) conditionPayload.invert = true
-      if (rule.pass_missing_key) conditionPayload.pass_missing_key = true
+      if (valueRaw !== '') {conditionPayload.value = parseLooseValue(valueRaw)}
+      if (rule.invert) {conditionPayload.invert = true}
+      if (rule.pass_missing_key) {conditionPayload.pass_missing_key = true}
       return conditionPayload
     })
-  if (conditions.length > 0) payload.conditions = conditions
+  if (conditions.length > 0) {payload.conditions = conditions}
   if (!payload.type && !payload.conditions)
-    return JSON.stringify({ logic: 'AND' })
+    {return JSON.stringify({ logic: 'AND' })}
   return JSON.stringify(payload)
 }
 
@@ -871,11 +871,11 @@ const buildPruneObjectsValueText = (draft: PruneObjectsDraft): string => {
 
 const parsePassHeaderNames = (rawValue: unknown): string[] => {
   if (Array.isArray(rawValue))
-    return rawValue.map((i) => String(i ?? '').trim()).filter(Boolean)
+    {return rawValue.map((i) => String(i ?? '').trim()).filter(Boolean)}
   if (rawValue && typeof rawValue === 'object') {
     const obj = rawValue as Record<string, unknown>
     if (Array.isArray(obj.headers))
-      return obj.headers.map((i) => String(i ?? '').trim()).filter(Boolean)
+      {return obj.headers.map((i) => String(i ?? '').trim()).filter(Boolean)}
     if (obj.header !== undefined) {
       const single = String(obj.header ?? '').trim()
       return single ? [single] : []
@@ -883,10 +883,10 @@ const parsePassHeaderNames = (rawValue: unknown): string[] => {
     return []
   }
   if (typeof rawValue === 'string')
-    return rawValue
+    {return rawValue
       .split(',')
       .map((i) => i.trim())
-      .filter(Boolean)
+      .filter(Boolean)}
   return []
 }
 
@@ -895,14 +895,14 @@ const buildConditionPayload = (
   condition: ParamOverrideCondition
 ): Record<string, unknown> | null => {
   const path = condition.path.trim()
-  if (!path) return null
+  if (!path) {return null}
   const payload: Record<string, unknown> = {
     path,
     mode: condition.mode || 'full',
     value: parseLooseValue(condition.value_text),
   }
-  if (condition.invert) payload.invert = true
-  if (condition.pass_missing_key) payload.pass_missing_key = true
+  if (condition.invert) {payload.invert = true}
+  if (condition.pass_missing_key) {payload.pass_missing_key = true}
   return payload
 }
 
@@ -922,28 +922,28 @@ const validateOperations = (
     const toValue = op.to.trim()
 
     if (meta.path && !pathValue)
-      return t('Rule {{line}} is missing target path', { line })
+      {return t('Rule {{line}} is missing target path', { line })}
     if (FROM_REQUIRED_MODES.has(mode) && !fromValue) {
       if (!(meta.pathAlias && pathValue))
-        return t('Rule {{line}} is missing source field', { line })
+        {return t('Rule {{line}} is missing source field', { line })}
     }
     if (TO_REQUIRED_MODES.has(mode) && !toValue) {
       if (!(meta.pathAlias && pathValue))
-        return t('Rule {{line}} is missing target field', { line })
+        {return t('Rule {{line}} is missing target field', { line })}
     }
     if (VALUE_REQUIRED_MODES.has(mode) && op.value_text.trim() === '')
-      return t('Rule {{line}} is missing value', { line })
+      {return t('Rule {{line}} is missing value', { line })}
 
     if (mode === 'return_error') {
       const raw = op.value_text.trim()
-      if (!raw) return t('Rule {{line}} is missing value', { line })
+      if (!raw) {return t('Rule {{line}} is missing value', { line })}
       try {
         const parsed = JSON.parse(raw)
         if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
           if (!String((parsed as Record<string, unknown>).message || '').trim())
-            return t('Rule {{line}} return_error requires a message field', {
+            {return t('Rule {{line}} return_error requires a message field', {
               line,
-            })
+            })}
         }
       } catch {
         /* plain string is allowed */
@@ -953,17 +953,17 @@ const validateOperations = (
     if (mode === 'prune_objects') {
       const raw = op.value_text.trim()
       if (!raw)
-        return t('Rule {{line}} prune_objects is missing conditions', { line })
+        {return t('Rule {{line}} prune_objects is missing conditions', { line })}
     }
 
     if (mode === 'pass_headers') {
       const raw = op.value_text.trim()
       if (!raw)
-        return t('Rule {{line}} pass_headers is missing header names', { line })
+        {return t('Rule {{line}} pass_headers is missing header names', { line })}
       const parsed = parseLooseValue(raw)
       const headers = parsePassHeaderNames(parsed)
       if (headers.length === 0)
-        return t('Rule {{line}} pass_headers format is invalid', { line })
+        {return t('Rule {{line}} pass_headers format is invalid', { line })}
     }
   }
   return ''
@@ -1058,11 +1058,11 @@ const buildOperationsJson = (
   t: (key: string, options?: Record<string, unknown>) => string
 ): string => {
   const filteredOps = sourceOperations.filter((o) => !isOperationBlank(o))
-  if (filteredOps.length === 0) return ''
+  if (filteredOps.length === 0) {return ''}
 
   if (options.validate) {
     const message = validateOperations(filteredOps, t)
-    if (message) throw new Error(message)
+    if (message) {throw new Error(message)}
   }
 
   const payloadOps = filteredOps.map((operation) => {
@@ -1073,17 +1073,17 @@ const buildOperationsJson = (
     const fromValue = operation.from.trim()
     const toValue = operation.to.trim()
     const payload: Record<string, unknown> = { mode }
-    if (descriptionValue) payload.description = descriptionValue
-    if (meta.path) payload.path = pathValue
-    if (meta.pathOptional && pathValue) payload.path = pathValue
-    if (meta.value) payload.value = parseLooseValue(operation.value_text)
-    if (meta.keepOrigin && operation.keep_origin) payload.keep_origin = true
-    if (meta.from) payload.from = fromValue
-    if (!meta.to && operation.to.trim()) payload.to = toValue
-    if (meta.to) payload.to = toValue
+    if (descriptionValue) {payload.description = descriptionValue}
+    if (meta.path) {payload.path = pathValue}
+    if (meta.pathOptional && pathValue) {payload.path = pathValue}
+    if (meta.value) {payload.value = parseLooseValue(operation.value_text)}
+    if (meta.keepOrigin && operation.keep_origin) {payload.keep_origin = true}
+    if (meta.from) {payload.from = fromValue}
+    if (!meta.to && operation.to.trim()) {payload.to = toValue}
+    if (meta.to) {payload.to = toValue}
     if (meta.pathAlias) {
-      if (!payload.from && pathValue) payload.from = pathValue
-      if (!payload.to && pathValue) payload.to = pathValue
+      if (!payload.from && pathValue) {payload.from = pathValue}
+      if (!payload.to && pathValue) {payload.to = pathValue}
     }
     const conditions = operation.conditions
       .map(buildConditionPayload)
@@ -1132,7 +1132,7 @@ export function ParamOverrideEditorDialog(
 
   // Initialize state when dialog opens
   useEffect(() => {
-    if (!props.open) return
+    if (!props.open) {return}
     const state = parseInitialState(props.value)
     setEditMode(state.editMode)
     setVisualMode(state.visualMode)
@@ -1181,7 +1181,7 @@ export function ParamOverrideEditorDialog(
 
   const filteredOperations = useMemo(() => {
     const keyword = operationSearch.trim().toLowerCase()
-    if (!keyword) return operations
+    if (!keyword) {return operations}
     return operations.filter((op) => {
       const searchableText = [
         op.description,
@@ -1210,13 +1210,13 @@ export function ParamOverrideEditorDialog(
 
   const returnErrorDraft = useMemo(() => {
     if (!selectedOperation || selectedOperation.mode !== 'return_error')
-      return null
+      {return null}
     return parseReturnErrorDraft(selectedOperation.value_text)
   }, [selectedOperation])
 
   const pruneObjectsDraft = useMemo(() => {
     if (!selectedOperation || selectedOperation.mode !== 'prune_objects')
-      return null
+      {return null}
     return parsePruneObjectsDraft(selectedOperation.value_text)
   }, [selectedOperation])
 
@@ -1254,7 +1254,7 @@ export function ParamOverrideEditorDialog(
     let insertedId = ''
     setOperations((prev) => {
       const idx = prev.findIndex((o) => o.id === operationId)
-      if (idx < 0) return prev
+      if (idx < 0) {return prev}
       const source = prev[idx]
       const cloned = normalizeOperation({
         description: source.description,
@@ -1278,12 +1278,12 @@ export function ParamOverrideEditorDialog(
       next.splice(idx + 1, 0, cloned)
       return next
     })
-    if (insertedId) setSelectedOperationId(insertedId)
+    if (insertedId) {setSelectedOperationId(insertedId)}
   }, [])
 
   const removeOperation = useCallback((operationId: string) => {
     setOperations((prev) => {
-      if (prev.length <= 1) return [createDefaultOperation()]
+      if (prev.length <= 1) {return [createDefaultOperation()]}
       return prev.filter((o) => o.id !== operationId)
     })
   }, [])
@@ -1344,7 +1344,7 @@ export function ParamOverrideEditorDialog(
     (operationId: string, draftPatch: Partial<ReturnErrorDraft>) => {
       setOperations((prev) =>
         prev.map((op) => {
-          if (op.id !== operationId) return op
+          if (op.id !== operationId) {return op}
           const draft = parseReturnErrorDraft(op.value_text)
           const nextDraft = { ...draft, ...draftPatch }
           return {
@@ -1367,7 +1367,7 @@ export function ParamOverrideEditorDialog(
     ) => {
       setOperations((prev) =>
         prev.map((op) => {
-          if (op.id !== operationId) return op
+          if (op.id !== operationId) {return op}
           const draft = parsePruneObjectsDraft(op.value_text)
           const nextDraft =
             typeof updater === 'function'
@@ -1436,7 +1436,7 @@ export function ParamOverrideEditorDialog(
   const handleDragOver = useCallback(
     (event: DragEvent, operationId: string) => {
       event.preventDefault()
-      if (!draggedOperationId || draggedOperationId === operationId) return
+      if (!draggedOperationId || draggedOperationId === operationId) {return}
       const rect = event.currentTarget.getBoundingClientRect()
       const position: 'before' | 'after' =
         event.clientY - rect.top > rect.height / 2 ? 'after' : 'before'
@@ -1472,19 +1472,19 @@ export function ParamOverrideEditorDialog(
   const buildVisualJson = useCallback((): string => {
     if (visualMode === 'legacy') {
       const trimmed = legacyValue.trim()
-      if (!trimmed) return ''
+      if (!trimmed) {return ''}
       if (!verifyJSON(trimmed))
-        throw new Error(t('Parameter override must be valid JSON format'))
+        {throw new Error(t('Parameter override must be valid JSON format'))}
       const parsed = JSON.parse(trimmed) as unknown
       if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed))
-        throw new Error(t('Legacy format must be a JSON object'))
+        {throw new Error(t('Legacy format must be a JSON object'))}
       return JSON.stringify(parsed, null, 2)
     }
     return buildOperationsJson(operations, { validate: true }, t)
   }, [legacyValue, operations, t, visualMode])
 
   const switchToJsonMode = useCallback(() => {
-    if (editMode === 'json') return
+    if (editMode === 'json') {return}
     try {
       setJsonText(buildVisualJson())
       setJsonError('')
@@ -1503,7 +1503,7 @@ export function ParamOverrideEditorDialog(
   }, [buildVisualJson, editMode, legacyValue, operations, t, visualMode])
 
   const switchToVisualMode = useCallback(() => {
-    if (editMode === 'visual') return
+    if (editMode === 'visual') {return}
     const trimmed = jsonText.trim()
     if (!trimmed) {
       const fallback = createDefaultOperation()
@@ -1573,7 +1573,7 @@ export function ParamOverrideEditorDialog(
             }
             parsedCurrent = JSON.parse(trimmed) as Record<string, unknown>
           }
-          const merged = { ...(payload || {}), ...parsedCurrent }
+          const merged = { ...payload, ...parsedCurrent }
           const text = JSON.stringify(merged, null, 2)
           setVisualMode('legacy')
           setLegacyValue(text)
@@ -1652,7 +1652,7 @@ export function ParamOverrideEditorDialog(
   )
 
   const visualValidationError = useMemo(() => {
-    if (editMode !== 'visual') return ''
+    if (editMode !== 'visual') {return ''}
     try {
       buildVisualJson()
       return ''
@@ -1669,7 +1669,7 @@ export function ParamOverrideEditorDialog(
         const trimmed = jsonText.trim()
         if (trimmed) {
           if (!verifyJSON(trimmed))
-            throw new Error(t('Parameter override must be valid JSON format'))
+            {throw new Error(t('Parameter override must be valid JSON format'))}
           result = JSON.stringify(JSON.parse(trimmed), null, 2)
         }
       } else {
@@ -1684,16 +1684,16 @@ export function ParamOverrideEditorDialog(
 
   // Expand/collapse all conditions
   const expandAllConditions = useCallback(() => {
-    if (!selectedOperation) return
+    if (!selectedOperation) {return}
     const map: Record<string, boolean> = {}
-    for (const c of selectedOperation.conditions) map[c.id] = true
+    for (const c of selectedOperation.conditions) {map[c.id] = true}
     setExpandedConditions((prev) => ({ ...prev, ...map }))
   }, [selectedOperation])
 
   const collapseAllConditions = useCallback(() => {
-    if (!selectedOperation) return
+    if (!selectedOperation) {return}
     const map: Record<string, boolean> = {}
-    for (const c of selectedOperation.conditions) map[c.id] = false
+    for (const c of selectedOperation.conditions) {map[c.id] = false}
     setExpandedConditions((prev) => ({ ...prev, ...map }))
   }, [selectedOperation])
 
@@ -1758,12 +1758,10 @@ export function ParamOverrideEditorDialog(
             {t('Template')}
           </span>
           <Combobox
-options={[
-              ...templatePresetOptions.map((o) => ({
+options={templatePresetOptions.map((o) => ({
                 value: o.value,
                 label: t(o.label),
-              })),
-            ]}
+              }))}
 value={templatePresetKey}
 onValueChange={(v) =>
               setTemplatePresetKey(v || 'operations_default')
@@ -2142,12 +2140,10 @@ function RuleEditor(ruleEditorProps: RuleEditorProps) {
           <div className='space-y-1.5'>
             <label className='text-xs font-medium'>{t('Operation Type')}</label>
             <Combobox
-options={[
-                ...OPERATION_MODE_OPTIONS.map((o) => ({
+options={OPERATION_MODE_OPTIONS.map((o) => ({
                   value: o.value,
                   label: t(o.label),
-                })),
-              ]}
+                }))}
 value={mode}
 onValueChange={(nextMode) =>
                 nextMode !== null &&
@@ -2244,7 +2240,7 @@ className='h-9'
                         ruleEditorProps.updateOperation(operation.id, {
                           value_text: JSON.stringify(parsed, null, 2),
                         })
-                      } catch (_e) {
+                      } catch {
                         /* not valid JSON */
                       }
                     }}
@@ -2519,12 +2515,10 @@ function ConditionEditor(conditionEditorProps: ConditionEditorProps) {
                   {t('Match Mode')}
                 </label>
                 <Combobox
-options={[
-                    ...CONDITION_MODE_OPTIONS.map((o) => ({
+options={CONDITION_MODE_OPTIONS.map((o) => ({
                       value: o.value,
                       label: t(o.label),
-                    })),
-                  ]}
+                    }))}
 value={condition.mode}
 onValueChange={(v) =>
                     v !== null &&
@@ -3027,12 +3021,10 @@ function PruneObjectsEditor(pruneObjectsEditorProps: PruneObjectsEditorProps) {
                           {t('Match Mode')}
                         </label>
                         <Combobox
-options={[
-                            ...CONDITION_MODE_OPTIONS.map((o) => ({
+options={CONDITION_MODE_OPTIONS.map((o) => ({
                               value: o.value,
                               label: t(o.label),
-                            })),
-                          ]}
+                            }))}
 value={rule.mode}
 onValueChange={(v) =>
                             v !== null &&
@@ -3128,12 +3120,10 @@ function SyncFieldsEditor(syncFieldsEditorProps: SyncFieldsEditorProps) {
           </label>
           <div className='flex gap-2'>
             <Select
-              items={[
-                ...SYNC_TARGET_TYPE_OPTIONS.map((o) => ({
+              items={SYNC_TARGET_TYPE_OPTIONS.map((o) => ({
                   value: o.value,
                   label: t(o.label),
-                })),
-              ]}
+                }))}
               value={syncFieldsEditorProps.syncFromTarget.type || 'json'}
               onValueChange={(v) =>
                 v !== null &&
@@ -3185,12 +3175,10 @@ function SyncFieldsEditor(syncFieldsEditorProps: SyncFieldsEditorProps) {
           </label>
           <div className='flex gap-2'>
             <Select
-              items={[
-                ...SYNC_TARGET_TYPE_OPTIONS.map((o) => ({
+              items={SYNC_TARGET_TYPE_OPTIONS.map((o) => ({
                   value: o.value,
                   label: t(o.label),
-                })),
-              ]}
+                }))}
               value={syncFieldsEditorProps.syncToTarget.type || 'json'}
               onValueChange={(v) =>
                 v !== null &&

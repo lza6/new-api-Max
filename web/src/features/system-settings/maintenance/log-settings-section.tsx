@@ -105,13 +105,13 @@ type ServerLogInfo = {
 const HOURS_IN_DAY = 24
 
 function formatBytes(bytes: number, decimals = 2): string {
-  if (!bytes || Number.isNaN(bytes)) return '0 Bytes'
-  if (bytes === 0) return '0 Bytes'
-  if (bytes < 0) return `-${formatBytes(-bytes, decimals)}`
+  if (!bytes || Number.isNaN(bytes)) {return '0 Bytes'}
+  if (bytes === 0) {return '0 Bytes'}
+  if (bytes < 0) {return `-${formatBytes(-bytes, decimals)}`}
   const k = 1024
   const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
   const i = Math.floor(Math.log(Math.abs(bytes)) / Math.log(k))
-  if (i < 0 || i >= sizes.length) return `${bytes} Bytes`
+  if (i < 0 || i >= sizes.length) {return `${bytes} Bytes`}
   return `${Number.parseFloat((bytes / Math.pow(k, i)).toFixed(decimals))} ${
     sizes[i]
   }`
@@ -173,7 +173,7 @@ export function LogSettingsSection({
     try {
       const res = await api.get('/api/performance/logs')
       requireServerSuccess(res.data)
-      if (res.data.success) setServerLogInfo(res.data.data)
+      if (res.data.success) {setServerLogInfo(res.data.data)}
     } catch (error) {
       handleServerError(error)
     }
@@ -209,12 +209,12 @@ export function LogSettingsSection({
   }, [])
 
   const purgeTimestamp = useMemo(() => {
-    if (!purgeDate) return null
+    if (!purgeDate) {return null}
     return Math.floor(purgeDate.getTime() / 1000)
   }, [purgeDate])
 
   const formattedPurgeDate = useMemo(() => {
-    if (!purgeDate) return ''
+    if (!purgeDate) {return ''}
     return formatTimestampToDate(purgeDate.getTime(), 'milliseconds')
   }, [purgeDate])
 
@@ -229,13 +229,13 @@ export function LogSettingsSection({
   const logCleanupTaskId = logCleanupTask?.task_id
 
   useEffect(() => {
-    if (!logCleanupTaskId || !logCleanupActive) return
+    if (!logCleanupTaskId || !logCleanupActive) {return}
 
     let cancelled = false
     const interval = window.setInterval(async () => {
       try {
         const res = await getSystemTask(logCleanupTaskId)
-        if (cancelled || !res.success || !res.data) return
+        if (cancelled || !res.success || !res.data) {return}
 
         setLogCleanupTask(res.data)
         if (!isActiveLogCleanupTask(res.data)) {
@@ -263,7 +263,7 @@ export function LogSettingsSection({
   }, [logCleanupActive, logCleanupTaskId, t])
 
   const onSubmit = async (values: LogSettingsFormValues) => {
-    if (values.LogConsumeEnabled === defaultEnabled) return
+    if (values.LogConsumeEnabled === defaultEnabled) {return}
     await updateOption.mutateAsync({
       key: 'LogConsumeEnabled',
       value: values.LogConsumeEnabled,

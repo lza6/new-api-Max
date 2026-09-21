@@ -97,7 +97,7 @@ function isActiveStatus(status: SystemTaskStatus) {
 
 function getProgress(task: SystemTask): number | null {
   const progress = (task.state as { progress?: unknown } | undefined)?.progress
-  if (typeof progress !== 'number' || Number.isNaN(progress)) return null
+  if (typeof progress !== 'number' || Number.isNaN(progress)) {return null}
   return Math.min(100, Math.max(0, progress))
 }
 

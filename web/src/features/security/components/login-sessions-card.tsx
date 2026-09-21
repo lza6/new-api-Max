@@ -208,7 +208,7 @@ export function LoginSessionsCard() {
         onRevokeTargetChange={setRevokeTarget}
         onConfirmOthersChange={setConfirmOthers}
         onRevoke={() => {
-          if (revokeTarget) revokeMutation.mutate(revokeTarget.sid)
+          if (revokeTarget) {revokeMutation.mutate(revokeTarget.sid)}
         }}
         onRevokeOthers={() => revokeOthersMutation.mutate()}
       />

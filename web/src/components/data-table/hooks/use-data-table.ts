@@ -146,11 +146,11 @@ function useControllableTableState<TValue>(
 }
 
 function readColumnVisibility(storageKey: string | undefined): VisibilityState {
-  if (!storageKey || typeof window === 'undefined') return {}
+  if (!storageKey || typeof window === 'undefined') {return {}}
 
   try {
     const raw = window.localStorage.getItem(storageKey)
-    if (!raw) return {}
+    if (!raw) {return {}}
 
     const parsed = JSON.parse(raw) as unknown
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -248,11 +248,11 @@ function readColumnSizing(
   storageKey: string | undefined,
   bounds: ColumnSizingBounds
 ): ColumnSizingState {
-  if (!storageKey || typeof window === 'undefined') return {}
+  if (!storageKey || typeof window === 'undefined') {return {}}
 
   try {
     const raw = window.localStorage.getItem(storageKey)
-    if (!raw) return {}
+    if (!raw) {return {}}
 
     const parsed = JSON.parse(raw) as unknown
     if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
@@ -471,7 +471,7 @@ export function useDataTable<TData>(options: UseDataTableOptions<TData>) {
   ])
 
   React.useEffect(() => {
-    if (!columnVisibilityStorageKey || typeof window === 'undefined') return
+    if (!columnVisibilityStorageKey || typeof window === 'undefined') {return}
 
     if (skipNextColumnVisibilityPersistRef.current) {
       skipNextColumnVisibilityPersistRef.current = false
@@ -489,7 +489,7 @@ export function useDataTable<TData>(options: UseDataTableOptions<TData>) {
   }, [columnVisibility, columnVisibilityStorageKey])
 
   React.useEffect(() => {
-    if (!columnSizingStorageKey || typeof window === 'undefined') return
+    if (!columnSizingStorageKey || typeof window === 'undefined') {return}
 
     if (skipNextColumnSizingPersistRef.current) {
       skipNextColumnSizingPersistRef.current = false

@@ -203,7 +203,7 @@ const TOKEN_FORMAT = new Intl.NumberFormat(undefined, {
 const MODEL_DETAILS_SKELETON_KEYS = ['first', 'second', 'third', 'fourth']
 
 function formatCatalogTokenCount(tokens: number): string {
-  if (!Number.isFinite(tokens) || tokens <= 0) return ''
+  if (!Number.isFinite(tokens) || tokens <= 0) {return ''}
   if (tokens >= 1_000_000) {
     return `${TOKEN_FORMAT.format(tokens / 1_000_000)}M`
   }
@@ -214,17 +214,17 @@ function formatCatalogTokenCount(tokens: number): string {
 }
 
 function formatCatalogYearMonth(value?: string): string {
-  if (!value) return ''
+  if (!value) {return ''}
   const [yearStr, monthStr] = value.split('-')
   const year = Number(yearStr)
   const month = Number(monthStr)
-  if (!Number.isFinite(year) || !Number.isFinite(month)) return value
+  if (!Number.isFinite(year) || !Number.isFinite(month)) {return value}
   const date = new Date(Date.UTC(year, month - 1, 1))
   return date.toLocaleString(undefined, { year: 'numeric', month: 'short' })
 }
 
 function normalizeCatalogItems(items?: readonly string[]): string[] {
-  if (!items) return []
+  if (!items) {return []}
   return items.filter((item) => item.trim().length > 0)
 }
 
@@ -349,7 +349,7 @@ function CatalogInfoCell(props: { label: string; children: React.ReactNode }) {
 
 function ModalityLabels(props: { items: string[] }) {
   const { t } = useTranslation()
-  if (props.items.length === 0) return null
+  if (props.items.length === 0) {return null}
 
   return (
     <span className='inline-flex items-center gap-1 align-middle'>
@@ -435,7 +435,7 @@ function ModelBackendQuickStats(props: { model: PricingModel }) {
     })
   }
 
-  if (stats.length === 0) return null
+  if (stats.length === 0) {return null}
 
   return (
     <div className='bg-muted/20 grid grid-cols-2 gap-px overflow-hidden rounded-lg border @md/details:grid-cols-3 @2xl/details:grid-cols-5'>
@@ -580,7 +580,7 @@ function ModelBackendProviderSection(props: { model: PricingModel }) {
     )
   }
 
-  if (cells.length === 0) return null
+  if (cells.length === 0) {return null}
 
   return (
     <section>
@@ -903,7 +903,7 @@ function AutoGroupChain(props: { model: PricingModel; autoGroups: string[] }) {
     modelEnableGroups.includes(g)
   )
 
-  if (autoChain.length === 0) return null
+  if (autoChain.length === 0) {return null}
 
   return (
     <div className='text-muted-foreground mb-3 flex flex-wrap items-center gap-1 text-xs'>
@@ -1516,7 +1516,7 @@ export function ModelDetails() {
     search.tokenUnit === 'K' ? 'K' : DEFAULT_TOKEN_UNIT
 
   const model = useMemo(() => {
-    if (!models || !modelId) return null
+    if (!models || !modelId) {return null}
     return models.find((m) => m.model_name === modelId) || null
   }, [models, modelId])
 

@@ -61,7 +61,7 @@ export function MultiKeyTableRowActions({
         variant='destructive'
         size='sm'
         onClick={() => {
-          if (!canDelete) return
+          if (!canDelete) {return}
           onAction({ type: 'delete', keyIndex })
         }}
         disabled={!canDelete}

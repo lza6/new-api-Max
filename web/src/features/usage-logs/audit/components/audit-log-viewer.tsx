@@ -44,8 +44,8 @@ export function AuditLogViewer(props: {
   const [filters, setFilters] = useState<AuditFilters>({ p: 1, page_size: 20 })
   const [tokenScope, setTokenScope] = useState('all')
   const params = { ...filters }
-  if (props.accessOnly) params.category = 'access_token'
-  if (tokenScope === 'current') params.token_ref = props.currentTokenRef
+  if (props.accessOnly) {params.category = 'access_token'}
+  if (tokenScope === 'current') {params.token_ref = props.currentTokenRef}
   if (tokenScope === 'historical') {
     params.exclude_token_ref = props.currentTokenRef
   }
@@ -70,7 +70,7 @@ export function AuditLogViewer(props: {
     query.error.response?.status === 403
   const onAccessDenied = props.onAccessDenied
   useEffect(() => {
-    if (accessDenied) void onAccessDenied?.()
+    if (accessDenied) {void onAccessDenied?.()}
   }, [accessDenied, onAccessDenied])
   const columns = useAuditLogColumns(props.accessOnly)
   const { table } = useDataTable({
@@ -83,7 +83,7 @@ export function AuditLogViewer(props: {
     totalCount: query.isError ? 0 : (query.data?.total ?? 0),
     pagination: { pageIndex: filters.p - 1, pageSize: filters.page_size },
     onPaginationChange: (updater) => {
-      if (query.isFetching || query.isError || invalidRange || !canQuery) return
+      if (query.isFetching || query.isError || invalidRange || !canQuery) {return}
       setFilters((previous) => {
         const current = {
           pageIndex: previous.p - 1,
@@ -137,7 +137,7 @@ export function AuditLogViewer(props: {
               }}
               isFetching={query.isFetching}
               onSearch={() => {
-                if (!invalidRange && canQuery) void query.refetch()
+                if (!invalidRange && canQuery) {void query.refetch()}
               }}
               onReset={() => {
                 setTokenScope('all')
