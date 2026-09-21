@@ -6359,6 +6359,7 @@
     "RPM Limit": "RPM Limit",
     "Allowed Models (comma separated)": "Allowed Models (comma separated)",
     "Empty means unlimited; subscribed users can only call these models.": "Empty means unlimited; subscribed users can only call these models.",
+    "Need higher concurrency/RPM than the plan tiers? Contact WeChat Tf00798 for custom plans.": "Need higher concurrency/RPM than the plan tiers? Contact WeChat Tf00798 for custom plans.",
     "Concurrency limit": "Limite de concurrence",
     "Max in-flight requests processed at once. 0 = unlimited (bucket off).": "Requêtes simultanées max. 0 = illimité (bucket désactivé).",
     "Queue capacity": "Capacité de file",

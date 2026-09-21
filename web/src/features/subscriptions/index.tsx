@@ -64,6 +64,14 @@ function SubscriptionsContent() {
                 </AlertDescription>
               </Alert>
             ) : null}
+            <Alert variant='default' className='shrink-0'>
+              <Info className='h-4 w-4' />
+              <AlertDescription className='text-xs'>
+                {t(
+                  'Need higher concurrency/RPM than the plan tiers? Contact WeChat Tf00798 for custom plans.'
+                )}
+              </AlertDescription>
+            </Alert>
             <div className='min-h-0 flex-1'>
               <SubscriptionsTable />
             </div>

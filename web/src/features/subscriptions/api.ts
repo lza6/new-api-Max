@@ -237,3 +237,17 @@ export async function getGroups(): Promise<ApiResponse<string[]>> {
   const res = await api.get('/api/group')
   return res.data
 }
+
+/**
+ * Admin: override a single user subscription tier (rpm/concurrency; 0 = use plan default).
+ */
+export async function setUserSubscriptionTier(
+  subscriptionId: number,
+  payload: { rpm_override: number; concurrency_override: number }
+): Promise<ApiResponse<unknown>> {
+  const res = await api.patch(
+    `/api/subscription/admin/user_subscriptions/${subscriptionId}/tier`,
+    payload
+  )
+  return res.data
+}

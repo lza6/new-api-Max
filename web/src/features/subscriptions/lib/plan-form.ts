@@ -80,7 +80,8 @@ export const PLAN_FORM_DEFAULTS: PlanFormValues = {
   waffo_pancake_product_id: '',
   concurrency_limit: 0,
   rpm_limit: 0,
-  models: '',
+  // 本站主力模型默认入卡（管理员可按套餐调整矩阵）。
+  models: 'deepseek-v4-flash',
 }
 
 export function planToFormValues(plan: SubscriptionPlan): PlanFormValues {

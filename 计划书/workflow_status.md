@@ -106,3 +106,8 @@
 - 套餐表单：周卡单位 week、并发上限 Concurrency limit、RPM Limit、Allowed Models（逗号分隔→JSON 数组）字段
 - plan-form 转换（JSON⇄逗号文本）；i18n 7 语言同步；typecheck 绿（订阅 feature 无 vitest 文件）
 - 待办：每用户覆盖 UI（user-subscriptions 弹窗 + PATCH tier）、订阅页微信 Tf00798 文案、deepseek-v4-flash 默认入卡
+
+## 十五、002 Phase C7 收尾（v1.2.69，2026-09-22）
+- 订阅管理页微信 Tf00798 高并发定制提示（i18n 7 语言）
+- 新套餐默认 Models 预填 deepseek-v4-flash（本站主力模型默认入卡）
+- api.setUserSubscriptionTier（PATCH /tier）客户端就绪（UI 控件待接）
