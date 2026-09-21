@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+/* oxlint-disable react/no-array-index-key -- append-only animation segments; index is the stable identity */
+
 import { useState, useEffect, useRef, type ReactNode } from 'react'
 
 import { cn } from '@/lib/utils'

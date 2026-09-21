@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+/* oxlint-disable react/no-array-index-key -- string detail values may repeat; index keeps keys unique */
+
 import { useCallback, useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -195,12 +197,19 @@ function LogsTab({ t }: { t: (k: string) => string }) {
     try { await banIP(target, Number(banMinutes) || 1440, "admin_ban"); toast.success(t("IP banned")); void load(); } catch (e) { handleServerError(e) }
   }
 
-  const sortBtn = (key: string, label: string) => (
-    <Button type="button" size="sm" variant={sort === key ? "default" : "outline"}
-      onClick={() => { if (sort === key) {setOrder(order === "desc" ? "asc" : "desc");} else { setSort(key); setOrder("desc") } }}>
-      {t(label)}{sort === key ? (order === "desc" ? " ↓" : " ↑") : null}
-    </Button>
-  )
+    const sortBtn = (key: string, label: string) => {
+    let indicator: string | null = null
+    if (sort === key) {
+      indicator = order === "desc" ? " ↓" : " ↑"
+    }
+    return (
+      <Button type="button" size="sm" variant={sort === key ? "default" : "outline"}
+        onClick={() => { if (sort === key) {setOrder(order === "desc" ? "asc" : "desc");} else { setSort(key); setOrder("desc") } }}
+        className="text-xs">
+        {t(label)}{indicator}
+      </Button>
+    )
+  }
 
   return (
     <Card>

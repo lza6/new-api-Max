@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+/* oxlint-disable react/no-array-index-key -- static checklist items without stable ids; index is the stable identity */
+
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 

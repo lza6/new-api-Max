@@ -180,3 +180,11 @@
 - 定向 oxlint 本会话全部改动文件 → 0 error；typecheck/build 通过；plugins-table 11/11。
 - 范围说明：仓库既有 lint 存量 ~253 处（brand-icons import type、no-array-index-key、嵌套三元、prefer-spread 等 18 类，跨 ~40 文件）为**历史债务，独立批次清理**；未在本批冒充完成。
 - 命令：go build ./... → 0；go vet（6 包）→ 0；go test ./model/ ./service/ ./pkg/jsplugin/ ./setting/ → ok；三库 conformance → PASS=28 FAIL=0 SKIP=0；前端 build → 0；typecheck → 0；定向 oxlint → 0；plugins-table vitest 11/11。
+
+## 质量基线·lint 存量债务全清（2026-09-21, v1.2.60）
+- 输入：仓库既有 lint error 基线 **245 处**（18 规则类、跨 ~60 文件；含本会话改动文件 0 error 既验）。目标：`bun run lint` → 0。
+- 处理方式（全部 typecheck 门禁、逐波验证）：
+  - **真实重构**：import-type 全类型导入 → `import type`（按模块保留值导入，避免重复导入）；curly 38 加花括号；prefer-spread/no-useless-spread/prefer-string-replace-all 用按规则限定 --fix + 手动补 concat/类数组语义；prefer-at `.at()` 配 undefined 收窄；non-null 改 get-or-create/可选链；exhaustive-deps 用 useCallback 正确修复；no-cycle 抽出 `context/search-context.ts` 打破 command-menu↔search-provider 环；nested-ternary 值查找链改 switch/if-else、JSX 渲染树改 IIFE/变量提取。
+  - **带理由豁免（保守、可审计）**：`.replaceAll` 全局正则（去 /g 会运行时抛 TypeError——已实测）；hero-terminal 动画帧/骨架屏/静态列表的索引键（append-only 稳定列表，index 即稳定身份）；param-override-editor-dialog 3 处超大渲染树模式切换（提取会产生大段间接层，逐行 disable 注释说明）。
+- 验收（真实运行）：`bun run lint` → **0 error**（245→0）；`bun run typecheck` → 0；`bun run build` → 0（总 JS 59232 kB，与清理前几乎一致=无语义膨胀）；spot vitest（plugins-table/task-artifacts）13/13。
+- 提交：检查点 `beeb5f59b`（528 文件批量）+ 尾部 `（20 文件）→ v1.2.60；风险控制：所有语义敏感转换（spread/replaceAll/at/useCallback）逐一 typecheck 验证，prefer-at 等已知破坏项手工处理。

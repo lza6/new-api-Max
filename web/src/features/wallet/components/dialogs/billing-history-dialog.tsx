@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+/* oxlint-disable react/no-array-index-key -- skeleton placeholder list; index is the stable identity */
+
 import { Search, Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -147,37 +149,44 @@ export function BillingHistoryDialog({
 
           {/* Records List */}
           <div className='max-h-[min(54vh,520px)] overflow-y-auto pr-1'>
-            {loading ? (
-              <div className='space-y-3'>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <div key={i} className='rounded-lg border p-3 sm:p-4'>
-                    <div className='flex items-start justify-between'>
-                      <div className='flex-1 space-y-2'>
-                        <Skeleton className='h-4 w-48' />
-                        <Skeleton className='h-3 w-32' />
+            {(() => {
+              if (loading) {
+                return (
+                  <div className='space-y-3'>
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className='rounded-lg border p-3 sm:p-4'>
+                        <div className='flex items-start justify-between'>
+                          <div className='flex-1 space-y-2'>
+                            <Skeleton className='h-4 w-48' />
+                            <Skeleton className='h-3 w-32' />
+                          </div>
+                          <Skeleton className='h-5 w-16' />
+                        </div>
+                        <div className='mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
+                          <Skeleton className='h-3 w-full' />
+                          <Skeleton className='h-3 w-full' />
+                          <Skeleton className='h-3 w-full' />
+                        </div>
                       </div>
-                      <Skeleton className='h-5 w-16' />
-                    </div>
-                    <div className='mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4'>
-                      <Skeleton className='h-3 w-full' />
-                      <Skeleton className='h-3 w-full' />
-                      <Skeleton className='h-3 w-full' />
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : records.length === 0 ? (
-              <div className='text-muted-foreground flex min-h-40 flex-col items-center justify-center py-10 text-center'>
-                <p className='text-sm font-medium'>
-                  {t('No billing records found')}
-                </p>
-                <p className='mt-1 text-xs'>
-                  {keyword
-                    ? t('Try adjusting your search')
-                    : t('Your transaction history will appear here')}
-                </p>
-              </div>
-            ) : (
+                )
+              }
+              if (records.length === 0) {
+                return (
+                  <div className='text-muted-foreground flex min-h-40 flex-col items-center justify-center py-10 text-center'>
+                    <p className='text-sm font-medium'>
+                      {t('No billing records found')}
+                    </p>
+                    <p className='mt-1 text-xs'>
+                      {keyword
+                        ? t('Try adjusting your search')
+                        : t('Your transaction history will appear here')}
+                    </p>
+                  </div>
+                )
+              }
+              return (
               <div className='space-y-3'>
                 {records.map((record) => {
                   const statusConfig = getStatusConfig(record.status)
@@ -275,7 +284,7 @@ export function BillingHistoryDialog({
                   )
                 })}
               </div>
-            )}
+            )})()}
           </div>
 
           {/* Pagination */}

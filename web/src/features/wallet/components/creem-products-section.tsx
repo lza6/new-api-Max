@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+/* oxlint-disable react/no-array-index-key -- skeleton placeholder list; index is the stable identity */
+
 import { useTranslation } from 'react-i18next'
 
 import { Card, CardContent } from '@/components/ui/card'

@@ -143,28 +143,42 @@ function DataTableFacetedFilterInner<TData, TValue>({
                     >
                       <CheckIcon className={cn('text-background h-4 w-4')} />
                     </div>
-                    {option.iconNode ? (
-                      <span className='text-muted-foreground flex size-4 items-center justify-center'>
-                        {option.iconNode}
-                      </span>
-                    ) : option.icon ? (
-                      <option.icon className='text-muted-foreground size-4' />
-                    ) : null}
+                    {(() => {
+                      if (option.iconNode) {
+                        return (
+                          <span className='text-muted-foreground flex size-4 items-center justify-center'>
+                            {option.iconNode}
+                          </span>
+                        )
+                      }
+                      if (option.icon) {
+                        return <option.icon className='text-muted-foreground size-4' />
+                      }
+                      return null
+                    })()}
                     <span
                       className='min-w-0 flex-1 truncate'
                       title={t(option.label)}
                     >
                       {t(option.label)}
                     </span>
-                    {typeof option.count === 'number' ? (
-                      <span className='text-muted-foreground ms-auto flex h-4 min-w-4 items-center justify-center font-mono text-xs'>
-                        {option.count}
-                      </span>
-                    ) : facets?.get(option.value) ? (
-                      <span className='ms-auto flex h-4 w-4 items-center justify-center font-mono text-xs'>
-                        {facets.get(option.value)}
-                      </span>
-                    ) : null}
+                    {(() => {
+                      if (typeof option.count === 'number') {
+                        return (
+                          <span className='text-muted-foreground ms-auto flex h-4 min-w-4 items-center justify-center font-mono text-xs'>
+                            {option.count}
+                          </span>
+                        )
+                      }
+                      if (facets?.get(option.value)) {
+                        return (
+                          <span className='ms-auto flex h-4 w-4 items-center justify-center font-mono text-xs'>
+                            {facets.get(option.value)}
+                          </span>
+                        )
+                      }
+                      return null
+                    })()}
                   </CommandItem>
                 )
               })}

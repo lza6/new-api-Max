@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+/* oxlint-disable react/no-array-index-key -- scroll animation duplicates icon rows; index is the stable per-array identity */
+
 import { cn } from '@/lib/utils'
 
 import { IconCard } from './icon-card'

@@ -18,6 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 'use client'
 
+/* oxlint-disable react/no-array-index-key -- log entries share timestamps; index keeps keys unique */
+
 import { ChevronDownIcon } from 'lucide-react'
 import {
   type ComponentProps,

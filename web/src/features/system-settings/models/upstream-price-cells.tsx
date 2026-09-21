@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+/* oxlint-disable react/no-array-index-key -- tier rows are static; index keeps keys unique */
+
 import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'

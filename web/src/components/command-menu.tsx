@@ -67,11 +67,11 @@ export function CommandMenu() {
             <CommandEmpty>{t('No results found.')}</CommandEmpty>
             {navGroups.map((group) => (
               <CommandGroup key={group.id || group.title} heading={group.title}>
-                {group.items.map((navItem, i) => {
+                {group.items.map((navItem) => {
                   if (navItem.url)
                     {return (
                       <CommandItem
-                        key={`${navItem.url}-${i}`}
+                        key={navItem.url}
                         value={navItem.title}
                         onSelect={() => {
                           runCommand(() => navigate({ to: navItem.url }))
@@ -84,9 +84,9 @@ export function CommandMenu() {
                       </CommandItem>
                     )}
 
-                  return navItem.items?.map((subItem, i) => (
+                  return navItem.items?.map((subItem) => (
                     <CommandItem
-                      key={`${navItem.title}-${subItem.url}-${i}`}
+                      key={subItem.url}
                       value={`${navItem.title}-${subItem.url}`}
                       onSelect={() => {
                         runCommand(() => navigate({ to: subItem.url }))

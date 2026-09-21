@@ -1796,6 +1796,7 @@ className='h-8 w-[220px]'
       </div>
       {/* Content */}
       <div className='min-h-0 flex-1 overflow-hidden'>
+        {/* eslint-disable-next-line eslint/no-nested-ternary -- render-tree mode switch; extraction would add a large indirection block */}
         {editMode === 'visual' ? (
           visualMode === 'legacy' ? (
             <div className='p-4'>
@@ -2207,6 +2208,7 @@ className='h-9'
 
         {/* Value section */}
         {meta.value &&
+          // eslint-disable-next-line eslint/no-nested-ternary -- render-tree mode switch; extraction would add a large indirection block
           (mode === 'return_error' && ruleEditorProps.returnErrorDraft ? (
             <ReturnErrorEditor
               operationId={operation.id}
@@ -2281,6 +2283,7 @@ className='h-9'
         )}
 
         {/* sync_fields */}
+        {/* eslint-disable-next-line eslint/no-nested-ternary -- render-tree mode switch; extraction would add a large indirection block */}
         {mode === 'sync_fields' && syncFromTarget && syncToTarget ? (
           <SyncFieldsEditor
             operationId={operation.id}

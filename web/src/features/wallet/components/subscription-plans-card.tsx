@@ -602,22 +602,29 @@ export function SubscriptionPlansCard({
 
                     <Separator className='mb-3' />
 
-                    {reached ? (
-                      <Tooltip>
-                        <TooltipTrigger render={<div />}>
+                    {(() => {
+                      if (reached) {
+                        return (
+                          <Tooltip>
+                            <TooltipTrigger render={<div />}>
+                              <Button variant='outline' className='w-full' disabled>
+                                {t('Limit Reached')}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              {t('Purchase limit reached')} ({count}/{limit})
+                            </TooltipContent>
+                          </Tooltip>
+                        )
+                      }
+                      if (!topupMasterEnabled) {
+                        return (
                           <Button variant='outline' className='w-full' disabled>
-                            {t('Limit Reached')}
+                            {t('Top-up is currently disabled')}
                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          {t('Purchase limit reached')} ({count}/{limit})
-                        </TooltipContent>
-                      </Tooltip>
-                    ) : !topupMasterEnabled ? (
-                      <Button variant='outline' className='w-full' disabled>
-                        {t('Top-up is currently disabled')}
-                      </Button>
-                    ) : (
+                        )
+                      }
+                      return (
                       <Button
                         variant='outline'
                         className='w-full'
@@ -628,7 +635,7 @@ export function SubscriptionPlansCard({
                       >
                         {t('Subscribe Now')}
                       </Button>
-                    )}
+                    )})()}
                   </CardContent>
                 </Card>
               )
