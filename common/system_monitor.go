@@ -37,12 +37,9 @@ func init() {
 func StartSystemMonitor() {
 	go func() {
 		for {
-			config := GetPerformanceMonitorConfig()
-			if !config.Enabled {
-				time.Sleep(30 * time.Second)
-				continue
-			}
-
+			// 系统资源采样（CPU/内存/磁盘）始终运行：心跳与系统信息页展示需要真实值。
+			// 性能监控开关仅控制 middleware 的超载拒绝（见 SystemPerformanceCheck），
+			// 不影响本采样，避免管理员关闭性能监控后系统信息页 CPU/内存/状态失去数据。
 			updateSystemStatus()
 			time.Sleep(5 * time.Second)
 		}

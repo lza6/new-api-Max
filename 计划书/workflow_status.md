@@ -72,3 +72,8 @@
 | B9 | 三库 conformance | ⏳ SQLite PASS；MySQL/PG 需 Docker 实例（本机无 docker，登记 blocker） | scripts/db-conformance.ps1 待跑 |
 
 阻塞项：本机无 docker → MySQL/PostgreSQL conformance 需在有实例环境跑一次再宣称三库闭环。
+
+## 九、002 Phase B 落地（v1.2.63 ✅ 2026-09-22）
+- v1.2.63 = 908a249fc：智能流量单位（后端 FormatBytes + 前端 formatTraffic）、站点权威统计（/api/log/overview + 公共 /api/site/stats）、日带宽排行（/api/log/bandwidth/leaderboard）、Log 持久化字节列、首页真实统计卡、i18n 7 语言；本地/远端 SHA 一致
+- 阻塞登记：Log 新列 MySQL/PG conformance 需 Docker 实例（本机无 docker）
+- 新增节点（Phase B-2，进行中）：系统信息资源解耦采样 ✅ → 模型广场卡片统计 ⏳ → 效果测试整合 ⏳

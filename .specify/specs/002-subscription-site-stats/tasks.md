@@ -26,3 +26,9 @@
 - [ ] E1 后端相关包测试全绿；前端 typecheck/build/vitest/i18n 全绿
 - [ ] E2 三库 conformance 通过
 - [ ] E3 主题 commit → push → tag → Release → 远端核验
+
+## Phase B-2：系统信息资源显示 + 模型广场卡片 + 效果测试整合（2026-09-22 补充）
+- [ ] B2-1 系统信息资源恒采样（CPU/内存/磁盘与性能监控开关解耦）— ✅ 已实现 common/system_monitor.go
+- [ ] B2-2 模型广场每卡片统计：今日调用总数/成功数、近30天总数/成功数（后端聚合端点 + 前端卡片）
+- [ ] B2-3 模型效果测试整合到模型广场：模型卡片下展示效果测试（模型名/测试时间/输入输出），复用 routes/model-test.tsx 资产
+- [ ] B2-4 效果测试数据可配置化（当前 SITE_MODEL/TEST_TIME 硬编码在 model-test.tsx）
