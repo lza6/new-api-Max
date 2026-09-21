@@ -164,3 +164,39 @@ func TestProfileCacheHitAndInvalidate(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, int64(800), p3.Overview30d.Quota, "rebuild must observe the newly added row")
 }
+
+// TestProfileModelShareMatchesRawLogs：验收标准「画像数据与原始 logs 抽样
+// 一致（占比误差 <5%）」。同刻度时间窗口内，模型占比必须与原始行占比一致
+// （同批数据无衰减误差，share 计算纯比例）。
+func TestProfileModelShareMatchesRawLogs(t *testing.T) {
+	setupLOGDB(t)
+
+	now := time.Now().Unix()
+	// modelA 80 条 / modelB 20 条 → 期望 share 0.8 / 0.2。
+	for i := range 80 {
+		seedLogRow(t, 42, model.LogTypeConsume, "model-a", 1, 10, 100, now-int64(60*(i+1)))
+	}
+	for i := range 20 {
+		seedLogRow(t, 42, model.LogTypeConsume, "model-b", 1, 10, 100, now-int64(60*(i+1)))
+	}
+
+	InvalidateProfileCache(42)
+	profile, err := GetUserProfile(42)
+	require.NoError(t, err)
+	require.NotNil(t, profile)
+
+	shares := map[string]float64{}
+	for _, mu := range profile.ModelUsage {
+		shares[mu.Model] = mu.Share
+	}
+	// 完全同刻度窗口 → 允许 <5% 容差（验收标准）。
+	assert.InDelta(t, 0.80, shares["model-a"], 0.05, "model-a share")
+	assert.InDelta(t, 0.20, shares["model-b"], 0.05, "model-b share")
+
+	// 原始行数核对（直接 SQL 抽样对照）。
+	var aCount, bCount int64
+	require.NoError(t, model.LOG_DB.Model(&model.Log{}).Where("user_id = ? AND type = ? AND model_name = ?", 42, model.LogTypeConsume, "model-a").Count(&aCount).Error)
+	require.NoError(t, model.LOG_DB.Model(&model.Log{}).Where("user_id = ? AND type = ? AND model_name = ?", 42, model.LogTypeConsume, "model-b").Count(&bCount).Error)
+	require.Equal(t, int64(80), aCount)
+	require.Equal(t, int64(20), bCount)
+}

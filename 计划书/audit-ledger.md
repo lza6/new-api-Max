@@ -96,3 +96,8 @@
 - 盘点：consume_log_flusher.go 已是真批量（CreateInBatches 200）。真实缺口：失败整批丢弃无重试、无指标暴露、Stop 后不可重启（sync.Once 单例）。
 - 修复：① flush 失败整批重试一次，仍失败记指标+SysError 绝不崩；② 新增 GetConsumeLogFlusherMetrics（队列深度/最近批大小/失败/重试，原子）；③ Stop/Start 改 mutex 门控可重启；④ FlushConsumeLogs 排空前先停 worker（消除与 pending 的竞争，测试语义正确）。
 - 测试：TestConsumeLogFlusherBatchAndMetrics（50 条批量落库+指标断言）与 TestConsumeLogFlusherQueueFullFallback（4100 条满载降级同步不丢）→ ok；model 全量 → ok；三库 conformance 24/24。
+## P1-1 用户画像层：验收标准闭合（2026-09-21, v1.2.48）
+- 索引命中（EXPLAIN，真实 MySQL 9.6）：画像聚合查询 `WHERE type=2 AND user_id=? AND created_at BETWEEN ?` → 优化器走 `idx_user_id_id`（cost=0.35）；FORCE INDEX 亦验证 `idx_log_user_type_created` 全列匹配范围扫描（user_id+type+created_at）。ANALYZE TABLE 后复测一致。
+- 占比一致性（验收 <5%）：新增 TestProfileModelShareMatchesRawLogs —— 80/20 分布 → share 0.80/0.20（InDelta 0.05 内实际误差 0）+ 原始行数 SQL 抽样核对 80/20。
+- 既有能力确认：Weibull 衰减/时段热力图/成本曲线/渠道亲和建议/双层缓存（profile.go）+ 空态测试（TestEmptyUserProfile）。
+- 命令：go test ./service/user_profile/ ./model/ → ok；三库 conformance 24/24。
