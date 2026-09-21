@@ -149,3 +149,12 @@
 - PUT /api/option/relay/rate_limit/overrides/user（设置/移除用户覆盖）
 - 变更即写 Option(relay) 持久化 + 热更新 + 审计留痕（RootAuth）
 - 待办：前端 relay 设置表单 UI（接线以上端点）
+
+## 二十三、生产热更新 v1.2.73（2026-09-22，真实执行+线上验收）
+- 服务器 103.233.252.213（HK CN2，root）SSH 直连（plink + hostkey 指纹）
+- 备份：pg_dump 22MB → /opt/backups/new-api-20260922-031514.dump；compose 备份 .bak.<TS>
+- 代码：/opt/new-api-src git fetch + checkout v1.2.73 (250f6c38c)；VERSION=v1.2.73
+- 构建：docker build new-api:local-v1.2.73（BUILD_EXIT=0，旧 local-v1.2.38 保留可回滚）
+- 切换：sed 换 tag + docker compose up -d new-api → healthy
+- 线上验收：/api/status HTTP 200；容器 Up healthy；真实计费日志 ¥ 正常；7 新列（request_bytes/response_bytes/concurrency_limit/rpm_limit/models/rpm_override/concurrency_override）在生产 PG AutoMigrate 完成
+- 回滚：cp 备份 compose → sed 换回 local-v1.2.38 → docker compose up -d new-api
