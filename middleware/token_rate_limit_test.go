@@ -75,3 +75,17 @@ func TestResolveSubscriptionTierWithoutSubscription(t *testing.T) {
 	assert.Zero(t, r)
 	assert.False(t, hasSub)
 }
+
+func TestUserRateLimitConcurrencyStore(t *testing.T) {
+	assert.True(t, acquireUserRateLimitConcurrency(401, 3))
+	assert.True(t, acquireUserRateLimitConcurrency(401, 3))
+	assert.True(t, acquireUserRateLimitConcurrency(401, 3))
+	assert.False(t, acquireUserRateLimitConcurrency(401, 3), "达到基础并发上限应拒绝")
+
+	releaseUserRateLimitConcurrency(401)
+	assert.True(t, acquireUserRateLimitConcurrency(401, 3), "释放后可再次获取")
+
+	releaseUserRateLimitConcurrency(401)
+	releaseUserRateLimitConcurrency(401)
+	releaseUserRateLimitConcurrency(401)
+}

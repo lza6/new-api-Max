@@ -136,3 +136,9 @@
 - TestDBConformance 全组：sqlite PASS + postgres PASS（AutoMigrateIdempotent 含全模型，25s）+ mysql SKIP（未安装）
 - 新列在真实 PG 验证存在：logs.request_bytes/response_bytes；subscription_plans.concurrency_limit/rpm_limit/models；user_subscriptions.rpm_override/concurrency_override
 - 剩余：MySQL 实例（本机未安装，无 Docker）→ blocker 收窄为仅 MySQL
+
+## 二十一、T7 每用户基础限速（v1.2.72，2026-09-22）
+- relay 设置新增：UserBaseRateLimitEnabled（nil=默认开）、UserBaseConcurrencyLimit（默认3）、UserBaseRpmLimit（默认120）、GroupRateLimitOverrides、UserRateLimitOverrides（热更新，无 schema 变更）
+- middleware.UserRateLimit：并发（秒）+ RPM（60s 窗口）→429；生效优先级 用户覆盖>分组覆盖>基础默认；挂载 relay 链 TokenRateLimit 之后（与订阅/密钥限流并存取最严）
+- 单测：解析器优先级/默认/关闭 + 并发存储；setting/middleware 全绿
+- 待办：管理员设置覆盖的 HTTP 端点 + 前端 relay 设置表单 UI

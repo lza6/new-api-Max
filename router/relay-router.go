@@ -73,6 +73,7 @@ func SetRelayRouter(router *gin.Engine) {
 	relayV1Router.Use(middleware.GlobalConcurrencyLimit())
 	relayV1Router.Use(middleware.ModelRequestRateLimit())
 	relayV1Router.Use(middleware.TokenRateLimit())
+	relayV1Router.Use(middleware.UserRateLimit())
 	relayV1Router.Use(middleware.SubscriptionRateLimit())
 	{
 		// WebSocket 路由（统一到 Relay）

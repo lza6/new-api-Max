@@ -43,6 +43,25 @@ type RelaySetting struct {
 	// GlobalConcurrencyWaitTimeout 排队最长等待秒数；到期仍未获得并发则 429。
 	// <=0 默认 30 秒。
 	GlobalConcurrencyWaitTimeout int `json:"global_concurrency_wait_timeout"`
+
+	// UserBaseRateLimitEnabled T7 每用户基础限速总开关（nil=默认开启）。
+	// 开启后所有用户按 UserBaseConcurrencyLimit（默认 3，并发/秒）与
+	// UserBaseRpmLimit（默认 120，RPM）限流，超限 429；管理员可关闭或调参。
+	UserBaseRateLimitEnabled *bool `json:"user_base_rate_limit_enabled"`
+	UserBaseConcurrencyLimit int   `json:"user_base_concurrency_limit"`
+	UserBaseRpmLimit         int   `json:"user_base_rpm_limit"`
+
+	// GroupRateLimitOverrides 分组限速覆盖：group -> 档位（0=该项不限）。
+	// UserRateLimitOverrides 用户/部分用户限速覆盖：userId -> 档位。
+	// 生效优先级：用户覆盖 > 分组覆盖 > 基础默认。热更新，无需 schema 变更。
+	GroupRateLimitOverrides map[string]RateLimitTier `json:"group_rate_limit_overrides"`
+	UserRateLimitOverrides  map[int]RateLimitTier    `json:"user_rate_limit_overrides"`
+}
+
+// RateLimitTier 限速档位（并发 + RPM）。
+type RateLimitTier struct {
+	Concurrency int `json:"concurrency"`
+	Rpm         int `json:"rpm"`
 }
 
 // DefaultStreamFirstTokenTimeout 首包超时默认 15 秒。
@@ -53,10 +72,14 @@ const (
 	DefaultGlobalConcurrencyLimit       = 0 // 0 = 不限制
 	DefaultGlobalConcurrencyQueue       = 1000
 	DefaultGlobalConcurrencyWaitTimeout = 30
+	DefaultUserBaseConcurrencyLimit     = 3   // 每用户基础并发（请求/秒）
+	DefaultUserBaseRpmLimit             = 120 // 每用户基础 RPM
 )
 
 var relaySetting = RelaySetting{
-	StreamFirstTokenTimeout: DefaultStreamFirstTokenTimeout,
+	StreamFirstTokenTimeout:  DefaultStreamFirstTokenTimeout,
+	UserBaseConcurrencyLimit: DefaultUserBaseConcurrencyLimit,
+	UserBaseRpmLimit:         DefaultUserBaseRpmLimit,
 }
 
 func init() {
@@ -101,4 +124,61 @@ func GetGlobalConcurrencyGate() GlobalConcurrencyGate {
 		g.WaitTimeout = DefaultGlobalConcurrencyWaitTimeout
 	}
 	return g
+}
+
+// GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：
+// 用户覆盖 > 分组覆盖 > 基础默认；返回 0 表示该项不限（沿用既有其它限流）。
+func GetUserRateLimitTier(userId int, group string) (concurrency, rpm int) {
+	s := GetRelaySetting()
+	if s == nil {
+		return DefaultUserBaseConcurrencyLimit, DefaultUserBaseRpmLimit
+	}
+	if tier, ok := s.UserRateLimitOverrides[userId]; ok {
+		return tier.Concurrency, tier.Rpm
+	}
+	if tier, ok := s.GroupRateLimitOverrides[group]; ok {
+		return tier.Concurrency, tier.Rpm
+	}
+	enabled := true
+	if s.UserBaseRateLimitEnabled != nil {
+		enabled = *s.UserBaseRateLimitEnabled
+	}
+	if !enabled {
+		return 0, 0
+	}
+	concurrency = s.UserBaseConcurrencyLimit
+	if concurrency <= 0 {
+		concurrency = DefaultUserBaseConcurrencyLimit
+	}
+	rpm = s.UserBaseRpmLimit
+	if rpm <= 0 {
+		rpm = DefaultUserBaseRpmLimit
+	}
+	return concurrency, rpm
+}
+
+// SetUserRateLimitOverride 设置/移除用户限速覆盖（0,0=移除；其余值整体替换档位）。
+func SetUserRateLimitOverride(userId int, tier RateLimitTier) {
+	s := GetRelaySetting()
+	if s.UserRateLimitOverrides == nil {
+		s.UserRateLimitOverrides = make(map[int]RateLimitTier)
+	}
+	if tier.Concurrency <= 0 && tier.Rpm <= 0 {
+		delete(s.UserRateLimitOverrides, userId)
+		return
+	}
+	s.UserRateLimitOverrides[userId] = tier
+}
+
+// SetGroupRateLimitOverride 设置/移除分组限速覆盖（0,0=移除）。
+func SetGroupRateLimitOverride(group string, tier RateLimitTier) {
+	s := GetRelaySetting()
+	if s.GroupRateLimitOverrides == nil {
+		s.GroupRateLimitOverrides = make(map[string]RateLimitTier)
+	}
+	if tier.Concurrency <= 0 && tier.Rpm <= 0 {
+		delete(s.GroupRateLimitOverrides, group)
+		return
+	}
+	s.GroupRateLimitOverrides[group] = tier
 }
