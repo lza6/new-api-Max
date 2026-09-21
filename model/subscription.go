@@ -537,6 +537,42 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 	if userId <= 0 {
 		return nil, errors.New("invalid user id")
 	}
+	nowUnix := getDBTimestampTx(tx)
+	now := time.Unix(nowUnix, 0)
+
+	// 续费顺延：同套餐存在 active 订阅时，直接在其到期时间上顺延一个周期，
+	// 不新建多行、不计入 MaxPurchasePerUser 购买上限；无限额度卡不追加额度。
+	var activeSub UserSubscription
+	err := lockForUpdate(tx).
+		Where("user_id = ? AND plan_id = ? AND status = ? AND end_time > ?",
+			userId, plan.Id, "active", nowUnix).
+		Order("end_time desc").First(&activeSub).Error
+	if err == nil {
+		baseEnd := activeSub.EndTime
+		if baseEnd < nowUnix {
+			baseEnd = nowUnix
+		}
+		extendedEnd, calcErr := calcPlanEndTime(time.Unix(baseEnd, 0), plan)
+		if calcErr != nil {
+			return nil, calcErr
+		}
+		updates := map[string]any{
+			"end_time":   extendedEnd,
+			"updated_at": common.GetTimestamp(),
+		}
+		if plan.TotalAmount > 0 {
+			updates["amount_total"] = gorm.Expr("amount_total + ?", plan.TotalAmount)
+		}
+		if updateErr := tx.Model(&UserSubscription{}).Where("id = ?", activeSub.Id).Updates(updates).Error; updateErr != nil {
+			return nil, updateErr
+		}
+		activeSub.EndTime = extendedEnd
+		return &activeSub, nil
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, err
+	}
+
 	if plan.MaxPurchasePerUser > 0 {
 		var count int64
 		if err := tx.Model(&UserSubscription{}).
@@ -548,8 +584,6 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 			return nil, errors.New("已达到该套餐购买上限")
 		}
 	}
-	nowUnix := getDBTimestampTx(tx)
-	now := time.Unix(nowUnix, 0)
 	endUnix, err := calcPlanEndTime(now, plan)
 	if err != nil {
 		return nil, err

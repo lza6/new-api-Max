@@ -231,3 +231,8 @@
 - 容器 healthy；STATUS_HTTP=200；MODEL_STATS_HTTP=200（匿名可访问，会话过期误报已修复）
 - 说明：首次部署会话被中断，应急重新 up -d 后确认 healthy（服务器脚本本身已完成构建与切换）
 - 回滚：compose 备份 + 换回旧 tag + up -d
+
+## 三十八、续费顺延（v1.2.81，2026-09-22）
+- CreateUserSubscriptionFromPlanTx：同套餐 active 订阅购买 → 到期时间顺延一个周期（锁行），不新建多行、不计入购买上限；无限额度卡不追加额度，有额度卡追加
+- 回归测试：续费后 EndTime=原+1周期、行数仍 1；model 全绿
+- 待办：兑换码兑换订阅、E2E 真实验证、日志筛选 UI、模型流量排行榜(G/T)

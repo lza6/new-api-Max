@@ -8,6 +8,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func seedSubscriptionResetPlan(t *testing.T, plan *SubscriptionPlan) {
@@ -263,4 +264,33 @@ func TestCalcSubscriptionBalanceQuotaOneToOneCNY(t *testing.T) {
 	got, err := calcSubscriptionBalanceQuota(0)
 	require.NoError(t, err)
 	require.Zero(t, got)
+}
+
+func TestCreateUserSubscriptionRenewsActiveByExtendingEndTime(t *testing.T) {
+	truncateTables(t)
+	plan := &SubscriptionPlan{Title: "续费卡", DurationUnit: SubscriptionDurationDay, DurationValue: 1, PriceAmount: 2, TotalAmount: 0, ConcurrencyLimit: 3, RpmLimit: 150}
+	require.NoError(t, DB.Create(plan).Error)
+	require.NoError(t, DB.Create(&User{Id: 70001, Username: "renew", Status: common.UserStatusEnabled, Quota: 500000}).Error)
+
+	var sub *UserSubscription
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		s, err := CreateUserSubscriptionFromPlanTx(tx, 70001, plan, PaymentMethodBalance)
+		sub = s
+		return err
+	}))
+	require.NotNil(t, sub)
+	firstEnd := sub.EndTime
+	var count int64
+	require.NoError(t, DB.Model(&UserSubscription{}).Where("user_id = ?", 70001).Count(&count).Error)
+	require.Equal(t, int64(1), count)
+
+	// 同套餐 active 期再次购买 → 顺延到期时间，不新建行。
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		s, err := CreateUserSubscriptionFromPlanTx(tx, 70001, plan, PaymentMethodBalance)
+		sub = s
+		return err
+	}))
+	require.Equal(t, firstEnd+86400, sub.EndTime)
+	require.NoError(t, DB.Model(&UserSubscription{}).Where("user_id = ?", 70001).Count(&count).Error)
+	require.Equal(t, int64(1), count)
 }
