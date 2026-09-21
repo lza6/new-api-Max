@@ -317,6 +317,36 @@ export function RedemptionsMutateDrawer({
 
                   <FormField
                     control={form.control}
+                    name='plan_id'
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('Linked subscription plan ID')}</FormLabel>
+                        <FormControl>
+                          <Input
+                            {...field}
+                            type='number'
+                            min={0}
+                            step={1}
+                            placeholder='0'
+                            onChange={(e) =>
+                              field.onChange(
+                                Number.parseInt(e.target.value, 10) || 0
+                              )
+                            }
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          {t(
+                            'Leave 0 for a quota code. Set a plan ID (e.g. 1/2/3) to make this a subscription code that activates the plan.'
+                          )}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
                     name='quota_dollars'
                     render={({ field }) => (
                       <FormItem>

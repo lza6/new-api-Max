@@ -30,6 +30,17 @@ type Redemption struct {
 	// RemainingUses 剩余可兑换次数（MaxUses=0 时忽略；每次成功兑换 -1，
 	// 归零后该码不再可兑换）。非持久化计算字段，随列表查询填充。
 	RemainingUses int `json:"remaining_uses" gorm:"-:all"`
+
+	// PlanId 关联订阅套餐 ID（0=额度码：兑换增加钱包额度；>0=订阅码：
+	// 兑换后直接开通/顺延对应套餐订阅，不再增加额度）。
+	PlanId int `json:"plan_id" gorm:"index;default:0"`
+}
+
+// RedeemResult 兑换结果：额度码返回 Quota>0；订阅码返回 PlanId/PlanName。
+type RedeemResult struct {
+	Quota    int    `json:"quota"`
+	PlanId   int    `json:"plan_id"`
+	PlanName string `json:"plan_name"`
 }
 
 func GetAllRedemptions(startIdx int, num int) (redemptions []*Redemption, total int64, err error) {
@@ -142,12 +153,12 @@ func GetRedemptionById(id int) (*Redemption, error) {
 	return &redemption, err
 }
 
-func Redeem(key string, userId int) (quota int, err error) {
+func Redeem(key string, userId int) (result RedeemResult, err error) {
 	if key == "" {
-		return 0, errors.New("未提供兑换码")
+		return RedeemResult{}, errors.New("未提供兑换码")
 	}
 	if userId == 0 {
-		return 0, errors.New("无效的 user id")
+		return RedeemResult{}, errors.New("无效的 user id")
 	}
 	redemption := &Redemption{}
 
@@ -229,23 +240,56 @@ func Redeem(key string, userId int) (quota int, err error) {
 				}
 			}
 		}
-		return creditTopUpQuota(tx, userId, redemption.Quota, nil)
+		if redemption.PlanId > 0 {
+			plan, planErr := getSubscriptionPlanByIdTx(tx, redemption.PlanId)
+			if planErr != nil {
+				return errors.New("兑换码关联的订阅套餐不存在")
+			}
+			if !plan.Enabled {
+				return errors.New("该订阅套餐已下架")
+			}
+			if _, createErr := CreateUserSubscriptionFromPlanTx(tx, userId, plan, "redemption"); createErr != nil {
+				return createErr
+			}
+			result = RedeemResult{PlanId: plan.Id, PlanName: plan.Title}
+			return nil
+		}
+		if creditErr := creditTopUpQuota(tx, userId, redemption.Quota, nil); creditErr != nil {
+			return creditErr
+		}
+		result = RedeemResult{Quota: redemption.Quota}
+		return nil
 	})
 	if err != nil {
 		common.SysError("redemption failed: " + err.Error())
-		return 0, ErrRedeemFailed
+		return RedeemResult{}, ErrRedeemFailed
 	}
-	syncCreditUserQuotaCache(userId, redemption.Quota, "redemption")
-	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(redemption.Quota), redemption.Id))
-	return redemption.Quota, nil
+	if result.PlanId > 0 {
+		RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码开通订阅套餐「%s」（套餐ID %d），兑换码ID %d", result.PlanName, result.PlanId, redemption.Id))
+		refreshSubscriptionUserGroupCache(userId, "redemption-plan")
+		return result, nil
+	}
+	syncCreditUserQuotaCache(userId, result.Quota, "redemption")
+	RecordLog(userId, LogTypeTopup, fmt.Sprintf("通过兑换码充值 %s，兑换码ID %d", logger.LogQuota(result.Quota), redemption.Id))
+	return result, nil
 }
 
 func (redemption *Redemption) Insert() error {
-	if redemption.Quota <= 0 {
-		return errors.New("redemption quota must be positive")
-	}
-	if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-		return err
+	if redemption.PlanId > 0 {
+		plan, err := getSubscriptionPlanByIdTx(DB, redemption.PlanId)
+		if err != nil {
+			return errors.New("redemption subscription plan not found")
+		}
+		if !plan.Enabled {
+			return errors.New("redemption subscription plan disabled")
+		}
+	} else {
+		if redemption.Quota <= 0 {
+			return errors.New("redemption quota must be positive")
+		}
+		if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
+			return err
+		}
 	}
 	var err error
 	err = DB.Create(redemption).Error
@@ -259,14 +303,24 @@ func (redemption *Redemption) SelectUpdate() error {
 
 // Update Make sure your token's fields is completed, because this will update non-zero values
 func (redemption *Redemption) Update() error {
-	if redemption.Quota <= 0 {
-		return errors.New("redemption quota must be positive")
-	}
-	if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-		return err
+	if redemption.PlanId > 0 {
+		plan, err := getSubscriptionPlanByIdTx(DB, redemption.PlanId)
+		if err != nil {
+			return errors.New("redemption subscription plan not found")
+		}
+		if !plan.Enabled {
+			return errors.New("redemption subscription plan disabled")
+		}
+	} else {
+		if redemption.Quota <= 0 {
+			return errors.New("redemption quota must be positive")
+		}
+		if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
+			return err
+		}
 	}
 	var err error
-	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time", "expired_time").Updates(redemption).Error
+	err = DB.Model(redemption).Select("name", "status", "quota", "redeemed_time", "expired_time", "plan_id").Updates(redemption).Error
 	return err
 }
 

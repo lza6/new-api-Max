@@ -128,9 +128,9 @@ func setupRedeemFixture(t *testing.T, quota int) (userId int, key string) {
 func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	userId, key := setupRedeemFixture(t, 500)
 
-	quota, err := Redeem(key, userId)
+	result, err := Redeem(key, userId)
 	require.NoError(t, err)
-	assert.Equal(t, 500, quota)
+	assert.Equal(t, 500, result.Quota)
 
 	var user User
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
@@ -146,6 +146,70 @@ func TestRedeemCreditsQuotaExactlyOnce(t *testing.T) {
 	require.Error(t, err)
 	require.NoError(t, DB.First(&user, "id = ?", userId).Error)
 	assert.Equal(t, 500, user.Quota)
+}
+
+// TestRedeemPlanSubscription 订阅码兑换：直接开通套餐订阅（source=redemption），
+// 不增加钱包额度；重复兑换走续费顺延由 CreateUserSubscriptionFromPlanTx 保证。
+func TestRedeemPlanSubscription(t *testing.T) {
+	require.NoError(t, DB.AutoMigrate(&Redemption{}, &SubscriptionPlan{}, &UserSubscription{}))
+	require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Unscoped().Delete(&Redemption{}, "plan_id > 0").Error)
+	t.Cleanup(func() {
+		require.NoError(t, DB.Session(&gorm.Session{AllowGlobalUpdate: true}).Unscoped().Delete(&Redemption{}, "plan_id > 0").Error)
+		DB.Exec("DELETE FROM user_subscriptions WHERE source = 'redemption'")
+		DB.Exec("DELETE FROM users WHERE username = 'redeem-plan-user'")
+		DB.Exec("DELETE FROM logs")
+	})
+
+	plan := &SubscriptionPlan{
+		Title:            "月卡无限",
+		Subtitle:         "E2E",
+		PriceAmount:      60,
+		Currency:         "CNY",
+		DurationUnit:     SubscriptionDurationMonth,
+		DurationValue:    1,
+		Enabled:          true,
+		TotalAmount:      0,
+		ConcurrencyLimit: 3,
+		RpmLimit:         150,
+	}
+	require.NoError(t, DB.Create(plan).Error)
+
+	user := &User{Username: "redeem-plan-user", Password: "password", Status: common.UserStatusEnabled, Quota: 0}
+	require.NoError(t, DB.Create(user).Error)
+
+	key := "10000000000000000000000000000099"
+	code := &Redemption{
+		Name:        "plan-code",
+		Key:         key,
+		Status:      common.RedemptionCodeStatusEnabled,
+		Quota:       0,
+		PlanId:      plan.Id,
+		CreatedTime: common.GetTimestamp(),
+	}
+	require.NoError(t, code.Insert())
+
+	result, err := Redeem(key, user.Id)
+	require.NoError(t, err)
+	assert.Equal(t, plan.Id, result.PlanId)
+	assert.Equal(t, plan.Title, result.PlanName)
+	assert.Zero(t, result.Quota)
+
+	var sub UserSubscription
+	require.NoError(t, DB.Where("user_id = ? AND plan_id = ?", user.Id, plan.Id).First(&sub).Error)
+	assert.Equal(t, "active", sub.Status)
+	assert.Equal(t, "redemption", sub.Source)
+	assert.Greater(t, sub.EndTime, common.GetTimestamp())
+
+	var reloadedUser User
+	require.NoError(t, DB.First(&reloadedUser, "id = ?", user.Id).Error)
+	assert.Zero(t, reloadedUser.Quota)
+
+	// 码被置为已使用，二次兑换失败且不重复建订阅。
+	_, err = Redeem(key, user.Id)
+	assert.Error(t, err)
+	var count int64
+	require.NoError(t, DB.Model(&UserSubscription{}).Where("user_id = ? AND plan_id = ?", user.Id, plan.Id).Count(&count).Error)
+	assert.Equal(t, int64(1), count)
 }
 
 func TestRedeemRejectsWalletOverflow(t *testing.T) {

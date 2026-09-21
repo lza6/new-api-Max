@@ -50,6 +50,11 @@ export function getRedemptionFormSchema(t: TFunction) {
       .int(t('Max uses must be a whole number'))
       .min(0, t('Max uses must be 0 or a positive number'))
       .optional(),
+    plan_id: z
+      .number()
+      .int(t('Plan ID must be a whole number'))
+      .min(0, t('Plan ID must be 0 or a positive number'))
+      .optional(),
   })
 }
 
@@ -59,6 +64,7 @@ export type RedemptionFormValues = {
   expired_time?: Date
   count?: number
   max_uses?: number
+  plan_id?: number
 }
 
 // ============================================================================
@@ -71,6 +77,7 @@ export const REDEMPTION_FORM_DEFAULT_VALUES: RedemptionFormValues = {
   expired_time: undefined,
   count: 1,
   max_uses: 0,
+  plan_id: 0,
 }
 
 // ============================================================================
@@ -91,6 +98,7 @@ export function transformFormDataToPayload(
       : 0,
     count: data.count || 1,
     max_uses: data.max_uses ?? 0,
+    plan_id: data.plan_id ?? 0,
   }
 }
 
@@ -109,5 +117,6 @@ export function transformRedemptionToFormDefaults(
         : undefined,
     count: 1,
     max_uses: redemption.max_uses ?? 0,
+    plan_id: redemption.plan_id ?? 0,
   }
 }

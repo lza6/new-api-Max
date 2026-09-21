@@ -33,7 +33,15 @@ export interface ApiResponse<T = unknown> {
  * Standard API response types
  */
 export type TopupInfoResponse = ApiResponse<TopupInfo>
-export type RedemptionResponse = ApiResponse<number>
+export type RedemptionResult = {
+  /** 额度码：增加的额度 */
+  quota?: number
+  /** 订阅码：关联的订阅套餐 ID（>0 表示兑换后开通了订阅） */
+  plan_id?: number
+  /** 订阅码：关联的订阅套餐名称 */
+  plan_name?: string
+}
+export type RedemptionResponse = ApiResponse<RedemptionResult>
 export type AmountResponse = ApiResponse<string>
 export type PaymentResponse = ApiResponse<Record<string, unknown>> & {
   url?: string

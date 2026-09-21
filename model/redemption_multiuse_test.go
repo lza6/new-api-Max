@@ -44,7 +44,7 @@ func TestRedeemOneTimeCode(t *testing.T) {
 
 	got, err := Redeem("once1", 1)
 	require.NoError(t, err)
-	assert.Equal(t, 100, got)
+	assert.Equal(t, 100, got.Quota)
 
 	// 第二次兑换：一次性码已被使用。
 	_, err = Redeem("once1", 1)
@@ -64,7 +64,7 @@ func TestRedeemMultiUseCode(t *testing.T) {
 		seedRedemptionUser(t, uid)
 		got, err := Redeem("multi3", uid)
 		require.NoError(t, err)
-		assert.Equal(t, 50, got)
+		assert.Equal(t, 50, got.Quota)
 	}
 
 	// 剩余归零后不可再兑（且状态被标为 disabled）。

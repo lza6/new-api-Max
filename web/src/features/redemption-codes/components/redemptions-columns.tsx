@@ -171,6 +171,25 @@ export function useRedemptionsColumns(): ColumnDef<Redemption>[] {
       size: 120,
     },
     {
+      accessorKey: 'plan_id',
+      header: t('Subscription plan'),
+      cell: ({ row }) => {
+        const planId = row.getValue('plan_id') as number | undefined
+        if (!planId || planId <= 0) {
+          return <span className='text-muted-foreground'>—</span>
+        }
+        return (
+          <StatusBadge
+            label={t('Plan #{{id}}', { id: planId })}
+            variant='neutral'
+            copyable={false}
+            className='-ml-1.5'
+          />
+        )
+      },
+      size: 140,
+    },
+    {
       id: 'max_uses',
       accessorKey: 'max_uses',
       header: t('Redemption Code Usage'),

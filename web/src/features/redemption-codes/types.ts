@@ -35,6 +35,7 @@ export const redemptionSchema = z.object({
   used_user_id: z.number(),
   max_uses: z.number().optional(),
   remaining_uses: z.number().optional(),
+  plan_id: z.number().optional(), // 0=额度码；>0=订阅码（兑换后开通对应套餐）
 })
 
 export type Redemption = z.infer<typeof redemptionSchema>
@@ -80,6 +81,7 @@ export interface RedemptionFormData {
   count?: number // Only for create
   max_uses?: number // Only for create; 0 = single-use, >0 = number of distinct users who can each redeem once
   status?: number // Only for status update
+  plan_id?: number // 0=额度码；>0=订阅码
 }
 
 // ============================================================================

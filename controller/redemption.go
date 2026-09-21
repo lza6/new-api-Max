@@ -91,13 +91,15 @@ func AddRedemption(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if redemption.Quota <= 0 {
-		common.ApiError(c, errors.New("redemption quota must be positive"))
-		return
-	}
-	if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-		common.ApiError(c, err)
-		return
+	if redemption.PlanId <= 0 {
+		if redemption.Quota <= 0 {
+			common.ApiError(c, errors.New("redemption quota must be positive"))
+			return
+		}
+		if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
+			common.ApiError(c, err)
+			return
+		}
 	}
 	if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
@@ -114,6 +116,7 @@ func AddRedemption(c *gin.Context) {
 			Quota:       redemption.Quota,
 			ExpiredTime: redemption.ExpiredTime,
 			MaxUses:     redemption.MaxUses,
+			PlanId:      redemption.PlanId,
 		}
 		err = cleanRedemption.Insert()
 		if err != nil {
@@ -128,9 +131,10 @@ func AddRedemption(c *gin.Context) {
 		keys = append(keys, key)
 	}
 	recordManageAudit(c, "redemption.create", map[string]any{
-		"name":  redemption.Name,
-		"count": redemption.Count,
-		"quota": logger.LogQuota(redemption.Quota),
+		"name":    redemption.Name,
+		"count":   redemption.Count,
+		"quota":   logger.LogQuota(redemption.Quota),
+		"plan_id": redemption.PlanId,
 	})
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -168,13 +172,15 @@ func UpdateRedemption(c *gin.Context) {
 		return
 	}
 	if statusOnly == "" {
-		if redemption.Quota <= 0 {
-			common.ApiError(c, errors.New("redemption quota must be positive"))
-			return
-		}
-		if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
-			common.ApiError(c, err)
-			return
+		if redemption.PlanId <= 0 {
+			if redemption.Quota <= 0 {
+				common.ApiError(c, errors.New("redemption quota must be positive"))
+				return
+			}
+			if err := common.ValidateWalletQuota(redemption.Quota); err != nil {
+				common.ApiError(c, err)
+				return
+			}
 		}
 		if valid, msg := validateExpiredTime(c, redemption.ExpiredTime); !valid {
 			c.JSON(http.StatusOK, gin.H{"success": false, "message": msg})
@@ -184,6 +190,7 @@ func UpdateRedemption(c *gin.Context) {
 		cleanRedemption.Name = redemption.Name
 		cleanRedemption.Quota = redemption.Quota
 		cleanRedemption.ExpiredTime = redemption.ExpiredTime
+		cleanRedemption.PlanId = redemption.PlanId
 	}
 	if statusOnly != "" {
 		cleanRedemption.Status = redemption.Status
