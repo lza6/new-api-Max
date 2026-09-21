@@ -122,3 +122,10 @@
 - ③ fail-open（验收）：因子评估异常/无法评分 → 回落固定权重路由（fail-open），快照热路径由 latencyFactor 纯内存读取承担，无 5xx 风险。
 - 测试矩阵：factor 评分器 6/6 + combo 全量 ok；三库 conformance 24/24。
 - 落点：service/channel_factor_route.go（新增评分器）+ channel_combo_route.go（factor 策略接入）+ channel_factor_route_test.go。
+## P1-5 前端体验矩阵（2026-09-21, v1.2.55）
+- 审计方法：全 feature 脚本扫描 `size="icon"` 按钮 aria-label（0 缺失）、绕过 Button 封装的手写 `<button>`、异步按钮 loading/disabled 防重、三态组件覆盖、表单 label 关联与弹窗 Esc/focus（Base UI 内建）。
+- 基线核验：登录/选模型/对话/看日志/充值/看账单六步主流程的三态与点击反馈已高度完善（证据见 `计划书/P1-5-体验审计-缺口表.md` 表二）。
+- 修复 ① 触控尺寸：Button 主尺寸（default/lg/icon/icon-lg）在 `[@media(pointer:coarse)]` 下 min-h/min-w 44px（新模块 `web/src/components/ui/button-touch-target.ts`），紧凑尺寸（xs/sm/icon-xs/icon-sm）豁免（密集表格）；修复 ② `usage-logs/components/task-artifacts.tsx` 两个手写 `<button>`（音频/视频预览触发）改用 `Button variant='link'`（web/AGENTS.md 3.3 强制复用）；修复 ③ `web/vitest.config.ts` testTimeout 5s→20s（消除慢机/CI 间歇超时误报，不引入 sleep）。
+- 测试：`web/src/components/ui/__tests__/button-touch-target.test.tsx`（5 用例）+ `web/src/features/usage-logs/components/__tests__/task-artifacts.test.tsx`（2 用例，点击→弹窗打开）→ 3 文件 12/12 PASS（含 combobox 原 5 用例在 20s 超时下全过）。
+- 命令：bun run typecheck → PASS；bun run build → PASS；bunx oxlint（改动文件）→ 0/0。全局 lint 既有 4 error 为未改动文件（sync-i18n.mjs/logo.tsx/rankings/sw.js），另批次清理。
+- 范围说明：375px 无横向溢出 + 对比度 axe/Lighthouse 扫描需真实浏览器仪器，本环境未伪造结果，列入剩余建议。

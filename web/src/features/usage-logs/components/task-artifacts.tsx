@@ -125,9 +125,10 @@ function LegacyAudioPreview(props: { data: unknown }) {
 
   return (
     <>
-      <button
+      <Button
         type='button'
-        className='group flex items-center gap-1 text-left text-xs'
+        variant='link'
+        className='text-foreground h-auto gap-1 px-0 text-xs'
         onClick={() => setOpen(true)}
       >
         <HugeiconsIcon
@@ -136,10 +137,8 @@ function LegacyAudioPreview(props: { data: unknown }) {
           strokeWidth={2}
           aria-hidden='true'
         />
-        <span className='text-foreground leading-snug group-hover:underline'>
-          {t('Click to preview audio')}
-        </span>
-      </button>
+        {t('Click to preview audio')}
+      </Button>
       <AudioPreviewDialog open={open} onOpenChange={setOpen} clips={clips} />
     </>
   )
@@ -418,13 +417,14 @@ export function TaskArtifactsCell(props: { log: TaskLog }) {
   return (
     <>
       {previewMode === 'legacy-video' ? (
-        <button
+        <Button
           type='button'
-          className='text-foreground text-xs hover:underline'
+          variant='link'
+          className='text-foreground h-auto px-0 text-xs'
           onClick={() => setOpen(true)}
         >
           {t('Click to preview video')}
-        </button>
+        </Button>
       ) : (
         <Button
           type='button'

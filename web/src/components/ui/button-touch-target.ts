@@ -16,30 +16,20 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import path from 'node:path'
-import { fileURLToPath } from 'node:url'
 
-import { defineConfig } from 'vitest/config'
+/**
+ * Mobile touch-target compliance (WCAG 2.5.5 / mobile HIG >= 44px).
+ *
+ * Only applied when the pointer is coarse (touch screens) via an arbitrary
+ * media variant, so desktop density is untouched. Compact sizes used inside
+ * dense tables (`xs`/`sm`/`icon-xs`/`icon-sm`) are exempt on purpose; the
+ * dense layouts they live in cannot afford 44px row growth.
+ */
+const COARSE_POINTER_MIN_SIZE =
+  '[@media(pointer:coarse)]:min-h-11 [@media(pointer:coarse)]:min-w-11'
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
+const COMPACT_BUTTON_SIZES = new Set(['xs', 'sm', 'icon-xs', 'icon-sm'])
 
-export default defineConfig({
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
-  test: {
-    // Slow CI/dev machines spend 10s+ on module transform and jsdom setup;
-    // the 5s default times out healthy interaction tests there.
-    testTimeout: 20_000,
-    environment: 'jsdom',
-    server: {
-      deps: { inline: [/@lobehub\//, /antd-style/] },
-    },
-    setupFiles: ['./src/test-setup.ts'],
-    clearMocks: true,
-    restoreMocks: true,
-    include: ['src/**/*.{test,spec}.{ts,tsx}'],
-  },
-})
+export function getCoarsePointerTouchTargetClass(size: string): string {
+  return COMPACT_BUTTON_SIZES.has(size) ? '' : COARSE_POINTER_MIN_SIZE
+}

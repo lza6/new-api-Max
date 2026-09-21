@@ -32,8 +32,8 @@
 | P0-2 计费安全收口 | ✅ DONE (v1.2.40) | 见 git log | `计划书/audit-ledger.md` + `service/token_counter.go` + `quota_saturation_test.go` |
 | P0-3 认证安全审计 | ✅ DONE (v1.2.40，审计结论：既有实现已满足关键 ASVS) | 见 git log | `计划书/audit-ledger.md` |
 | P0-4 日志透明化（错误归因落日志） | ✅ DONE (v1.2.40) | 见 git log | `计划书/audit-ledger.md` + `controller/relay.go` + `relay_error_log_test.go` |
-| P1-1 用户画像层 | ✅ DONE (v1.2.48：EXPLAIN 索引命中+占比一致性验收) | 见 audit-ledger | service/user_profile/ |`r`n| P1-2 Redis 批量落库 | ✅ DONE (v1.2.47/50：重试+回退+指标+并发/故障注入验收) | 见 audit-ledger | model/consume_log_flusher.go + test |`r`n| P1-3 SSE 断线续传 | ✅ DONE (v1.2.49/51：done 截断修复+500 条压测+权限+Last-Event-ID) | 见 audit-ledger | controller/task_event.go + 前端 task-event-stream |`r`n| P1-4 渠道健康+组合路由 | ✅ 已落地 | 见 audit-ledger | channel_health_score.go + channel_combo_route.go |`r`n| P2-2 事件子系统（最小核心） | ✅ DONE (v1.2.42) | 见 audit-ledger | service/event_bus.go + event_bus_test.go |`r`n| P2-1 无锁快照 / P2-3 jsplugin 沙箱 / P2-4 平台生态 | ⏳ 待办（大项独立批次） | - | - |
+| P1-1 用户画像层 | ✅ DONE (v1.2.48：EXPLAIN 索引命中+占比一致性验收) | 见 audit-ledger | service/user_profile/ |`r`n| P1-2 Redis 批量落库 | ✅ DONE (v1.2.47/50：重试+回退+指标+并发/故障注入验收) | 见 audit-ledger | model/consume_log_flusher.go + test |`r`n| P1-3 SSE 断线续传 | ✅ DONE (v1.2.49/51：done 截断修复+500 条压测+权限+Last-Event-ID) | 见 audit-ledger | controller/task_event.go + 前端 task-event-stream |`r`n| P1-4 渠道健康+组合路由 | ✅ 已落地 | 见 audit-ledger | channel_health_score.go + channel_combo_route.go |`r`n| P1-5 前端体验矩阵 | ✅ DONE (v1.2.55) | 见 audit-ledger | 触控≥44px + task-artifacts Button 复用 + vitest 超时 |`r`n| P1-6 前端性能（路由懒加载） | ✅ DONE (v1.2.54) | 见 audit-ledger | web/src/routes 懒加载 6 路由 |`r`n| P2-1 无锁快照 | ✅ DONE (v1.2.46) | 见 audit-ledger | service/channel_combo_route.go 快照 + 并发读测试 |`r`n| P2-2 事件子系统（webhook 接入/幂等表） | ⏳ 待办（核心 event_bus 已 v1.2.42） | 见 audit-ledger | service/event_bus.go |`r`n| P2-3 jsplugin 沙箱 / P2-4 平台生态 | ⏳ 待办（大项独立批次） | - | - |
 
 ## 五、下一步（最小可行）
-1. 推荐下一批：P0-2 计费安全收口 或 P0-4 日志透明化。
+1. 推荐下一批：P2-2 事件子系统完整版（支付 webhook 接入 + 事件幂等表 + 对账回归）。
 2. 从《下一步改进指南.md》取批次定义，按 03-工作流-SOP 推进，完成后在本文件登记提交 SHA 与证据路径。
