@@ -56,6 +56,10 @@ type RelaySetting struct {
 	// 生效优先级：用户覆盖 > 分组覆盖 > 基础默认。热更新，无需 schema 变更。
 	GroupRateLimitOverrides map[string]RateLimitTier `json:"group_rate_limit_overrides"`
 	UserRateLimitOverrides  map[int]RateLimitTier    `json:"user_rate_limit_overrides"`
+
+	// SubscriptionRequiredGroups 需订阅才能使用的分组清单：未订阅用户选择这些
+	// 分组（自动分组或手动指定）时被拒（403）。空 = 不启用该门禁。
+	SubscriptionRequiredGroups []string `json:"subscription_required_groups"`
 }
 
 // RateLimitTier 限速档位（并发 + RPM）。
@@ -181,4 +185,18 @@ func SetGroupRateLimitOverride(group string, tier RateLimitTier) {
 		return
 	}
 	s.GroupRateLimitOverrides[group] = tier
+}
+
+// IsSubscriptionRequiredGroup 判断分组是否被标记为"需订阅才能使用"。
+func IsSubscriptionRequiredGroup(group string) bool {
+	s := GetRelaySetting()
+	if s == nil || group == "" || len(s.SubscriptionRequiredGroups) == 0 {
+		return false
+	}
+	for _, g := range s.SubscriptionRequiredGroups {
+		if g == group {
+			return true
+		}
+	}
+	return false
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -105,4 +106,44 @@ func TestNoSubscriptionNegativeCacheAvoidsDB(t *testing.T) {
 
 	// 订阅用户不缓存（保持实时正确）。
 	require.False(t, HasCachedNoSubscription(61001))
+}
+
+func TestCheckSubscriptionGroupAccess(t *testing.T) {
+	s := relay_setting.GetRelaySetting()
+	prevGroups := s.SubscriptionRequiredGroups
+	defer func() { s.SubscriptionRequiredGroups = prevGroups }()
+	s.SubscriptionRequiredGroups = []string{"subscriber"}
+
+	// 未标记分组放行。
+	allowed, reason, err := CheckSubscriptionGroupAccess(1, "default")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.Empty(t, reason)
+
+	// DB 不可用 fail-open。
+	previousDB := model.DB
+	model.DB = nil
+	allowed, _, err = CheckSubscriptionGroupAccess(1, "subscriber")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	model.DB = previousDB
+
+	db := seedSubscriptionAccessDB(t)
+	now := common.GetTimestamp()
+	// 有订阅 → 放行。
+	plan := &model.SubscriptionPlan{Title: "门禁卡", Models: "", DurationUnit: model.SubscriptionDurationMonth, DurationValue: 1, PriceAmount: 1}
+	require.NoError(t, db.Create(plan).Error)
+	sub := &model.UserSubscription{UserId: 63001, PlanId: plan.Id, Status: "active", StartTime: now, EndTime: now + 86400}
+	require.NoError(t, db.Create(sub).Error)
+	allowed, reason, err = CheckSubscriptionGroupAccess(63001, "subscriber")
+	require.NoError(t, err)
+	require.True(t, allowed)
+	require.Empty(t, reason)
+
+	// 未订阅 + 需订阅分组 → 拒绝且文案可读。
+	allowed, reason, err = CheckSubscriptionGroupAccess(63002, "subscriber")
+	require.NoError(t, err)
+	require.False(t, allowed)
+	require.Contains(t, reason, "需持有订阅")
+	require.Contains(t, reason, "Tf00798")
 }

@@ -188,3 +188,10 @@
 - checkout v1.2.75(0fb195106) + build local-v1.2.75 + tag 切换 + up -d
 - 容器 healthy；/api/status 200；订阅页 ¥ 显示已上线（三张 CNY 卡可见）
 - 回滚：compose 备份 + 换回旧 tag + up -d
+
+## 三十、分组订阅门禁（v1.2.76，2026-09-22）
+- relay_setting.SubscriptionRequiredGroups（需订阅分组清单）+ IsSubscriptionRequiredGroup
+- service.CheckSubscriptionGroupAccess：未订阅用户使用需订阅分组 → 403 可读文案；未标记/DB 不可用 fail-open
+- 接入 RelayHelper（模型矩阵校验后）
+- 单测：标记判定 + 放行/拒绝/fail-open；setting/service 全绿
+- 配置：管理员在 relay 设置填分组名（如 subscriber）即启用；三张卡 upgrade_group 待分组名确认后配置

@@ -134,6 +134,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		newAPIError = types.NewErrorWithStatusCode(fmt.Errorf("%s", reason), "model_not_in_subscription", http.StatusForbidden, types.ErrOptionWithSkipRetry())
 		return
 	}
+	// 分组订阅门禁：管理员标记的"需订阅分组"，未订阅用户被拒（fail-open）。
+	if allowed, reason, accessErr := service.CheckSubscriptionGroupAccess(relayInfo.UserId, relayInfo.UsingGroup); accessErr == nil && !allowed {
+		newAPIError = types.NewErrorWithStatusCode(fmt.Errorf("%s", reason), "subscription_required_for_group", http.StatusForbidden, types.ErrOptionWithSkipRetry())
+		return
+	}
 
 	needSensitiveCheck := setting.ShouldCheckPromptSensitive()
 	needCountToken := constant.CountToken

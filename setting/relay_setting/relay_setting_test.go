@@ -59,3 +59,13 @@ func TestGetUserRateLimitTierOverrides(t *testing.T) {
 	_, ok = relaySetting.GroupRateLimitOverrides["vip"]
 	require.False(t, ok)
 }
+
+func TestIsSubscriptionRequiredGroup(t *testing.T) {
+	prev := relaySetting
+	defer func() { relaySetting = prev }()
+	relaySetting = RelaySetting{SubscriptionRequiredGroups: []string{"subscriber", "vip"}}
+	require.True(t, IsSubscriptionRequiredGroup("subscriber"))
+	require.True(t, IsSubscriptionRequiredGroup("vip"))
+	require.False(t, IsSubscriptionRequiredGroup("default"))
+	require.False(t, IsSubscriptionRequiredGroup(""))
+}

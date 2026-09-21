@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 )
 
 // 无订阅负缓存：非订阅用户（relay 热路径的常见情形）短时间跳过 DB 订阅查询，
@@ -77,4 +78,24 @@ func CheckSubscriptionModelAccess(userId int, modelName string) (bool, string, e
 		return true, "", nil
 	}
 	return false, fmt.Sprintf("模型 %s 不在当前订阅套餐（%s）可用模型内，请升级套餐或联系微信 Tf00798 定制", modelName, plan.Title), nil
+}
+
+// CheckSubscriptionGroupAccess 分组订阅门禁：分组被管理员标记为
+// "需订阅才能使用"（relay 设置 SubscriptionRequiredGroups）时，未订阅用户
+// 使用该分组被拒（403）；未标记/无订阅判定失败/DB 不可用一律放行（fail-open）。
+func CheckSubscriptionGroupAccess(userId int, group string) (bool, string, error) {
+	if userId <= 0 || group == "" || !relay_setting.IsSubscriptionRequiredGroup(group) {
+		return true, "", nil
+	}
+	if model.DB == nil {
+		return true, "", nil
+	}
+	subs, err := model.GetAllActiveUserSubscriptions(userId)
+	if err != nil {
+		return true, "", nil
+	}
+	if len(subs) > 0 {
+		return true, "", nil
+	}
+	return false, fmt.Sprintf("分组 %s 需持有订阅后才能使用，请先购买订阅或联系微信 Tf00798 定制", group), nil
 }
