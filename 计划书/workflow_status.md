@@ -183,3 +183,8 @@
 - lib/format.formatPlanPrice：currency=CNY→¥，否则 $
 - 替换 3 处硬编码 $：订阅表格 Price 列、用户订阅弹窗计划下拉、购买弹窗价格
 - typecheck 绿
+
+## 二十九、生产热更新 v1.2.75（2026-09-22，真实执行+线上验收）
+- checkout v1.2.75(0fb195106) + build local-v1.2.75 + tag 切换 + up -d
+- 容器 healthy；/api/status 200；订阅页 ¥ 显示已上线（三张 CNY 卡可见）
+- 回滚：compose 备份 + 换回旧 tag + up -d
