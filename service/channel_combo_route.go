@@ -157,7 +157,45 @@ func ComboNextCandidate(combo *model.ChannelCombo) (*ComboCandidate, error) {
 		}
 		return &ComboCandidate{ChannelID: items[0].ChannelID, Model: items[0].Model, ComboName: combo.Name}, nil
 
+	case "factor":
+		// P1-4：多因子凸组合。因子数据源 = 健康快照 + fail 计数（现有真实
+		// 数据，不伪造）：每候选按 ScoreChannelFactors 打分，最高者当选。
+		// 因子评估异常（panic/超时保护由调用方热路径承担）时回落固定权重
+		// 逻辑（weighted 的 fail-open 语义）。
+		state.mu.Lock()
+		defer state.mu.Unlock()
+		best := -1
+		var bestScores ChannelFactorScores
+		for _, item := range items {
+			in := ChannelFactorInput{}
+			if snap := GetChannelHealthSnapshot(item.ChannelID); snap.SampleCount > 0 {
+				in = ChannelFactorInput{
+					HealthScore:  snap.Score,
+					P50LatencyMs: snap.P50LatencyMs,
+					ErrorRate:    1 - snap.SuccessRate,
+					HasSamples:   true,
+				}
+			}
+			score, scores := ScoreChannelFactors(in)
+			if score > float64(best) {
+				best = int(score * 1000)
+				bestScores = scores
+			}
+		}
+		if best >= 0 {
+			for _, item := range items {
+				score, _ := ScoreChannelFactors(factorInputFor(item.ChannelID))
+				if int(score*1000) == best {
+					RecordComboSelected(combo.Name, item.ChannelID, item.Model)
+					common.SysLog(ExplainFactorDecision(combo.Name, item.ChannelID, bestScores))
+					return &ComboCandidate{ChannelID: item.ChannelID, Model: item.Model, ComboName: combo.Name}, nil
+				}
+			}
+		}
+		// fail-open：无法评分时回到第一个候选。
+		return &ComboCandidate{ChannelID: items[0].ChannelID, Model: items[0].Model, ComboName: combo.Name}, nil
 	default: // fallback
+
 		state.mu.Lock()
 		defer state.mu.Unlock()
 		// 默认顺序 = models 数组顺序（首个优先）；若已推进过（失败过），
@@ -223,4 +261,18 @@ func ComboCandidateCoolingDown(channelID int) bool {
 	}
 	delete(comboFailCool.channelCool, channelID)
 	return false
+}
+
+// factorInputFor 将候选渠道健康快照映射为因子输入（真实数据，未知→中性）。
+func factorInputFor(channelID int) ChannelFactorInput {
+	snap := GetChannelHealthSnapshot(channelID)
+	if snap.SampleCount == 0 {
+		return ChannelFactorInput{}
+	}
+	return ChannelFactorInput{
+		HealthScore:  snap.Score,
+		P50LatencyMs: snap.P50LatencyMs,
+		ErrorRate:    1 - snap.SuccessRate,
+		HasSamples:   true,
+	}
 }
