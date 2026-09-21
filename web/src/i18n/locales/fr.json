@@ -6374,6 +6374,8 @@
     "RPM (requests per minute)": "RPM (requests per minute)",
     "Max requests per user in a 60s sliding window. 0 = unlimited.": "Max requests per user in a 60s sliding window. 0 = unlimited.",
     "Save user base rate limit": "Save user base rate limit",
+    "High concurrency/RPM customization": "High concurrency/RPM customization",
+    "Contact WeChat Tf00798": "Contact WeChat Tf00798",
     "Concurrency limit": "Limite de concurrence",
     "Max in-flight requests processed at once. 0 = unlimited (bucket off).": "Requêtes simultanées max. 0 = illimité (bucket désactivé).",
     "Queue capacity": "Capacité de file",

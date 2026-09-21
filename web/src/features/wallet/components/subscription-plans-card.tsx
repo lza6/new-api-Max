@@ -550,6 +550,12 @@ export function SubscriptionPlansCard({
                 plan.upgrade_group
                   ? `${t('Upgrade Group')}: ${plan.upgrade_group}`
                   : null,
+                plan.concurrency_limit > 0 || plan.rpm_limit > 0
+                  ? `${t('Concurrency')} ${plan.concurrency_limit || 0}/s · ${t('RPM')} ${plan.rpm_limit || 0}`
+                  : null,
+                `${t('High concurrency/RPM customization')}: ${t(
+                  'Contact WeChat Tf00798'
+                )}`,
               ].filter(Boolean) as string[]
 
               return (

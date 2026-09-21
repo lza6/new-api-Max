@@ -210,3 +210,7 @@
 ## 三十三、余额兑换不依赖充值开关（v1.2.78，2026-09-22）
 - SubscriptionRequestBalancePay 移除 IsTopUpEnabled 门控：充值关闭仍可用钱包额度兑换订阅（保留合规确认）
 - 前端订阅卡显示并发/RPM/微信提示、兑换码兑换、续费顺延、日志按用户筛选 → 待办
+
+## 三十四、订阅卡显示并发/RPM + 微信定制提示（v1.2.79，2026-09-22）
+- wallet/subscription-plans-card：benefits 增加 并发/s + RPM + 微信Tf00798高并发定制 两行
+- i18n 7 语言；typecheck 绿
