@@ -21,7 +21,7 @@ import { getRouteApi } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
 import { Skeleton } from '@/components/ui/skeleton'
-import { formatLogQuota } from '@/lib/format'
+import { formatLogQuota, formatTraffic } from '@/lib/format'
 import { requireServerSuccess } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
 
@@ -48,20 +48,20 @@ function StatBadge(props: {
   )
 }
 
-function TrafficBadges(props: { byDay: Array<{ date: string; mb: number }> }) {
+function TrafficBadges(props: { byDay: Array<{ date: string; bytes: number }> }) {
   const { t } = useTranslation()
   const todayStr = new Date().toLocaleDateString('en-CA')
   const sorted = [...props.byDay].sort((a, b) => b.date.localeCompare(a.date))
-  const sum = (rows: Array<{ date: string; mb: number }>) =>
-    rows.reduce((acc, row) => acc + row.mb, 0)
+  const sum = (rows: Array<{ date: string; bytes: number }>) =>
+    rows.reduce((acc, row) => acc + (row.bytes || 0), 0)
   const today = sum(sorted.filter((row) => row.date === todayStr))
   const week = sum(sorted.slice(0, 7))
   const month = sum(sorted)
   return (
     <>
-      <StatBadge label={t('Traffic today')} value={`${today.toFixed(2)} MB`} accent='bg-emerald-500/70' />
-      <StatBadge label={t('Traffic 7d')} value={`${week.toFixed(2)} MB`} accent='bg-emerald-500/50' />
-      <StatBadge label={t('Traffic 30d')} value={`${month.toFixed(2)} MB`} accent='bg-emerald-500/30' />
+      <StatBadge label={t('Traffic today')} value={formatTraffic(today)} accent='bg-emerald-500/70' />
+      <StatBadge label={t('Traffic 7d')} value={formatTraffic(week)} accent='bg-emerald-500/50' />
+      <StatBadge label={t('Traffic 30d')} value={formatTraffic(month)} accent='bg-emerald-500/30' />
     </>
   )
 }

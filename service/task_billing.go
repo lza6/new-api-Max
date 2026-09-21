@@ -69,14 +69,16 @@ func LogTaskConsumption(c *gin.Context, info *relaycommon.RelayInfo, task *model
 	appendTaskLogInfo(task, other)
 	attachQuotaSaturation(c, info, other)
 	model.RecordConsumeLog(c, info.UserId, model.RecordConsumeLogParams{
-		ChannelId: info.ChannelId,
-		ModelName: info.OriginModelName,
-		TokenName: tokenName,
-		Quota:     info.PriceData.Quota,
-		Content:   logContent,
-		TokenId:   info.TokenId,
-		Group:     info.UsingGroup,
-		Other:     other,
+		ChannelId:     info.ChannelId,
+		ModelName:     info.OriginModelName,
+		TokenName:     tokenName,
+		Quota:         info.PriceData.Quota,
+		Content:       logContent,
+		TokenId:       info.TokenId,
+		Group:         info.UsingGroup,
+		Other:         other,
+		RequestBytes:  info.RequestBytes,
+		ResponseBytes: info.ResponseBytes,
 	})
 	model.UpdateUserUsedQuotaAndRequestCount(info.UserId, info.PriceData.Quota)
 	model.UpdateChannelUsedQuota(info.ChannelId, info.PriceData.Quota)

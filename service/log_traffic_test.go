@@ -32,3 +32,28 @@ func TestAggregateTrafficByDayEmpty(t *testing.T) {
 	require.Nil(t, AggregateTrafficByDay(nil, time.UTC))
 	require.Empty(t, AggregateTrafficByDay([]TrafficRecord{}, time.UTC))
 }
+
+func TestAggregateBandwidthByDay(t *testing.T) {
+	loc := time.FixedZone("CST", 8*3600)
+	day1 := time.Date(2026, 9, 20, 10, 0, 0, 0, loc).Unix()
+	day2 := time.Date(2026, 9, 19, 23, 0, 0, 0, loc).Unix()
+	records := []TrafficBytesRecord{
+		{CreatedAt: day1, RequestBytes: 100, ResponseBytes: 900},
+		{CreatedAt: day1, RequestBytes: 200, ResponseBytes: 800},
+		{CreatedAt: day2, RequestBytes: 50, ResponseBytes: 10},
+	}
+	got := AggregateBandwidthByDay(records, loc, 0)
+	require.Len(t, got, 2)
+	require.Equal(t, "2026-09-20", got[0].Date)
+	require.Equal(t, int64(2000), got[0].Bytes)
+	require.Equal(t, int64(2), got[0].Requests)
+	require.Equal(t, "2026-09-19", got[1].Date)
+	require.Equal(t, int64(60), got[1].Bytes)
+
+	limited := AggregateBandwidthByDay(records, loc, 1)
+	require.Len(t, limited, 1)
+	require.Equal(t, "2026-09-20", limited[0].Date)
+
+	require.Nil(t, AggregateBandwidthByDay(nil, time.UTC, 0))
+	require.Empty(t, AggregateBandwidthByDay([]TrafficBytesRecord{}, time.UTC, 10))
+}

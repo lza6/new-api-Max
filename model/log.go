@@ -57,19 +57,23 @@ func sanitizeClickHouseLikePattern(input string) (string, error) {
 }
 
 type Log struct {
-	Id                int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2;index:idx_log_type_created_id,priority:3"`
-	UserId            int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1;index:idx_log_user_type_created,priority:1"`
-	CreatedAt         int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_log_type_created_id,priority:2;index:idx_log_user_type_created,priority:3"`
-	Type              int    `json:"type" gorm:"index:idx_log_type_created_id,priority:1;index:idx_log_user_type_created,priority:2"`
-	Content           string `json:"content"`
-	Username          string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
-	TokenName         string `json:"token_name" gorm:"index;default:''"`
-	ModelName         string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
-	Quota             int    `json:"quota" gorm:"default:0"`
-	PromptTokens      int    `json:"prompt_tokens" gorm:"default:0"`
-	CompletionTokens  int    `json:"completion_tokens" gorm:"default:0"`
-	UseTime           int    `json:"use_time" gorm:"default:0"`
-	IsStream          bool   `json:"is_stream"`
+	Id               int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2;index:idx_log_type_created_id,priority:3"`
+	UserId           int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1;index:idx_log_user_type_created,priority:1"`
+	CreatedAt        int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_log_type_created_id,priority:2;index:idx_log_user_type_created,priority:3"`
+	Type             int    `json:"type" gorm:"index:idx_log_type_created_id,priority:1;index:idx_log_user_type_created,priority:2"`
+	Content          string `json:"content"`
+	Username         string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
+	TokenName        string `json:"token_name" gorm:"index;default:''"`
+	ModelName        string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
+	Quota            int    `json:"quota" gorm:"default:0"`
+	PromptTokens     int    `json:"prompt_tokens" gorm:"default:0"`
+	CompletionTokens int    `json:"completion_tokens" gorm:"default:0"`
+	UseTime          int    `json:"use_time" gorm:"default:0"`
+	IsStream         bool   `json:"is_stream"`
+	// RequestBytes/ResponseBytes 每请求流量字节（供站点权威统计/带宽排行直接 SUM，
+	// 避免全表扫 other JSON；旧行无值按 0 计入，不影响既有 other 口径）。
+	RequestBytes      int64  `json:"request_bytes" gorm:"bigint;default:0;index:idx_logs_traffic,priority:2"`
+	ResponseBytes     int64  `json:"response_bytes" gorm:"bigint;default:0;index:idx_logs_traffic,priority:3"`
 	ChannelId         int    `json:"channel" gorm:"index"`
 	ChannelName       string `json:"channel_name" gorm:"->"`
 	TokenId           int    `json:"token_id" gorm:"default:0;index"`
@@ -336,6 +340,8 @@ type RecordConsumeLogParams struct {
 	UseTimeSeconds   int       `json:"use_time_seconds"`
 	IsStream         bool      `json:"is_stream"`
 	Group            string    `json:"group"`
+	RequestBytes     int64     `json:"request_bytes"`
+	ResponseBytes    int64     `json:"response_bytes"`
 	Other            *LogOther `json:"other"`
 }
 
@@ -377,6 +383,8 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		TokenId:          params.TokenId,
 		UseTime:          params.UseTimeSeconds,
 		IsStream:         params.IsStream,
+		RequestBytes:     params.RequestBytes,
+		ResponseBytes:    params.ResponseBytes,
 		Group:            params.Group,
 		Ip: func() string {
 			if needRecordIp {

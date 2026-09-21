@@ -37,3 +37,19 @@ export interface HomePageContentResult {
   isLoaded: boolean
   isUrl: boolean
 }
+
+/**
+ * Site-wide authoritative statistics from GET /api/site/stats
+ */
+export interface SiteStatsResponse {
+  success: boolean
+  message?: string
+  data?: {
+    days: number
+    total_requests: number
+    total_bytes: number
+    total_bytes_text: string
+    total_tokens: number
+    total_quota: number
+  }
+}

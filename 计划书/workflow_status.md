@@ -37,3 +37,38 @@
 ## 五、下一步（最小可行）
 1. 质量基线：仓库 lint 存量债务 245→0 全清（v1.2.60）✅；P0-P2 全部落地；后续：P2-4 平台生态（战略级立项）+ controller 测试基线（补 TestMain）+ 沙箱 OS 级隔离。
 2. 从《下一步改进指南.md》取批次定义，按 03-工作流-SOP 推进，完成后在本文件登记提交 SHA 与证据路径。
+---
+
+## 六、B 批次 controller 测试基线（v1.2.62 ✅ 2026-09-22）
+
+| 节点 | 任务 | 状态 | 证据 |
+|---|---|---|---|
+| B-P0 | executeTaskSubmissionWith 恢复任务落库（B4-1 误删 task.Insert，任务行不落库、internal_task_id=0、轮询/SSE 断链） | ✅ 生产修复 | controller/relay.go:896-901 + 回归测试组全绿 |
+| B-1 | controller TestMain 共享全模型内存库 + RedisEnabled=false（异步 teardown 写空库根因） | ✅ | controller/main_test.go |
+| B-2 | :memory: sqlite 单连接固定 + Task/TaskEvent/User/Channel/Token 迁移（多连接各独立内存库根因） | ✅ | relay_task_plugin_test.go / plugin_protocol_test.go |
+| B-3 | task_unconfirmed 测试基建（真实 gin context + wallet_only + 用户/令牌种子） | ✅ | task_unconfirmed_test.go |
+| B-4 | model.InitCol 导出（commonKeyCol 空 → WHERE '' IN ? 语法错） | ✅ | model/main.go + billing_option_test.go |
+| 验证 | controller Task\|Plugin\|Event 组全绿；model 包全绿；远端 SHA 一致 | ✅ | `go test ./controller/ -run Task\|Plugin\|Event` + `go test ./model/` |
+
+提交：1609a1979（v1.2.62）｜ 远端核验 MATCH ✓
+
+## 七、002 订阅+流量单位+站点统计（立项 2026-09-22）
+- 规范：`.specify/specs/002-subscription-site-stats/`（spec.md / plan.md / tasks.md）
+- Phase B（流量单位/站点统计/排行）→ Phase C（订阅档位/模型矩阵/覆盖）→ Phase D（泄漏排查/文档）→ Phase E（总验收交付）
+- 当前进行：Phase B 实现
+
+## 八、002 Phase B 智能流量单位 + 站点权威统计（进行中，2026-09-22）
+
+| 节点 | 任务 | 状态 | 证据 |
+|---|---|---|---|
+| B1 | 后端 FormatBytes（B/KB/MB/GB/TB/PB，1024，2 位小数） | ✅ | common/format.go + format_test.go（含 0/负/小数边界） |
+| B2 | Log 持久化 RequestBytes/ResponseBytes 列（写库时落列，站点统计免扫 JSON） | ✅ SQLite 验证；MySQL/PG 待三库实例（Docker 不可用，登记 blocker） | model/log.go + service/quota.go/task_billing.go/text_quota.go 接线 |
+| B3 | 站点权威统计端点 GET /api/log/overview（累计带宽/请求/token/额度）+ 公共 GET /api/site/stats（限流） | ✅ | controller/log.go GetSiteOverview + router 两条路由 |
+| B4 | 每日带宽排行端点 GET /api/log/bandwidth/leaderboard（按日降序限量） | ✅ | controller/log.go + service/log_traffic.go AggregateBandwidthByDay + 单测 |
+| B5 | 前端 formatTraffic 共享工具 + vitest | ✅ | web/src/lib/format.ts + __tests__/format-traffic.test.ts（2/2 绿） |
+| B6 | TrafficBadges 智能单位（管理端流量徽章） | ✅ | common-logs-stats.tsx 改用 formatTraffic(bytes) |
+| B7 | 首页站点统计卡（真实数据 + 加载/错误/空态） | ✅ | home/components/site-stats.tsx + Stats 挂载 + i18n（7 语言同步） |
+| B8 | 质量门 | ✅ 后端 build/common/service 绿；前端 typecheck/build/vitest 绿 | - |
+| B9 | 三库 conformance | ⏳ SQLite PASS；MySQL/PG 需 Docker 实例（本机无 docker，登记 blocker） | scripts/db-conformance.ps1 待跑 |
+
+阻塞项：本机无 docker → MySQL/PostgreSQL conformance 需在有实例环境跑一次再宣称三库闭环。

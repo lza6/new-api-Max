@@ -253,6 +253,25 @@ export function formatTokens(tokens: number): string {
 }
 
 /**
+ * Format byte count to a human readable traffic string (B/KB/MB/GB/TB/PB,
+ * 1024-based, 2 decimals). Mirrors backend common.FormatBytes so the admin
+ * dashboard and homepage stay consistent. Negative/zero returns "0 B".
+ */
+export function formatTraffic(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {return '0 B'}
+  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+  let value = bytes
+  let unit = units[0]
+  for (const next of units.slice(1)) {
+    if (value < 1024) {break}
+    value /= 1024
+    unit = next
+  }
+  if (unit === 'B') {return `${Math.round(value)} B`}
+  return `${value.toFixed(2)} ${unit}`
+}
+
+/**
  * Format use time in seconds with appropriate unit
  */
 export function formatUseTime(seconds: number): string {

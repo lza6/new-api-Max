@@ -192,3 +192,80 @@ func GetLogsTraffic(c *gin.Context) {
 		"by_day":         byDay,
 	})
 }
+
+// GetSiteOverview 站点权威统计：累计处理请求数 / 提供总带宽 / token 总数 / 总消耗额度。
+// GET /api/log/overview?days=0|N（0=累计至今，N=近 N 天）。
+// 带宽与 token 直接对持久化列 SUM，避免全表扫 other JSON（慢查询友好）。
+func GetSiteOverview(c *gin.Context) {
+	days := 0
+	if v := c.Query("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = min(n, 3650)
+		}
+	}
+	tx := model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeConsume)
+	if days > 0 {
+		tx = tx.Where("created_at >= ?", time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
+	}
+	var agg struct {
+		TotalRequests int64
+		TotalBytes    int64
+		TotalTokens   int64
+		TotalQuota    int64
+	}
+	if err := tx.Select(
+		"COUNT(*) AS total_requests, " +
+			"COALESCE(SUM(request_bytes),0)+COALESCE(SUM(response_bytes),0) AS total_bytes, " +
+			"COALESCE(SUM(prompt_tokens),0)+COALESCE(SUM(completion_tokens),0) AS total_tokens, " +
+			"COALESCE(SUM(quota),0) AS total_quota",
+	).Scan(&agg).Error; err != nil {
+		common.ApiErrorMsg(c, "failed to query site overview: "+err.Error())
+		return
+	}
+	common.ApiSuccess(c, gin.H{
+		"days":             days,
+		"total_requests":   agg.TotalRequests,
+		"total_bytes":      agg.TotalBytes,
+		"total_bytes_text": common.FormatBytes(agg.TotalBytes),
+		"total_tokens":     agg.TotalTokens,
+		"total_quota":      agg.TotalQuota,
+	})
+}
+
+// GetBandwidthLeaderboard 管理端带宽日排行：按日分组、按带宽降序、限量。
+// GET /api/log/bandwidth/leaderboard?days=30&limit=10
+func GetBandwidthLeaderboard(c *gin.Context) {
+	days := 30
+	if v := c.Query("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = min(n, 3650)
+		}
+	}
+	limit := 10
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = min(n, 1000)
+		}
+	}
+	var rows []service.TrafficBytesRecord
+	if err := model.LOG_DB.Model(&model.Log{}).
+		Select("created_at", "request_bytes", "response_bytes").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume,
+			time.Now().Add(-time.Duration(days)*24*time.Hour).Unix()).
+		Scan(&rows).Error; err != nil {
+		common.ApiErrorMsg(c, "failed to query bandwidth leaderboard: "+err.Error())
+		return
+	}
+	byDay := service.AggregateBandwidthByDay(rows, time.Local, limit)
+	type row struct {
+		Date      string `json:"date"`
+		Requests  int64  `json:"requests"`
+		Bytes     int64  `json:"bytes"`
+		BytesText string `json:"bytes_text"`
+	}
+	out := make([]row, 0, len(byDay))
+	for _, d := range byDay {
+		out = append(out, row{Date: d.Date, Requests: d.Requests, Bytes: d.Bytes, BytesText: common.FormatBytes(d.Bytes)})
+	}
+	common.ApiSuccess(c, gin.H{"days": days, "limit": limit, "leaderboard": out})
+}

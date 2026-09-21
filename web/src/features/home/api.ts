@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
-import type { HomePageContentResponse } from './types'
+import type { HomePageContentResponse, SiteStatsResponse } from './types'
 
 // ============================================================================
 // Home Page APIs
@@ -35,5 +35,14 @@ export async function getHomePageContent(): Promise<HomePageContentResponse> {
   const res = await api.get('/api/home_page_content', {
     headers: { 'Cache-Control': null },
   })
+  return res.data
+}
+
+/**
+ * Get authoritative site-wide statistics (aggregates only, no PII).
+ * Total bandwidth served / requests processed / tokens processed.
+ */
+export async function getSiteStats(): Promise<SiteStatsResponse> {
+  const res = await api.get('/api/site/stats')
   return res.data
 }

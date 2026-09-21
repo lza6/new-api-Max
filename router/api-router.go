@@ -33,6 +33,8 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/about", controller.GetAbout)
 		//apiRouter.GET("/midjourney", controller.GetMidjourney)
 		apiRouter.GET("/home_page_content", controller.GetHomePageContent)
+		// 站点权威统计（累计带宽/请求/token，仅聚合无 PII）：首页公开展示，限流防滥用。
+		apiRouter.GET("/site/stats", middleware.SearchRateLimit(), controller.GetSiteOverview)
 		apiRouter.GET("/pricing", middleware.HeaderNavModuleAuth("pricing"), controller.GetPricing)
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")
 		perfMetricsRoute.Use(middleware.HeaderNavModulePublicOrUserAuth("pricing"))
@@ -264,7 +266,7 @@ func SetApiRouter(router *gin.Engine) {
 			taskPluginRoute.POST("/:key/activate", controller.ActivateTaskPlugin)
 			taskPluginRoute.POST("/:key/status", controller.SetTaskPluginStatus)
 			taskPluginRoute.POST("/:key/dryrun", controller.DryRunTaskPlugin)
-	taskPluginRoute.POST("/:key/approve", controller.ApproveTaskPlugin)
+			taskPluginRoute.POST("/:key/approve", controller.ApproveTaskPlugin)
 			taskPluginRoute.DELETE("/:key/versions/:version", controller.DeleteTaskPluginVersion)
 		}
 		apiRouter.GET("/task_plugin_options", middleware.AdminAuth(), middleware.RequirePermission(authz.TaskPluginBind), controller.GetTaskPluginOptions)
@@ -317,6 +319,8 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/channel_affinity_usage_cache", middleware.AdminAuth(), controller.GetChannelAffinityUsageCacheStats)
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/traffic", middleware.AdminAuth(), controller.GetLogsTraffic)
+		logRoute.GET("/overview", middleware.AdminAuth(), controller.GetSiteOverview)
+		logRoute.GET("/bandwidth/leaderboard", middleware.AdminAuth(), controller.GetBandwidthLeaderboard)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
 		logRoute.GET("/usage/:id/cost-detail", middleware.UserAuth(), controller.GetLogCostDetail)
