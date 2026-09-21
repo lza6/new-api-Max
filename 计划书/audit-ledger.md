@@ -145,3 +145,17 @@
   - 渠道亲和 usage-cache 测试夹具：`time.Now().UnixNano()` 在 Windows 上连续调用撞值导致缓存键复用（Total 累加）→ 原子计数器生成唯一键。
 - 命令：go build ./... → 0；go vet ./model/ ./service/ ./controller/ → 0；go test ./service/ ×3 全过（flaky 已除）；go test ./model/ → ok；relaykit GOWORK=off go build → 0；三库 conformance → PASS=28 FAIL=0 SKIP=0。
 - 范围说明：订阅 epay（subscription_payment_epay.go）暂未归一（独立订单状态机），列入后续；本批只覆盖充值主路径。
+
+## P2-3 jsplugin 安全模型升级（2026-09-21, v1.2.57）
+- 新增 `pkg/jsplugin/security.go`（四个安全原语，纯内存/可插拔，三库无关）：
+  - **ExecutionGate 内容寻址审批**：以 (pluginKey, sourceHash) 为审批单元，审批仅对该哈希生效；改动一行 → ContentHash 变化 → 必须重新审批（杜绝「审 A 跑 B」）；ApprovalState pending/approved/rejected + Revoke；一次性 token 绑定 (key,hash)，重复消费被拒。
+  - **分层权限**：PermissionKind network/file/process/secret/run；ParsePermissions 从插件 meta 解析；无声明默认全禁（deny-by-default）；RequirePermission 校验。
+  - **Ed25519 签名**：VerifyPluginSignature（32 字节公钥），防源码被篡改。
+  - **沙箱降级链**：ResolveSandboxPolicy（required/lenient/disabled）；required 无可用隔离 → ErrSandboxUnavailable（fail-closed，禁止静默降级）；lenient 降级 workspace 并置 degraded 供调用方明示降级日志。
+- 引擎层收口：Engine 增加 sourceHash（Compile 时 ContentHash）+ atomic policy；`Call/CallMember/CallPath/CallPathWithAdmissionTimeout` 在真正执行前统一过 `enforceCallSecurity`（审批闸门 + 钩子权限）。未配置策略保持既有行为（零回归）。
+- 生产接线（非破坏）：
+  - `setting/task_plugin.go` 新增 `TaskPluginEd25519PublicKey` / `TaskPluginApprovalRequired` 设置项（OptionMap 模式）+ 读写 setter。
+  - `controller/task_plugin.go` 上传新增可选 `signature`（base64 Ed25519）；配置公钥后缺签/错签 → 400 拒绝。审批开关预留（需管理端审批界面，列入后续批次）。
+- 测试：`pkg/jsplugin/security_test.go` 11 用例（哈希稳定/权限默认全禁/审批+token 单次/改行重审批/拒批撤销/验签篡改拒/沙箱 fail-closed/引擎审批门/引擎权限钩子/无策略向后兼容）；`controller/task_plugin_security_test.go` 4 用例（篡改拒、缺签拒、未配置放行、设置往返）；jsplugin 全量 + setting + service 全量无回归。
+- 命令：go build ./... → 0；go vet → 0；go test ./pkg/jsplugin/ ./setting/ ./service/ → ok；relaykit GOWORK=off go build → 0；controller 安全定向 → 4/4 PASS。
+- 范围说明：审批工作流 UI（管理端展示代码+一键审批）与沙箱 docker/bubblewrap 实际运行时隔离为后续批次；本批提供原语 + 引擎收口 + 上传验签，全部行为测试落地。

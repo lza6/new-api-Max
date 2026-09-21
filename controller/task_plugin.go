@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -35,6 +36,9 @@ type taskPluginUploadRequest struct {
 	// Icon carries the sidecar icon.svg / icon.png as a data URI. It is optional
 	// and stored separately from the source so the JavaScript stays readable.
 	Icon string `json:"icon"`
+	// Signature 可选 Ed25519 插件签名（base64，32 字节公钥对应签名）。
+	// 管理端配置公钥后必须携带且校验通过，否则上传被拒绝（P2-3）。
+	Signature string `json:"signature"`
 }
 
 func UploadTaskPlugin(c *gin.Context) {
@@ -51,6 +55,17 @@ func UploadTaskPlugin(c *gin.Context) {
 		actual := fmt.Sprintf("%x", sha256.Sum256([]byte(request.Source)))
 		if !strings.EqualFold(actual, expected) {
 			common.ApiErrorMsg(c, "plugin source sha256 mismatch")
+			return
+		}
+	}
+	if publicKey := setting.GetTaskPluginEd25519PublicKey(); len(publicKey) > 0 {
+		signature, decodeErr := base64.StdEncoding.DecodeString(strings.TrimSpace(request.Signature))
+		if decodeErr != nil || len(signature) == 0 {
+			common.ApiErrorMsg(c, "plugin signature required but missing or invalid base64")
+			return
+		}
+		if verifyErr := jsplugin.VerifyPluginSignature([]byte(request.Source), signature, publicKey); verifyErr != nil {
+			common.ApiErrorMsg(c, verifyErr.Error())
 			return
 		}
 	}

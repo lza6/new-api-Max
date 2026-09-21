@@ -8,11 +8,12 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/lza6/new-api-Max/logger"
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/parser"
+	"github.com/lza6/new-api-Max/logger"
 )
 
 const (
@@ -111,14 +112,16 @@ type Options struct {
 }
 
 type Engine struct {
-	key       string
-	version   string
-	timeout   time.Duration
-	now       func() time.Time
-	log       func(string)
-	module    *sobek.SourceTextModuleRecord
-	pool      sync.Pool
-	semaphore chan struct{}
+	key        string
+	version    string
+	sourceHash string
+	timeout    time.Duration
+	now        func() time.Time
+	log        func(string)
+	module     *sobek.SourceTextModuleRecord
+	pool       sync.Pool
+	semaphore  chan struct{}
+	policy     atomic.Pointer[SecurityPolicy]
 }
 
 type runtimeInstance struct {
@@ -165,13 +168,14 @@ func Compile(source string, options Options) (*Engine, error) {
 	}
 
 	engine := &Engine{
-		key:       options.Key,
-		version:   options.Version,
-		timeout:   timeout,
-		now:       now,
-		log:       options.Log,
-		module:    module,
-		semaphore: make(chan struct{}, concurrency),
+		key:        options.Key,
+		version:    options.Version,
+		sourceHash: ContentHash(source),
+		timeout:    timeout,
+		now:        now,
+		log:        options.Log,
+		module:     module,
+		semaphore:  make(chan struct{}, concurrency),
 	}
 	instance, err := engine.newRuntime(context.Background())
 	if err != nil {
@@ -336,6 +340,9 @@ func (e *Engine) call(
 	members []string,
 	args ...any,
 ) (result any, err error) {
+	if err = e.enforceCallSecurity(ctx, callHookKey(exportName, members)); err != nil {
+		return nil, err
+	}
 	if err = e.acquireCallSlot(ctx, admissionTimeout); err != nil {
 		return nil, err
 	}
