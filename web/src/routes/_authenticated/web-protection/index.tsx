@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { lazy } from 'react'
 import { createFileRoute, redirect } from "@tanstack/react-router"
 
-import { WebProtectionPage } from "@/features/web-protection/web-protection-page"
+const WebProtectionPage = lazy(() => import("@/features/web-protection/web-protection-page").then((m) => ({ default: m.WebProtectionPage })))
 import { ROLE } from "@/lib/roles"
 import { useAuthStore } from "@/stores/auth-store"
 

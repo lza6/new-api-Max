@@ -16,10 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { lazy } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
-import { UsageLogs } from '@/features/usage-logs'
+const UsageLogs = lazy(() => import('@/features/usage-logs').then((m) => ({ default: m.UsageLogs })))
 import {
   isUsageLogsSectionId,
   USAGE_LOGS_DEFAULT_SECTION,

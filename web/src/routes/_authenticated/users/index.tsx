@@ -16,10 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { lazy } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 import z from 'zod'
 
-import { Users } from '@/features/users'
+const Users = lazy(() => import('@/features/users').then((m) => ({ default: m.Users })))
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 

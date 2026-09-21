@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { lazy } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { SystemSettings } from '@/features/system-settings'
+const SystemSettings = lazy(() => import('@/features/system-settings').then((m) => ({ default: m.SystemSettings })))
 import { ROLE } from '@/lib/roles'
 import { useAuthStore } from '@/stores/auth-store'
 

@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { lazy } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { Dashboard } from '@/features/dashboard'
+const Dashboard = lazy(() => import('@/features/dashboard').then((m) => ({ default: m.Dashboard })))
 import {
   DASHBOARD_SECTION_IDS,
   DASHBOARD_DEFAULT_SECTION,
