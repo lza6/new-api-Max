@@ -51,7 +51,7 @@
 <table>
 <tr><th>项</th><th>状态</th><th>说明</th></tr>
 <tr><td>订阅前端 C7（套餐表单档位/模型矩阵、覆盖 UI、微信 Tf00798 文案、deepseek-v4-flash 默认入卡）</td><td><span class="tag todo">待办</span></td><td>后端已就绪，前端表单/管理页未接</td></tr>
-<tr><td>三库 conformance（MySQL/PG）</td><td><span class="tag warn">blocker</span></td><td>本机无 Docker；新列 SQLite 已验证，MySQL/PG 需实例环境跑 <code>scripts/db-conformance.ps1</code></td></tr>
+<tr><td>三库 conformance</td><td><span class="tag ok">PG16 已闭环</span><span class="tag warn">MySQL 待办</span></td><td>真实 PostgreSQL 16 全组 PASS（含新列 AutoMigrate）；SQLite PASS；MySQL 本机未安装（无 Docker）需实例后跑 <code>scripts/db-conformance.ps1</code></td></tr>
 <tr><td>发行版上游地址泄漏</td><td><span class="tag warn">需你在 GitHub 侧核查</span></td><td>仓库全量扫描仅官方 SDK 默认地址，无私有上游/密钥；Release 描述需人工确认后我可整改</td></tr>
 <tr><td>独立审查线程循环 + 复验</td><td><span class="tag todo">待办</span></td><td>终局质量门</td></tr>
 </table>

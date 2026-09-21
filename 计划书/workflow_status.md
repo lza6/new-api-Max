@@ -130,3 +130,9 @@
 ## 十九、前端最终验收 + 报告更新（2026-09-22）
 - bun run build 通过（v1.2.68-71 全部前端改动打包成功）
 - HTML 报告补 v1.2.71 行；全版本线 62→71 完整
+
+## 二十、三库 conformance 重大进展（2026-09-22）
+- 发现本机已装 PostgreSQL 16 → 临时 trust 集群（127.0.0.1:55432）跑真实 conformance
+- TestDBConformance 全组：sqlite PASS + postgres PASS（AutoMigrateIdempotent 含全模型，25s）+ mysql SKIP（未安装）
+- 新列在真实 PG 验证存在：logs.request_bytes/response_bytes；subscription_plans.concurrency_limit/rpm_limit/models；user_subscriptions.rpm_override/concurrency_override
+- 剩余：MySQL 实例（本机未安装，无 Docker）→ blocker 收窄为仅 MySQL
