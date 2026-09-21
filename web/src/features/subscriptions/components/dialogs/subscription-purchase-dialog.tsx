@@ -39,7 +39,7 @@ import {
   paySubscriptionWaffoPancake,
   paySubscriptionBalance,
 } from '../../api'
-import { formatDuration, formatResetPeriod } from '../../lib'
+import { formatDuration, formatPlanPrice, formatResetPeriod } from '../../lib'
 import type { PlanRecord } from '../../types'
 
 interface PaymentMethod {
@@ -87,7 +87,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
     props.enableOnlineTopUp && (props.epayMethods || []).length > 0
   const hasAnyPayment = hasStripe || hasCreem || hasWaffoPancake || hasEpay
   const totalAmount = Number(plan.total_amount || 0)
-  const price = Number(plan.price_amount || 0).toFixed(2)
+  const price = formatPlanPrice(plan)
   const quotaPerUnit =
     currency?.quotaPerUnit && currency.quotaPerUnit > 0
       ? currency.quotaPerUnit

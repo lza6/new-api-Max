@@ -178,3 +178,8 @@
 - 幂等插入 subscription_plans：天卡¥2/day、周卡¥25/week、月卡¥60/month；CNY；无限额度(total_amount=0)；并发3/RPM150；models=["deepseek-v4-flash"]；allow_balance_pay=true；subtitle 含微信Tf00798
 - 验证：3 rows 查询确认（id 1-3，sort_order 1-3）
 - 待确认：自动升级分组 upgrade_group 留空（需用户指定分组名后配置）
+
+## 二十八、前端订阅 ¥ 符号（v1.2.75，2026-09-22）
+- lib/format.formatPlanPrice：currency=CNY→¥，否则 $
+- 替换 3 处硬编码 $：订阅表格 Price 列、用户订阅弹窗计划下拉、购买弹窗价格
+- typecheck 绿
