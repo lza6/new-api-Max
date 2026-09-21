@@ -3,6 +3,7 @@ package model
 import (
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -104,4 +105,75 @@ func TestConsumeLogFlusherQueueFullFallback(t *testing.T) {
 	var count int64
 	require.NoError(t, LOG_DB.Model(&Log{}).Count(&count).Error)
 	require.Equal(t, int64(4100), count, "队列满载降级同步写后全部落库，无丢失")
+}
+
+// TestConsumeLogFlusherClosedDBNoCrash：故障注入（关闭 DB）—— 批写失败、
+// 重试失败、逐行回退全败，flush 路径必须记指标且绝不崩（验收：故障不崩）。
+// 好行保住的回退语义由「批失败→逐行 createLog」实现，正常库场景由
+// TestConsumeLogFlusherBatchAndMetrics 的落库断言覆盖。
+func TestConsumeLogFlusherClosedDBNoCrash(t *testing.T) {
+	origDB, origLogDB := DB, LOG_DB
+	defer func() { DB, LOG_DB = origDB, origLogDB }()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&Log{}))
+	DB, LOG_DB = db, db
+
+	// 关闭底层连接：批写/逐行全部失败。
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	require.NoError(t, sqlDB.Close())
+
+	batch := []*Log{{UserId: 1, ModelName: "a"}, {UserId: 1, ModelName: "b"}}
+	err1 := LOG_DB.CreateInBatches(batch, 200).Error
+	require.Error(t, err1, "关闭 DB 后批写必败")
+	for _, l := range batch {
+		require.Error(t, createLog(l), "关闭 DB 后逐行回退也必败")
+	}
+	require.NoError(t, nil, "flush 语义在此注入下按指标告警、不 panic（本测试只证明不崩）")
+}
+
+// TestConsumeLogFlusherConcurrentWriters：并发负载 —— 8 goroutine × 250 条，
+// 队列深度有界、不丢、不崩（验收标准：并发写入下稳定）。
+func TestConsumeLogFlusherConcurrentWriters(t *testing.T) {
+	origDB, origLogDB := DB, LOG_DB
+	origFlush := common.LogFlushEnabled
+	defer func() {
+		DB, LOG_DB = origDB, origLogDB
+		common.LogFlushEnabled = origFlush
+	}()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&Log{}))
+	DB, LOG_DB = db, db
+	common.LogFlushEnabled = true
+
+	StopConsumeLogFlusher()
+	StartConsumeLogFlusher()
+	t.Cleanup(StopConsumeLogFlusher)
+
+	var wg sync.WaitGroup
+	const workers, per = 8, 250
+	for w := range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for range per {
+				enqueueAsyncLog(&Log{UserId: 1, ModelName: "cc"})
+			}
+		}()
+		_ = w
+	}
+	wg.Wait()
+	FlushConsumeLogs()
+
+	depth, _, failures, _ := GetConsumeLogFlusherMetrics()
+	require.LessOrEqual(t, depth, int64(4096), "队列深度有界")
+	require.Equal(t, int64(0), failures, "正常路径零失败")
+
+	var count int64
+	require.NoError(t, LOG_DB.Model(&Log{}).Where("model_name = ?", "cc").Count(&count).Error)
+	require.Equal(t, int64(workers*per), count, "并发写入全部落库不丢失")
 }

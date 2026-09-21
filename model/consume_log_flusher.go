@@ -83,13 +83,23 @@ func consumeLogFlusherLoop(ctx context.Context) {
 		}
 		batch := pending
 		pending = nil
-		// P1-2：批量写失败先整批重试一次（瞬时错误如连接抖动），仍失败
-		// 则记指标并告警，绝不 panic/crash（尽力而为，进程保活优先）。
+		// P1-2 失败语义：批写失败先整批重试一次（瞬时错误）；仍失败则
+		// 逐行回退——坏行丢弃并告警，好行保住（计费日志不丢），绝不
+		// panic/crash。
 		if err := LOG_DB.CreateInBatches(batch, 200).Error; err != nil {
 			consumeFlushMetrics.Retries.Add(1)
 			if retryErr := LOG_DB.CreateInBatches(batch, 200).Error; retryErr != nil {
 				consumeFlushMetrics.Failures.Add(1)
-				common.SysError("failed to batch insert logs (after retry): " + retryErr.Error() + "; dropped=" + strconv.Itoa(len(batch)))
+				common.SysError("batch insert failed (after retry), falling back row-by-row: " + retryErr.Error())
+				salvaged := 0
+				for _, l := range batch {
+					if rowErr := createLog(l); rowErr == nil {
+						salvaged++
+					}
+				}
+				if salvaged < len(batch) {
+					common.SysError("row-by-row fallback salvaged " + strconv.Itoa(salvaged) + "/" + strconv.Itoa(len(batch)) + " logs")
+				}
 				return
 			}
 		}

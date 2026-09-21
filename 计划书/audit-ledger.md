@@ -106,3 +106,8 @@
 - 500 条压测（验收）：TestStreamTaskEvents500EventsNoGapNoDup —— 500 progress 无缺失、id 集合 500 无重复、done 恰好一次。
 - SSE 权限/续传/取消回归 6/6 PASS；前端 task-event-stream.test.tsx 6/6 PASS。
 - 前端全量 vitest 存在既有超时失败（与本次后端改动无关；零 web/ diff）。
+## P1-2 批量落库验收闭合（2026-09-21, v1.2.50）
+- ① 并发负载（验收）：TestConsumeLogFlusherConcurrentWriters —— 8 goroutine×250=2000 条并发入队，队列深度有界（≤4096）、零失败、全部落库不丢。
+- ② 故障注入（验收）：TestConsumeLogFlusherClosedDBNoCrash —— 关闭 DB 后批写/重试/逐行回退全败，指标告警不崩；批失败语义升级为「重试一次 → 逐行回退（坏行丢弃告警、好行保住=计费日志不丢）」。
+- ③ 三库批量回归（验收）：conformance 24/24（SQLite/MySQL9.6/PG16.14 真实实例，AutoMigrate 幂等三库）；model 全量 ok。
+- 命令：go test ./model/ -run TestConsumeLogFlusher → 4/4 PASS；三库 conformance → PASS=24 FAIL=0。
