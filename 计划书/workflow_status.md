@@ -151,7 +151,7 @@
 - 待办：前端 relay 设置表单 UI（接线以上端点）
 
 ## 二十三、生产热更新 v1.2.73（2026-09-22，真实执行+线上验收）
-- 服务器 103.233.252.213（HK CN2，root）SSH 直连（plink + hostkey 指纹）
+- 服务器 <SERVER_IP>（HK CN2）SSH 直连（plink + hostkey 指纹）
 - 备份：pg_dump 22MB → /opt/backups/new-api-20260922-031514.dump；compose 备份 .bak.<TS>
 - 代码：/opt/new-api-src git fetch + checkout v1.2.73 (250f6c38c)；VERSION=v1.2.73
 - 构建：docker build new-api:local-v1.2.73（BUILD_EXIT=0，旧 local-v1.2.38 保留可回滚）
@@ -257,7 +257,7 @@
 - 回滚：compose 备份 .bak.<TS> → sed 换回旧 tag → up -d
 
 ## 四十二、E2E 真实账号验证（v1.2.83 线上，2026-09-22）
-- 环境：freeapi.tingfengai.art（Caddy 反代 127.0.0.1:3000）；PostgreSQL newapi；本机 HTTPS 出站被断 → 直连 http://103.233.252.213:3000 验收
+- 环境：freeapi.tingfengai.art（Caddy 反代 127.0.0.1:3000）；PostgreSQL newapi；本机 HTTPS 出站被断 → 直连 http://<SERVER_IP>:3000 验收
 - E2E 账号：e2e_tingfeng（id=910，普通用户，bcrypt 密码独立生成，quota=0）
 - 订阅码兑换：POST /api/user/topup → data={"quota":0,"plan_id":1,"plan_name":"天卡无限"}（额度不增加）
 - 续费顺延：两次兑换不同码 → user_subscriptions 仅 1 行 active，end_time 由 +1 天顺延为 +2 天（start=1790030345, end=1790203145）

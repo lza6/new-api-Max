@@ -36,10 +36,10 @@ func TestGetApiInfoFallsBackToServerAddress(t *testing.T) {
 	})
 
 	GetConsoleSetting().ApiInfo = ""
-	system_setting.ServerAddress = "http://103.233.252.213:3000"
+	system_setting.ServerAddress = "http://127.0.0.1:3000"
 	list := GetApiInfo()
 	assert.Len(t, list, 1)
-	assert.Equal(t, "http://103.233.252.213:3000", list[0]["url"])
+	assert.Equal(t, "http://127.0.0.1:3000", list[0]["url"])
 	assert.Equal(t, "/v1", list[0]["route"])
 }
 

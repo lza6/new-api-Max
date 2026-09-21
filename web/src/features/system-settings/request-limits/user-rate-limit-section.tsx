@@ -79,7 +79,7 @@ export function UserRateLimitSection({
     <SettingsSection title={t('User Base Rate Limit')}>
       <p className='text-muted-foreground text-sm'>
         {t(
-          'Every user is rate limited by default: concurrency (requests per second) and RPM (requests per minute). Over-limit requests get 429. Group/user overrides are managed via the rate-limit overrides API.'
+          'Every user is rate limited by default: concurrency (requests per second) and RPM (requests per minute). Over-limit requests get 429. Group/user overrides are managed via the rate-limit overrides API. Users with an active subscription are governed by their subscription tier instead of this base limit.'
         )}
       </p>
 
@@ -127,7 +127,7 @@ export function UserRateLimitSection({
                       step={1}
                       {...field}
                       onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 0)
+                        field.onChange(Number.parseInt(e.target.value, 10) || 0)
                       }
                     />
                   </FormControl>
@@ -153,7 +153,7 @@ export function UserRateLimitSection({
                       step={1}
                       {...field}
                       onChange={(e) =>
-                        field.onChange(parseInt(e.target.value) || 0)
+                        field.onChange(Number.parseInt(e.target.value, 10) || 0)
                       }
                     />
                   </FormControl>

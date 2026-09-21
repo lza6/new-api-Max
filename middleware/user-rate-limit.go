@@ -18,6 +18,10 @@ import (
 // 生效档位：用户覆盖 > 分组覆盖 > 基础默认（管理员在 relay 设置中调控）。
 // 与订阅档位（SubscriptionRateLimit）、单密钥限速（TokenRateLimit）并存，
 // 任一超限即 429（取最严，不绕过既有防线）。进程内计数，多实例需接 Redis。
+//
+// 订阅用户例外：持有 active 订阅且套餐档位 > 0 时，跳过基础默认（含分组/用户
+// 覆盖经本中间件的叠加），由订阅档位中间件（套餐档位/管理员对单个订阅的覆盖）
+// 统一约束。否则基础 RPM(120) 会先于订阅 RPM(150) 触发，订阅档位形同虚设。
 
 var userRateLimitRpmLimiter = &common.InMemoryRateLimiter{}
 
@@ -63,6 +67,12 @@ func UserRateLimit() gin.HandlerFunc {
 			group = common.GetContextKeyString(c, constant.ContextKeyUserGroup)
 		}
 		concurrency, rpm := relay_setting.GetUserRateLimitTier(userId, group)
+		if subConcurrency, subRpm, hasSub := resolveSubscriptionTier(userId); hasSub &&
+			(subConcurrency > 0 || subRpm > 0) {
+			// 订阅档位已约束该用户（并发/RPM），基础默认不再叠加。
+			c.Next()
+			return
+		}
 		if concurrency <= 0 && rpm <= 0 {
 			c.Next()
 			return

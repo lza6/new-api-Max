@@ -185,7 +185,7 @@ export function RateLimitOverridesSection() {
     <SettingsSection title={t('Rate Limit Overrides')}>
       <p className='text-muted-foreground text-sm'>
         {t(
-          'Per-group and per-user concurrency/RPM overrides. Priority: user override > group override > base (3/s, 120 RPM). Saving 0/0 removes an override. Changes apply immediately.'
+          'Per-group and per-user concurrency/RPM overrides. Priority: user override > group override > base (3/s, 120 RPM). Saving 0/0 removes an override. Changes apply immediately. Subscribed users are constrained by their subscription tier instead.'
         )}
       </p>
 
