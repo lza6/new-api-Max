@@ -33,10 +33,10 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/about", controller.GetAbout)
 		//apiRouter.GET("/midjourney", controller.GetMidjourney)
 		apiRouter.GET("/home_page_content", controller.GetHomePageContent)
-		// 站点权威统计（累计带宽/请求/token，仅聚合无 PII）：首页公开展示，限流防滥用。
-		apiRouter.GET("/site/stats", middleware.SearchRateLimit(), controller.GetSiteOverview)
-		// 模型广场卡片统计（今日/近30天调用与成功，站点级聚合，无 PII）：模型广场展示，限流防滥用。
-		apiRouter.GET("/model/stats", middleware.SearchRateLimit(), controller.GetModelStats)
+		// 公共只读聚合（无 PII）：首页/模型广场公开展示，未登录可访问。
+		// 不能用登录型限流（SearchRateLimit 对匿名请求 401）——保持无认证。
+		apiRouter.GET("/site/stats", controller.GetSiteOverview)
+		apiRouter.GET("/model/stats", controller.GetModelStats)
 		apiRouter.GET("/pricing", middleware.HeaderNavModuleAuth("pricing"), controller.GetPricing)
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")
 		perfMetricsRoute.Use(middleware.HeaderNavModulePublicOrUserAuth("pricing"))

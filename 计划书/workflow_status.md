@@ -220,3 +220,8 @@
 - 容器 healthy；/api/status 200
 - 已上线：余额兑换不受充值开关限制(78)、限速设置表单(77)、订阅卡并发/RPM+微信提示(79)
 - 回滚：compose 备份 + 换回旧 tag + up -d
+
+## 三十六、修复：模型广场"会话过期"误报（v1.2.80，2026-09-22）
+- 根因：/api/site/stats、/api/model/stats 挂了登录型限流 SearchRateLimit → 匿名请求 401 → 前端误判"会话过期"
+- 修复：两个公共只读聚合接口移除 SearchRateLimit（保持无认证）
+- 线上证据：model/stats 连续 401（82.41.50.93）；pricing 200
