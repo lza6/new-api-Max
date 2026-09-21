@@ -206,3 +206,7 @@
 - registry 挂载（Security→Rate Limiting 组）+ defaultSettings + SecuritySettings 类型补 3 键 + i18n 7 语言
 - typecheck 绿
 - 待办：分组/用户覆盖 UI（后端端点已就绪 v1.2.73）；部署 v1.2.77
+
+## 三十三、余额兑换不依赖充值开关（v1.2.78，2026-09-22）
+- SubscriptionRequestBalancePay 移除 IsTopUpEnabled 门控：充值关闭仍可用钱包额度兑换订阅（保留合规确认）
+- 前端订阅卡显示并发/RPM/微信提示、兑换码兑换、续费顺延、日志按用户筛选 → 待办
