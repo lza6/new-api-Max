@@ -26,11 +26,19 @@ type TrafficBytesRecord struct {
 	CreatedAt     int64
 	RequestBytes  int64
 	ResponseBytes int64
+	ModelName     string
 }
 
 // BandwidthDay 带宽排行单日行（按日期分组后按字节降序）。
 type BandwidthDay struct {
 	Date     string `json:"date"`
+	Requests int64  `json:"requests"`
+	Bytes    int64  `json:"bytes"`
+}
+
+// BandwidthModel 模型维度带宽排行行（按模型聚合，字节降序）。
+type BandwidthModel struct {
+	Model    string `json:"model"`
 	Requests int64  `json:"requests"`
 	Bytes    int64  `json:"bytes"`
 }
@@ -105,6 +113,42 @@ func AggregateBandwidthByDay(records []TrafficBytesRecord, loc *time.Location, l
 			return out[i].Bytes > out[j].Bytes
 		}
 		return out[i].Date < out[j].Date
+	})
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out
+}
+
+// AggregateBandwidthByModel 将持久化字节列按模型聚合、按带宽降序并限量
+// （limit<=0 不限）。站点「模型流量排行榜」用，字节由调用方转可读单位（G/T）。
+func AggregateBandwidthByModel(records []TrafficBytesRecord, limit int) []BandwidthModel {
+	if len(records) == 0 {
+		return nil
+	}
+	index := make(map[string]*BandwidthModel)
+	for _, r := range records {
+		model := r.ModelName
+		if model == "" {
+			model = "(unknown)"
+		}
+		d, ok := index[model]
+		if !ok {
+			d = &BandwidthModel{Model: model}
+			index[model] = d
+		}
+		d.Requests++
+		d.Bytes += r.RequestBytes + r.ResponseBytes
+	}
+	out := make([]BandwidthModel, 0, len(index))
+	for _, d := range index {
+		out = append(out, *d)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Bytes != out[j].Bytes {
+			return out[i].Bytes > out[j].Bytes
+		}
+		return out[i].Model < out[j].Model
 	})
 	if limit > 0 && len(out) > limit {
 		out = out[:limit]

@@ -327,6 +327,7 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/traffic", middleware.AdminAuth(), controller.GetLogsTraffic)
 		logRoute.GET("/overview", middleware.AdminAuth(), controller.GetSiteOverview)
 		logRoute.GET("/bandwidth/leaderboard", middleware.AdminAuth(), controller.GetBandwidthLeaderboard)
+		logRoute.GET("/bandwidth/model-leaderboard", middleware.AdminAuth(), controller.GetModelBandwidthLeaderboard)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
 		logRoute.GET("/usage/:id/cost-detail", middleware.UserAuth(), controller.GetLogCostDetail)

@@ -58,6 +58,32 @@ func TestAggregateBandwidthByDay(t *testing.T) {
 	require.Empty(t, AggregateBandwidthByDay([]TrafficBytesRecord{}, time.UTC, 10))
 }
 
+func TestAggregateBandwidthByModel(t *testing.T) {
+	records := []TrafficBytesRecord{
+		{ModelName: "deepseek-v4-flash", RequestBytes: 100, ResponseBytes: 900},
+		{ModelName: "deepseek-v4-flash", RequestBytes: 200, ResponseBytes: 800},
+		{ModelName: "gpt-5.6-sol", RequestBytes: 50, ResponseBytes: 10},
+		{ModelName: "", RequestBytes: 10, ResponseBytes: 20},
+	}
+	got := AggregateBandwidthByModel(records, 0)
+	require.Len(t, got, 3)
+	require.Equal(t, "deepseek-v4-flash", got[0].Model)
+	require.Equal(t, int64(2), got[0].Requests)
+	require.Equal(t, int64(2000), got[0].Bytes)
+	require.Equal(t, "gpt-5.6-sol", got[1].Model)
+	require.Equal(t, int64(1), got[1].Requests)
+	require.Equal(t, int64(60), got[1].Bytes)
+	require.Equal(t, "(unknown)", got[2].Model)
+	require.Equal(t, int64(30), got[2].Bytes)
+
+	limited := AggregateBandwidthByModel(records, 1)
+	require.Len(t, limited, 1)
+	require.Equal(t, "deepseek-v4-flash", limited[0].Model)
+
+	require.Nil(t, AggregateBandwidthByModel(nil, 0))
+	require.Empty(t, AggregateBandwidthByModel([]TrafficBytesRecord{}, 10))
+}
+
 func TestMergeModelStats(t *testing.T) {
 	got := MergeModelStats(
 		map[string]int64{"a": 10, "b": 1},

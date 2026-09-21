@@ -57,6 +57,44 @@ export async function getLogsTraffic(days: number): Promise<{
 	return res.data
 }
 
+export interface BandwidthLeaderboardRow {
+	/** 每日排行：日期 YYYY-MM-DD */
+	date?: string
+	/** 模型排行：模型名 */
+	model?: string
+	requests: number
+	bytes: number
+	bytes_text: string
+}
+
+export interface BandwidthLeaderboardData {
+	days: number
+	limit: number
+	leaderboard: BandwidthLeaderboardRow[]
+}
+
+export async function getBandwidthLeaderboard(
+	days = 30,
+	limit = 10
+): Promise<{ success: boolean; data?: BandwidthLeaderboardData }> {
+	const res = await api.get<{ success: boolean; data?: BandwidthLeaderboardData }>(
+		'/api/log/bandwidth/leaderboard',
+		{ params: { days, limit } }
+	)
+	return res.data
+}
+
+export async function getModelBandwidthLeaderboard(
+	days = 30,
+	limit = 10
+): Promise<{ success: boolean; data?: BandwidthLeaderboardData }> {
+	const res = await api.get<{ success: boolean; data?: BandwidthLeaderboardData }>(
+		'/api/log/bandwidth/model-leaderboard',
+		{ params: { days, limit } }
+	)
+	return res.data
+}
+
 // ============================================================================
 // Generic API Helpers
 // ============================================================================

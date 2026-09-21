@@ -270,6 +270,44 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 	common.ApiSuccess(c, gin.H{"days": days, "limit": limit, "leaderboard": out})
 }
 
+// GetModelBandwidthLeaderboard 管理端模型带宽排行：按模型聚合请求字节，降序限量。
+// GET /api/log/bandwidth/model-leaderboard?days=30&limit=10
+func GetModelBandwidthLeaderboard(c *gin.Context) {
+	days := 30
+	if v := c.Query("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = min(n, 3650)
+		}
+	}
+	limit := 10
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = min(n, 1000)
+		}
+	}
+	var rows []service.TrafficBytesRecord
+	if err := model.LOG_DB.Model(&model.Log{}).
+		Select("model_name", "request_bytes", "response_bytes").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume,
+			time.Now().Add(-time.Duration(days)*24*time.Hour).Unix()).
+		Scan(&rows).Error; err != nil {
+		common.ApiErrorMsg(c, "failed to query model bandwidth leaderboard: "+err.Error())
+		return
+	}
+	byModel := service.AggregateBandwidthByModel(rows, limit)
+	type row struct {
+		Model     string `json:"model"`
+		Requests  int64  `json:"requests"`
+		Bytes     int64  `json:"bytes"`
+		BytesText string `json:"bytes_text"`
+	}
+	out := make([]row, 0, len(byModel))
+	for _, m := range byModel {
+		out = append(out, row{Model: m.Model, Requests: m.Requests, Bytes: m.Bytes, BytesText: common.FormatBytes(m.Bytes)})
+	}
+	common.ApiSuccess(c, gin.H{"days": days, "limit": limit, "leaderboard": out})
+}
+
 // GetModelStats 模型广场卡片统计：每个模型今日/近 30 天调用总数与成功数（站点级聚合，
 // 无用户维度、无敏感字段）。成功 = consume 计费日志数；总数 = consume + error。
 // GET /api/model/stats
