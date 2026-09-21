@@ -120,12 +120,21 @@ func streamTaskEvents(w io.Writer, flush func(), task *model.Task, ctx context.C
 				flush()
 			}
 
-			// 任务进入终态（且已推送完现有事件）→ 发 done 并关闭流。
+			// 任务进入终态且已推送完现有事件 → 发 done 并关闭流。
+			// P1-3 修复：终态时必须确认没有滞后事件（单批 100 上限可能
+			// 只拉了一部分），否则 done 提前关闭会截断丢事件。
 			status := task.Status
 			if current, _, err := model.GetByTaskId(task.UserId, task.TaskID); err == nil {
 				status = current.Status
 			}
-			if (status == model.TaskStatusSuccess || status == model.TaskStatusFailure) && !doneSent {
+			terminal := status == model.TaskStatusSuccess || status == model.TaskStatusFailure
+			drained := true
+			if terminal {
+				if lastSeq, err := model.LastTaskEventSeq(task.ID); err == nil && lastSeq > lastSent {
+					drained = false
+				}
+			}
+			if terminal && drained && !doneSent {
 				doneSent = true
 				if _, err := fmt.Fprint(w, "event: done\ndata: {}\n\n"); err != nil {
 					return

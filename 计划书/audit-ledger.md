@@ -101,3 +101,8 @@
 - 占比一致性（验收 <5%）：新增 TestProfileModelShareMatchesRawLogs —— 80/20 分布 → share 0.80/0.20（InDelta 0.05 内实际误差 0）+ 原始行数 SQL 抽样核对 80/20。
 - 既有能力确认：Weibull 衰减/时段热力图/成本曲线/渠道亲和建议/双层缓存（profile.go）+ 空态测试（TestEmptyUserProfile）。
 - 命令：go test ./service/user_profile/ ./model/ → ok；三库 conformance 24/24。
+## P1-3 SSE 验收闭合（2026-09-21, v1.2.49）
+- 真实缺陷：500 条事件压测暴露「终态任务在第一批推送后即发 done 截断后续事件」缺陷（doneSent 在已推 100/500 时触发）。修复 controller/task_event.go：终态判断前确保本轮批量已拉空（len(events)==0 才发 done）。
+- 500 条压测（验收）：TestStreamTaskEvents500EventsNoGapNoDup —— 500 progress 无缺失、id 集合 500 无重复、done 恰好一次。
+- SSE 权限/续传/取消回归 6/6 PASS；前端 task-event-stream.test.tsx 6/6 PASS。
+- 前端全量 vitest 存在既有超时失败（与本次后端改动无关；零 web/ diff）。

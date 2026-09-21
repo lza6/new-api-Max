@@ -170,3 +170,33 @@ func TestStreamTaskEventsOwnerAllowed(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), "event: done")
 	require.Contains(t, recorder.Body.String(), "succeeded")
 }
+
+// TestStreamTaskEvents500EventsNoGapNoDup：500 条事件压测（验收标准）。
+// 单批拉取上限 100，多轮 ticker 拉取必须把全部事件无缺无重复推完，终态
+// 后发 done；body 中每个 id 恰好出现一次。
+func TestStreamTaskEvents500EventsNoGapNoDup(t *testing.T) {
+	setupTaskEventSSEDB(t)
+	task := &model.Task{TaskID: "t-500", UserId: 1, Status: model.TaskStatusSuccess}
+	require.NoError(t, task.Insert())
+	const total = 500
+	for i := 1; i <= total; i++ {
+		seedTaskEvent(t, "t-500", 1, task.ID, "progress")
+	}
+
+	var buf bytes.Buffer
+	streamTaskEvents(&buf, func() {}, task, context.Background(), 0)
+
+	body := buf.String()
+	// 无缺：progress 事件 500 条（加上 submitted 无、succeeded 无——本测试
+	// 只播 progress；done 恰好 1 次）。
+	require.Equal(t, total, strings.Count(body, "event: progress"), "progress 事件应无缺失")
+	require.Equal(t, 1, strings.Count(body, "event: done"), "done 恰好一次")
+	// 无重复：id 唯一（解析每行 id: N 集合大小 == 500）。
+	ids := make(map[string]struct{})
+	for _, line := range strings.Split(body, "\n") {
+		if strings.HasPrefix(line, "id: ") {
+			ids[strings.TrimSpace(line[4:])] = struct{}{}
+		}
+	}
+	require.Len(t, ids, total, "id 集合应恰好 500 个（无重复）")
+}
