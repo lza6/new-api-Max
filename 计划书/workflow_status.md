@@ -142,3 +142,10 @@
 - middleware.UserRateLimit：并发（秒）+ RPM（60s 窗口）→429；生效优先级 用户覆盖>分组覆盖>基础默认；挂载 relay 链 TokenRateLimit 之后（与订阅/密钥限流并存取最严）
 - 单测：解析器优先级/默认/关闭 + 并发存储；setting/middleware 全绿
 - 待办：管理员设置覆盖的 HTTP 端点 + 前端 relay 设置表单 UI
+
+## 二十二、T7 管理端限速覆盖端点（v1.2.73，2026-09-22）
+- GET /api/option/relay/rate_limit/overrides（查看 base/分组/用户档位）
+- PUT /api/option/relay/rate_limit/overrides/group（设置/移除分组覆盖）
+- PUT /api/option/relay/rate_limit/overrides/user（设置/移除用户覆盖）
+- 变更即写 Option(relay) 持久化 + 热更新 + 审计留痕（RootAuth）
+- 待办：前端 relay 设置表单 UI（接线以上端点）

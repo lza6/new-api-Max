@@ -214,6 +214,9 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			optionRoute.GET("/", controller.GetOptions)
 			optionRoute.PUT("/", controller.UpdateOption)
+			optionRoute.GET("/relay/rate_limit/overrides", controller.GetRelayRateLimitOverrides)
+			optionRoute.PUT("/relay/rate_limit/overrides/group", controller.SetRelayRateLimitGroupOverride)
+			optionRoute.PUT("/relay/rate_limit/overrides/user", controller.SetRelayRateLimitUserOverride)
 			optionRoute.GET("/model_pricing", controller.GetModelPricingConfig)
 			optionRoute.PATCH("/model_pricing", controller.UpdateModelPricingConfig)
 			optionRoute.POST("/payment_compliance", controller.ConfirmPaymentCompliance)
