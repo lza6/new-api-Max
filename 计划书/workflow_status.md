@@ -195,3 +195,8 @@
 - 接入 RelayHelper（模型矩阵校验后）
 - 单测：标记判定 + 放行/拒绝/fail-open；setting/service 全绿
 - 配置：管理员在 relay 设置填分组名（如 subscriber）即启用；三张卡 upgrade_group 待分组名确认后配置
+
+## 三十一、生产热更新 v1.2.76（2026-09-22，真实执行+线上验收）
+- checkout v1.2.76(707d5a183) + build local-v1.2.76 + tag 切换 + up -d
+- 容器 healthy；/api/status 200；分组订阅门禁已上线
+- 回滚：compose 备份 + 换回旧 tag + up -d
