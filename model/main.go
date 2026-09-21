@@ -40,7 +40,7 @@ func jsonScanBytes(value any) []byte {
 	}
 }
 
-func initCol() {
+func InitCol() {
 	// init common column names
 	if common.UsingMainDatabase(common.DatabaseTypePostgreSQL) {
 		commonGroupCol = `"group"`
@@ -190,7 +190,7 @@ func InitDB() (err error) {
 		if os.Getenv("LOG_SQL_DSN") == "" {
 			common.SetLogDatabaseType(dbType)
 		}
-		initCol()
+		InitCol()
 		if common.DebugEnabled {
 			db = db.Debug()
 		}
@@ -231,7 +231,7 @@ func InitLogDB() (err error) {
 	if os.Getenv("LOG_SQL_DSN") == "" {
 		LOG_DB = DB
 		common.SetLogDatabaseType(common.MainDatabaseType())
-		initCol()
+		InitCol()
 		if common.IsMasterNode {
 			return MigrateAuditLogs()
 		}
@@ -240,7 +240,7 @@ func InitLogDB() (err error) {
 	db, dbType, err := chooseDB("LOG_SQL_DSN", true)
 	if err == nil {
 		common.SetLogDatabaseType(dbType)
-		initCol()
+		InitCol()
 		if common.DebugEnabled {
 			db = db.Debug()
 		}

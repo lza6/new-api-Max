@@ -62,7 +62,7 @@ func conformanceDialects(t *testing.T) []struct {
 				common.SQLitePath = filepath.Join(t.TempDir(), "conformance.db")
 				t.Cleanup(func() { common.SQLitePath = previous })
 				common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
-				initCol()
+				InitCol()
 				db, dbType, err := chooseDB("CONFORMANCE_DSN", false)
 				require.NoError(t, err)
 				require.Equal(t, common.DatabaseTypeSQLite, dbType)
@@ -80,7 +80,7 @@ func conformanceDialects(t *testing.T) []struct {
 				}
 				t.Setenv("CONFORMANCE_DSN", dsn)
 				common.SetDatabaseTypes(common.DatabaseTypeMySQL, common.DatabaseTypeMySQL)
-				initCol()
+				InitCol()
 				db, dbType, err := chooseDB("CONFORMANCE_DSN", false)
 				require.NoError(t, err)
 				require.Equal(t, common.DatabaseTypeMySQL, dbType)
@@ -97,7 +97,7 @@ func conformanceDialects(t *testing.T) []struct {
 				}
 				t.Setenv("CONFORMANCE_DSN", dsn)
 				common.SetDatabaseTypes(common.DatabaseTypePostgreSQL, common.DatabaseTypePostgreSQL)
-				initCol()
+				InitCol()
 				db, dbType, err := chooseDB("CONFORMANCE_DSN", false)
 				require.NoError(t, err)
 				require.Equal(t, common.DatabaseTypePostgreSQL, dbType)

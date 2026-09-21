@@ -893,6 +893,12 @@ func executeTaskSubmissionWith(
 		}
 	}
 	diagnostics.insertStart(task)
+	if insertErr := task.InsertWithContext(c.Request.Context()); insertErr != nil {
+		common.SysError("insert task error: " + insertErr.Error())
+		taskErr = service.TaskErrorWrapperLocal(errors.New("failed to persist task"), "task_insert_failed", http.StatusInternalServerError)
+		diagnostics.failed("insert", "database_error", taskErr, false)
+		return nil, taskErr
+	}
 	durable = true
 
 	// B4-1: 任务事件流 —— 提交成功（durable barrier 后）发出 submitted 事件；

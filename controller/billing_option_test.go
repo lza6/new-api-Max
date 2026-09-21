@@ -117,6 +117,7 @@ func setupBillingAliasOptionDB(t *testing.T) {
 	model.DB = database
 	model.LOG_DB = database
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)
+	model.InitCol()
 	common.MemoryCacheEnabled = false
 	common.RedisEnabled = false
 	common.OptionMap = map[string]string{}

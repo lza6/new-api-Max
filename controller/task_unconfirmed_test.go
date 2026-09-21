@@ -27,7 +27,10 @@ func buildUnconfirmedTestPriceData() types.PriceData {
 func newUnconfirmedTestBillingSession(t *testing.T, relayInfo *relaycommon.RelayInfo, quota int) *service.BillingSession {
 	t.Helper()
 	relayInfo.ForcePreConsume = true
-	session, apiErr := service.NewBillingSession(nil, relayInfo, quota)
+	relayInfo.UserSetting.BillingPreference = "wallet_only"
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	session, apiErr := service.NewBillingSession(ctx, relayInfo, quota)
 	require.Nil(t, apiErr)
 	require.NotNil(t, session)
 	return session
@@ -39,16 +42,21 @@ func TestPersistUnconfirmedTask(t *testing.T) {
 	originalDB := model.DB
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, database.AutoMigrate(&model.Task{}, &model.User{}))
+	require.NoError(t, database.AutoMigrate(&model.Task{}, &model.TaskEvent{}, &model.User{}, &model.Token{}))
 	model.DB = database
 	t.Cleanup(func() { model.DB = originalDB })
 
 	require.NoError(t, database.Create(&model.User{
-		Id: 88, Username: "unconfirmed_owner", Status: common.UserStatusEnabled,
+		Id: 88, Username: "unconfirmed_owner", Status: common.UserStatusEnabled, Quota: 100_000,
+	}).Error)
+
+	require.NoError(t, database.Create(&model.Token{
+		Id: 7, UserId: 88, Key: "unconfirmed-token-88", Name: "unconfirmed", Status: common.TokenStatusEnabled, RemainQuota: 1_000_000, ExpiredTime: -1,
 	}).Error)
 
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/tasks", nil)
 	c.Set("platform", "kling")
 
 	relayInfo := &relaycommon.RelayInfo{
@@ -96,20 +104,27 @@ func TestPersistUnconfirmedTaskWithoutHint(t *testing.T) {
 	originalDB := model.DB
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, database.AutoMigrate(&model.Task{}, &model.User{}))
+	require.NoError(t, database.AutoMigrate(&model.Task{}, &model.TaskEvent{}, &model.User{}, &model.Token{}))
 	model.DB = database
 	t.Cleanup(func() { model.DB = originalDB })
 
 	require.NoError(t, database.Create(&model.User{
-		Id: 89, Username: "unconfirmed_owner2", Status: common.UserStatusEnabled,
+		Id: 89, Username: "unconfirmed_owner2", Status: common.UserStatusEnabled, Quota: 100_000,
+	}).Error)
+
+	require.NoError(t, database.Create(&model.Token{
+		Id: 7, UserId: 89, Key: "unconfirmed-token-89", Name: "unconfirmed", Status: common.TokenStatusEnabled, RemainQuota: 1_000_000, ExpiredTime: -1,
 	}).Error)
 
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/tasks", nil)
 	c.Set("platform", "kling")
 
 	relayInfo := &relaycommon.RelayInfo{
 		UserId:        89,
+		TokenId:       7,
+		TokenKey:      "unconfirmed-token-89",
 		UsingGroup:    "default",
 		BillingSource: service.BillingSourceWallet,
 		PriceData:     buildUnconfirmedTestPriceData(),

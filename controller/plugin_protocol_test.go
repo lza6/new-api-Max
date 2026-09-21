@@ -243,7 +243,13 @@ func TestServeTaskPluginProtocolDisconnectDuringTerminalSettlementStopsOnlyObser
 	previousMemoryCache := common.MemoryCacheEnabled
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.Task{}))
+	// :memory: SQLite keeps ONE database per pooled connection; pin a single
+	// connection so AutoMigrate (conn A) and settlement writes (other conns)
+	// share the same tables instead of empty per-connection databases.
+	sqlConn, connErr := database.DB()
+	require.NoError(t, connErr)
+	sqlConn.SetMaxOpenConns(1)
+	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.Task{}, &model.TaskEvent{}, &model.User{}))
 	model.DB = database
 	common.MemoryCacheEnabled = false
 	t.Cleanup(func() {

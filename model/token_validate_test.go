@@ -20,7 +20,7 @@ func setupTokenValidateDB(t *testing.T) *gorm.DB {
 	DB, LOG_DB = db, db
 	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
 	common.RedisEnabled = false
-	initCol()
+	InitCol()
 	t.Cleanup(func() { DB, LOG_DB = prevDB, prevLogDB })
 	return db
 }

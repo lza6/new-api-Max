@@ -356,11 +356,22 @@ func setupTaskSubmissionDatabase(t *testing.T, migrate bool, events *[]string) *
 	previousDB := model.DB
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, database.Callback().Create().Before("gorm:create").Register("test:task-submit-order", func(*gorm.DB) {
-		*events = append(*events, "insert")
+	// :memory: SQLite keeps ONE database per pooled connection; pin a single
+	// connection so AutoMigrate (conn A) and settlement writes (other conns)
+	// share the same tables instead of empty per-connection databases.
+	sqlConn, connErr := database.DB()
+	require.NoError(t, connErr)
+	sqlConn.SetMaxOpenConns(1)
+	// Count only durable Task-row inserts as "insert": the same gorm instance
+	// also carries best-effort TaskEvent / consume-log Creates that must not
+	// shift the barrier-order assertion.
+	require.NoError(t, database.Callback().Create().Before("gorm:create").Register("test:task-submit-order", func(db *gorm.DB) {
+		if _, ok := db.Statement.Dest.(*model.Task); ok {
+			*events = append(*events, "insert")
+		}
 	}))
 	if migrate {
-		require.NoError(t, database.AutoMigrate(&model.Task{}))
+		require.NoError(t, database.AutoMigrate(&model.Task{}, &model.TaskEvent{}, &model.User{}, &model.Channel{}))
 	}
 	model.DB = database
 	t.Cleanup(func() { model.DB = previousDB })
