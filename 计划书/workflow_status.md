@@ -364,3 +364,8 @@
 - 场景：新用户 e2e_exp（default）兑换天卡 → 自动升级 subscriber（实证）→ 强制 end_time 置为过去 → 主节点 1 分钟到期扫描
 - 结果：user_subscriptions status active→expired；用户 group subscriber→default（回退购买前分组）
 - 结论：订阅全生命周期（购买/兑换升级 → 档位/矩阵生效 → 到期自动降级）在生产全部实证；到期扫描 StartSubscriptionQuotaResetTask 每 60s 由主节点执行
+
+## 六十、终局审计收尾（v1.2.88 + 文档/技能/HTML 报告）
+- v1.2.88：购买/兑换/管理员授信后清除"无订阅"负缓存（service.ClearCachedNoSubscription），订阅立即生效；回归测试 TestClearCachedNoSubscription；已部署（.bak.20260922-090042）
+- 交付物：计划书/requirements-traceability-matrix.md（27 项需求矩阵）、计划书/OPERATIONS_SOP.md（运维 SOP）、计划书/change-report.html（变更报告+测验）、.agents/skills/project-delivery/SKILL.md（项目工作流技能）、README.md 增强说明、记忆补丁（验证台账，避免重复劳动）
+- 已知受限/优化项：非 zh 语言回退 zh；订阅用户每请求多次订阅查询（P2，当前规模可接受）；付费上游（图片/视频生成）未做真实调用（烧钱），仅契约审查

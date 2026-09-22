@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>new-api-Max 变更报告（2026-09-22）</title>
+<style>
+  :root { --bg:#0f172a; --card:#1e293b; --ink:#e2e8f0; --muted:#94a3b8; --acc:#38bdf8; --ok:#34d399; --warn:#fbbf24; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font-family:-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; line-height:1.65; }
+  .wrap { max-width:880px; margin:0 auto; padding:32px 20px 80px; }
+  h1 { font-size:26px; margin:0 0 6px; }
+  h2 { font-size:20px; margin:34px 0 12px; border-left:4px solid var(--acc); padding-left:10px; }
+  h3 { font-size:16px; margin:20px 0 8px; }
+  .sub { color:var(--muted); font-size:14px; margin-bottom:22px; }
+  .card { background:var(--card); border:1px solid #334155; border-radius:12px; padding:16px 18px; margin:12px 0; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:999px; font-size:12px; font-weight:600; margin-right:6px; }
+  .done { background:rgba(52,211,153,.15); color:var(--ok); }
+  .part { background:rgba(251,191,36,.15); color:var(--warn); }
+  table { border-collapse:collapse; width:100%; font-size:13px; }
+  th,td { border:1px solid #334155; padding:7px 9px; text-align:left; vertical-align:top; }
+  th { background:#273449; }
+  code { background:#0b1220; padding:1px 6px; border-radius:5px; font-size:12px; color:#7dd3fc; }
+  .quiz-q { margin:14px 0; }
+  .quiz-q p { margin:0 0 6px; font-weight:600; }
+  .quiz-q label { display:block; margin:3px 0; font-weight:400; color:var(--ink); }
+  .quiz-q label.correct { color:var(--ok); }
+  .quiz-q label.wrong { color:#f87171; }
+  button { background:var(--acc); color:#082f49; border:0; border-radius:8px; padding:10px 22px; font-weight:700; cursor:pointer; font-size:15px; }
+  button:hover { filter:brightness(1.1); }
+  #score { font-size:18px; font-weight:800; margin-top:14px; }
+  .foot { color:var(--muted); font-size:12px; margin-top:40px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>new-api-Max 变更报告</h1>
+  <div class="sub">生产：freeapi.tingfengai.art（Caddy→3000→PG/Redis）｜线上版本：v1.2.88｜日期：2026-09-22</div>
+
+  <h2>一、上下文与直觉</h2>
+  <div class="card">
+    这是一个已在生产的 AI API 网关（上游 New API 的分支 lza6/new-api-Max）。需求本质：
+    <ul>
+      <li>把「订阅」做成可售卖的商业化能力：套餐定价、兑换/余额购买、并发与 RPM 档位、模型白名单、自动升级分组、到期降级；</li>
+      <li>把「数据」变成网站权威性：每模型调用统计、流量智能单位、带宽排行、站点总带宽/请求/Token；</li>
+      <li>把「体验」拉满：模型效果测试入卡、系统信息真实上报、前端中文汉化；</li>
+      <li>把「交付」变可靠：生产热更新 SOP、敏感信息脱敏、真实 E2E 台账。</li>
+    </ul>
+    关键直觉：<b>“能买的订阅必须真实生效”</b>——所以逐条做了线上实证（429 文案、RPM 计数、分组升降级、billing_source=subscription 等），而不是“有代码就算完成”。
+  </div>
+
+  <h2>二、做了什么（按版本）</h2>
+  <table>
+    <tr><th>版本</th><th>内容</th><th>状态</th></tr>
+    <tr><td>v1.2.82</td><td>模型+每日带宽排行（G/T 智能单位）、站点统计</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.83</td><td>兑换码→订阅（额度码/订阅码）、钱包兑换提示</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.84</td><td>模型效果测试整合进模型卡片（含测试日期）</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.85</td><td>分组/用户限速覆盖 UI + 订阅自动升级分组 + 门禁配置</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.86</td><td>订阅档位真实生效（基础限速不再抢先）+ 发行版敏感信息脱敏</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.87</td><td>前端 zh/zh-TW 汉化（28 组键）</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.88</td><td>购买/兑换/授信后清“无订阅”负缓存，订阅立即生效</td><td><span class="tag done">已闭环</span></td></tr>
+  </table>
+
+  <h2>三、验证证据（节选）</h2>
+  <div class="card">
+    <ul>
+      <li>余额兑换：充值开关=false 时 <code>POST /api/subscription/balance/pay</code> → 200；扣 ¥2；source=balance；订单 success</li>
+      <li>并发 3/s：同秒 3 个 200，第 4 个 429「基础并发请求已达上限（每秒 3 次）」</li>
+      <li>订阅 RPM150：170 并发 = 3×200 + 147×订阅并发429 + 20×订阅RPM429（基础 429=0）</li>
+      <li>管理员升档：PATCH tier rpm 150→200 → 170 并发 0 个 rpm429 → 复位</li>
+      <li>矩阵越权：qwen-3.8-max → 403「不在当前订阅套餐」；deepseek → 200</li>
+      <li>自动升级/降级：兑换后 group=subscriber；到期扫描后 group 回退 default</li>
+      <li>费用类型：消费日志 <code>billing_source:"subscription"</code></li>
+      <li>产物实证：部署二进制 grep 命中 用户基础限速×1、Effect test×2、2026-09-18×2</li>
+    </ul>
+  </div>
+
+  <h2>四、文档与技能</h2>
+  <div class="card">
+    新增/更新：<code>计划书/workflow_status.md</code>（§1-59 变更台账）、<code>计划书/requirements-traceability-matrix.md</code>（27 项需求矩阵）、<code>计划书/OPERATIONS_SOP.md</code>（部署/回滚/排障）、<code>计划书/change-report.html</code>（本报告）、<code>.agents/skills/project-delivery/SKILL.md</code>（项目工作流技能）、README.md 尾部增强说明。
+  </div>
+
+  <h2>五、变更测验（你必须通过）</h2>
+  <div class="card">
+    <div class="quiz-q" data-ans="1">
+      <p>Q1. 余额兑换订阅在“充值功能关闭”时应表现为？</p>
+      <label><input type="radio" name="q1" value="0"> 无法兑换，提示先开启充值</label>
+      <label><input type="radio" name="q1" value="1"> 仍可兑换（v1.2.78 起移除充值开关门控）</label>
+      <label><input type="radio" name="q1" value="0"> 只能兑换额度码，不能换订阅</label>
+    </div>
+    <div class="quiz-q" data-ans="1">
+      <p>Q2. 订阅用户调用“有渠道但不在套餐内”的模型，返回什么？</p>
+      <label><input type="radio" name="q2" value="0"> 200 正常放行</label>
+      <label><input type="radio" name="q2" value="1"> 403「模型不在当前订阅套餐…」</label>
+      <label><input type="radio" name="q2" value="0"> 401 无权限</label>
+    </div>
+    <div class="quiz-q" data-ans="0">
+      <p>Q3. 订阅档位（RPM 150）与基础限速（RPM 120）的关系？</p>
+      <label><input type="radio" name="q3" value="0"> 订阅用户由订阅档位约束，基础限速不再叠加（v1.2.86）</label>
+      <label><input type="radio" name="q3" value="1"> 两者叠加取更严，订阅用户永远是 120</label>
+      <label><input type="radio" name="q3" value="0"> 订阅用户完全不限速</label>
+    </div>
+    <div class="quiz-q" data-ans="2">
+      <p>Q4. 购买/兑换订阅后为什么 v1.2.88 要“清负缓存”？</p>
+      <label><input type="radio" name="q4" value="0"> 为了刷新页面</label>
+      <label><input type="radio" name="q4" value="1"> 为了删除 Redis 里的缓存</label>
+      <label><input type="radio" name="q4" value="2"> 让“无订阅”负缓存（15s TTL）立即失效，订阅马上生效</label>
+    </div>
+    <div class="quiz-q" data-ans="1">
+      <p>Q5. 到期后订阅用户的自动处理是？</p>
+      <label><input type="radio" name="q5" value="0"> 订阅自动续费扣款</label>
+      <label><input type="radio" name="q5" value="1"> 主节点扫描将订阅置 expired，并降级回购买前分组</label>
+      <label><input type="radio" name="q5" value="0"> 用户永久保持 subscriber 分组</label>
+    </div>
+    <div class="quiz-q" data-ans="1">
+      <p>Q6. 发行版“暴露上游地址”问题的处理？</p>
+      <label><input type="radio" name="q6" value="0"> 忽略，不影响</label>
+      <label><input type="radio" name="q6" value="1"> 清除仓库内硬编码的生产 IP（占位符化），git grep 零残留</label>
+      <label><input type="radio" name="q6" value="0"> 把仓库改为私有</label>
+    </div>
+    <button onclick="check()">交卷</button>
+    <div id="score"></div>
+  </div>
+
+  <div class="foot">生成：2026-09-22 ｜ 证据详见 计划书/workflow_status.md 与 requirements-traceability-matrix.md</div>
+</div>
+<script>
+function check(){
+  const qs=document.querySelectorAll('.quiz-q'); let right=0;
+  qs.forEach((q,i)=>{
+    const ans=parseInt(q.dataset.ans,10);
+    const labels=q.querySelectorAll('label');
+    const picked=q.querySelector('input:checked');
+    labels.forEach((l,li)=>l.classList.remove('correct','wrong'));
+    if(picked && parseInt(picked.value,10)===ans){ right++; labels[ans].classList.add('correct'); }
+    else { labels[ans].classList.add('correct'); if(picked) labels[parseInt(picked.value,10)].classList.add('wrong'); }
+  });
+  const s=document.getElementById('score');
+  s.textContent = right===qs.length ? '✅ 满分 '+right+'/'+qs.length+'，通过！' : '❌ '+right+'/'+qs.length+'，请回看报告再答';
+  s.style.color = right===qs.length ? '#34d399' : '#f87171';
+}
+</script>
+</body>
+</html>

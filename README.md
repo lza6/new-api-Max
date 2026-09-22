@@ -41,6 +41,27 @@
 
 </div>
 
+---
+
+## 本站部署增强（lza6/new-api-Max 生产分支）
+
+以下为生产实例 `freeapi.tingfengai.art` 已落地并验证的能力，基于上游 New API 扩展：
+
+### 订阅系统
+- 套餐：天卡 ¥2 / 周卡 ¥25 / 月卡 ¥60（无限额度，CNY 1:1）；余额兑换与兑换码兑换均可用（充值开关关闭仍可余额兑换）
+- 档位：并发 3/s、订阅 RPM 150（基础限速 3/s + 120RPM 管理员可控，分组/用户/单订阅三级覆盖）
+- 自动升级分组（购买/兑换→`subscriber`）+ 分组订阅门禁 + 到期自动降级
+- 订阅模型矩阵：套餐可用模型白名单，越权调用 403；续费顺延
+
+### 统计与模型广场
+- 模型卡片：今日/近 30 天调用与成功数；模型效果测试（含测试日期时间）整合进卡片
+- 流量智能单位（B/KB/MB/GB/TB）、每日/模型带宽排行、站点权威统计（带宽/请求/Token）
+
+### 运维与本地化
+- 前端 zh / zh-TW 汉化；系统信息页 CPU/内存/状态真实上报
+- 部署/回滚/验收/E2E 复现：见 `计划书/OPERATIONS_SOP.md`、`计划书/requirements-traceability-matrix.md`、`计划书/workflow_status.md`
+- 常用改动请先读 `.agents/skills/project-delivery/SKILL.md`（项目工作流技能）
+
 ## 📝 Project Description
 
 > [!IMPORTANT]
