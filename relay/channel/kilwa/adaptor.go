@@ -141,12 +141,16 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 	if err != nil {
 		return nil, err
 	}
+	// 兼容多种被转发 body：本适配器转换产物（kilwaRequest）、原始 OpenAI/
+	// Claude/Responses 请求（passthrough 或协议桥接时），统一提取提示词。
+	logger.LogWarn(c, "kilwa request body: %.300s", string(body))
 	var kr kilwaRequest
-	if err := common.Unmarshal(body, &kr); err != nil {
-		return nil, fmt.Errorf("invalid kilwa request body: %w", err)
-	}
-	if strings.TrimSpace(kr.Prompt) == "" {
-		return nil, errors.New("empty prompt")
+	if err := common.Unmarshal(body, &kr); err == nil && strings.TrimSpace(kr.Prompt) != "" {
+		// use kilwaRequest
+	} else if prompt, err := extractPromptFromRaw(body); err == nil {
+		kr.Prompt = prompt
+	} else {
+		return nil, fmt.Errorf("kilwa: no prompt in request body (%v)", err)
 	}
 
 	fullURL, err := a.GetRequestURL(info)
@@ -358,6 +362,56 @@ func (a *Adaptor) GetModelList() []string {
 
 func (a *Adaptor) GetChannelName() string {
 	return ChannelName
+}
+
+// extractPromptFromRaw handles raw request bodies that bypass Convert*Request
+// (global/channel passthrough or protocol bridges): OpenAI chat, Claude, Responses.
+func extractPromptFromRaw(body []byte) (string, error) {
+	var openAI dto.GeneralOpenAIRequest
+	if err := common.Unmarshal(body, &openAI); err == nil && len(openAI.Messages) > 0 {
+		return extractPrompt(&openAI)
+	}
+	var claudeReq dto.ClaudeRequest
+	if err := common.Unmarshal(body, &claudeReq); err == nil && len(claudeReq.Messages) > 0 {
+		for i := len(claudeReq.Messages) - 1; i >= 0; i-- {
+			message := claudeReq.Messages[i]
+			if message.Role != "user" {
+				continue
+			}
+			text := claudeMessageText(message.Content)
+			if text != "" {
+				return text, nil
+			}
+		}
+	}
+	var responsesReq dto.OpenAIResponsesRequest
+	if err := common.Unmarshal(body, &responsesReq); err == nil {
+		chat, convErr := relayconvert.ResponsesRequestToChatCompletionsRequest(&responsesReq)
+		if convErr == nil && len(chat.Messages) > 0 {
+			return extractPrompt(chat)
+		}
+	}
+	return "", errors.New("unsupported request body shape")
+}
+
+func claudeMessageText(content any) string {
+	switch v := content.(type) {
+	case string:
+		return v
+	case []any:
+		var builder strings.Builder
+		for _, item := range v {
+			if block, ok := item.(map[string]any); ok {
+				if block["type"] == "text" {
+					if text, ok := block["text"].(string); ok {
+						builder.WriteString(text)
+					}
+				}
+			}
+		}
+		return builder.String()
+	}
+	return ""
 }
 
 // extractPrompt picks the last non-empty user text message as the upstream prompt.
