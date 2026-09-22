@@ -94,6 +94,7 @@ import {
   transformUserToFormDefaults,
 } from '../lib'
 import type { User } from '../types'
+import { UserSubscriptionRateLimitSection } from '@/features/subscriptions/components/user-subscription-rate-limit-section'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -534,6 +535,25 @@ export function UsersMutateDrawer({
                     )}
                   </SideDrawerSection>
                 )}
+
+              {/* Subscription & Rate Limits (Update only) */}
+              {isUpdate && currentRow && (
+                <SideDrawerSection>
+                  <h3 className='text-sm font-medium'>
+                    {t('Subscription & Rate Limits')}
+                  </h3>
+                  <p className='text-muted-foreground text-xs'>
+                    {t(
+                      'View this user subscriptions and effective concurrency/RPM, or adjust them in real time.'
+                    )}
+                  </p>
+                  <UserSubscriptionRateLimitSection
+                    userId={currentRow.id}
+                    username={currentRow.username}
+                    onChanged={refreshUserData}
+                  />
+                </SideDrawerSection>
+              )}
 
               {/* Binding Information (Read-only) */}
               {isUpdate && (

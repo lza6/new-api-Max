@@ -6556,7 +6556,10 @@
     "Redemption": "兑换码",
     "From": "来源",
     "No subscription records found": "暂无订阅记录",
-    "Subscription purchases, redemptions and admin grants will appear here.": "订阅购买、兑换码兑换和管理员发放记录将显示在此。"
+    "Subscription purchases, redemptions and admin grants will appear here.": "订阅购买、兑换码兑换和管理员发放记录将显示在此。",
+    "Subscription & Rate Limits": "订阅与限速",
+    "View this user subscriptions and effective concurrency/RPM, or adjust them in real time.": "查看该用户的订阅与当前生效并发/RPM，并可实时调整。",
+    "concurrency/s": "并发/秒"
   },
   "Task Event Stream": "任务事件流",
   "Stream ended": "事件流已结束",

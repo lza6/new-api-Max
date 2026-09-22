@@ -6556,7 +6556,10 @@
     "Redemption": "Redemption",
     "From": "From",
     "No subscription records found": "No subscription records found",
-    "Subscription purchases, redemptions and admin grants will appear here.": "Subscription purchases, redemptions and admin grants will appear here."
+    "Subscription purchases, redemptions and admin grants will appear here.": "Subscription purchases, redemptions and admin grants will appear here.",
+    "Subscription & Rate Limits": "Subscription & Rate Limits",
+    "View this user subscriptions and effective concurrency/RPM, or adjust them in real time.": "View this user subscriptions and effective concurrency/RPM, or adjust them in real time.",
+    "concurrency/s": "concurrency/s"
   },
   "Task Event Stream": "Task Event Stream",
   "Stream ended": "Stream ended",
