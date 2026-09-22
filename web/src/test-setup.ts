@@ -22,11 +22,12 @@ import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { afterEach, beforeAll } from 'vitest'
 
-// Parallel CI/dev workers starve individual test processes, so the 1s default
-// async timeout regularly times out healthy findBy*/waitFor flows (audit log
-// tables, dashboards) under full-suite load. Raise it like the vitest
-// testTimeout already is for slow machines.
-configure({ asyncUtilTimeout: 3000 })
+// Parallel CI/dev workers and Windows real-time AV (Defender) starve
+// individual test processes, so the 1s default async timeout regularly times
+// out healthy findBy*/waitFor flows (audit log tables, dashboards) under
+// full-suite load. Raise it like the vitest testTimeout already is for slow
+// machines; the 8s budget absorbs heavy AV/import contention on Windows hosts.
+configure({ asyncUtilTimeout: 8000 })
 
 beforeAll(async () => {
   await i18next.use(initReactI18next).init({
