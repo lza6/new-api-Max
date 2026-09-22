@@ -129,7 +129,7 @@ export function UserSubscriptionRateLimitSection(props: Props) {
   const planMap = useMemo(() => {
     const map = new Map<number, PlanRecord['plan']>()
     plans.forEach((p) => {
-      if (p.plan.id) {map.set(p.plan.id, p.plan)}
+      if (p?.plan?.id) {map.set(p.plan.id, p.plan)}
     })
     return map
   }, [plans])
@@ -141,15 +141,20 @@ export function UserSubscriptionRateLimitSection(props: Props) {
         getAdminPlans(),
         getUserSubscriptions(props.userId),
       ])
-      if (plansRes.success) {
-        setPlans(plansRes.data || [])
-      } else {
+      // 防御：仅接受数组数据，避免异常/测试 mock 结构导致渲染崩溃
+      if (plansRes.success && Array.isArray(plansRes.data)) {
+        setPlans(plansRes.data)
+      } else if (!plansRes.success) {
         handleServerError(plansRes)
-      }
-      if (subsRes.success) {
-        setSubs(subsRes.data || [])
       } else {
+        setPlans([])
+      }
+      if (subsRes.success && Array.isArray(subsRes.data)) {
+        setSubs(subsRes.data)
+      } else if (!subsRes.success) {
         handleServerError(subsRes)
+      } else {
+        setSubs([])
       }
     } catch (error) {
       handleServerError(error, t('Loading failed'))
