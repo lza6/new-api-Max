@@ -359,3 +359,8 @@
 - backup compose .bak.20260922-083157 → build local-v1.2.87 → up -d；healthy；VERSION=v1.2.87；/api/status 200
 - 线上当前 = v1.2.87（含汉化 + 此前全部订阅/限速/排行/测试能力）
 - 回滚：compose 备份 .bak.<TS> → sed 换回旧 tag → up -d
+
+## 五十九、订阅到期自动降级分组 E2E（v1.2.87 线上，2026-09-22）
+- 场景：新用户 e2e_exp（default）兑换天卡 → 自动升级 subscriber（实证）→ 强制 end_time 置为过去 → 主节点 1 分钟到期扫描
+- 结果：user_subscriptions status active→expired；用户 group subscriber→default（回退购买前分组）
+- 结论：订阅全生命周期（购买/兑换升级 → 档位/矩阵生效 → 到期自动降级）在生产全部实证；到期扫描 StartSubscriptionQuotaResetTask 每 60s 由主节点执行
