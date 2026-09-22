@@ -27,9 +27,4 @@ import type { TopNavLink } from '../types'
  * This is intentionally empty to encourage backend configuration.
  * If you need fallback links, add them here.
  */
-export const defaultTopNavLinks: TopNavLink[] = [
-  {
-    title: "Model Effect Test",
-    href: "/model-test",
-  },
-]
+export const defaultTopNavLinks: TopNavLink[] = []
