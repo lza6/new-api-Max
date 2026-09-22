@@ -3,6 +3,7 @@ package router
 import (
 	"embed"
 	"net/http"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-contrib/gzip"
@@ -29,6 +30,15 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 		middleware.AccessTokenAudit(),
 		middleware.GlobalWebRateLimit(),
 		middleware.Cache(),
+		func(c *gin.Context) {
+			// 文档路由（无文件扩展名）不缓存：每次部署后浏览器重新获取最新
+			// index.html（其引用的静态资源带内容哈希，Caddy 已配 immutable）。
+			// 带扩展名的资源（.js/.css/.png 等）保持可缓存，不受影响。
+			if filepath.Ext(c.Request.URL.Path) == "" {
+				c.Header("Cache-Control", "no-cache")
+			}
+			c.Next()
+		},
 		static.Serve("/", frontendFS),
 		func(c *gin.Context) {
 			if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
