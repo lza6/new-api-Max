@@ -375,3 +375,11 @@
 - 结果：兑换后立即 3×200 + 7×429「订阅并发」（若负缓存未清，15s 内会继续显示「基础并发」429）
 - 对照组：e2e_base（无订阅、有额度、真上游）8 并发 = 3×200 + 5×429「基础并发」→ 非订阅用户基础限速正常
 - 结论：v1.2.88 清负缓存在生产真实生效：购买/兑换后订阅档位即时接管；此前 15s TTL 延迟问题已消除
+
+## 六十二、模型卡统计英文根因与修复（v1.2.89，2026-09-22）
+- 现象：模型卡「Today calls/Today success/30d calls/30d success」显示英文，但导航为中文
+- 排查：已部署二进制与 HTTP 送达 bundle 均含中文（今日调用/今日成功/近 30 天调用）→ 部署正确，非 i18n 缺失
+- 根因：`static.Serve` 直接命中嵌入的 index.html 并绕过 fallback 的 no-cache → 浏览器缓存旧版 index.html（引用 v1.2.87 之前的英文 bundle），导致混合显示
+- 修复：router/web-router.go 文档路由（无扩展名路径）统一 `Cache-Control: no-cache`；带哈希静态资源保持可缓存
+- 验证：deploy 后 `/` 与 `/pricing` 均返回 `Cache-Control: no-cache`；生产 v1.2.89 healthy
+- 用户侧：刷新一次（或强刷）即取到新 bundle，统计标签显示中文
