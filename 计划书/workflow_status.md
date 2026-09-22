@@ -383,3 +383,11 @@
 - 修复：router/web-router.go 文档路由（无扩展名路径）统一 `Cache-Control: no-cache`；带哈希静态资源保持可缓存
 - 验证：deploy 后 `/` 与 `/pricing` 均返回 `Cache-Control: no-cache`；生产 v1.2.89 healthy
 - 用户侧：刷新一次（或强刷）即取到新 bundle，统计标签显示中文
+
+## 六十三、计费倍率对账 + 定价载荷补 group_ratio（v1.2.91，2026-09-22）
+- 用户疑问：模型按次 0.001 × 分组倍率 0.1，最终消耗应为 0.0001，但观感不一致
+- 计费对账（真实 E2E，deepseek-v4-pro-0813，price=0.001、ratio=0.1）：消费日志 quota=50 = ¥0.0001（¥1=500000 内部整数额度，防浮点误差；显示 1:1 CNY：quota_display_type=CNY、usd_exchange_rate=1、price=1）→ 系统扣费 = 0.001×0.1 = ¥0.0001，与用户期望一致
+- 显示缺口根因：/api/pricing 载荷缺 model 级 group_ratio → 前端 getDisplayGroupRatio 回退倍率 1 → 卡片报 ¥0.001（配置价）而实际扣 ¥0.0001，造成“不对”观感
+- 修复：model.Pricing 增 GroupRatio，controller.GetPricing 注入全局分组倍率；模型卡按次价格按 配置价×分组倍率 显示有效价，并标注「分组倍率 0.1」（i18n en/zh/zh-TW）
+- 部署：v1.2.91（.bak.20260922-101524）healthy；/api/pricing 载荷已含 group_ratio（default/subscriber=0.1）
+- 附加观察：会话期间 ModelPrice 中 deepseek-v4-pro-0813/grok-4.6/glm-5.3 由 0.001/0.01 变为 0（仅后台保存会写该选项）——若为误存，请在「模型定价」后台恢复；恢复后卡片自动按新价×倍率显示
