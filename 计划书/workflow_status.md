@@ -427,3 +427,16 @@
 - 质量：tsgo typecheck、oxlint、i18n 校验、web build 全绿
 - 部署：v1.2.94 healthy；/api/status version=v1.2.94；bundle 含 Subscription & Rate Limits / concurrency/s
 - 线上 E2E（e2e_adm3 临时管理员，已清理）：plans=3；用户 935 订阅 id=7 → PATCH tier rpm=100/concurrency=5 成功且 verify 写入 → 复原 0/0 成功；全部实时生效
+
+## 六十七、终局审计补位（v1.2.95，2026-09-22）
+- 触发：用户要求以 Spec Kit 技能做终局闭环总审计（反向审判 / 补位 / 真实验收 / 深度修复），重点核查 v1.2.93-94 新增功能
+- 审计发现 2 个 P1 缺口：
+  P1-1 订阅日志 tab 对所有登录用户可见：TASK_LOG_SECTIONS 未过滤 subscription，普通用户可直接访问 /usage-logs/subscription 触发 admin API 401
+    → 修复：tabNavGroups 过滤（仅 canManageScope 显示 subscription）+ 组件层 useEffect 重定向非管理员到 common（路由/UI 双保险）
+  P1-2 用户抽屉「订阅与限速」板块操作后触发 refreshUserData → form.reset() 清空管理员未保存的表单编辑（分组/备注等）
+    → 修复：onChanged 由 refreshUserData 改为 triggerRefresh（只刷新用户列表，不重置表单）
+- 审计确认项（无缺口）：AdminAuth(role>=10) 与前端 ROLE.ADMIN 对齐；订阅日志无敏感字段泄漏（无 password/token）；板块内按钮均 type=button 防误触表单提交；Combobox 内部按钮已是 type=button；侧边栏无订阅日志入口（页面内 tab 才显示）
+- 已知 P2：订阅日志表格无独立移动端卡片（桌面表格可横向滚动）；已记录
+- 质量门：go build / tsgo typecheck / oxlint / i18n 校验全绿
+- 部署：v1.2.95（.bak.20260922-151431）healthy；/api/status version=v1.2.95；bundle 含 Subscription & Rate Limits / 订阅与限速 / concurrency/s
+- 交付：tag v1.2.95 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.95
