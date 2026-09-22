@@ -37,7 +37,7 @@ import {
   isUnconfiguredTaskUsageModel,
 } from '../lib/dynamic-price'
 import { parseTags } from '../lib/filters'
-import { isTokenBasedModel } from '../lib/model-helpers'
+import { getDisplayGroupRatio, isTokenBasedModel } from '../lib/model-helpers'
 import { formatPrice, formatRequestPrice } from '../lib/price'
 import { taskPriceLabel } from '../lib/task-price-display'
 import { getModelTestMeta } from '../lib/model-test-meta'
@@ -218,6 +218,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       </div>
     ))
   } else {
+    const reqDisplayRatio = getDisplayGroupRatio(
+      props.model,
+      props.selectedGroup
+    )
     priceSummary = (
       <div className='col-span-full flex min-w-0 flex-col gap-1'>
         <span className='font-mono text-sm font-semibold tabular-nums'>
@@ -233,6 +237,11 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             / {t('request')}
           </span>
         </span>
+        {reqDisplayRatio !== 1 && (
+          <span className='text-muted-foreground text-xs'>
+            {t('Group ratio')} {reqDisplayRatio}
+          </span>
+        )}
       </div>
     )
   }

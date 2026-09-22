@@ -63,6 +63,11 @@ func GetPricing(c *gin.Context) {
 			delete(groupRatio, group)
 		}
 	}
+	// 把分组倍率附带进每个模型条目，前端模型广场卡片据此展示
+	// "配置价 × 分组倍率"的有效价格（与计费侧 HandleGroupRatio 一致）。
+	for i := range pricing {
+		pricing[i].GroupRatio = groupRatio
+	}
 
 	c.JSON(200, gin.H{
 		"success":            true,
