@@ -45,6 +45,17 @@ func CacheNoSubscription(userId int) {
 	noSubscriptionCache.m[userId] = time.Now().Add(noSubscriptionCacheTTL)
 }
 
+// ClearCachedNoSubscription 清除"无订阅"负缓存，使刚购买/兑换/被授予订阅的用户
+// 立即按订阅档位/矩阵生效，而不是等待负缓存 TTL（15s）过期。
+func ClearCachedNoSubscription(userId int) {
+	if userId <= 0 {
+		return
+	}
+	noSubscriptionCache.Lock()
+	defer noSubscriptionCache.Unlock()
+	delete(noSubscriptionCache.m, userId)
+}
+
 // CheckSubscriptionModelAccess 校验订阅模型矩阵：用户存在 active 订阅时，
 // 请求的模型必须在其套餐 Models 列表内（Models 为空 = 不限）。
 // 无订阅 / 无套餐 / 查询失败一律放行（fail-open，沿用既有模型访问控制），

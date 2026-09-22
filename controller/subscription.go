@@ -8,6 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/lza6/new-api-Max/setting/ratio_setting"
 	"gorm.io/gorm"
@@ -113,6 +114,8 @@ func SubscriptionRequestBalancePay(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	// 余额兑换成功后清除"无订阅"负缓存，订阅立即生效。
+	service.ClearCachedNoSubscription(userId)
 	common.ApiSuccess(c, nil)
 }
 
@@ -457,6 +460,8 @@ func AdminCreateUserSubscription(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	// 管理员授信订阅后清除"无订阅"负缓存，订阅立即生效。
+	service.ClearCachedNoSubscription(userId)
 	if msg != "" {
 		common.ApiSuccess(c, gin.H{"message": msg})
 		return

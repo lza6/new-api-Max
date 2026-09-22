@@ -108,6 +108,20 @@ func TestNoSubscriptionNegativeCacheAvoidsDB(t *testing.T) {
 	require.False(t, HasCachedNoSubscription(61001))
 }
 
+func TestClearCachedNoSubscription(t *testing.T) {
+	seedSubscriptionAccessDB(t)
+	// 构造"无订阅"负缓存。
+	CacheNoSubscription(63001)
+	require.True(t, HasCachedNoSubscription(63001))
+	// 清除后应立即可用（等价于刚购买/兑换订阅的场景）。
+	ClearCachedNoSubscription(63001)
+	require.False(t, HasCachedNoSubscription(63001))
+
+	// 非法/空用户 ID 安全返回。
+	ClearCachedNoSubscription(0)
+	ClearCachedNoSubscription(-1)
+}
+
 func TestCheckSubscriptionGroupAccess(t *testing.T) {
 	s := relay_setting.GetRelaySetting()
 	prevGroups := s.SubscriptionRequiredGroups

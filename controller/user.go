@@ -1261,6 +1261,8 @@ func TopUp(c *gin.Context) {
 		logger.LogError(c, fmt.Sprintf("failed to redeem key %s for user %d: %s", req.Key, id, err.Error()))
 		return
 	}
+	// 兑换成功（额度码或订阅码）后清除"无订阅"负缓存，使刚开通的订阅立即生效。
+	service.ClearCachedNoSubscription(id)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
