@@ -391,3 +391,18 @@
 - 修复：model.Pricing 增 GroupRatio，controller.GetPricing 注入全局分组倍率；模型卡按次价格按 配置价×分组倍率 显示有效价，并标注「分组倍率 0.1」（i18n en/zh/zh-TW）
 - 部署：v1.2.91（.bak.20260922-101524）healthy；/api/pricing 载荷已含 group_ratio（default/subscriber=0.1）
 - 附加观察：会话期间 ModelPrice 中 deepseek-v4-pro-0813/grok-4.6/glm-5.3 由 0.001/0.01 变为 0（仅后台保存会写该选项）——若为误存，请在「模型定价」后台恢复；恢复后卡片自动按新价×倍率显示
+
+## 六十四、v1.2.92 版本显示修复 + 日志分组倍率展示 + deepseek 单价修正（2026-09-22）
+- 现象 1：「系统维护」版本恒为 v1.2.80（实际代码 v1.2.91），且「检查更新」永远提示新版本
+  - 根因：仓库 VERSION 文件长期停留在 v1.2.54（从未随 tag 更新）；生产 /opt/new-api-src/VERSION 残留 v1.2.80，Dockerfile 用 \v1.2.92 注入 common.Version → 镜像内嵌版本号错误
+  - 修复：仓库 VERSION 更新为 v1.2.92 并提交；服务器 checkout v1.2.92 + echo v1.2.92 > VERSION + 重建镜像 local-v1.2.92 + 切换 compose tag + up -d
+  - 验证：/api/status version = v1.2.92（生产实证）；系统维护页随之显示 v1.2.92
+- 现象 2：deepseek-v4-flash 单价配置 0.01（非 0.001）→ 0.01×0.1=¥0.001/次 =「6 元 6000 次」；用户期望 0.001×0.1=¥0.0001/次
+  - 生产配置修正：ModelPrice[deepseek-v4-flash] 0.01 → 0.001（备份 /tmp/ModelPrice.backup.*.json，可回滚）
+  - 真实 E2E 对账（e2e_nosub / deepseek-v4-flash）：改后消费日志 quota=50 = ¥0.0001/次（改前 500=¥0.001），other 记录 model_price=0.001、group_ratio=0.1
+  - /api/pricing 恢复 quota_type=1（按次）、model_price=0.001、group_ratio={default:0.1,subscriber:0.1}
+- 现象 3：消费日志费用列只有金额、看不到分组倍率
+  - 修复：web LogCostDisplay 增加 ×倍率 小字 + tooltip「模型单价 × 分组倍率」（复用 Group Ratio / User Exclusive Ratio / Model Price i18n key，en/zh 均存在）
+  - 构建产物实证：主 bundle 含 Group Ratio / Model Price / User Exclusive Ratio / group_ratio
+- 安全提醒：本次改 DB 时曾因 bash 引号展开把 ModelPrice JSON 破坏（key 引号丢失→模型按 token 回退显示），已当场用 SQL 文件+stdin 方式修复为合法 JSON 并验证（教训：改 option 走官方 API 或 SQL 文件，勿在 shell 内嵌 JSON）
+- 待确认：deepseek-v4-pro-0813 / grok-4.6 / glm-5.3 / glm-5.3-flash 单价为 0 系用户有意清零（用户已确认）
