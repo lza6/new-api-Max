@@ -477,3 +477,23 @@
   - 处置：docker builder prune + image prune（98%→19%）→ 加 4G swapfile（fstab 持久化，swap 2G→6G）→ 临时给服务器侧 Dockerfile builder2 加 `ENV GOFLAGS=-p=1 GOMAXPROCS=1` 串行化 Go 编译（构建后 git checkout 还原）→ nohup 构建日志落盘 `/opt/new-api/build-v1298.log`（勿用 `| tail` 吞输出，会误判卡死）
   - 结论：2GB 机器上服务器本地构建不可持续；正确热更新路径是 CI/CD（docker-build.yml 推 ghcr.io/lza6/new-api-max:v<tag>）→ 服务器 `docker compose pull`。本次 GitHub Actions 队列卡死（74h+ queued 未被 runner 接单，tag 推送也未触发），临时用服务器构建兜底；CI 队列问题已登记待办
 - 验收：/api/status version=v1.2.98；/docs、/pricing、/model-test、/tool-setup 本地+域名 http 200
+
+## 七十一、单用户限速覆盖：显示当前生效并发/RPM + 直改实时生效（v1.2.99，2026-09-22）
+- 需求：管理员在「更新用户」抽屉对每个用户（含无订阅用户）查看其当前生效的真实速率（并发/RPM）并可直接修改、实时生效
+- 机制（后端既有，纯前端补齐）：
+  - `GET /api/option/relay/rate_limit/overrides` 返回基础默认 + 分组/用户覆盖；`PUT .../overrides/user {user_id, concurrency, rpm}` 写入即热更新（0,0=移除）
+  - 生效优先级与后端 GetUserRateLimitTier 一致：用户覆盖 > 分组覆盖 > 系统默认（3/s + 120RPM，可关闭=不限）
+- 实现：
+  - 新增 `UserRateLimitOverrideSection`（web/src/features/users/components/）挂载在「更新用户」抽屉「订阅与限速」板块：展示当前生效档位+来源徽标（用户覆盖/分组覆盖/系统默认/基础已关闭），输入并发与 RPM 保存即写用户覆盖，提供「移除覆盖」
+  - 解析逻辑独立到 `users/lib/user-rate-limit.ts`（resolveEffectiveRate）
+  - API helper：`users/api.ts` 新增 getRelayRateLimitOverrides / setUserRateLimitOverride
+  - i18n：13 个新 key 写入默认 translation 命名空间（en/zh/zh-TW 中文化；fr/ja/ru/vi 英文占位）——先踩坑：key 若放顶层命名空间会被 t() 忽略（中文不生效），必须放 translation
+- 质量：tsgo -b / rsbuild build / oxlint 全绿；全量前端测试 137 files / 1231 tests 0 失败（新增 5 用例）
+- 交付：`ef1d1e09c`（功能）+ `3716e268d`（VERSION）→ tag v1.2.99 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.99
+- 部署：CI/CD 手动 dispatch 构建 `ghcr.io/lza6/new-api-max:v1.2.99`（cosign 签名）→ 服务器 compose 切 GHCR 源 pull + recreate（v1.2.98 已验证该路径，本次直接复用）；/api/status version=v1.2.99；页面全 200
+- 真实 E2E（线上 103.233.252.213:3000，deepseek-v4-flash）：
+  - 用户 A（e2e_nosub，id=913）设覆盖 concurrency=1,rpm=1000 → 并行 2 请求 = [200,429]，429 消息「基础并发请求已达上限（每秒 1 次）」✓
+  - 用户 B（e2e_base，id=937）设覆盖 concurrency=1000,rpm=3 → 窗口内第 4 个请求 429（[200,200,429,429]，含 1 次基线）✓
+  - 移除覆盖（0,0）→ GET 确认两用户覆盖清除 ✓
+  - 临时管理员 e2e_adm_rl037426 用完即删（DELETE 1）
+- 待办登记：/docs 等顶层命名空间 key 不参与默认 translation 命名空间（中文站部分文案仍英文），下一轮修复
