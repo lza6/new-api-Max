@@ -6632,6 +6632,10 @@
     "Go to model effect test": "Open model effect test",
     "Subscription docs body": "Subscribe for higher concurrency/RPM and model access. Day/Week/Month unlimited plans are available.",
     "Contact WeChat Tf00798 for higher concurrency/RPM": "Need higher concurrency/RPM? Contact WeChat Tf00798 for custom plans.",
-    "Model test": "Model test"
+    "Model test": "Model test",
+    "Model Traffic Leaderboard": "Model Traffic Leaderboard",
+    "Traffic by model over the last 30 days": "Traffic by model over the last 30 days",
+    "Unable to load traffic data": "Unable to load traffic data",
+    "No traffic data yet": "No traffic data yet"
   }
 }

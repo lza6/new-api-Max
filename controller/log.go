@@ -272,6 +272,19 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 
 // GetModelBandwidthLeaderboard 管理端模型带宽排行：按模型聚合请求字节，降序限量。
 // GET /api/log/bandwidth/model-leaderboard?days=30&limit=10
+// queryModelBandwidthLeaderboard 查询 consume 日志并按模型聚合带宽（降序限量），
+// 供管理端 /api/log/bandwidth/model-leaderboard 与公开 /api/rankings/bandwidth 复用。
+func queryModelBandwidthLeaderboard(days, limit int) ([]service.BandwidthModel, error) {
+	var rows []service.TrafficBytesRecord
+	if err := model.LOG_DB.Model(&model.Log{}).
+		Select("model_name", "request_bytes", "response_bytes").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume,
+			time.Now().Add(-time.Duration(days)*24*time.Hour).Unix()).
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	return service.AggregateBandwidthByModel(rows, limit), nil
+}
 func GetModelBandwidthLeaderboard(c *gin.Context) {
 	days := 30
 	if v := c.Query("days"); v != "" {
@@ -285,16 +298,11 @@ func GetModelBandwidthLeaderboard(c *gin.Context) {
 			limit = min(n, 1000)
 		}
 	}
-	var rows []service.TrafficBytesRecord
-	if err := model.LOG_DB.Model(&model.Log{}).
-		Select("model_name", "request_bytes", "response_bytes").
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume,
-			time.Now().Add(-time.Duration(days)*24*time.Hour).Unix()).
-		Scan(&rows).Error; err != nil {
+	byModel, err := queryModelBandwidthLeaderboard(days, limit)
+	if err != nil {
 		common.ApiErrorMsg(c, "failed to query model bandwidth leaderboard: "+err.Error())
 		return
 	}
-	byModel := service.AggregateBandwidthByModel(rows, limit)
 	type row struct {
 		Model     string `json:"model"`
 		Requests  int64  `json:"requests"`

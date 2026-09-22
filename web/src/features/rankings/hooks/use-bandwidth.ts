@@ -16,11 +16,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export * from './bandwidth-section'
-export * from './entity-links'
-export * from './growth-text'
-export * from './market-share-section'
-export * from './model-leaderboard'
-export * from './models-section'
-export * from './pulse-section'
-export * from './rankings-hero'
+import { useQuery } from '@tanstack/react-query'
+
+import { requireServerSuccess } from '@/lib/server-error-message'
+
+import { getBandwidth } from '../api'
+
+export function useBandwidth(days = 30) {
+  return useQuery({
+    queryKey: ['rankings', 'bandwidth', days],
+    queryFn: async () => requireServerSuccess(await getBandwidth(days)).data,
+    staleTime: 5 * 60 * 1000,
+  })
+}

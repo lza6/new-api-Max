@@ -6632,6 +6632,10 @@
     "Plugin approved": "插件已批准",
     "Plugin approval rejected": "插件审批已拒绝",
     "Reject plugin version?": "拒绝该插件版本？",
-    "Rejecting this version keeps it inactive and blocks its source hash from running until approved.": "拒绝后该版本保持停用，其源代码哈希在获得批准前无法执行。"
+    "Rejecting this version keeps it inactive and blocks its source hash from running until approved.": "拒绝后该版本保持停用，其源代码哈希在获得批准前无法执行。",
+    "Model Traffic Leaderboard": "模型流量排行",
+    "Traffic by model over the last 30 days": "近 30 天各模型流量",
+    "Unable to load traffic data": "流量数据加载失败",
+    "No traffic data yet": "暂无流量数据"
   }
 }

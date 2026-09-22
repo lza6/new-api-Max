@@ -67,6 +67,20 @@ export type VendorRanking = {
   top_model: string
 }
 
+export type BandwidthEntry = {
+  model: string
+  requests: number
+  bytes: number
+  /** Human-readable traffic, e.g. "1.2 GB" (backend FormatBytes). */
+  bytes_text: string
+}
+
+export type BandwidthLeaderboard = {
+  days: number
+  limit: number
+  period_end: number
+  leaderboard: BandwidthEntry[]
+}
 export type RankingMover = {
   model_name: string
   vendor: string

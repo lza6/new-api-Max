@@ -6632,6 +6632,10 @@
     "Plugin approved": "Plugin approved",
     "Plugin approval rejected": "Plugin approval rejected",
     "Reject plugin version?": "Reject plugin version?",
-    "Rejecting this version keeps it inactive and blocks its source hash from running until approved.": "Rejecting this version keeps it inactive and blocks its source hash from running until approved."
+    "Rejecting this version keeps it inactive and blocks its source hash from running until approved.": "Rejecting this version keeps it inactive and blocks its source hash from running until approved.",
+    "Model Traffic Leaderboard": "Model Traffic Leaderboard",
+    "Traffic by model over the last 30 days": "Traffic by model over the last 30 days",
+    "Unable to load traffic data": "Unable to load traffic data",
+    "No traffic data yet": "No traffic data yet"
   }
 }

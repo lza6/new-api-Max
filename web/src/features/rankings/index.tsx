@@ -26,6 +26,7 @@ import { PageTransition } from '@/components/page-transition'
 import { Skeleton } from '@/components/ui/skeleton'
 
 import {
+  BandwidthSection,
   MarketShareSection,
   ModelsSection,
   PulseSection,
@@ -78,6 +79,7 @@ export function Rankings() {
           rows={snapshot.models}
           period={period}
         />
+        <BandwidthSection />
         <MarketShareSection
           history={snapshot.vendor_share_history}
           rows={snapshot.vendors}
