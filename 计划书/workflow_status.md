@@ -454,3 +454,11 @@
 - 质量：go build / web build / tsgo typecheck / oxlint / i18n 校验全绿；routeTree 仅 +21 行（/docs）
 - 部署：v1.2.96 healthy；/api/status docs_link=''；/docs、/pricing、/tool-setup 均 200；bundle 含 使用文档/模型测试 key
 - 交付：tag v1.2.96 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.96 + 收尾 commit 66fb72c7f
+
+## 六十九、防御修复：用户抽屉订阅组件健壮性（v1.2.97，2026-09-22）
+- 触发：全量前端测试发现 16 failed / 1210 passed，其中 permissions.test.tsx 3 个失败（v1.2.94 引入）
+- 根因：UserSubscriptionRateLimitSection 的 planMap/loadData 直接遍历 plans，permissions 测试 mock api.get 对订阅接口返回 user 对象（非 PlanRecord[]）→ p.plan undefined → 组件崩溃
+- 修复：planMap 加可选链（p?.plan?.id）；loadData 用 Array.isArray 校验后才 set（非数组按空数组处理，success=false 才报错）
+- 验证：permissions 3/3 通过；全量 6 failed / 1220 passed（quota-display、metadata-sync 为干净 HEAD 也失败的存量；viewer、setup-guide 单独跑通过、全量跑才失败的 flaky 隔离，与本次无关）
+- 部署：v1.2.97（.bak.20260922-173900）healthy；/api/status version=v1.2.97；docs_link=''；各页面 200
+- 交付：tag v1.2.97 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.97
