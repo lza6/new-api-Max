@@ -28,6 +28,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { formatLogQuota } from '@/lib/format'
 
 import { hasToolSurcharge } from '../lib/format'
@@ -42,6 +43,61 @@ function splitQuotaDisplay(value: string): { prefix: string; amount: string } {
   const match = value.match(/^([^0-9+\-.,\s]+)(.+)$/)
   if (!match) {return { prefix: '', amount: value }}
   return { prefix: match[1], amount: match[2] }
+}
+
+function formatRatioCompact(ratio: number): string {
+  if (!Number.isFinite(ratio)) {return '-'}
+  return ratio % 1 === 0
+    ? String(ratio)
+    : ratio.toFixed(4).replace(/\.?0+$/, '')
+}
+
+/**
+ * Group-ratio hint shown next to the cost badge: `×0.1` with a tooltip that
+ * explains `model price × group ratio = actual cost` so the group ratio is
+ * visible in the consumption log instead of only in the details dialog.
+ */
+function GroupRatioMarker(props: { other: LogOtherData | null }) {
+  const { t } = useTranslation()
+  const userGroupRatio = props.other?.user_group_ratio
+  const isUserRatio =
+    userGroupRatio != null &&
+    Number.isFinite(userGroupRatio) &&
+    userGroupRatio !== -1
+  const ratio = isUserRatio ? userGroupRatio : props.other?.group_ratio
+  if (ratio == null || !Number.isFinite(ratio) || ratio === 1) {
+    return null
+  }
+
+  const modelPrice = props.other?.model_price
+  const ratioText = `${formatRatioCompact(ratio)}x`
+  const modelPriceText =
+    modelPrice != null && Number.isFinite(modelPrice)
+      ? formatBillingCurrencyFromUSD(modelPrice, {
+          digitsLarge: 4,
+          digitsSmall: 6,
+          abbreviate: false,
+        })
+      : null
+  const ratioLabel = isUserRatio
+    ? t('User Exclusive Ratio')
+    : t('Group Ratio')
+  const detail = modelPriceText
+    ? `${t('Model Price')} ${modelPriceText} × ${ratioLabel} ${ratioText}`
+    : `${ratioLabel} ${ratioText}`
+
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <span className='text-muted-foreground/70 text-[10px] leading-none tabular-nums'>
+            ×{ratioText}
+          </span>
+        }
+      />
+      <TooltipContent>{detail}</TooltipContent>
+    </Tooltip>
+  )
 }
 
 function ToolSurchargeMarker() {
@@ -123,9 +179,12 @@ export function LogCostDisplay(props: LogCostDisplayProps) {
 
   if (!isSubscription && !showToolSurcharge) {
     return (
-      <div className='flex flex-col gap-0.5'>
-        <QuotaBadge quota={props.quota} />
-      </div>
+      <TooltipProvider>
+        <div className='flex flex-col gap-0.5'>
+          <QuotaBadge quota={props.quota} />
+          <GroupRatioMarker other={props.other} />
+        </div>
+      </TooltipProvider>
     )
   }
 
