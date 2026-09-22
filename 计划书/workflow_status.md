@@ -528,3 +528,11 @@
   - 全量前端测试 **137 files / 1231 tests 0 失败**（受限 6 worker，环境极慢 19min）；tsgo / oxlint / build 全过
 - 交付：commit d7fd0e96d（i18n+test-setup）+ 1220a12ff（VERSION）→ tag v1.3.3 + release https://github.com/lza6/new-api-Max/releases/tag/v1.3.3 + CI(GHCR) + 生产 pull 热更新
 - 线上验收：version=v1.3.3；/ /docs /tool-setup /model-test /pricing 全 200；**线上 bundle 已含中文翻译串**（创建 API Token / 工具接入 / 任务事件流 / Web 防护 / 拒绝该插件版本 / 三步接入 全 HIT）
+
+## 七十四、模型流量排行榜（GB/TB，公开）上线（v1.3.4，2026-09-23）
+- 需求：用户点名"模型排行榜那边要显示消耗了多少 G 流量 / T"（此前多轮只登记未落地）
+- 后端：新增公开 `GET /api/rankings/bandwidth?days=30&limit=10`（controller/rankings.go GetRankingsBandwidth），按模型聚合 request/response 字节、降序限量、`common.FormatBytes` 转人类可读；抽取 `queryModelBandwidthLeaderboard` 共享函数（管理端 `/api/log/bandwidth/model-leaderboard` 与公开端点同源复用，controller/log.go 改为调用共享函数）
+- 前端：`BandwidthSection` 组件（模型流量排行卡片：rank/模型/请求数/流量）+ `useBandwidth` hook（TanStack Query，加载/错误/空态齐全）；`formatTraffic`（B/KB/MB/GB/TB）渲染，bytes_text 兜底；i18n 4 新 key（en/zh/zh-TW 中文化 + 其余英文占位，probe 实证中文命中）
+- 质量：go build / go test ./service/ ./model/ ./constant/ 全过；前端 tsgo / oxlint / build 全过；全量测试 **138 files / 1234 tests 0 失败**（新增 3 带宽用例）
+- 交付：commit fcd9b9cf1（含 VERSION）→ tag v1.3.4 + release + CI(GHCR) + 生产 pull 热更新
+- 线上真实 E2E：`GET /api/rankings/bandwidth?days=30&limit=8` 返回真实流量 —— deepseek-v4-flash **18.13 GB**（285,941 请求）、glm-5.3-flash 2.03 GB、mimo-v2.6-flash 1.84 GB、glm-5.3 1.14 GB…（bytes_text 全为人类可读单位）；/rankings 页面 200；线上 bundle 含「模型流量排行」「近 30 天各模型流量」中文
