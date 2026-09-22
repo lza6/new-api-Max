@@ -24,7 +24,7 @@ type GeneralSetting struct {
 
 // 默认配置
 var generalSetting = GeneralSetting{
-	DocsLink:                   "https://github.com/lza6/new-api-Max",
+	DocsLink:                   "", // 站内 /docs 详细使用文档（外链由后台配置覆盖）
 	PingIntervalEnabled:        false,
 	PingIntervalSeconds:        60,
 	QuotaDisplayType:           QuotaDisplayTypeUSD,

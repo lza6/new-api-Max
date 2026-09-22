@@ -86,13 +86,14 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('Rankings'), href: '/rankings', requiresAuth })
   }
 
-  // Docs (supports external links)
+  // Docs -> 站内详细使用文档（/docs），保持后端开关可控
   if (modules?.docs !== false) {
-    if (docsLink) {
-      links.push({ title: t('Docs'), href: docsLink, external: true })
-    } else {
-      links.push({ title: t('Docs'), href: '/docs' })
-    }
+    const isExternalLink = typeof docsLink === 'string' && /^https?:\/\//.test(docsLink)
+    links.push({
+      title: t('Docs'),
+      href: isExternalLink && docsLink ? docsLink : '/docs',
+      external: isExternalLink,
+    })
   }
 
   // About
@@ -100,15 +101,9 @@ export function useTopNavLinks(): TopNavLink[] {
     links.push({ title: t('About'), href: '/about' })
   }
 
-  // Model Effect Test: public archive of the current model's real output.
-  if (modules?.modelTest !== false) {
-    links.push({ title: t('Model Effect Test'), href: '/model-test' })
-  }
 
-  // Tool Integration Presets (B5-5): one-click config presets for Claude Code / Cursor / OpenCode / Codex / Cline.
-  if (modules?.toolSetup !== false) {
-    links.push({ title: t('Tool Integration'), href: '/tool-setup' })
-  }
+
+
 
   return links
 }

@@ -396,9 +396,10 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
       <CardFooter className='mt-auto border-0 bg-transparent pt-0'>
         {testMeta ? (
           <Button
-            variant='ghost'
+            variant='outline'
             size='sm'
-            className='text-muted-foreground hover:text-foreground gap-1.5 self-start px-2 text-xs'
+            className='text-foreground/80 hover:text-foreground gap-1.5 self-start rounded-full border-transparent bg-foreground/5 py-0.5 text-xs shadow-none backdrop-blur hover:bg-foreground/10 active:scale-[0.98]'
+            title={`${t('Model test')} · ${testMeta.testedAt}`}
             onClick={() =>
               navigate({
                 to: '/model-test',
@@ -407,8 +408,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             }
           >
             <FlaskConical aria-hidden className='size-3.5' />
-            {t('Effect test')}
-            <span className='font-mono'>{testMeta.testedAt}</span>
+            {t('Model test')}
           </Button>
         ) : null}
         <ModelPerfBadge

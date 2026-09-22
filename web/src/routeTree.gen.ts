@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as authRouteRouteImport } from './routes/(auth)/route'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as DocsRouteImport } from './routes/docs'
 import { Route as ModelTestRouteImport } from './routes/model-test'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
 import { Route as ToolSetupRouteImport } from './routes/tool-setup'
@@ -86,6 +87,11 @@ const authRouteRoute = authRouteRouteImport.update({
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsRoute = DocsRouteImport.update({
+  id: '/docs',
+  path: '/docs',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ModelTestRoute = ModelTestRouteImport.update({
@@ -436,6 +442,7 @@ const AuthenticatedSystemSettingsSiteSectionRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/docs': typeof DocsRoute
   '/model-test': typeof ModelTestRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/tool-setup': typeof ToolSetupRoute
@@ -501,6 +508,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/docs': typeof DocsRoute
   '/model-test': typeof ModelTestRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/tool-setup': typeof ToolSetupRoute
@@ -568,6 +576,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/(auth)': typeof authRouteRouteWithChildren
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/docs': typeof DocsRoute
   '/model-test': typeof ModelTestRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
   '/tool-setup': typeof ToolSetupRoute
@@ -635,6 +644,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/docs'
     | '/model-test'
     | '/privacy-policy'
     | '/tool-setup'
@@ -700,6 +710,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/docs'
     | '/model-test'
     | '/privacy-policy'
     | '/tool-setup'
@@ -766,6 +777,7 @@ export interface FileRouteTypes {
     | '/'
     | '/(auth)'
     | '/_authenticated'
+    | '/docs'
     | '/model-test'
     | '/privacy-policy'
     | '/tool-setup'
@@ -834,6 +846,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   authRouteRoute: typeof authRouteRouteWithChildren
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  DocsRoute: typeof DocsRoute
   ModelTestRoute: typeof ModelTestRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
   ToolSetupRoute: typeof ToolSetupRoute
@@ -872,6 +885,13 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs': {
+      id: '/docs'
+      path: '/docs'
+      fullPath: '/docs'
+      preLoaderRoute: typeof DocsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/model-test': {
@@ -1457,6 +1477,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   authRouteRoute: authRouteRouteWithChildren,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  DocsRoute: DocsRoute,
   ModelTestRoute: ModelTestRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
   ToolSetupRoute: ToolSetupRoute,

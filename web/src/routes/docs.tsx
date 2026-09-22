@@ -18,13 +18,8 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
 
-import { ToolIntegrationSection } from '@/features/tool-setup/tool-integration-section'
+import { Docs } from '@/features/docs'
 
-export const Route = createFileRoute('/tool-setup')({
-  component: ToolSetupPage,
+export const Route = createFileRoute('/docs')({
+  component: Docs,
 })
-
-/** 工具接入预设（与站内文档 /docs 共用同一份内容）。 */
-function ToolSetupPage() {
-  return <ToolIntegrationSection />
-}
