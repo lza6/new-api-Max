@@ -191,3 +191,19 @@ func TestResponsesRequestBridgeProducesPrompt(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "ping", text)
 }
+
+func TestDoResponseClaudeStreamFullEventSequence(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	info := newRelayInfo("", types.RelayFormatClaude)
+	info.IsStream = true
+	a := &Adaptor{reply: "hi"}
+	oai := &dto.OpenAITextResponse{Id: "chatcmpl-1", Model: "kilwa-grok", Object: "chat.completion", Created: int64(1), Choices: []dto.OpenAITextResponseChoice{{Index: 0, Message: dto.Message{Role: "assistant", Content: "hi"}, FinishReason: "stop"}}}
+	err := a.doClaudeResponse(c, info, oai, "chatcmpl-1", "kilwa-grok", 1)
+	require.Nil(t, err)
+	body := w.Body.String()
+	for _, ev := range []string{"message_start", "content_block_start", "content_block_delta", "content_block_stop", "message_delta", "message_stop"} {
+		assert.Contains(t, body, "event: "+ev, "missing claude stream event %s", ev)
+	}
+}

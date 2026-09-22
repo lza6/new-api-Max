@@ -292,23 +292,36 @@ func (a *Adaptor) doClaudeResponse(c *gin.Context, info *relaycommon.RelayInfo, 
 		c.JSON(http.StatusOK, claudeResp)
 		return nil
 	}
-	stop := "end_turn"
-	content := a.reply
-	chunk := &dto.ChatCompletionsStreamResponse{
-		Id:      id,
-		Object:  "chat.completion.chunk",
-		Created: created,
-		Model:   model,
-		Choices: []dto.ChatCompletionsStreamResponseChoice{{
-			Index:        0,
-			Delta:        dto.ChatCompletionsStreamResponseChoiceDelta{Content: &content},
-			FinishReason: &stop,
-		}},
-	}
-	claudeEvents := service.StreamResponseOpenAI2Claude(chunk, info)
+	// 上游为单次回复，无法透传增量流：手动构造完整 Anthropic SSE 事件序列
+	// （message_start -> content_block_start -> content_block_delta ->
+	//  content_block_stop -> message_delta -> message_stop），保证 Claude Code
+	// 等客户端正常收尾。
 	helper.SetEventStreamHeaders(c)
-	for _, claudeResp := range claudeEvents {
-		if err := helper.ClaudeData(c, *claudeResp); err != nil {
+	index := 0
+	stopReason := "end_turn"
+	empty := ""
+	msgID := id
+	if !strings.HasPrefix(msgID, "msg_") {
+		msgID = "msg_" + strings.TrimPrefix(id, "chatcmpl-")
+	}
+	startMessage := &dto.ClaudeMediaMessage{
+		Id:    msgID,
+		Model: model,
+		Type:  "message",
+		Role:  "assistant",
+		Usage: &dto.ClaudeUsage{InputTokens: 0, OutputTokens: 0},
+	}
+	startMessage.SetContent(make([]any, 0))
+	events := []dto.ClaudeResponse{
+		{Type: "message_start", Message: startMessage},
+		{Type: "content_block_start", Index: &index, ContentBlock: &dto.ClaudeMediaMessage{Type: "text", Text: &empty}},
+		{Type: "content_block_delta", Index: &index, Delta: &dto.ClaudeMediaMessage{Type: "text_delta", Text: &a.reply}},
+		{Type: "content_block_stop", Index: &index},
+		{Type: "message_delta", Delta: &dto.ClaudeMediaMessage{Type: "message_delta", StopReason: &stopReason}, Usage: &dto.ClaudeUsage{OutputTokens: 0}},
+		{Type: "message_stop"},
+	}
+	for _, ev := range events {
+		if err := helper.ClaudeData(c, ev); err != nil {
 			return types.NewOpenAIError(err, types.ErrorCodeBadResponse, http.StatusInternalServerError)
 		}
 	}
