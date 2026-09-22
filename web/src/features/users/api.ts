@@ -172,6 +172,49 @@ export async function resetUserTwoFA(id: number): Promise<ApiResponse> {
 /**
  * Get all available groups
  */
+// ============================================================================
+// Per-user rate limit overrides (effective immediately)
+// ============================================================================
+
+export interface RateLimitTier {
+  concurrency: number
+  rpm: number
+}
+
+export interface RelayRateLimitOverrides {
+  base_enabled: boolean
+  base_concurrency: number
+  base_rpm: number
+  group_overrides: Record<string, RateLimitTier>
+  user_overrides: Record<string, RateLimitTier>
+}
+
+/**
+ * 管理端读取基础限速配置与分组/用户覆盖：
+ * 优先级 用户覆盖 > 分组覆盖 > 基础默认（3/s + 120RPM，可关闭）。
+ */
+export async function getRelayRateLimitOverrides(): Promise<
+  ApiResponse<RelayRateLimitOverrides>
+> {
+  const res = await api.get('/api/option/relay/rate_limit/overrides')
+  return res.data
+}
+
+/**
+ * 设置/移除单个用户的限速覆盖（concurrency/rpm 均为 0 表示移除覆盖，实时生效）。
+ */
+export async function setUserRateLimitOverride(
+  userId: number,
+  concurrency: number,
+  rpm: number
+): Promise<ApiResponse> {
+  const res = await api.put('/api/option/relay/rate_limit/overrides/user', {
+    user_id: userId,
+    concurrency,
+    rpm,
+  })
+  return res.data
+}
 export async function getGroups(): Promise<ApiResponse<string[]>> {
   const res = await api.get('/api/group/')
   return res.data

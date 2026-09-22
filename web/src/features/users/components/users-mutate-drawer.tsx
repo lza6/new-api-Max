@@ -95,6 +95,7 @@ import {
 } from '../lib'
 import type { User } from '../types'
 import { UserSubscriptionRateLimitSection } from '@/features/subscriptions/components/user-subscription-rate-limit-section'
+import { UserRateLimitOverrideSection } from './user-rate-limit-override-section'
 import { UserQuotaDialog } from './user-quota-dialog'
 import { useUsers } from './users-provider'
 
@@ -551,6 +552,13 @@ export function UsersMutateDrawer({
                     userId={currentRow.id}
                     username={currentRow.username}
                     // 订阅/档位已改动时只刷新用户列表，不重置表单（避免清空未保存编辑）
+                    onChanged={triggerRefresh}
+                  />
+
+                  <div className='border-border/60 my-1 border-t' />
+                  <UserRateLimitOverrideSection
+                    userId={currentRow.id}
+                    group={currentRow.group}
                     onChanged={triggerRefresh}
                   />
                 </SideDrawerSection>
