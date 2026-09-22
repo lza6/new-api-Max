@@ -24,6 +24,7 @@ import (
 	"github.com/lza6/new-api-Max/relay/channel/gemini"
 	"github.com/lza6/new-api-Max/relay/channel/jimeng"
 	"github.com/lza6/new-api-Max/relay/channel/jina"
+	"github.com/lza6/new-api-Max/relay/channel/kilwa"
 	"github.com/lza6/new-api-Max/relay/channel/minimax"
 	"github.com/lza6/new-api-Max/relay/channel/mistral"
 	"github.com/lza6/new-api-Max/relay/channel/mokaai"
@@ -123,6 +124,8 @@ func GetAdaptor(apiType int) channel.Adaptor {
 		return &sub2api.Adaptor{}
 	case constant.APITypeNewAPI:
 		return &newapi.Adaptor{}
+	case constant.APITypeKilwa:
+		return &kilwa.Adaptor{}
 	}
 	return nil
 }
