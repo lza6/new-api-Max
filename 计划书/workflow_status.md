@@ -497,3 +497,22 @@
   - 移除覆盖（0,0）→ GET 确认两用户覆盖清除 ✓
   - 临时管理员 e2e_adm_rl037426 用完即删（DELETE 1）
 - 待办登记：/docs 等顶层命名空间 key 不参与默认 translation 命名空间（中文站部分文案仍英文），下一轮修复
+
+## 七十二、KILWA "GROK" 渠道：协议转换适配器 + 上线 + 三协议 E2E 实测（v1.3.0-v1.3.2，2026-09-22/23）
+- 需求：接入 KILWA 免费 GROK 接口（GET `https://kilwaapi.vercel.app/kilwa-grok?text=<prompt>` → `{status, reply,...}`），协议转换适配 Claude Code / Codex / OpenAI，0 费用按次计费，上模型广场
+- 实现（新增渠道类型 Kilwa，type=62 / APIType=Kilwa）：
+  - `relay/channel/kilwa/adaptor.go`：入站三协议（OpenAI Chat / Anthropic Claude / OpenAI Responses）→ 提取提示词 → 上游 GET；出站还原 OpenAI/Claude/Responses 的 JSON+SSE；DoRequest 兼容 passthrough/桥接原始请求体（v1.3.1）
+  - 常量/映射：constant/channel.go（62 + baseURL + 名称）、constant/api_type.go、common/api_type.go（ChannelType2APIType）、relay/relay_adaptor.go（GetAdaptor）
+  - 前端：web/src/features/channels/constants.ts 渠道类型选项新增 Kilwa
+  - 单测 relay/channel/kilwa/adaptor_test.go（8 用例：提示词提取、三协议转换、GET 构建、上游失败、OpenAI/Claude 输出、Claude SSE 完整序列）
+- 修复线：v1.3.0（渠道 503→models 逗号分隔；empty prompt→多形态 body 解析）；v1.3.1（同）；v1.3.2（Claude 流式改为手动完整 Anthropic SSE 序列 message_start→…→message_stop）
+- 线上配置：渠道 id=32（type=62，base=https://kilwaapi.vercel.app，models=kilwa-grok，group=default）；model_pricing ModelPrice=0（按次 0 费用）；模型元数据 id=74（描述/标签/default 分组）；`POST /api/channel/fix` 重建 abilities 后出现在 /api/pricing（model_price=0, quota_type=1）
+- 真实 E2E（103.233.252.213:3000，deepseek 侧用户 e2e_nosub token）：
+  - OpenAI 非流 200 `Pong! 👋`；OpenAI 流 SSE+[DONE] ✅
+  - Claude 流（Claude Code 格式）SSE 事件齐全 message_start/content_block_start/content_block_delta/content_block_stop/message_delta/message_stop ✅
+  - Responses 流（Codex 格式）response.created→…→response.completed（output_text.delta 与 done 均含 text 属标准协议）✅
+  - 计费 0：used_quota 750→750（delta 0）✅
+  - **上下文容量受限**：4816 字符 prompt 触发上游 414（GET URL 长度限制）——Kilwa 只支持短文本单轮问答，如实标注
+  - **最大输出实测**：中文短文约 400-580 字符
+- 交付：v1.3.0 / v1.3.1 / v1.3.2 各 commit+tag+release+CI(GHCR)+生产 pull 热更新；生产 version=v1.3.2
+- 备注：CI 曾因 bun install 下载 rspack tarball 损坏失败（与代码无关），重试成功
