@@ -440,3 +440,17 @@
 - 质量门：go build / tsgo typecheck / oxlint / i18n 校验全绿
 - 部署：v1.2.95（.bak.20260922-151431）healthy；/api/status version=v1.2.95；bundle 含 Subscription & Rate Limits / 订阅与限速 / concurrency/s
 - 交付：tag v1.2.95 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.95
+
+## 六十八、站内文档 /docs + 模型卡按钮美化 + 导航去重（v1.2.96，2026-09-22）
+- 需求：① 模型卡「效果测试」按钮占空间大 → 改 iOS 风格紧凑「模型测试」胶囊（时间戳移入 hover title）；② 顶部导航「模型效果测试」与卡片按钮重复 → 去重；③ 「文档」点击应进站内详细使用文档而非外链 GitHub；④ Tool Integration 独立导航奇怪 → 内容并入文档
+- 实现：
+  - 新增 web/src/features/docs（站内使用文档：快速开始/Base URL/API Key/对话示例/协议与模型/模型效果测试/工具接入/订阅说明）+ 路由 /docs
+  - 工具接入预设抽为共享组件 ToolIntegrationSection（/tool-setup 与 /docs 复用同一份）
+  - use-top-nav-links：Docs 优先站内 /docs（docs_link 为外链 http(s) 才外跳）；移除独立「模型效果测试」「Tool Integration」项
+  - top-nav.config 兜底导航清空（彻底去重）
+  - 后端 general_setting.DocsLink 默认清空（外链由后台配置覆盖）
+  - 模型卡按钮：iOS 风格圆角胶囊（bg-foreground/5、active:scale、rounded-full），时间戳 title 提示
+- i18n：en/zh/zh-TW 各 +14 key（Usage Docs/Quick Start/Model test/Protocols & Models 等）
+- 质量：go build / web build / tsgo typecheck / oxlint / i18n 校验全绿；routeTree 仅 +21 行（/docs）
+- 部署：v1.2.96 healthy；/api/status docs_link=''；/docs、/pricing、/tool-setup 均 200；bundle 含 使用文档/模型测试 key
+- 交付：tag v1.2.96 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.96 + 收尾 commit 66fb72c7f
