@@ -414,3 +414,16 @@
 - 质量：go build、web build、tsgo typecheck、oxlint、i18n 校验全绿；model 单测 TestGetAllSubscriptionLogsJoinsUserAndPlan PASS
 - 部署：v1.2.93（.bak.20260922-125403）healthy；/api/status version=v1.2.93
 - 线上 E2E（e2e_adm2 临时管理员，已清理）：全量 total=8（首条 972098576/天卡无限/balance/active）；username=e2e 筛出 6 条；source=redemption 筛出 4 条；status=active 筛出 7 条；前端 bundle 含 Subscription Logs / No subscription records found
+
+## 六十六、更新用户抽屉内「订阅与限速」板块（v1.2.94，2026-09-22）
+- 需求：管理员在用户维度要能看到完整订阅情况 + 当前并发/RPM，并能直接改并发/RPM、分配订阅、实时生效
+- 现状盘点：独立 UserSubscriptionsDialog（行操作图标）已有 查看/分配/改RPM并发/作废/重置，但入口深、用户编辑抽屉无订阅板块
+- 实现：新增 web UserSubscriptionRateLimitSection，嵌入「用户管理 → 更新用户」抽屉（Group & Quota 之后）：
+  - 显示每个订阅：套餐、来源、状态、有效期、额度、当前生效并发/RPM（套餐档位 + override，实时显示）
+  - 直接改并发/RPM override（0=回套餐档位）→ PATCH tier 实时生效
+  - 分配订阅（选套餐 + 添加）→ POST createUserSubscription
+  - 重置额度（advance_reset_time 可切）/作废/删除（ConfirmDialog）
+  - i18n en/zh/zh-TW（+3 key：Subscription & Rate Limits / 说明文案 / concurrency/s）
+- 质量：tsgo typecheck、oxlint、i18n 校验、web build 全绿
+- 部署：v1.2.94 healthy；/api/status version=v1.2.94；bundle 含 Subscription & Rate Limits / concurrency/s
+- 线上 E2E（e2e_adm3 临时管理员，已清理）：plans=3；用户 935 订阅 id=7 → PATCH tier rpm=100/concurrency=5 成功且 verify 写入 → 复原 0/0 成功；全部实时生效
