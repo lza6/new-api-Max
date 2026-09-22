@@ -571,3 +571,15 @@
   - **上下文容量**：4800/8000/12000/16000/20000/30000 字符均 200（远超 grok 的 ~4816 字符 414 上限）✅
   - **最大输出实测**：中文故事约 592 字符
 - 临时账号已清理（tokens DELETE 5 / users DELETE 2，count=0）；渠道/模型/定价保留为正式配置
+
+## 七十七、服务器 Docker 磁盘自动清理（防 98% 爆盘复发，2026-09-23）
+- 触发：用户复盘 v1.2.98 磁盘 98% 事故（Build Cache 32GB + 旧镜像 7.1GB 手动清理才恢复 19%），要求"以后自动清理，不要再出现这种情况"
+- 现状基线：/ 49G 用 40%；docker system df 可回收 Images 2.095GB + Build Cache 3.327GB + 悬空 Volumes 1.028GB；无 daemon.json；无 crontab；容器日志无 >50M
+- 方案（不重启 Docker、不动运行中容器、不动数据卷）：
+  - `/usr/local/bin/docker-cleanup.sh` 双模式：
+    - 默认（每日维护）：`docker system prune -f --filter until=24h` + `docker builder prune -f --filter until=24h`（只清 24h 前悬空/未用镜像与构建缓存）；若磁盘仍 >=85% 自动升级激进清理
+    - `--if-full`（每小时守卫）：磁盘 <80% 直接跳过；>=80% 执行 `docker system prune -af --filter until=1h` + `docker builder prune -af --filter until=1h` + 截断 >200M 容器 json 日志（truncate，无重启）
+    - 日志 `/var/log/docker-cleanup.log`，>1MB 自动裁剪到最近 200 行
+  - crontab（root）：`17 4 * * *` 每日维护 + `8 * * * *` 每小时 if-full 守卫；cron 服务 active
+- 实测：维护模式回收 511.7MB（旧 redis/postgres 镜像），磁盘 40%→39%；if-full 在 39% 正确跳过；new-api/postgres/redis/watchtower 全部健康，零停机
+- 说明：悬空卷故意不清理（`--volumes` 不传，数据安全优先）；新版本部署走 GHCR pull + compose up -d，配合本清理不会再有磁盘堆积
