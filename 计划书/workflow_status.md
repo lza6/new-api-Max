@@ -462,3 +462,18 @@
 - 验证：permissions 3/3 通过；全量 6 failed / 1220 passed（quota-display、metadata-sync 为干净 HEAD 也失败的存量；viewer、setup-guide 单独跑通过、全量跑才失败的 flaky 隔离，与本次无关）
 - 部署：v1.2.97（.bak.20260922-173900）healthy；/api/status version=v1.2.97；docs_link=''；各页面 200
 - 交付：tag v1.2.97 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.97
+
+## 七十、前端全量测试全绿 + 生产热更新 v1.2.98（2026-09-22）
+- 触发：v1.2.97 全量前端测试 6 failed / 1220 passed（quota-display、metadata-sync 为干净 HEAD 存量失败；setup-guide、viewer 全量跑才失败的 flaky）
+- 确定性修复：
+  - quota-display：`—` 断言从整行收窄到 `invite_info` 列单元格（Sign Up Method 列对无 source 用户同样合法渲染 `—`，getByText 匹配到 2 个）
+  - metadata-sync：断言改为友好文案正则 `upstream service is temporarily unavailable`（B6-2 人话映射把原始 "Upstream unavailable" 改写，字面量不会出现）
+  - setup-guide：`Hide setup guide` 可见性断言包进 waitFor（CardStaggerContainer 入场动画初始 opacity:0，findByRole 命中但动画未完成时 toBeVisible 误报）
+  - test-setup 全局 asyncUtilTimeout 1s→3s：并行 worker 抢占 CPU 导致 findBy*/waitFor 健康流程超时（viewer 全量跑 3~16 个随机失败），与既有 testTimeout:20s 适配慢 CI 的理念一致
+- 验证：全量测试 136 files / 1226 tests **0 failure**；go build / web build / tsgo -b / oxlint（exit 0）全绿
+- 交付：commit fbec63b20（测试修复）+ 26018a024（VERSION bump）→ tag v1.2.98 + release https://github.com/lza6/new-api-Max/releases/tag/v1.2.98
+- 部署（特殊过程，重要经验）：
+  - 服务器 2GB 内存，直接 docker build 冷构建多次 OOM-kill 生产 new-api 容器（dmesg 留证），磁盘曾 98%（build cache 35GB+旧镜像 7GB 可回收）
+  - 处置：docker builder prune + image prune（98%→19%）→ 加 4G swapfile（fstab 持久化，swap 2G→6G）→ 临时给服务器侧 Dockerfile builder2 加 `ENV GOFLAGS=-p=1 GOMAXPROCS=1` 串行化 Go 编译（构建后 git checkout 还原）→ nohup 构建日志落盘 `/opt/new-api/build-v1298.log`（勿用 `| tail` 吞输出，会误判卡死）
+  - 结论：2GB 机器上服务器本地构建不可持续；正确热更新路径是 CI/CD（docker-build.yml 推 ghcr.io/lza6/new-api-max:v<tag>）→ 服务器 `docker compose pull`。本次 GitHub Actions 队列卡死（74h+ queued 未被 runner 接单，tag 推送也未触发），临时用服务器构建兜底；CI 队列问题已登记待办
+- 验收：/api/status version=v1.2.98；/docs、/pricing、/model-test、/tool-setup 本地+域名 http 200
