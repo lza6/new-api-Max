@@ -536,3 +536,25 @@
 - 质量：go build / go test ./service/ ./model/ ./constant/ 全过；前端 tsgo / oxlint / build 全过；全量测试 **138 files / 1234 tests 0 失败**（新增 3 带宽用例）
 - 交付：commit fcd9b9cf1（含 VERSION）→ tag v1.3.4 + release + CI(GHCR) + 生产 pull 热更新
 - 线上真实 E2E：`GET /api/rankings/bandwidth?days=30&limit=8` 返回真实流量 —— deepseek-v4-flash **18.13 GB**（285,941 请求）、glm-5.3-flash 2.03 GB、mimo-v2.6-flash 1.84 GB、glm-5.3 1.14 GB…（bytes_text 全为人类可读单位）；/rankings 页面 200；线上 bundle 含「模型流量排行」「近 30 天各模型流量」中文
+
+## 七十五、终局审计 R1/R2/R4 修复 + 线上 E2E 验收（v1.3.5，2026-09-23）
+- 触发：终局闭环总审计（Explorer 前端链路 + Ampere 后端链路双 agent 并行）产出 R1-R10 风险清单；本版落地 R1/R2/R4 三项可修项
+- R1（负价写端拒绝，已修+单测+线上验收）：
+  - 修复：`setting/ratio_setting/model_ratio.go` `UpdateModelPriceByJSONString` 增加 ModelPrice >= 0 校验（非有限/负数一律拒绝），杜绝管理员误写负价→计费负扣费
+  - 单测：`setting/ratio_setting/model_ratio_price_test.go`（拒绝负值 / 接受 0 与正值），go test 通过
+  - 线上验收（103.233.252.213:3000，临时管理员 e2e_adm_v135677828 role=100）：
+    - PATCH /api/option/model_pricing 提交 ModelPrice=-1 → **400 "ModelPrice must be a finite, non-negative number"**（带 expected_version 乐观锁版本）
+    - 失败后 GET snapshot：configured/effective 仍为 0，version 不变（未污染配置）
+- R2（零余额用户可调免费模型，已修+线上验收）：
+  - 修复：`service/billing_session.go` tryWallet 仅在 preConsumedQuota > 0 时才要求余额>0（免费模型预扣=0，不再误 403）
+  - 线上验收：新注册零余额用户 e2e_zero_v135678449（quota=0）调 kilwa-grok → **200 `Pong! 👋 How can I help you?`**（此前 403）
+- R4（多用户兑换码每用户限一次，已修+单测）：
+  - 修复：`model/redemption.go` 事务内 SumRedemptionUsageByUser 检查（查询必须在 tx 内，SQLite :memory: 跨连接会报错）
+  - 单测：TestRedeemMultiUseCodePerUserOnce（SQLite 隔离覆盖）；线上真实码不扰动
+- 前端：`subscriptions-mutate-drawer.tsx` `.catch(() => {})` → handleServerError（不再吞错误）
+- CI：docker-build.yml 增加 `release: published` 触发（resolve tag 支持 release 分支）；**登记：fork 仓库 push/release 事件均无法触发 workflow，仅 workflow_dispatch 可靠（多次实证），本版仍手动 dispatch 构建**
+- 审计登记（不修，符合预期/设计权衡）：R3（未配价格回退默认倍率；线上 kilwa-grok 已显式配 ModelPrice=0）、R5（多库隔离理论窗口）、R6/R7/R8（进程内限流/订阅档位替代基础限流=设计权衡）、R9（kilwa 零 usage=免费意图符合预期）、R10（compact 格式不可达）
+- 质量（本机复跑）：后端 go test R1（TestUpdateModelPriceByJSONString* 2/2）+ R4（TestRedeemMultiUseCodePerUserOnce 等）全过；前端全量测试 **138 files / 1234 tests 0 失败**（1152.55s，6 worker）；bun run build / tsgo -b / oxlint（exit 0）全绿
+- 交付：commit 8c9d949df（审计修复）+ 38b32b84c（VERSION v1.3.5）→ tag v1.3.5 + release https://github.com/lza6/new-api-Max/releases/tag/v1.3.5 + CI(GHCR) + 生产 pull 热更新（docker compose pull + up -d，容器 Up healthy）
+- 线上验收：/api/status version=v1.3.5；临时 E2E 用户已清理（tokens DELETE 3 / users DELETE 2，SELECT count=0）
+
