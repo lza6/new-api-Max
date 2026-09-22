@@ -306,3 +306,23 @@
 - e2e_nosub（无订阅，兑换额度 1000 走真实缓存路径）手动选 subscriber 分组 token → 调用 → 403「分组 subscriber 需持有订阅后才能使用，请先购买订阅或联系微信 Tf00798 定制」
 - 教训记录：token 创建 API payload 为扁平结构（{name,unlimited_quota,group}），包 {token:{...}} 会导致 name/group 丢失、后端兜底强制无限额度
 - 复现脚本：.codex/e2e-scratch/e2e-group.mjs
+
+## 四十九、订阅档位真实生效（v1.2.86，2026-09-22）
+- 问题：基础限速（3/s + 120RPM）先于订阅档位（3/s + 150RPM）触发，订阅卡宣传的 RPM150 永远到不了
+- 修复：middleware/user-rate-limit.go 对「有 active 订阅且套餐档位>0」的用户跳过基础默认（含分组/用户覆盖叠加），由订阅档位中间件（套餐档位/管理员订阅覆盖）统一约束
+- 前端说明文案 + i18n 更新（订阅用户改由订阅档位约束）
+- 线上 E2E（订阅用户 e2e_sub1 打 170 个并发）：3×200 + 147×订阅并发429 + 20×订阅RPM429，**基础429=0**（RPM150 可到达，计数 3+147+20=170 吻合）
+
+## 五十、安全：发行版/仓库敏感信息脱敏（v1.2.86，2026-09-22）
+- 审计发现提交进仓库的两处生产服务器 IP：setting/console_setting/validation_test.go、计划书/workflow_status.md
+- 修复：测试文件 IP → 127.0.0.1；运维文档 IP → <SERVER_IP> 占位符；git grep 确认零残留
+- 结论：发行版暴露的"上游地址"即为此类 IP 硬编码，已全部清除；DB 凭据/密码从未入库（仅服务器与未跟踪的 .codex/ 本地工具）
+
+## 五十一、生产热更新 v1.2.86（2026-09-22，真实执行+线上验收）
+- backup compose .bak.20260922-075908 → build local-v1.2.86 → up -d；healthy；VERSION=v1.2.86；/api/status 200
+- 线上当前 = v1.2.86（订阅档位真实生效 + 敏感信息脱敏）
+- 回滚：compose 备份 .bak.<TS> → sed 换回旧 tag → up -d
+
+## 五十二、系统信息内存/CPU 核验（2026-09-22）
+- 后端 system_instances 最新上报：new-api-hk-1，resources.cpu.usage_percent=12.4%、memory=60.7%、storage 67.8%（真实数据）
+- 结论：v1.2.64「系统监控解耦」后系统信息页 CPU/内存/状态已有真实数据；旧版 v1.2.38 未显示是历史版本问题
