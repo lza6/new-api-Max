@@ -42,7 +42,7 @@ func newRelayInfo(baseURL string, format types.RelayFormat) *relaycommon.RelayIn
 	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
 	info.ChannelBaseUrl = baseURL
 	info.ChannelType = 62
-	info.UpstreamModelName = "kilwa-grok"
+	info.UpstreamModelName = "grok-4.3"
 	info.RelayFormat = format
 	return info
 }
@@ -111,7 +111,7 @@ func TestConvertClaudeRequest(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	maxTokens := uint(128)
 	converted, err := (&Adaptor{}).ConvertClaudeRequest(c, newRelayInfo("", types.RelayFormatClaude), &dto.ClaudeRequest{
-		Model:     "kilwa-grok",
+		Model:     "claude-haiku-4.5",
 		MaxTokens: &maxTokens,
 		Messages: []dto.ClaudeMessage{
 			{Role: "user", Content: "ping"},
@@ -127,7 +127,7 @@ func TestConvertResponsesRequest(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	responsesReq := dto.OpenAIResponsesRequest{
-		Model: "kilwa-grok",
+		Model: "claude-haiku-4.5",
 		Input: json.RawMessage(`[{"role":"user","content":"ping"}]`),
 	}
 	converted, err := (&Adaptor{}).ConvertOpenAIResponsesRequest(c, newRelayInfo("", types.RelayFormatOpenAIResponses), responsesReq)
@@ -199,7 +199,7 @@ func TestDoResponseClaudeStreamFullEventSequence(t *testing.T) {
 	info := newRelayInfo("", types.RelayFormatClaude)
 	info.IsStream = true
 	a := &Adaptor{reply: "hi"}
-	oai := &dto.OpenAITextResponse{Id: "chatcmpl-1", Model: "kilwa-grok", Object: "chat.completion", Created: int64(1), Choices: []dto.OpenAITextResponseChoice{{Index: 0, Message: dto.Message{Role: "assistant", Content: "hi"}, FinishReason: "stop"}}}
+	oai := &dto.OpenAITextResponse{Id: "chatcmpl-1", Model: "claude-haiku-4.5", Object: "chat.completion", Created: int64(1), Choices: []dto.OpenAITextResponseChoice{{Index: 0, Message: dto.Message{Role: "assistant", Content: "hi"}, FinishReason: "stop"}}}
 	err := a.doClaudeResponse(c, info, oai, "chatcmpl-1", "kilwa-grok", 1)
 	require.Nil(t, err)
 	body := w.Body.String()
@@ -212,13 +212,13 @@ func TestGetRequestURLSelectsPathByModel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	grok := newRelayInfo("https://up.example", types.RelayFormatOpenAI)
-	grok.UpstreamModelName = "kilwa-grok"
+	grok.UpstreamModelName = "grok-4.3"
 	url, err := (&Adaptor{}).GetRequestURL(grok)
 	require.NoError(t, err)
 	assert.Contains(t, url, "/kilwa-grok")
 
 	claude := newRelayInfo("https://up.example", types.RelayFormatOpenAI)
-	claude.UpstreamModelName = "kilwa-claude"
+	claude.UpstreamModelName = "claude-haiku-4.5"
 	url, err = (&Adaptor{}).GetRequestURL(claude)
 	require.NoError(t, err)
 	assert.Contains(t, url, "/kilwa-claude")

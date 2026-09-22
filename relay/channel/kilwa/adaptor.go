@@ -41,13 +41,22 @@ import (
 
 const ChannelName = "Kilwa"
 
-var ModelList = []string{"kilwa-grok", "kilwa-claude"}
+var ModelList = []string{"grok-4.3", "claude-haiku-4.5"}
 
 const (
-	kilwaPath       = "/kilwa-grok"
+	kilwaPathGrok   = "/kilwa-grok"
 	kilwaPathClaude = "/kilwa-claude"
 	kilwaTimeout    = 120 * time.Second
 )
+
+// kilwaUpstreamPath 按真实模型名选择上游端点：Claude 系列走 /kilwa-claude，
+// 其余（Grok 4.3 及未知模型）走 /kilwa-grok。
+func kilwaUpstreamPath(modelName string) string {
+	if strings.Contains(modelName, "claude") {
+		return kilwaPathClaude
+	}
+	return kilwaPathGrok
+}
 
 // kilwaRequest is the normalized upstream payload produced by every request
 // converter. It is marshaled by the relay core and consumed by DoRequest.
@@ -72,11 +81,7 @@ type Adaptor struct {
 func (a *Adaptor) Init(info *relaycommon.RelayInfo) {}
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	path := kilwaPath
-	if info.UpstreamModelName == "kilwa-claude" {
-		path = kilwaPathClaude
-	}
-	return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, path, info.ChannelType), nil
+	return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, kilwaUpstreamPath(info.UpstreamModelName), info.ChannelType), nil
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
@@ -220,7 +225,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 	}
 	model := info.UpstreamModelName
 	if model == "" {
-		model = "kilwa-grok"
+		model = "grok-4.3"
 	}
 	created := time.Now().Unix()
 	id := fmt.Sprintf("chatcmpl-%d", created)
