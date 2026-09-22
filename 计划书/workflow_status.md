@@ -326,3 +326,10 @@
 ## 五十二、系统信息内存/CPU 核验（2026-09-22）
 - 后端 system_instances 最新上报：new-api-hk-1，resources.cpu.usage_percent=12.4%、memory=60.7%、storage 67.8%（真实数据）
 - 结论：v1.2.64「系统监控解耦」后系统信息页 CPU/内存/状态已有真实数据；旧版 v1.2.38 未显示是历史版本问题
+
+## 五十三、管理员单订阅档位升级 E2E（v1.2.86 线上，2026-09-22）
+- 能力：PATCH /api/subscription/admin/user_subscriptions/:id/tier（rpm/concurrency 覆盖，0=回退套餐）已上线；前端 user-subscriptions-dialog「Tier Override」列可改
+- E2E：临时管理员(role=10，事后已删+会话清理) 对 e2e_sub1 订阅(id=2) PATCH rpm 150→200
+- 订阅用户打 170 并发：升级前 20×订阅RPM429 → 升级后 **0×订阅RPM429**（3×200 + 167×订阅并发429，170<200 全过 RPM）
+- 复位：rpm_override/concurrency_override 归 0，DB 核验回退套餐默认（150/3）
+- 结论：管理员可对单个用户的订阅单独升级/降级 rpm 与并发，且立即生效
