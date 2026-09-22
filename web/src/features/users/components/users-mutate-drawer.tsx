@@ -550,7 +550,8 @@ export function UsersMutateDrawer({
                   <UserSubscriptionRateLimitSection
                     userId={currentRow.id}
                     username={currentRow.username}
-                    onChanged={refreshUserData}
+                    // 订阅/档位已改动时只刷新用户列表，不重置表单（避免清空未保存编辑）
+                    onChanged={triggerRefresh}
                   />
                 </SideDrawerSection>
               )}

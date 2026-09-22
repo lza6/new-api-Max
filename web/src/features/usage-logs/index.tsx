@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { getRouteApi, useNavigate } from '@tanstack/react-router'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
@@ -76,17 +76,32 @@ function UsageLogsContent() {
     setAffinityDialogOpen,
   } = useUsageLogsContext()
   const { canManageScope, viewScope, setViewScope } = useLogsViewScope()
+
+  // 订阅日志仅管理员可见；非管理员直接访问该 URL 时重定向到通用日志
+  useEffect(() => {
+    if (activeCategory === 'subscription' && !canManageScope) {
+      void navigate({
+        to: '/usage-logs/$section',
+        params: { section: USAGE_LOGS_DEFAULT_SECTION },
+        replace: true,
+      })
+    }
+  }, [activeCategory, canManageScope, navigate])
+
   const tabNavGroups = useMemo<NavGroup[]>(
     () => [
       {
         title: 'Task Logs',
-        items: TASK_LOG_SECTIONS.map((section) => ({
+        items: TASK_LOG_SECTIONS.filter(
+          // 订阅日志仅管理员可见（数据来自 /api/subscription/admin/logs）
+          (section) => section !== 'subscription' || canManageScope
+        ).map((section) => ({
           title: SECTION_META[section].titleKey,
           url: `/usage-logs/${section}`,
         })),
       },
     ],
-    []
+    [canManageScope]
   )
   const filteredTabGroups = useSidebarConfig(tabNavGroups)
   const visibleSections = useMemo(
