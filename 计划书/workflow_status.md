@@ -516,3 +516,15 @@
   - **最大输出实测**：中文短文约 400-580 字符
 - 交付：v1.3.0 / v1.3.1 / v1.3.2 各 commit+tag+release+CI(GHCR)+生产 pull 热更新；生产 version=v1.3.2
 - 备注：CI 曾因 bun install 下载 rspack tarball 损坏失败（与代码无关），重试成功
+
+## 七十三、全站汉化闭环：顶层命名空间 key 归位（v1.3.3，2026-09-23）
+- 触发：此前多轮登记"中文站部分文案仍英文"（/docs、Tool Integration、任务事件流、插件审核等）
+- 根因：docs/工具集成/任务事件流/插件审核共 **49 个 key 位于 locale 文件顶层命名空间**，默认 `translation` 命名空间 `t()` 命中不了 → 显示英文兜底；而这些 key **在 zh.json 的中文翻译早已存在，从未生效**（放错命名空间）
+- 修复：node 脚本将 7 个语言文件的 49 个顶层 key 全部并入 `translation` 命名空间（顶层本地化值优先；仅 `Web Protection` 冲突，用顶层本地化值），并补齐 fr/ja/ru/vi 缺失的 54 个 key（英文占位）→ 7 语言 translation 全量一致 **6633 key、顶层 0 key**
+- 验证：
+  - probe 实证：zh t('Step 1')='创建 API Token'、t('Tool Integration')='工具接入'、t('Event.succeeded')='已完成'、t('Stream ended')='事件流已结束'、t('Web Protection')='Web 防护'、t('Approve')='批准'，全部中文命中
+  - **baseline 对照实验**（git stash 回退 i18n 后 viewer 仍 30+1fail、import ~90s）确认 viewer 慢/超时是环境漂移（Windows Defender+微信进程使 node import 慢 5 倍），非 i18n 回归
+  - test-setup asyncUtilTimeout 3s→8s 消除环境 flaky（适配超慢主机，与 v1.2.98 1s→3s 同逻辑）
+  - 全量前端测试 **137 files / 1231 tests 0 失败**（受限 6 worker，环境极慢 19min）；tsgo / oxlint / build 全过
+- 交付：commit d7fd0e96d（i18n+test-setup）+ 1220a12ff（VERSION）→ tag v1.3.3 + release https://github.com/lza6/new-api-Max/releases/tag/v1.3.3 + CI(GHCR) + 生产 pull 热更新
+- 线上验收：version=v1.3.3；/ /docs /tool-setup /model-test /pricing 全 200；**线上 bundle 已含中文翻译串**（创建 API Token / 工具接入 / 任务事件流 / Web 防护 / 拒绝该插件版本 / 三步接入 全 HIT）
