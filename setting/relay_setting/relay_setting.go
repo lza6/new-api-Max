@@ -51,6 +51,11 @@ type RelaySetting struct {
 	UserBaseConcurrencyLimit int   `json:"user_base_concurrency_limit"`
 	UserBaseRpmLimit         int   `json:"user_base_rpm_limit"`
 
+	// UserRateLimitExemptModels 限流豁免模型清单：命中这些模型的请求跳过
+	// 每用户/每密钥/订阅档位的并发与 RPM 限速（如免费翻译模型 google-translate，
+	// 对所有用户一律不限并发/不限速率）。空 = 不豁免任何模型。
+	UserRateLimitExemptModels []string `json:"user_rate_limit_exempt_models"`
+
 	// GroupRateLimitOverrides 分组限速覆盖：group -> 档位（0=该项不限）。
 	// UserRateLimitOverrides 用户/部分用户限速覆盖：userId -> 档位。
 	// 生效优先级：用户覆盖 > 分组覆盖 > 基础默认。热更新，无需 schema 变更。
@@ -128,6 +133,14 @@ func GetGlobalConcurrencyGate() GlobalConcurrencyGate {
 		g.WaitTimeout = DefaultGlobalConcurrencyWaitTimeout
 	}
 	return g
+}
+
+// GetUserRateLimitExemptModels 返回限流豁免模型清单（空 = 不豁免任何模型）。
+func GetUserRateLimitExemptModels() []string {
+	if s := GetRelaySetting(); s != nil {
+		return s.UserRateLimitExemptModels
+	}
+	return nil
 }
 
 // GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：

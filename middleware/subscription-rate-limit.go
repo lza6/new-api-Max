@@ -92,6 +92,11 @@ func resolveSubscriptionTier(userId int) (concurrencyLimit, rpmLimit int, hasSub
 // SubscriptionRateLimit 订阅档位限流中间件：rpm（60s 滑动窗口）+ 并发（进程内信号量）。
 func SubscriptionRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if isRateLimitExemptModel(c) {
+			c.Next()
+			return
+		}
+
 		userId := common.GetContextKeyInt(c, constant.ContextKeyUserId)
 		concurrency, rpm, hasSub := resolveSubscriptionTier(userId)
 		if !hasSub || (concurrency <= 0 && rpm <= 0) {

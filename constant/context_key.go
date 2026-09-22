@@ -74,6 +74,9 @@ const (
 	ContextKeyLanguage ContextKey = "language"
 	ContextKeyIsStream ContextKey = "is_stream"
 
+	// ContextKeyRequestModelPeek 缓存中间件对请求体 model 字段的一次性 peek（限流豁免判断用）。
+	ContextKeyRequestModelPeek ContextKey = "request_model_peek"
+
 	// ContextKeyAuditLogged marks that the current request has already recorded
 	// a manage/operation audit log inside the handler. When set, the admin-audit
 	// fallback in authHelper (finishAdminAudit) skips its record to avoid

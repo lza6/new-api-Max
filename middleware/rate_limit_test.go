@@ -1,9 +1,12 @@
 package middleware
 
 import (
+	"bytes"
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -13,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-redis/redis/v8"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -224,4 +228,48 @@ func TestRedisFailurePolicies(t *testing.T) {
 	assert.Equal(t, http.StatusInternalServerError, userResponse.Code)
 	assert.Empty(t, userResponse.Body.String())
 	assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/email", "192.0.2.62:12345").Code)
+}
+
+func TestRequestModelNamePeekRestoresBody(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	raw := []byte(`{"model":"google-translate","messages":[{"role":"user","content":"hi"}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(raw))
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = req
+
+	model := requestModelNamePeek(c)
+	assert.Equal(t, "google-translate", model)
+
+	// 请求体必须完整还原，后续 relay 解析不受影响。
+	restored, err := io.ReadAll(c.Request.Body)
+	require.NoError(t, err)
+	assert.Equal(t, raw, restored)
+
+	// 二次调用走 context 缓存，不重复读体。
+	c.Request.Body = io.NopCloser(bytes.NewReader([]byte(`{"model":"other"}`)))
+	assert.Equal(t, "google-translate", requestModelNamePeek(c))
+}
+
+func TestIsRateLimitExemptModel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	prev := relay_setting.GetRelaySetting().UserRateLimitExemptModels
+	t.Cleanup(func() { relay_setting.GetRelaySetting().UserRateLimitExemptModels = prev })
+
+	newCtx := func(body string) *gin.Context {
+		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body))
+		w := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(w)
+		c.Request = req
+		return c
+	}
+
+	// 空清单：任何模型都不豁免，且不读体。
+	relay_setting.GetRelaySetting().UserRateLimitExemptModels = nil
+	assert.False(t, isRateLimitExemptModel(newCtx(`{"model":"google-translate"}`)))
+
+	// 命中豁免模型。
+	relay_setting.GetRelaySetting().UserRateLimitExemptModels = []string{"google-translate"}
+	assert.True(t, isRateLimitExemptModel(newCtx(`{"model":"google-translate"}`)))
+	assert.False(t, isRateLimitExemptModel(newCtx(`{"model":"deepseek-v4-flash"}`)))
 }

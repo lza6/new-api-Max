@@ -61,6 +61,11 @@ func releaseUserRateLimitConcurrency(userId int) {
 // UserRateLimit 每用户基础限速中间件：rpm（60s 滑动窗口）+ 并发（进程内信号量）。
 func UserRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if isRateLimitExemptModel(c) {
+			c.Next()
+			return
+		}
+
 		userId := common.GetContextKeyInt(c, constant.ContextKeyUserId)
 		group := common.GetContextKeyString(c, constant.ContextKeyTokenGroup)
 		if group == "" {

@@ -122,6 +122,11 @@ func parseTokenRateLimitConfigFromString(raw string) model.TokenRateLimitConfig 
 // 未配置 rate_limit 的 token 直接放行；超限返回 429。
 func TokenRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if isRateLimitExemptModel(c) {
+			c.Next()
+			return
+		}
+
 		cfg := parseTokenRateLimitConfig(c)
 		if cfg.RPM <= 0 && cfg.QBS <= 0 && cfg.Concurrency <= 0 {
 			c.Next()

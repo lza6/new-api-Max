@@ -3,6 +3,7 @@ package relay_setting
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -68,4 +69,13 @@ func TestIsSubscriptionRequiredGroup(t *testing.T) {
 	require.True(t, IsSubscriptionRequiredGroup("vip"))
 	require.False(t, IsSubscriptionRequiredGroup("default"))
 	require.False(t, IsSubscriptionRequiredGroup(""))
+}
+
+func TestGetUserRateLimitExemptModelsDefaultEmpty(t *testing.T) {
+	prev := GetRelaySetting().UserRateLimitExemptModels
+	t.Cleanup(func() { GetRelaySetting().UserRateLimitExemptModels = prev })
+	GetRelaySetting().UserRateLimitExemptModels = nil
+	assert.Empty(t, GetUserRateLimitExemptModels())
+	GetRelaySetting().UserRateLimitExemptModels = []string{"google-translate"}
+	assert.Equal(t, []string{"google-translate"}, GetUserRateLimitExemptModels())
 }
