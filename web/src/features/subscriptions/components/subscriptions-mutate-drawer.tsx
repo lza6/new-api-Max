@@ -128,7 +128,7 @@ export function SubscriptionsMutateDrawer({
             handleServerError(res)
           }
         })
-        .catch(() => {})
+        .catch((error) => handleServerError(error))
       // Best-effort — empty list still lets the operator use "+ Create".
       listWaffoPancakeSubscriptionProductOptions()
         .then((res) => {

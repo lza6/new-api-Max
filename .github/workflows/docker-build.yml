@@ -7,6 +7,9 @@ on:
     tags:
       - '*'
       - '!nightly*'
+  release:
+    types:
+      - published
   workflow_dispatch:
     inputs:
       tag:
@@ -54,6 +57,8 @@ jobs:
               exit 1
             fi
           elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "tag" ]; then
+            TAG=${GITHUB_REF#refs/tags/}
+          elif [ "${{ github.event_name }}" = "release" ]; then
             TAG=${GITHUB_REF#refs/tags/}
           elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             TAG=main

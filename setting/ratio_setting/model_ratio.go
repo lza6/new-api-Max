@@ -1,6 +1,7 @@
 package ratio_setting
 
 import (
+	"fmt"
 	"maps"
 	"strings"
 
@@ -353,6 +354,16 @@ func ModelPrice2JSONString() string {
 }
 
 func UpdateModelPriceByJSONString(jsonStr string) error {
+	// 计费安全：拒绝负价格写入（预扣侧有兜底，但结算侧对负值无防御）。
+	var values map[string]float64
+	if err := common.UnmarshalJsonStr(jsonStr, &values); err != nil {
+		return err
+	}
+	for name, price := range values {
+		if price < 0 {
+			return fmt.Errorf("模型价格不能为负数: %s", name)
+		}
+	}
 	return types.LoadFromJsonStringWithCallback(modelPriceMap, jsonStr, InvalidateExposedDataCache)
 }
 

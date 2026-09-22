@@ -204,6 +204,16 @@ func Redeem(key string, userId int) (result RedeemResult, err error) {
 				Count(&used).Error; err != nil {
 				return err
 			}
+			// 防单用户刷：同一用户对同一多用户码仅可兑换一次（事务内查询保证一致性）。
+			var userUsed int64
+			if err := tx.Model(&RedemptionUsage{}).
+				Where("redemption_id = ? AND user_id = ?", redemption.Id, userId).
+				Count(&userUsed).Error; err != nil {
+				return err
+			}
+			if userUsed > 0 {
+				return errors.New("该兑换码已被使用")
+			}
 			remaining := int64(redemption.MaxUses) - used
 			if remaining <= 0 {
 				return errors.New("该兑换码已被使用")
@@ -221,7 +231,7 @@ func Redeem(key string, userId int) (result RedeemResult, err error) {
 			if result.RowsAffected == 0 {
 				return errors.New("该兑换码已被使用")
 			}
-			// 记录使用明细（同用户重复兑换仍计入次数）。
+			// 记录使用明细（每用户限一次）。
 			usage := RedemptionUsage{
 				RedemptionId: redemption.Id,
 				UserId:       userId,

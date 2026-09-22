@@ -371,21 +371,24 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 		if err != nil {
 			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
 		}
-		if userQuota <= 0 {
-			// B6-3 第二档：额度用尽时通知用户（默认开启，不扰动存量设置）。
-			notifyQuotaExhausted(relayInfo, userQuota)
-			return nil, types.NewErrorWithStatusCode(
-				fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)),
-				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
-		}
-		if userQuota-preConsumedQuota < 0 {
-			// B6-3 第二档：额度不足以支付本次预扣时通知用户。
-			notifyQuotaExhausted(relayInfo, userQuota)
-			return nil, types.NewErrorWithStatusCode(
-				fmt.Errorf("预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(userQuota), logger.FormatQuota(preConsumedQuota)),
-				types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
-				types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+		if preConsumedQuota > 0 {
+			// 预扣为 0（免费模型）时无需余额，避免 0 费用模型对零余额用户 403。
+			if userQuota <= 0 {
+				// B6-3 第二档：额度用尽时通知用户（默认开启，不扰动存量设置）。
+				notifyQuotaExhausted(relayInfo, userQuota)
+				return nil, types.NewErrorWithStatusCode(
+					fmt.Errorf("用户额度不足, 剩余额度: %s", logger.FormatQuota(userQuota)),
+					types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
+			if userQuota-preConsumedQuota < 0 {
+				// B6-3 第二档：额度不足以支付本次预扣时通知用户。
+				notifyQuotaExhausted(relayInfo, userQuota)
+				return nil, types.NewErrorWithStatusCode(
+					fmt.Errorf("预扣费额度失败, 用户剩余额度: %s, 需要预扣费额度: %s", logger.FormatQuota(userQuota), logger.FormatQuota(preConsumedQuota)),
+					types.ErrorCodeInsufficientUserQuota, http.StatusForbidden,
+					types.ErrOptionWithSkipRetry(), types.ErrOptionWithNoRecordErrorLog())
+			}
 		}
 		relayInfo.UserQuota = userQuota
 

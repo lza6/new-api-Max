@@ -98,3 +98,29 @@ func TestRedeemMultiUseConcurrentSameRemaining(t *testing.T) {
 	}
 	assert.Equal(t, 2, success, "MaxUses=2 时并发最多成功 2 次")
 }
+
+func TestRedeemMultiUseCodePerUserOnce(t *testing.T) {
+	setupRedemptionTest(t)
+	seedRedemptionUser(t, 1)
+	seedRedemptionUser(t, 2)
+
+	code := &Redemption{Key: "multi-peruser", Quota: 100, Status: 1, MaxUses: 2}
+	require.NoError(t, DB.Create(code).Error)
+
+	// 用户 1 首次兑换成功
+	_, err := Redeem("multi-peruser", 1)
+	require.NoError(t, err)
+
+	// 用户 1 再次兑换同一码：每用户限一次，应报错
+	_, err = Redeem("multi-peruser", 1)
+	require.Error(t, err)
+
+	// 用户 2 可正常兑换（次数上限 2）
+	_, err = Redeem("multi-peruser", 2)
+	require.NoError(t, err)
+
+	// 次数耗尽后第三位用户被拒
+	seedRedemptionUser(t, 3)
+	_, err = Redeem("multi-peruser", 3)
+	require.Error(t, err)
+}
