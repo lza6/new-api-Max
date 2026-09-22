@@ -26,6 +26,7 @@ import type {
   GetLogStatsParams,
   GetLogStatsResponse,
   GetMidjourneyLogsParams,
+  GetSubscriptionLogsResponse,
   GetTaskLogsParams,
   TaskArtifactsResponse,
   UserInfo,
@@ -176,6 +177,32 @@ export const getAllTaskLogs = (params: GetTaskLogsParams) =>
 
 export const getUserTaskLogs = (params: GetTaskLogsParams) =>
   fetchLogs('/api/task', params, false)
+
+// ============================================================================
+// Subscription Logs API (admin)
+// ============================================================================
+
+export interface GetSubscriptionLogsParams {
+  p?: number
+  page_size?: number
+  username?: string
+  status?: string
+  source?: string
+  start_time?: number
+  end_time?: number
+}
+
+export async function getSubscriptionLogs(
+  params: GetSubscriptionLogsParams
+): Promise<GetSubscriptionLogsResponse> {
+  const queryParams = buildQueryParams({
+    p: params.p || 1,
+    page_size: params.page_size || 20,
+    ...params,
+  })
+  const res = await api.get(`/api/subscription/admin/logs?${queryParams}`)
+  return res.data
+}
 
 const taskArtifactRequestConfig = {
   skipBusinessError: true,

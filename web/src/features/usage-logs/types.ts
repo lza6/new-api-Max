@@ -31,6 +31,45 @@ import type { UsageLog } from './data/schema'
  */
 export type LogCategory = 'common' | 'drawing' | 'task'
 
+/**
+ * 管理员「订阅日志」视图中的一条记录：谁、何时、通过什么来源购买了
+ * 哪个套餐、状态、档位与分组变化。来自后端 /api/subscription/admin/logs。
+ */
+export interface SubscriptionLogItem {
+  id: number
+  user_id: number
+  username: string
+  plan_id: number
+  plan_title: string
+  price_amount: number
+  currency: string
+  duration_unit: string
+  duration_value: number
+  source: string
+  status: string
+  start_time: number
+  end_time: number
+  created_at: number
+  amount_total: number
+  amount_used: number
+  rpm_override: number
+  concurrency_override: number
+  upgrade_group: string
+  prev_user_group: string
+  downgrade_group: string
+}
+
+export interface GetSubscriptionLogsResponse {
+  success: boolean
+  message?: string
+  data?: {
+    items: SubscriptionLogItem[]
+    total: number
+    page: number
+    page_size: number
+  }
+}
+
 // ============================================================================
 // Filter Types
 // ============================================================================

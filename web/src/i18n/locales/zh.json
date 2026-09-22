@@ -6550,7 +6550,13 @@
     "Traffic 30d": "近30日流量",
     "Check-in max must be at least the minimum": "签到最大额度不能小于最小额度",
     "No available channel for this model right now. Please try again in a moment or choose another model.": "当前没有可用渠道。请稍后再试，或换一个模型。",
-    "The channel connection has an issue. Contact the administrator or try again later.": "渠道连接出现问题。请联系管理员，或稍后重试。"
+    "The channel connection has an issue. Contact the administrator or try again later.": "渠道连接出现问题。请联系管理员，或稍后重试。",
+    "Subscription Logs": "订阅日志",
+    "Order": "订单",
+    "Redemption": "兑换码",
+    "From": "来源",
+    "No subscription records found": "暂无订阅记录",
+    "Subscription purchases, redemptions and admin grants will appear here.": "订阅购买、兑换码兑换和管理员发放记录将显示在此。"
   },
   "Task Event Stream": "任务事件流",
   "Stream ended": "事件流已结束",

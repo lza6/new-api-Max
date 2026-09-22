@@ -6550,7 +6550,13 @@
     "Traffic 30d": "Traffic 30d",
     "Check-in max must be at least the minimum": "Check-in max must be at least the minimum",
     "No available channel for this model right now. Please try again in a moment or choose another model.": "No available channel for this model right now. Please try again in a moment or choose another model.",
-    "The channel connection has an issue. Contact the administrator or try again later.": "The channel connection has an issue. Contact the administrator or try again later."
+    "The channel connection has an issue. Contact the administrator or try again later.": "The channel connection has an issue. Contact the administrator or try again later.",
+    "Subscription Logs": "Subscription Logs",
+    "Order": "Order",
+    "Redemption": "Redemption",
+    "From": "From",
+    "No subscription records found": "No subscription records found",
+    "Subscription purchases, redemptions and admin grants will appear here.": "Subscription purchases, redemptions and admin grants will appear here."
   },
   "Task Event Stream": "Task Event Stream",
   "Stream ended": "Stream ended",

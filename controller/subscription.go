@@ -413,6 +413,43 @@ func AdminListUserSubscriptions(c *gin.Context) {
 	common.ApiSuccess(c, subs)
 }
 
+// AdminListSubscriptionLogs 返回管理员视角的全量订阅日志：谁、何时、
+// 通过什么来源购买了哪个套餐、状态、档位与分组变化。支持按用户名、
+// 状态、来源、创建时间范围筛选，分页返回。
+func AdminListSubscriptionLogs(c *gin.Context) {
+	page := common.GetPageQuery(c)
+	if page.Page < 1 || page.PageSize < 1 || page.Page > 100000000 {
+		common.ApiErrorMsg(c, "无效的分页参数")
+		return
+	}
+
+	filter := model.SubscriptionLogFilter{
+		Username:  c.Query("username"),
+		Status:    c.Query("status"),
+		Source:    c.Query("source"),
+		StartTime: parseInt64Safe(c.Query("start_time")),
+		EndTime:   parseInt64Safe(c.Query("end_time")),
+	}
+
+	result, err := model.GetAllSubscriptionLogs(page.Page, page.PageSize, filter)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	page.SetTotal(int(result.Total))
+	page.SetItems(result.Items)
+	common.ApiSuccess(c, page)
+}
+
+func parseInt64Safe(s string) int64 {
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return v
+}
+
 type AdminCreateUserSubscriptionRequest struct {
 	PlanId int `json:"plan_id"`
 }
