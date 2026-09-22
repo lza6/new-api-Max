@@ -333,3 +333,13 @@
 - 订阅用户打 170 并发：升级前 20×订阅RPM429 → 升级后 **0×订阅RPM429**（3×200 + 167×订阅并发429，170<200 全过 RPM）
 - 复位：rpm_override/concurrency_override 归 0，DB 核验回退套餐默认（150/3）
 - 结论：管理员可对单个用户的订阅单独升级/降级 rpm 与并发，且立即生效
+
+## 五十四、余额兑换订阅 E2E（充值开关关闭仍可兑换，v1.2.78 修复实证）
+- 场景：payment_setting.topup_enabled 临时置 false（可逆，E2E 后已恢复 true）→ 用户兑换额度码充值 3,000,000 → POST /api/subscription/balance/pay {plan_id:1}
+- 结果：200 success；钱包 3,000,000→2,000,000（扣 ¥2=100 万）；user_subscriptions 新增 active source=balance（+1 天）；subscription_orders 行 money=2 payment_method=balance status=success；用户自动升级 subscriber 分组
+- 结论：充值功能关闭时余额兑换订阅照常可用（仅需合规确认），即用户要求“即便充值功能关闭也可以用额度兑换”
+
+## 五十五、订阅模型矩阵越权 403 E2E
+- 场景：订阅用户（plan 1 models=["deepseek-v4-flash"]）调用有渠道但不在套餐内的模型
+- 结果：qwen-3.8-max（channel 29 存在、default 分组可用）→ 403「模型 qwen-3.8-max 不在当前订阅套餐（天卡无限）可用模型内，请升级套餐或联系微信 Tf00798 定制」；deepseek-v4-flash → 200
+- 说明：gpt-4o 返回 503（无任何渠道）是渠道分发层先于矩阵检查的合理分层；矩阵检查在渠道分发后、上游调用前执行，用“有渠道但不在套餐”的模型可稳定触发 403
