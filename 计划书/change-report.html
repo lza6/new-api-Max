@@ -35,7 +35,7 @@
 <body>
 <div class="wrap">
   <h1>new-api-Max 变更报告</h1>
-  <div class="sub">生产：freeapi.tingfengai.art（Caddy→3000→PG/Redis）｜线上版本：v1.2.88｜日期：2026-09-22</div>
+  <div class="sub">生产：freeapi.tingfengai.art（Caddy→3000→PG/Redis）｜线上版本：v1.2.92｜日期：2026-09-22</div>
 
   <h2>一、上下文与直觉</h2>
   <div class="card">
@@ -59,6 +59,10 @@
     <tr><td>v1.2.86</td><td>订阅档位真实生效（基础限速不再抢先）+ 发行版敏感信息脱敏</td><td><span class="tag done">已闭环</span></td></tr>
     <tr><td>v1.2.87</td><td>前端 zh/zh-TW 汉化（28 组键）</td><td><span class="tag done">已闭环</span></td></tr>
     <tr><td>v1.2.88</td><td>购买/兑换/授信后清“无订阅”负缓存，订阅立即生效</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.89</td><td>文档路由 no-cache，修复英文混合显示根因（浏览器缓存旧 index.html）</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.90</td><td>订阅卡价格显示 ¥（CNY），去掉硬编码 $</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.91</td><td>定价载荷补 group_ratio，模型卡按“配置价×分组倍率”显示有效价</td><td><span class="tag done">已闭环</span></td></tr>
+    <tr><td>v1.2.92</td><td>VERSION 随 tag 同步（修“系统维护显示旧版本”）；消费日志显示分组倍率；deepseek-v4-flash 单价 0.01→0.001（按次 0.001×0.1=¥0.0001）</td><td><span class="tag done">已闭环</span></td></tr>
   </table>
 
   <h2>三、验证证据（节选）</h2>
@@ -72,6 +76,9 @@
       <li>自动升级/降级：兑换后 group=subscriber；到期扫描后 group 回退 default</li>
       <li>费用类型：消费日志 <code>billing_source:"subscription"</code></li>
       <li>产物实证：部署二进制 grep 命中 用户基础限速×1、Effect test×2、2026-09-18×2</li>
+      <li>计费对账（v1.2.92 真实 E2E）：deepseek-v4-flash 按次，模型单价 0.001 × 分组倍率 0.1 → 消费日志 quota=50 = ¥0.0001/次；改价前 0.01×0.1=¥0.001/次（6 元仅 6000 次）→ 改价后 6 元可用 60000 次</li>
+      <li>模型广场恢复按次：/api/pricing 返回 quota_type=1（按次）、model_price=0.001、group_ratio={default:0.1, subscriber:0.1}</li>
+      <li>版本显示修复：仓库 VERSION 首次随 tag 同步为 v1.2.92，/api/status version=v1.2.92（此前因 VERSION 残留 v1.2.80 导致“系统维护”恒显旧版且检查更新永远有新版本）</li>
     </ul>
   </div>
 

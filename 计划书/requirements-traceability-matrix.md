@@ -32,6 +32,9 @@
 | R25 | 兑换码格式按后台（32 位 UUID） | admin redemption | ✅ | 用户确认“按后台来” |
 | R26 | 其他语言本地化（fr/ru/ja/vi） | i18n fallback→zh | 🟡 | 回退中文可用；如需英文/本地化待确认 |
 | R27 | 订阅用户每请求订阅查询次数优化 | — | 🟡 | 当前 4 次/请求（PG 索引查询），规模小可接受；优化项已记录 |
+| R28 | 版本显示与仓库 VERSION 同步 | VERSION 随 tag 更新 + /api/status | ✅ | v1.2.92 起仓库 VERSION=v1.2.92，/api/status version=v1.2.92（生产实证） |
+| R29 | 按次计费单价×分组倍率真实对账 | ModelPrice + GroupRatio | ✅ | deepseek-v4-flash 单价 0.001×倍率0.1=¥0.0001/次，quota=50（真实 E2E） |
+| R30 | 消费日志显示分组倍率 | LogCostDisplay GroupRatioMarker | ✅ | 费用徽章旁 ×倍率 + tooltip「模型单价×分组倍率」；bundle 实证 |
 
 ## 隐式需求（全部满足）
 - 可运行/可调用/可使用 ✅（生产实证）

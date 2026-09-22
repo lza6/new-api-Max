@@ -5,14 +5,14 @@
 ## 1. 拓扑
 - 香港 CN2 单机：Caddy(80/443) → new-api(3000) → PostgreSQL(newapi) / Redis
 - 代码：`/opt/new-api-src`（git，tag 部署）；compose：`/opt/new-api/docker-compose.yml`
-- 版本：`/opt/new-api/VERSION`；当前线上 **v1.2.88**
+- 版本：`/opt/new-api/VERSION`；当前线上 **v1.2.92**
 
 ## 2. 部署（热更新）
 ```bash
 TS=$(date +%Y%m%d-%H%M%S)
 cd /opt/new-api && cp docker-compose.yml docker-compose.yml.bak.$TS
 cd /opt/new-api-src && git fetch --tags origin && git checkout v<tag>
-echo "v<tag>" > /opt/new-api/VERSION
+echo "v<tag>" > /opt/new-api-src/VERSION && git add VERSION && git commit -m "chore: bump VERSION to v<tag>" 2>/dev/null || true
 docker build -t new-api:local-v<tag> .
 cd /opt/new-api && sed -i "s|new-api:local-v[0-9.]*|new-api:local-v<tag>|" docker-compose.yml
 docker compose up -d new-api
