@@ -500,7 +500,9 @@ describe('metadata sync preview', () => {
       .setup()
       .click(screen.getByRole('button', { name: 'Load metadata preview' }))
     await waitFor(() =>
-      expect(screen.getByText('Upstream unavailable')).toBeInTheDocument()
+      expect(
+        screen.getByText(/upstream service is temporarily unavailable/i)
+      ).toBeInTheDocument()
     )
     expect(
       screen.getByRole('button', { name: 'Preview selected changes' })

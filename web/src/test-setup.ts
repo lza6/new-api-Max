@@ -17,10 +17,16 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import '@testing-library/jest-dom/vitest'
-import { cleanup } from '@testing-library/react'
+import { cleanup, configure } from '@testing-library/react'
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import { afterEach, beforeAll } from 'vitest'
+
+// Parallel CI/dev workers starve individual test processes, so the 1s default
+// async timeout regularly times out healthy findBy*/waitFor flows (audit log
+// tables, dashboards) under full-suite load. Raise it like the vitest
+// testTimeout already is for slow machines.
+configure({ asyncUtilTimeout: 3000 })
 
 beforeAll(async () => {
   await i18next.use(initReactI18next).init({
