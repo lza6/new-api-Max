@@ -406,3 +406,11 @@
   - 构建产物实证：主 bundle 含 Group Ratio / Model Price / User Exclusive Ratio / group_ratio
 - 安全提醒：本次改 DB 时曾因 bash 引号展开把 ModelPrice JSON 破坏（key 引号丢失→模型按 token 回退显示），已当场用 SQL 文件+stdin 方式修复为合法 JSON 并验证（教训：改 option 走官方 API 或 SQL 文件，勿在 shell 内嵌 JSON）
 - 待确认：deepseek-v4-pro-0813 / grok-4.6 / glm-5.3 / glm-5.3-flash 单价为 0 系用户有意清零（用户已确认）
+
+## 六十五、订阅日志（v1.2.93，2026-09-22）
+- 需求：管理员要能看到谁、什么时间、通过什么来源买了什么订阅；建议放在日志 UI 下
+- 后端：GET /api/subscription/admin/logs（管理员鉴权），联表 user_subscriptions + users + subscription_plans，支持 username/status/source/时间范围筛选 + 分页；model/subscription_log.go
+- 前端：usage-logs 新增 subscription section（「订阅日志」，与绘图/任务日志并列），列：ID/用户/套餐/来源/状态/价格/档位覆盖/起始/到期/创建时间/分组升降级；筛选栏（用户名/状态/来源）+ 分页；i18n en/zh/zh-TW
+- 质量：go build、web build、tsgo typecheck、oxlint、i18n 校验全绿；model 单测 TestGetAllSubscriptionLogsJoinsUserAndPlan PASS
+- 部署：v1.2.93（.bak.20260922-125403）healthy；/api/status version=v1.2.93
+- 线上 E2E（e2e_adm2 临时管理员，已清理）：全量 total=8（首条 972098576/天卡无限/balance/active）；username=e2e 筛出 6 条；source=redemption 筛出 4 条；status=active 筛出 7 条；前端 bundle 含 Subscription Logs / No subscription records found
