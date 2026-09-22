@@ -558,3 +558,16 @@
 - 交付：commit 8c9d949df（审计修复）+ 38b32b84c（VERSION v1.3.5）→ tag v1.3.5 + release https://github.com/lza6/new-api-Max/releases/tag/v1.3.5 + CI(GHCR) + 生产 pull 热更新（docker compose pull + up -d，容器 Up healthy）
 - 线上验收：/api/status version=v1.3.5；临时 E2E 用户已清理（tokens DELETE 3 / users DELETE 2，SELECT count=0）
 
+
+## 七十六、接入 Kilwa Claude（Claude Haiku，渠道 type 62）上线（v1.3.6，2026-09-23）
+- 需求：用户提供上游 `https://kilwaapi.vercel.app/kilwa-claude?text=PROMPT`（GET 单轮问答，`{"status":"success","model":"🤖 Claude Haiku 3.5","reply":"..."}`），要求协议转换适配 Claude Code / Codex 等、上模型广场、一次调用 0 费用、按次计费
+- 代码：`relay/channel/kilwa/adaptor.go` 扩展 —— `ModelList` 增加 `kilwa-claude`；`GetRequestURL` 按 `UpstreamModelName` 路由 `/kilwa-grok` / `/kilwa-claude`；新增单测 `TestGetRequestURLSelectsPathByModel`（grok/claude/未知模型三态），kilwa 包 **12/12 测试通过**，`go build ./...` 通过
+- 交付：commit 1f38e7aa0（功能）+ f2a3add7a（VERSION v1.3.6）→ tag v1.3.6 + release https://github.com/lza6/new-api-Max/releases/tag/v1.3.6 + CI(GHCR 多架构 amd64/arm64) + 生产 pull 热更新（version=v1.3.6）
+- 线上配置（管理 API 完成）：模型元数据 id=75（kilwa-claude，status=1，tags=KILWA,Claude,免费，groups=default）；model_pricing ModelPrice=0（按次 0 费用）；渠道 id=33（type=62，base=https://kilwaapi.vercel.app，models=kilwa-claude，group=default）；`POST /api/channel/fix` 重建 abilities 后出现在 /api/pricing（model_price=0, quota_type=1）
+- 真实 E2E（103.233.252.213:3000，临时用户 e2e_usr_v136667667 token）：
+  - OpenAI 非流 200 `Pong! 👋 I'm here and ready to help...`（model=kilwa-claude）✅
+  - OpenAI 流 SSE+[DONE] ✅；Claude 流事件齐全 message_start→…→message_stop ✅；Responses 流 response.completed+output_text.delta ✅
+  - 计费 0：user quota before/after delta=0 ✅；管理员日志 14 条 kilwa-claude 记录（quota=0, prompt/completion_tokens=0, 流式标记正确, 字节数正常）✅
+  - **上下文容量**：4800/8000/12000/16000/20000/30000 字符均 200（远超 grok 的 ~4816 字符 414 上限）✅
+  - **最大输出实测**：中文故事约 592 字符
+- 临时账号已清理（tokens DELETE 5 / users DELETE 2，count=0）；渠道/模型/定价保留为正式配置
