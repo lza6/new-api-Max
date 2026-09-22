@@ -207,3 +207,26 @@ func TestDoResponseClaudeStreamFullEventSequence(t *testing.T) {
 		assert.Contains(t, body, "event: "+ev, "missing claude stream event %s", ev)
 	}
 }
+
+func TestGetRequestURLSelectsPathByModel(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	grok := newRelayInfo("https://up.example", types.RelayFormatOpenAI)
+	grok.UpstreamModelName = "kilwa-grok"
+	url, err := (&Adaptor{}).GetRequestURL(grok)
+	require.NoError(t, err)
+	assert.Contains(t, url, "/kilwa-grok")
+
+	claude := newRelayInfo("https://up.example", types.RelayFormatOpenAI)
+	claude.UpstreamModelName = "kilwa-claude"
+	url, err = (&Adaptor{}).GetRequestURL(claude)
+	require.NoError(t, err)
+	assert.Contains(t, url, "/kilwa-claude")
+	assert.NotContains(t, url, "/kilwa-grok")
+
+	unknown := newRelayInfo("https://up.example", types.RelayFormatOpenAI)
+	unknown.UpstreamModelName = "kilwa-other"
+	url, err = (&Adaptor{}).GetRequestURL(unknown)
+	require.NoError(t, err)
+	assert.Contains(t, url, "/kilwa-grok")
+}

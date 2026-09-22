@@ -41,11 +41,12 @@ import (
 
 const ChannelName = "Kilwa"
 
-var ModelList = []string{"kilwa-grok"}
+var ModelList = []string{"kilwa-grok", "kilwa-claude"}
 
 const (
-	kilwaPath    = "/kilwa-grok"
-	kilwaTimeout = 120 * time.Second
+	kilwaPath       = "/kilwa-grok"
+	kilwaPathClaude = "/kilwa-claude"
+	kilwaTimeout    = 120 * time.Second
 )
 
 // kilwaRequest is the normalized upstream payload produced by every request
@@ -71,7 +72,11 @@ type Adaptor struct {
 func (a *Adaptor) Init(info *relaycommon.RelayInfo) {}
 
 func (a *Adaptor) GetRequestURL(info *relaycommon.RelayInfo) (string, error) {
-	return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, kilwaPath, info.ChannelType), nil
+	path := kilwaPath
+	if info.UpstreamModelName == "kilwa-claude" {
+		path = kilwaPathClaude
+	}
+	return relaycommon.GetFullRequestURL(info.ChannelBaseUrl, path, info.ChannelType), nil
 }
 
 func (a *Adaptor) SetupRequestHeader(c *gin.Context, req *http.Header, info *relaycommon.RelayInfo) error {
