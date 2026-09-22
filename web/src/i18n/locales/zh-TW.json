@@ -6636,6 +6636,8 @@
     "Model Traffic Leaderboard": "模型流量排行",
     "Traffic by model over the last 30 days": "近 30 天各模型流量",
     "Unable to load traffic data": "流量數據載入失敗",
-    "No traffic data yet": "暫無流量數據"
+    "No traffic data yet": "暫無流量數據",
+    "Rate limit exempt models (comma separated)": "限流豁免模型（逗號分隔）",
+    "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.": "命中這些模型的請求對所有用戶一律不限並發/不限速率（如免費翻譯模型 google-translate = 不限）。其他模型仍按用戶自身速率與並發限制。"
   }
 }

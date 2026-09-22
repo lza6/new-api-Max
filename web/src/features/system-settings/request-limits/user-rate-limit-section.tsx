@@ -31,6 +31,7 @@ const createSchema = () =>
     enabled: z.boolean(),
     concurrency: z.number().int().min(0).max(100000),
     rpm: z.number().int().min(0).max(1000000),
+    exemptModels: z.string(),
   })
 
 type FormValues = z.infer<ReturnType<typeof createSchema>>
@@ -43,6 +44,16 @@ interface UserRateLimitSectionProps {
  * T7 每用户基础限速：默认对所有用户生效（并发/秒 + RPM/分钟，超限 429）。
  * 分组/用户覆盖通过 /api/option/relay/rate_limit/overrides 管理端点调整。
  */
+
+/** 把逗号分隔的豁免模型输入转换为后端要求的 JSON 数组字符串（空 = []）。 */
+function toExemptModelsValue(input: string): string {
+  const list = input
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return JSON.stringify(list)
+}
+
 export function UserRateLimitSection({
   defaultValues,
 }: UserRateLimitSectionProps) {
@@ -66,6 +77,7 @@ export function UserRateLimitSection({
         ['relay.user_base_rate_limit_enabled', values.enabled],
         ['relay.user_base_concurrency_limit', values.concurrency],
         ['relay.user_base_rpm_limit', values.rpm],
+        ['relay.user_rate_limit_exempt_models', toExemptModelsValue(values.exemptModels)],
       ] as Array<[string, string | number | boolean]>
     ).map(([key, value]) => ({ key, value }))
     for (const { key, value } of updates) {
@@ -167,6 +179,30 @@ export function UserRateLimitSection({
               )}
             />
           </div>
+
+          <FormField
+            control={form.control}
+            name='exemptModels'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  {t('Rate limit exempt models (comma separated)')}
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder='google-translate'
+                    {...field}
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.'
+                  )}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
         </SettingsForm>
       </Form>
     </SettingsSection>

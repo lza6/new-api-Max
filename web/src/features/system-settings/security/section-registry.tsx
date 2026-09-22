@@ -70,6 +70,7 @@ const SECURITY_SECTIONS = [
           concurrency:
             Number(settings['relay.user_base_concurrency_limit']) || 3,
           rpm: Number(settings['relay.user_base_rpm_limit']) || 120,
+          exemptModels: parseExemptModels(settings['relay.user_rate_limit_exempt_models']),
         }}
       />
     ),
@@ -150,6 +151,17 @@ const securityRegistry = createSectionRegistry<
   basePath: '/system-settings/security',
   urlStyle: 'path',
 })
+
+function parseExemptModels(raw: string | undefined): string {
+  if (!raw) return ''
+  try {
+    const arr = JSON.parse(raw)
+    if (Array.isArray(arr)) return arr.join(', ')
+  } catch {
+    /* fall through */
+  }
+  return raw.replace(/^\[/, '').replace(/\]$/, '')
+}
 
 export const SECURITY_SECTION_IDS = securityRegistry.sectionIds
 export const SECURITY_DEFAULT_SECTION = securityRegistry.defaultSection

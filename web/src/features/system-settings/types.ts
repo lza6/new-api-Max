@@ -400,6 +400,7 @@ export type SecuritySettings = {
   'relay.user_base_rate_limit_enabled': boolean
   'relay.user_base_concurrency_limit': number
   'relay.user_base_rpm_limit': number
+  'relay.user_rate_limit_exempt_models': string
 }
 
 export type UpstreamChannel = {

@@ -50,6 +50,7 @@ const defaultSecuritySettings: SecuritySettings = {
   'relay.user_base_rate_limit_enabled': true,
   'relay.user_base_concurrency_limit': 3,
   'relay.user_base_rpm_limit': 120,
+  'relay.user_rate_limit_exempt_models': '',
 }
 
 export function SecuritySettings() {
