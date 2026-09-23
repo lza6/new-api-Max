@@ -473,3 +473,23 @@
 ## 前状态（承接上段）
 - 上段到 v1.3.6（记录 kling/sora、kilwa、signage）之前内容读本文件上方。
 - 本段不覆盖上方记录；待收尾项：本地成对基准 + 是否进入 T2（渠道健康路由）。
+---
+
+# 2026-09-23 追加段：T2-1 健康分边界测试 + T6-1 Data 合并验收测试（已推送，纯测试）
+
+## T2-1 渠道健康分边界（commit 2a9788412，push main）
+- `service/channel_health_score_test.go` 扩展（沿用既有文件，不新增）：
+  - `TestComputeHealthScoreBoundaries`：1.5s 满分 100 / 10s 延迟零分 70 / 5.75s 中点 85 / 零成功率 0 / 半成功率 50 / 全失败 0 —— 7 用例 PASS。
+  - `TestChannelHealthSnapshotEmptyReturnsZero`：无样本渠道返回全零且不 panic。
+- 验证：`go test ./service/ -run "TestComputeHealthScoreBoundaries|TestChannelHealthSnapshot"` 全 PASS。
+- 结论：健康分公式（成功率×70 + 延迟分30）边界被测试锁住，供后续 CHANNEL_HEALTH_ROUTING 路由加权复用。
+
+## T6-1 任务 Data 结构化进度合并验收（commit fb9f73e51，push main）
+- 前置审计：`applyStructuredTaskProgress`（service/task_polling.go:774）已实现（旧 workflow_status 的“B5-3 后端缺口”记录过时），缺验收测试。
+- 新增 `TestApplyStructuredTaskProgressMergesWithoutClobbering`（service/task_polling_test.go）：
+  - 结构化 "5/10 images" 合并 Data.progress 且保留 refund/resolution；纯字符串 "30%" 零破坏；nil 守卫不 panic —— 3 用例 PASS。
+- 验证：`go test ./service/` 全量 exit 0（4.757s）。
+
+## 批次台账（防重复）
+- 已锁定“无需重查”：用户设置缓存存在性；429/4xx 透传正确性（error_test.go）；Task.Data 合并行为；健康分公式边界。
+- 待做批次（各自独立 spec→实现→E2E→发布）：T2-2 路由加权、T2-3 stream_fallover 灰度、T2-4 前端健康分概览、T3 Web 防护配置化+状态页、T4 费用解释、T5 request-id/span、T6-2 插件沙箱、T6-4 webhook/定时同步、T7-T15。
