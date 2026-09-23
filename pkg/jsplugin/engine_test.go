@@ -9,8 +9,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/lza6/new-api-Max/common"
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -371,5 +371,51 @@ func TestValidateRequestURL(t *testing.T) {
 			require.Error(t, err)
 			assert.True(t, strings.Contains(err.Error(), test.wantError), err.Error())
 		})
+	}
+}
+
+// TestPluginSandboxBlocksHostAccess T6-2：插件运行环境不得暴露网络/文件/
+// 进程/全局宿主对象——「未注入即不存在」的隐式沙箱回归锁。
+// 插件尝试 require/fetch/process/fs 必须失败（undefined 或编译拒绝），
+// 且不影响正常纯计算插件。
+func TestPluginSandboxBlocksHostAccess(t *testing.T) {
+	t.Parallel()
+	// 尝试访问宿主对象的恶意插件：require/fetch/process 在 ESM 插件里应
+	// 是未定义标识符，运行时引用即抛 ReferenceError（被 HookError 包装）。
+	engine, err := Compile(`
+export function poke(ctx) {
+  const results = {};
+  try { results.fetch = typeof fetch; } catch (err) { results.fetch = "error:" + (err && err.name || "ReferenceError"); }
+  try { results.process = typeof process; } catch (err) { results.process = "error:" + (err && err.name || "ReferenceError"); }
+  try { results.require = typeof require; } catch (err) { results.require = "error:" + (err && err.name || "ReferenceError"); }
+  try { results.fs = typeof fs; } catch (err) { results.fs = "error:" + (err && err.name || "ReferenceError"); }
+  try { results.global = typeof global; } catch (err) { results.global = "error:" + (err && err.name || "ReferenceError"); }
+  return results;
+}
+`, Options{Key: "sandbox-poke", Version: "1.0.0"})
+	require.NoError(t, err)
+
+	result, err := engine.Call(context.Background(), "poke", map[string]any{})
+	require.NoError(t, err)
+	got, ok := result.(map[string]any)
+	require.True(t, ok)
+	// 全部宿主对象不可达：typeof 必须为 "undefined"（未注入），引用则报错。
+	for _, key := range []string{"fetch", "process", "require", "fs", "global"} {
+		val, _ := got[key].(string)
+		assert.Contains(t, []string{"undefined", "error:ReferenceError"}, val,
+			"%s must not be reachable from plugin runtime, got %q", key, val)
+	}
+}
+
+// TestPluginSandboxBlocksNetworkAtCompile T6-2：源码级 import/fetch 声明被
+// 编译拒绝（ESM import 禁用 + async/await 禁用），从源头阻断网络/模块加载。
+func TestPluginSandboxBlocksNetworkAtCompile(t *testing.T) {
+	t.Parallel()
+	for _, src := range []string{
+		`import fetch from "node-fetch"; export function run() { return 1; }`,
+		`export async function run() { return await fetch("https://evil.example"); }`,
+	} {
+		_, err := Compile(src, Options{Key: "sandbox-block", Version: "1.0.0"})
+		require.Error(t, err, "source should be rejected at compile: %s", src)
 	}
 }
