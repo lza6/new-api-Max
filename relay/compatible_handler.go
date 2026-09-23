@@ -159,11 +159,17 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	// 不 skip retry（可换渠道 failover）。流式请求仍由 stream_scanner 的首字超时负责。
 	if !info.IsStream && relay_setting.GetNonStreamFirstByteTimeout() > 0 {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(relay_setting.GetNonStreamFirstByteTimeout())*time.Second)
-		defer cancel()
 		originalRequest := c.Request
 		c.Request = c.Request.WithContext(ctx)
 		resp, err = adaptor.DoRequest(c, info, requestBody)
+		// [修复防御] 首字节已拿到（resp 非 nil 即响应头已到达）：立即解除 deadline，
+		// 避免响应体读取被「首字节超时」误杀（上游已返回头但 body 慢/长时被错判 504）。
+		// 后续 body 读取只受 http.Client.Timeout（RelayTimeout 总时长）约束。
+		if resp != nil {
+			cancel()
+		}
 		c.Request = originalRequest
+		defer cancel()
 	} else {
 		resp, err = adaptor.DoRequest(c, info, requestBody)
 	}

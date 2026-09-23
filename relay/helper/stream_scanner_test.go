@@ -829,3 +829,48 @@ func TestFirstPacketBufferWriterOverflow(t *testing.T) {
 	assert.True(t, bw.Committed(), "超过 1MB 缓冲上限必须直接放行（进入直通）")
 	assert.Contains(t, recorder.Body.String(), "x")
 }
+
+// TestStreamScannerHandler_ReasoningRenewsFirstTokenTimeout 生产回归（用户日志：
+// 上游长 reasoning 流被首包超时误杀为 500/504）。fallover on + 极短首包超时，
+// 上游先持续发 reasoning 超过超时阈值后才发 content → 必须正常透传不误杀。
+func TestStreamScannerHandler_ReasoningRenewsFirstTokenTimeout(t *testing.T) {
+	rs := relay_setting.GetRelaySetting()
+	oldFallover := rs.StreamFallover
+	oldTimeout := rs.StreamFirstTokenTimeout
+	rs.StreamFallover = true
+	rs.StreamFirstTokenTimeout = 1 // 1s 首包超时，加速测试
+	t.Cleanup(func() {
+		rs.StreamFallover = oldFallover
+		rs.StreamFirstTokenTimeout = oldTimeout
+	})
+
+	// 渠道：reasoning 块持续 2.5s（> 1s 首包超时阈值）后才发 content。
+	pipeR, pipeW := io.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 3 {
+			_, _ = pipeW.Write([]byte("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"thinking step\"}}]}\n"))
+			time.Sleep(900 * time.Millisecond)
+		}
+		_, _ = pipeW.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"FINAL-ANSWER\"}}]}\n"))
+		_, _ = pipeW.Write([]byte("data: [DONE]\n"))
+		_ = pipeW.Close()
+	}()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	resp := &http.Response{Body: io.NopCloser(pipeR)}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+
+	var got []string
+	fatalErr := StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {
+		got = append(got, data)
+		_, _ = c.Writer.WriteString(data + "\n")
+	})
+	<-done
+
+	assert.Nil(t, fatalErr, "reasoning 持续流超过首包超时阈值后到达 content 必须正常结束，不得误杀为 upstream stream timeout")
+	assert.Contains(t, recorder.Body.String(), "FINAL-ANSWER", "客户端应收到最终 content")
+}

@@ -56,8 +56,10 @@ func isUsefulStreamData(data string) bool {
 	var payload struct {
 		Choices []struct {
 			Delta *struct {
-				Content   any   `json:"content"`
-				ToolCalls []any `json:"tool_calls"`
+				Content          any   `json:"content"`
+				ReasoningContent any   `json:"reasoning_content"`
+				Reasoning        any   `json:"reasoning"`
+				ToolCalls        []any `json:"tool_calls"`
 			} `json:"delta"`
 		} `json:"choices"`
 	}
@@ -144,13 +146,18 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			c.Writer = originalWriter
 		}()
 	}
+	// [修复防御] 仅停止首包超时计时（上游已开始传输任何数据块），不 commit 缓冲：
+	// reasoning 流不断续命不被误杀，但纯 reasoning 无 content 流结束仍判空壳。
+	stopFirstTokenTimer := func() {
+		if firstTokenTimer != nil {
+			firstTokenTimer.Stop()
+		}
+	}
 	commitBuffer := func() {
 		if bufferWriter != nil {
 			bufferWriter.Commit()
 		}
-		if firstTokenTimer != nil {
-			firstTokenTimer.Stop()
-		}
+		stopFirstTokenTimer()
 	}
 	// B1-1 空壳流标记：fallover 开启时，若流正常结束但从未遇到有效
 	// content/tool_call（缓冲从未 commit），判定本次渠道失败交还重试链。
@@ -343,7 +350,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 					info.ReceivedResponseCount++
 					commitBuffer()
 				} else {
-					// B1-1：reasoning-only 增量 → 不提交，继续缓冲等待有效内容。
+					// [修复防御] reasoning-only 增量：不 commit（空壳判定保持），
+					// 但停止首包超时计时——上游在正常传输 reasoning（deepseek 系
+					// 长思考流），不应被判「首包超时」。流结束仍由空壳检测兜底。
+					stopFirstTokenTimer()
 					logger.LogDebug(c, "stream first packet is reasoning-only, keep buffering")
 				}
 
@@ -430,4 +440,17 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		logger.LogError(c, fmt.Sprintf("stream ended: %s, received=%d", info.StreamStatus.Summary(), info.ReceivedResponseCount))
 	}
 	return nil
+}
+
+func isNonEmptyDelta(v any) bool {
+	switch val := v.(type) {
+	case nil:
+		return false
+	case string:
+		return strings.TrimSpace(val) != ""
+	case []any:
+		return len(val) > 0
+	default:
+		return true
+	}
 }
