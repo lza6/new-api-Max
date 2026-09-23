@@ -84,3 +84,47 @@ This document provides standard translation references for key terminology in th
 **贡献说明**: 如发现术语翻译不一致或有更好的翻译建议，欢迎提交 Issue 或 Pull Request。
 
 **Contribution Note**: If you find any inconsistencies in terminology translations or have better translation suggestions, please feel free to submit an Issue or Pull Request.
+
+## 限速与配额 (Rate Limit & Quota)
+
+| 中文 | English | 说明 | Description |
+|------|---------|------|-------------|
+| 并发限制 | Concurrency Limit | 同时处理的请求数上限 | Max in-flight requests |
+| 每分钟请求数 | RPM (Requests Per Minute) | 每分钟请求数上限 | Requests per minute limit |
+| 配额 | Quota | 用户可用额度（计费单位） | User's billable balance |
+| 额度用尽 | Insufficient Quota | 配额不足 | Balance exhausted |
+| 分组 | Group | 渠道/用户的分组归属 | Group membership for channels/users |
+| 分组倍率 | Group Ratio | 分组计费倍率 | Billing multiplier per group |
+| 缓存倍率 | Cache Ratio | 缓存命中输入的计费倍率 | Billing multiplier for cached input |
+| 影子价 | Shadow Price | 微美元等价费用（仅展示） | Micro-USD equivalent (display only) |
+| 配额饱和 | Quota Saturation | 额度换算溢出被钳制（审计标记） | Clamped quota conversion (audit marker) |
+
+## 任务插件 (Task Plugins)
+
+| 中文 | English | 说明 | Description |
+|------|---------|------|-------------|
+| 任务插件 | Task Plugin | 异步任务（视频/图像）适配插件 | Async task adapter plugin |
+| 审批闸门 | Execution Gate | 插件内容寻址审批 | Content-addressed plugin approval |
+| 沙箱 | Sandbox | 插件执行受限环境 | Restricted plugin runtime |
+| 轮询 | Polling | 异步任务状态轮询 | Async task status polling |
+| 结构化进度 | Structured Progress | 任务进度分段数据 | Structured task progress |
+| 回调 | Webhook | 任务状态变更回调 | Task state-change callback |
+| 市场 | Marketplace | 插件市场 | Plugin marketplace |
+
+## Web 防护 (Web Protection)
+
+| 中文 | English | 说明 | Description |
+|------|---------|------|-------------|
+| Web 防护 | Web Protection | 管理端 Web 层防刷/限流/封禁 | Admin web-layer protection |
+| 每秒请求数 | Limit Per Second | 每 IP 每秒请求上限 | Per-IP requests per second |
+| 突发容忍 | Burst | 令牌桶突发容量 | Token-bucket burst capacity |
+| 自动封禁 | Auto Ban | 触发阈值后自动封禁 IP | Auto-ban after threshold |
+| 服务器状态 | Server Stats | 实时状态（网络/CPU/内存/磁盘） | Realtime server metrics |
+
+## 订阅 (Subscription)
+
+| 中文 | English | 说明 | Description |
+|------|---------|------|-------------|
+| 订阅档位 | Subscription Tier | 订阅套餐等级 | Subscription plan tier |
+| 订阅限速 | Subscription Rate Limit | 订阅档位的并发/RPM 限制 | Subscription-tier rate limits |
+| 需订阅分组 | Subscription Required Groups | 未订阅用户不可用的分组 | Groups requiring subscription |
