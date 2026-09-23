@@ -1,0 +1,45 @@
+{
+  "type": "real-upstream-e2e",
+  "version": "v1.3.13",
+  "date": "2026-09-24",
+  "host": "freeapi.tingfengai.art (103.233.252.213, container http://127.0.0.1:3000)",
+  "token": "created id=867 (e2e-v1313)",
+  "results": [
+    {
+      "kind": "non-stream",
+      "model": "deepseek-v4-flash",
+      "status": 200,
+      "content": "E2E-OK",
+      "usage": {"prompt": 92, "completion": 38, "total": 130, "reasoning": 32},
+      "request_id": "c61afb6588a54077993e0000ae9b72ba",
+      "evidence": "T5 request-id round-trip; T4 billing path exercised"
+    },
+    {
+      "kind": "stream",
+      "model": "claude-haiku-4.5",
+      "status": 200,
+      "sse": "data chunks + data: [DONE]",
+      "evidence": "stream_fallover default-on path works end-to-end (first-packet buffer commit + normal completion)"
+    },
+    {
+      "kind": "stream-empty-failure",
+      "model": "deepseek-v4-flash",
+      "status": 500,
+      "error": "upstream stream empty (request id ...)",
+      "evidence": "stream_fallover correctly rejects empty-shell stream as failure (known free-model empty reply per site announcement)"
+    },
+    {
+      "kind": "model-not-found",
+      "model": "gpt-4o-mini",
+      "status": 503,
+      "error": "No available channel for model gpt-4o-mini under group default (distributor)",
+      "evidence": "error mapping + request-id in error path"
+    }
+  ],
+  "observability_confirmed": {
+    "consume_log_has_timeline_stages": true,
+    "frt_ms": 4542,
+    "explain_facts": true,
+    "stream_status_ok": true
+  }
+}
