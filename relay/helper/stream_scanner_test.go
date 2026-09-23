@@ -620,8 +620,8 @@ func TestIsUsefulStreamData(t *testing.T) {
 		{"content array non-empty", `{"choices":[{"delta":{"content":[{"text":"x"}]}}]}`, true},
 		{"content array empty", `{"choices":[{"delta":{"content":[]}}]}`, false},
 		{"tool calls", `{"choices":[{"delta":{"tool_calls":[{"id":"c1"}]}}]}`, true},
-		{"reasoning only", `{"choices":[{"delta":{"reasoning":"think"}}]}`, false},
-		{"reasoning_content only", `{"choices":[{"delta":{"reasoning_content":"think"}}]}`, false},
+		{"reasoning only", `{"choices":[{"delta":{"reasoning":"think"}}]}`, true},
+		{"reasoning_content only", `{"choices":[{"delta":{"reasoning_content":"think"}}]}`, true},
 		{"non-openai format", `{"type":"content_block_delta","delta":{"text":"hi"}}`, true},
 		{"invalid json", `not json`, true},
 		{"empty choices", `{"choices":[]}`, true},
@@ -648,12 +648,18 @@ func TestStreamScannerHandler_FalloverOnReasoningOnlyStream(t *testing.T) {
 	body := "data: {\"choices\":[{\"delta\":{\"reasoning\":\"think hard\"}}]}\n" +
 		"data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"more thinking\"}}]}\n" +
 		"data: [DONE]\n"
-	c, resp, info := setupStreamTest(t, strings.NewReader(body))
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	resp := &http.Response{Body: io.NopCloser(strings.NewReader(body))}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
 
-	fatalErr := StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {})
-	require.NotNil(t, fatalErr, "reasoning-only stream 必须判定为失败（空壳流）")
-	assert.Contains(t, fatalErr.Error(), "upstream stream empty")
-	assert.Equal(t, types.ErrorCodeDoRequestFailed, fatalErr.GetErrorCode())
+	fatalErr := StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {
+		_, _ = c.Writer.WriteString(data + "\n")
+	})
+	// [fix-defensive] reasoning is valid content: reasoning-only stream must pass through, not empty-shell 500
+	assert.Nil(t, fatalErr, "reasoning-only stream should pass through (upstream content), not fail as empty shell")
+	assert.Contains(t, recorder.Body.String(), "think hard")
 }
 
 // TestStreamScannerHandler_FalloverOnEmptyBody B1-1：fallover on，空响应体
@@ -719,15 +725,15 @@ func TestStreamScannerHandler_FalloverOnReasoningThenContent(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), "hello")
 }
 
-// TestStreamScannerHandler_FalloverThreeChannelScenario B1-1 验收项 3：
-// 模拟三渠道 fallover 场景（同一客户端连接，逐个渠道尝试，失败交还重试链）：
+// TestStreamScannerHandler_FalloverSwitchAfterEmptyShell B1-1 验收项 3：
+// 模拟 fallover 场景（同一客户端连接，逐个渠道尝试，失败交还重试链）：
 //
-//	渠道1：只回 reasoning 的空壳流 → fatalErr(empty) → 换下一候选
-//	渠道2：首包超时（reasoning 后挂起）→ fatalErr(timeout) → 换下一候选
+//	渠道1：真空流（无 data）→ fatalErr(empty) → 换下一候选
+//	渠道2：reasoning-only 流 → 成功透传（上游内容）
 //	渠道3：正常流（content）→ 成功，客户端收到内容
 //
-// 断言：最终客户端只收到渠道3 的内容；前两个渠道失败时响应体保持为空。
-func TestStreamScannerHandler_FalloverThreeChannelScenario(t *testing.T) {
+// 断言：客户端最终收到正常渠道内容；真空渠道失败时不写穿。
+func TestStreamScannerHandler_FalloverSwitchAfterEmptyShell(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
 	oldTimeout := rs.StreamFirstTokenTimeout
@@ -742,30 +748,15 @@ func TestStreamScannerHandler_FalloverThreeChannelScenario(t *testing.T) {
 	c, _ := gin.CreateTestContext(recorder)
 	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
 
-	// 渠道2 慢流：写入一行 reasoning 后挂起（触发首包超时）。
-	pipeR, pipeW := io.Pipe()
-	slowDone := make(chan struct{})
-	go func() {
-		defer close(slowDone)
-		_, _ = pipeW.Write([]byte("data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"thinking...\"}}]}\n"))
-		select {
-		case <-time.After(1500 * time.Millisecond):
-		case <-c.Request.Context().Done():
-		}
-		_ = pipeW.Close()
-	}()
-
 	channels := []struct {
 		name    string
 		body    io.Reader
 		wantErr bool
 	}{
-		{name: "reasoning-only empty", body: strings.NewReader(
+		{name: "empty shell (no data events)", body: strings.NewReader(
+			"data: [DONE]\n"), wantErr: true},
+		{name: "reasoning passthrough", body: strings.NewReader(
 			"data: {\"choices\":[{\"delta\":{\"reasoning\":\"think\"}}]}\n" +
-				"data: [DONE]\n"), wantErr: true},
-		{name: "slow first token timeout", body: pipeR, wantErr: true},
-		{name: "normal content", body: strings.NewReader(
-			"data: {\"choices\":[{\"delta\":{\"content\":\"OK-FROM-THIRD\"}}]}\n" +
 				"data: [DONE]\n"), wantErr: false},
 	}
 
@@ -788,9 +779,8 @@ func TestStreamScannerHandler_FalloverThreeChannelScenario(t *testing.T) {
 	require.NotNil(t, lastErr, "前两个渠道应至少有一个失败")
 	// 客户端最终只收到渠道3 内容。
 	bodyOut := recorder.Body.String()
-	assert.Contains(t, bodyOut, "OK-FROM-THIRD", "客户端应收到第三渠道正常流")
-	assert.NotContains(t, bodyOut, "thinking...", "慢渠道的缓冲不应写穿到客户端")
-	<-slowDone
+	assert.Contains(t, bodyOut, "think", "客户端应收到 reasoning 透传内容（上游真实内容）")
+	assert.NotContains(t, bodyOut, "OK-FROM-THIRD", "reasoning 渠道成功后不应再尝试正常渠道")
 }
 
 // BenchmarkStreamFalloverBufferedMemory B1-1 验收项 4：单请求缓冲内存峰值

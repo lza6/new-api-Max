@@ -75,6 +75,12 @@ func isUsefulStreamData(data string) bool {
 	if len(delta.ToolCalls) > 0 {
 		return true
 	}
+	// [修复防御] reasoning/reasoning_content 是上游返回的真实内容（deepseek 系
+	// 思考流）：透传模式必须透传，不能因「无 content」判空壳 500。
+	// 真空响应（零 data 事件）仍由 emptyStream 检测兜底。
+	if isNonEmptyDelta(delta.ReasoningContent) || isNonEmptyDelta(delta.Reasoning) {
+		return true
+	}
 	switch v := delta.Content.(type) {
 	case string:
 		return strings.TrimSpace(v) != ""
