@@ -487,6 +487,16 @@ func GetSelf(c *gin.Context) {
 // buildSelfUserData is the single safe dashboard-user DTO used by GetSelf,
 // login and refresh. It intentionally excludes password, management PAT and
 // administrator-only remarks.
+// resolveSelfRateLimit 汇总用户当前生效限速档位供个人资料展示。
+func resolveSelfRateLimit(userId int, group string) map[string]any {
+	concurrency, rpm, source := service.ResolveUserRateLimit(userId, group)
+	return map[string]any{
+		"concurrency": concurrency,
+		"rpm":         rpm,
+		"source":      source,
+	}
+}
+
 func buildSelfUserData(user *model.User) map[string]any {
 	userSetting := user.GetSetting()
 	permissions := calculateUserPermissions(user.Role)
@@ -517,6 +527,7 @@ func buildSelfUserData(user *model.User) map[string]any {
 		"setting":           user.Setting,
 		"stripe_customer":   user.StripeCustomer,
 		"sidebar_modules":   userSetting.SidebarModules, // 正确提取sidebar_modules字段
+		"rate_limit":        resolveSelfRateLimit(user.Id, user.Group),
 		"permissions":       permissions,
 	}
 }
