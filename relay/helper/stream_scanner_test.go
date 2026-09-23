@@ -289,6 +289,11 @@ func TestStreamScannerHandler_ClientCancelAbortsUpstreamAndReturns(t *testing.T)
 // ---------- Ping tests ----------
 
 func TestStreamScannerHandler_PingSentDuringSlowUpstream(t *testing.T) {
+	// T2-3：默认 fallover=on 会禁用 ping；本用例锁 off 路径。
+	oldFallover := relay_setting.GetRelaySetting().StreamFallover
+	relay_setting.GetRelaySetting().StreamFallover = false
+	t.Cleanup(func() { relay_setting.GetRelaySetting().StreamFallover = oldFallover })
+
 	setting := operation_setting.GetGeneralSetting()
 	oldEnabled := setting.PingIntervalEnabled
 	oldSeconds := setting.PingIntervalSeconds
@@ -335,6 +340,8 @@ func TestStreamScannerHandler_PingSentDuringSlowUpstream(t *testing.T) {
 
 	body := recorder.Body.String()
 	pingCount := strings.Count(body, ": PING")
+	// T2-3：stream_fallover 默认已翻转为 on（fallover 会禁 ping 保活）。
+	// 本用例显式测 off 路径，确保「fallover off + ping 保活」行为不回退。
 	assert.GreaterOrEqual(t, pingCount, 1,
 		"expected at least 1 ping during slow stream with 1s interval; got %d", pingCount)
 }
@@ -714,9 +721,11 @@ func TestStreamScannerHandler_FalloverOnReasoningThenContent(t *testing.T) {
 
 // TestStreamScannerHandler_FalloverThreeChannelScenario B1-1 验收项 3：
 // 模拟三渠道 fallover 场景（同一客户端连接，逐个渠道尝试，失败交还重试链）：
-//   渠道1：只回 reasoning 的空壳流 → fatalErr(empty) → 换下一候选
-//   渠道2：首包超时（reasoning 后挂起）→ fatalErr(timeout) → 换下一候选
-//   渠道3：正常流（content）→ 成功，客户端收到内容
+//
+//	渠道1：只回 reasoning 的空壳流 → fatalErr(empty) → 换下一候选
+//	渠道2：首包超时（reasoning 后挂起）→ fatalErr(timeout) → 换下一候选
+//	渠道3：正常流（content）→ 成功，客户端收到内容
+//
 // 断言：最终客户端只收到渠道3 的内容；前两个渠道失败时响应体保持为空。
 func TestStreamScannerHandler_FalloverThreeChannelScenario(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()

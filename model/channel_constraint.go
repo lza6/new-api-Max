@@ -3,13 +3,19 @@ package model
 import (
 	"slices"
 
+	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/dto"
 )
 
+// ChannelHealthProbe 由 service 层注册，返回渠道健康分快照。
+// 用于 FilterChannelHealth：冷却剔除 + 低分剔除。nil = 不启用。
+var ChannelHealthProbe func(channelID int) (score float64, coolingDown bool, hasSamples bool)
+
 var filterEvalOrder = []dto.ChannelFilterKind{
 	dto.FilterRequestPath,
 	dto.FilterTaskPluginIdentity,
+	dto.FilterChannelHealth,
 }
 
 // ChannelSatisfiesFilters reports whether ch passes every filter.
@@ -102,7 +108,49 @@ func channelMatchesFilter(ch *Channel, modelName string, filter dto.ChannelFilte
 			return filter.TaskPluginKey != "" && ch.GetSetting().TaskPluginKey == filter.TaskPluginKey
 		}
 		return filter.TaskPluginKey == "" || slices.Contains(filter.TaskPluginChannelTypes, ch.Type)
+	case dto.FilterChannelHealth:
+		// T2-2 健康分路由：仅当启用全局开关时过滤。
+		// 冷却中剔除（无论是否设分数阈值）；健康分低于阈值剔除（阈值 <=0 = 只做冷却剔除）。
+		// fail-open：无回调/开关关闭时放行所有候选（行为与现状一致）。
+		if !ChannelHealthRoutingEnabled() {
+			return true
+		}
+		if ChannelHealthProbe == nil {
+			return true
+		}
+		score, cooling, hasSamples := ChannelHealthProbe(ch.Id)
+		if filter.HealthCoolingExclude && cooling {
+			return false
+		}
+		if filter.HealthMinScore <= 0 {
+			return true
+		}
+		// fail-open：无样本（新渠道/冷启动）不按分剔除，避免新渠道永远选不到。
+		if !hasSamples {
+			return true
+		}
+		return score >= float64(filter.HealthMinScore)
 	default:
 		return true
 	}
+}
+
+// channelHealthRoutingEnabled 全局开关：CHANNEL_HEALTH_ROUTING=on|true 开启
+// 健康分路由过滤（T2-2）。默认 on（keep 灰度通过后的默认行为），运维可
+// 显式设 off 关闭（回滚路径）。零值默认需要热更，但为避免 model 层依赖
+// config 热更系统，这里用 env 一次性读取（进程级快照，热更不覆盖 env）。
+var channelHealthRoutingEnabled = common.GetEnvOrDefaultBool("CHANNEL_HEALTH_ROUTING", true)
+
+// SetChannelHealthRoutingEnabled 测试用覆盖；传 nil 恢复 env 默认。
+func SetChannelHealthRoutingEnabled(v *bool) {
+	if v == nil {
+		channelHealthRoutingEnabled = common.GetEnvOrDefaultBool("CHANNEL_HEALTH_ROUTING", true)
+		return
+	}
+	channelHealthRoutingEnabled = *v
+}
+
+// ChannelHealthRoutingEnabled 报告健康分路由开关状态。
+func ChannelHealthRoutingEnabled() bool {
+	return channelHealthRoutingEnabled
 }

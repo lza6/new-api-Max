@@ -20,6 +20,15 @@ func GetChannelConstraints(c *gin.Context) *dto.ChannelConstraints {
 		return existing
 	}
 	constraints := &dto.ChannelConstraints{}
+	// T2-2 健康分路由：开关开启时自动注入冷却剔除（阈值 0 = 不按分过滤，
+	// 仅确保冷却中的坏渠道不被普通选择器选中）。显式 filter 已由调用方
+	// 先 AddFilter 覆盖默认（默认 filter 放在尾部，eval 顺序仍会执行）。
+	if model.ChannelHealthRoutingEnabled() {
+		constraints.AddFilter(dto.ChannelFilter{
+			Kind:                 dto.FilterChannelHealth,
+			HealthCoolingExclude: true,
+		})
+	}
 	common.SetContextKey(c, constant.ContextKeyChannelConstraints, constraints)
 	return constraints
 }

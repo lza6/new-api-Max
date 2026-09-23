@@ -119,7 +119,7 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	// 无条件新建 StreamStatus
 	info.StreamStatus = relaycommon.NewStreamStatus()
 
-	// B3-2 流式首包缓冲 fallover（开关 relay.stream_fallover，默认 off）：
+	// B3-2 流式首包缓冲 fallover（开关 relay.stream_fallover，默认 on）：
 	// 安装缓冲 Writer 挡住客户端写；收到首个有效 data 块时 Commit 放行；
 	// 首包超时则放弃本次 attempt（返回 fatalErr 交还渠道重试链）。
 	// 缓冲期间 ping 保活必须关闭（PING 注释行会提前上线响应头）。

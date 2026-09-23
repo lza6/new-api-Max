@@ -24,7 +24,7 @@ import "github.com/lza6/new-api-Max/setting/config"
 type RelaySetting struct {
 	// StreamFallover B3-2 流式首包缓冲 fallover：缓冲 SSE 直到首个有效
 	// data 块才向客户端提交响应头；首包超时判定本次渠道失败并走重试链。
-	// 默认 off（不缓冲，行为与现状完全一致）。
+	// 默认 on：流式首包缓冲 fallover 默认开启（B3-2 灰度通过）；
 	StreamFallover bool `json:"stream_fallover"`
 	// StreamFirstTokenTimeout 首包超时（秒），默认 15；<=0 表示禁用首包超时
 	// （仅缓冲不判超时）。仅在 StreamFallover 开启时生效。
@@ -91,6 +91,7 @@ const (
 )
 
 var relaySetting = RelaySetting{
+	StreamFallover:            true,
 	StreamFirstTokenTimeout:   DefaultStreamFirstTokenTimeout,
 	UserBaseConcurrencyLimit:  DefaultUserBaseConcurrencyLimit,
 	UserBaseRpmLimit:          DefaultUserBaseRpmLimit,

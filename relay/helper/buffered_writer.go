@@ -24,7 +24,7 @@ For commercial licensing, please contact support@quantumnous.com
 //
 // 性能契约：缓冲用单 bytes.Buffer 顺序追加（单次内存拷贝），上限
 // maxFirstPacketBufferBytes（1MB）超过即放行（防异常响应占内存）。
-// 开关 relay.stream_fallover（默认 off）：off 时完全不安装本 Writer。
+// 开关 relay.stream_fallover（默认 on）：off 时完全不安装本 Writer。
 
 package helper
 

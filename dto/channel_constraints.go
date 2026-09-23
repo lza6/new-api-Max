@@ -38,6 +38,8 @@ type ChannelFilterKind string
 const (
 	FilterRequestPath        ChannelFilterKind = "request_path"
 	FilterTaskPluginIdentity ChannelFilterKind = "task_plugin_identity"
+	// FilterChannelHealth 按渠道健康分/冷却状态过滤候选（T2-2 健康分路由）。
+	FilterChannelHealth ChannelFilterKind = "channel_health"
 )
 
 type ChannelFilter struct {
@@ -45,6 +47,10 @@ type ChannelFilter struct {
 	RequestPath            string
 	TaskPluginKey          string
 	TaskPluginChannelTypes []int
+	// HealthMinScore 启用 FilterChannelHealth 时，渠道健康分(0-100)低于该值的候选剔除；0=不按分过滤(仅冷却过滤)。
+	HealthMinScore int
+	// HealthCoolingExclude 启用 FilterChannelHealth 时，冷却中的渠道直接剔除。
+	HealthCoolingExclude bool
 }
 
 type ChannelConstraints struct {

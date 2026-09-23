@@ -216,3 +216,78 @@ func TestChannelSatisfiesFilters(t *testing.T) {
 	assert.False(t, ok)
 	assert.Equal(t, dto.FilterRequestPath, kind)
 }
+
+// TestChannelHealthRoutingFilter T2-2：健康分路由过滤行为。
+// 覆盖：冷却中剔除、低分剔除、无样本 fail-open、开关关闭放行。
+func TestChannelHealthRoutingFilter(t *testing.T) {
+	healthy := &Channel{Id: 910001, Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled}
+	slow := &Channel{Id: 910002, Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled}
+	failing := &Channel{Id: 910003, Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled}
+	fresh := &Channel{Id: 910004, Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled} // 无样本
+
+	channelSyncLock.Lock()
+	previous := channelsIDM
+	channelsIDM = map[int]*Channel{
+		910001: healthy,
+		910002: slow,
+		910003: failing,
+		910004: fresh,
+	}
+	t.Cleanup(func() {
+		channelsIDM = previous
+		channelSyncLock.Unlock()
+	})
+
+	// 保存并注入 probe：healthy=100分，slow=50分，failing=10分且冷却，fresh=无样本
+	prevProbe := ChannelHealthProbe
+	defer func() { ChannelHealthProbe = prevProbe }()
+	ChannelHealthProbe = func(channelID int) (float64, bool, bool) {
+		switch channelID {
+		case 910001:
+			return 100, false, true
+		case 910002:
+			return 50, false, true
+		case 910003:
+			return 10, true, true
+		default:
+			return 0, false, false // 无样本
+		}
+	}
+	prevEnabled := channelHealthRoutingEnabled
+	defer func() { channelHealthRoutingEnabled = prevEnabled }()
+	channelHealthRoutingEnabled = true
+
+	// 冷却剔除（阈值 0）→ failing 被剔
+	kept, _ := filterCandidateIDs([]int{910001, 910003}, "gpt-4", []dto.ChannelFilter{{
+		Kind:                 dto.FilterChannelHealth,
+		HealthCoolingExclude: true,
+	}})
+	assert.Equal(t, []int{910001}, kept)
+
+	// 阈值 60：100 通过、50 被剔、无样本 fresh 通过（fail-open）
+	kept, _ = filterCandidateIDs([]int{910001, 910002, 910004}, "gpt-4", []dto.ChannelFilter{{
+		Kind:                 dto.FilterChannelHealth,
+		HealthMinScore:       60,
+		HealthCoolingExclude: true,
+	}})
+	assert.Equal(t, []int{910001, 910004}, kept)
+
+	// 开关关闭 → 全部放行
+	channelHealthRoutingEnabled = false
+	kept, _ = filterCandidateIDs([]int{910001, 910002, 910003}, "gpt-4", []dto.ChannelFilter{{
+		Kind:                 dto.FilterChannelHealth,
+		HealthMinScore:       60,
+		HealthCoolingExclude: true,
+	}})
+	assert.Equal(t, []int{910001, 910002, 910003}, kept)
+
+	// probe 未注册（nil）→ 放行（fail-open）
+	channelHealthRoutingEnabled = true
+	ChannelHealthProbe = nil
+	kept, _ = filterCandidateIDs([]int{910002, 910003}, "gpt-4", []dto.ChannelFilter{{
+		Kind:                 dto.FilterChannelHealth,
+		HealthMinScore:       60,
+		HealthCoolingExclude: true,
+	}})
+	assert.Equal(t, []int{910002, 910003}, kept)
+}

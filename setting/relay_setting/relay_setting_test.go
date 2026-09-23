@@ -88,3 +88,8 @@ func TestGetNonStreamFirstByteTimeout(t *testing.T) {
 	GetRelaySetting().NonStreamFirstByteTimeout = 60
 	assert.Equal(t, 60, GetNonStreamFirstByteTimeout())
 }
+
+// TestStreamFalloverDefaultOn T2-3：灰度通过后，stream_fallover 包级默认值必须为 true。
+func TestStreamFalloverDefaultOn(t *testing.T) {
+	require.True(t, relaySetting.StreamFallover, "stream_fallover 默认应为 on（T2-3 灰度通过后翻转）")
+}

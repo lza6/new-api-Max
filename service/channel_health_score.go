@@ -29,6 +29,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"github.com/lza6/new-api-Max/model"
 )
 
 // channelHealthRing 每渠道滑动窗口固定 256 条，防多渠道内存膨胀。
@@ -127,6 +129,15 @@ type ChannelHealthSnapshot struct {
 	CoolUntil    int64   `json:"cool_until,omitempty"` // unix 秒，0 = 未冷却
 	// LastCoolClass 最近一次冷却的错误类（B2-1），供前端 hover 展示原因。
 	LastCoolClass string `json:"last_cool_class,omitempty"`
+}
+
+// init 注册健康分路由回调（T2-2）：model 层 FilterChannelHealth 过滤时
+// 通过该回调读取快照；无样本渠道 fail-open（不剔除新渠道）。
+func init() {
+	model.ChannelHealthProbe = func(channelID int) (float64, bool, bool) {
+		snap := GetChannelHealthSnapshot(channelID)
+		return snap.Score, snap.CoolingDown, snap.SampleCount > 0
+	}
 }
 
 // GetChannelHealthSnapshot 计算渠道健康快照（近 1h 窗口）。
