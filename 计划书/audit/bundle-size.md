@@ -44,3 +44,11 @@ Top 10 chunk（原始/gzip）：
 ## 防重复跑
 - 已记录本次 build 基线；下次改动 rsbuild.config.ts / 路由树 / 重依赖引入后再跑 build 对比。
 - 本报告为唯一基线源，勿重复盲跑全量 build 仅为了「看数字」。
+## 记录 0002 · T9-E2 入口瘦身结论（2026-09-24）
+- **改造**: devtools 改为 DEV-only 动态 import（`__root.tsx`）——生产彻底排除 @tanstack/*-devtools，
+  工程正确性收益；入口体积实测不变（4377.6 kB，说明 devtools 本就被 Rspack DCE 处理或异步分包）。
+- **入口构成分析（dist 反查）**: index.js 仅含 katex/marked 轻库；shiki/recharts/visactor/codemirror/mermaid
+  全部已异步分包（cacheGroups）。4.38MB 大头是业务代码（31 feature 路由树 + 共享组件层）。
+- **结论**: 入口已是最优结构（重依赖全异步 + 路由级 autoCodeSplitting）；进一步瘦身需拆共享层，
+  收益低风险高，**不推荐**。首屏 JS ≈ 1.25MB gzip 为合理基线。
+- **防重复跑**: 不再重复全量 build 仅看 index 体积；改动入口/共享层后再对比。
