@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/lza6/new-api-Max/types"
 
 	"github.com/gin-gonic/gin"
@@ -279,6 +281,23 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	}
 }
 
+// userSettingRecordIp reports whether consume/error logs should store the client IP.
+// Reads the user setting from the request context when the auth middleware has already
+// loaded it (relay hot path), falling back to GetUserSetting otherwise. Either way it
+// returns the same value; nothing is cached or mutated here, so this only avoids a
+// redundant cache/database fetch per request and never changes billing behavior.
+func userSettingRecordIp(c *gin.Context, userId int) bool {
+	if c != nil {
+		if s, ok := common.GetContextKeyType[dto.UserSetting](c, constant.ContextKeyUserSetting); ok {
+			return s.RecordIpLog
+		}
+	}
+	if settingMap, err := GetUserSetting(userId, false); err == nil {
+		return settingMap.RecordIpLog
+	}
+	return false
+}
+
 func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string, tokenName string, content string, tokenId int, useTimeSeconds int,
 	isStream bool, group string, other *LogOther) {
 	logger.LogInfo(c, fmt.Sprintf("record error log: userId=%d, channelId=%d, modelName=%s, tokenName=%s, content=%s", userId, channelId, modelName, tokenName, common.LocalLogPreview(content)))
@@ -287,12 +306,7 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	otherStr := other.JSONString()
 	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
+	needRecordIp := userSettingRecordIp(c, userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -362,12 +376,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	}
 	otherStr := params.Other.JSONString()
 	// 判断是否需要记录 IP
-	needRecordIp := false
-	if settingMap, err := GetUserSetting(userId, false); err == nil {
-		if settingMap.RecordIpLog {
-			needRecordIp = true
-		}
-	}
+	needRecordIp := userSettingRecordIp(c, userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,

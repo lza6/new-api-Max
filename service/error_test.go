@@ -158,3 +158,18 @@ func withDebugEnabled(t *testing.T, enabled bool) {
 		common.DebugEnabled = oldDebug
 	})
 }
+
+func TestRelayErrorHandlerPreserves4xxStatus(t *testing.T) {
+	t.Parallel()
+	codes := []int{http.StatusBadRequest, http.StatusUnauthorized, http.StatusForbidden, http.StatusNotFound, http.StatusTooManyRequests}
+	body := `{"error":{"message":"upstream rejected","type":"invalid_request_error"}}`
+	for _, code := range codes {
+		t.Run(http.StatusText(code), func(t *testing.T) {
+			t.Parallel()
+			resp := &http.Response{StatusCode: code, Body: io.NopCloser(strings.NewReader(body))}
+			apiErr := RelayErrorHandler(context.Background(), resp, false)
+			require.NotNil(t, apiErr)
+			require.Equal(t, code, apiErr.StatusCode, "upstream 4xx must pass through unchanged, not become 500")
+		})
+	}
+}

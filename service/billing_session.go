@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
@@ -367,9 +368,17 @@ func NewBillingSession(c *gin.Context, relayInfo *relaycommon.RelayInfo, preCons
 
 	// 钱包路径需要先检查用户额度
 	tryWallet := func() (*BillingSession, *types.NewAPIError) {
-		userQuota, err := model.GetUserQuota(relayInfo.UserId, false)
-		if err != nil {
-			return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+		// Reuse the quota already loaded into the request context by the auth
+		// middleware (same Redis cache value) to avoid a second GetUserCache
+		// fetch on the relay hot path. Falls back to GetUserQuota only when the
+		// context carries no value (non-auth flows); behavior is unchanged.
+		userQuota, ok := common.GetContextKeyType[int](c, constant.ContextKeyUserQuota)
+		if !ok {
+			var err error
+			userQuota, err = model.GetUserQuota(relayInfo.UserId, false)
+			if err != nil {
+				return nil, types.NewError(err, types.ErrorCodeQueryDataError, types.ErrOptionWithSkipRetry())
+			}
 		}
 		if preConsumedQuota > 0 {
 			// 预扣为 0（免费模型）时无需余额，避免 0 费用模型对零余额用户 403。

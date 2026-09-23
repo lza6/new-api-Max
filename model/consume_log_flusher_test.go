@@ -9,6 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -176,4 +178,22 @@ func TestConsumeLogFlusherConcurrentWriters(t *testing.T) {
 	var count int64
 	require.NoError(t, LOG_DB.Model(&Log{}).Where("model_name = ?", "cc").Count(&count).Error)
 	require.Equal(t, int64(workers*per), count, "并发写入全部落库不丢失")
+}
+
+func TestUserSettingRecordIpReusesRequestContext(t *testing.T) {
+	t.Run("record-ip true from context without DB row", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+		c.Set(string(constant.ContextKeyUserSetting), dto.UserSetting{RecordIpLog: true})
+		// The user does not exist in any database; if the fast path fell back to
+		// GetUserSetting it would resolve to false, so true proves the request-scoped
+		// cache value is reused and no extra cache/database round trip happens.
+		require.True(t, userSettingRecordIp(c, 999999))
+	})
+	t.Run("record-ip false from context wins", func(t *testing.T) {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+		c.Set(string(constant.ContextKeyUserSetting), dto.UserSetting{})
+		require.False(t, userSettingRecordIp(c, 1))
+	})
 }
