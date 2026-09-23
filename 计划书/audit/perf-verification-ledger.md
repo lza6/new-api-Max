@@ -22,3 +22,13 @@
   - 完整「本地网关 + mock 上游 + 渠道」成对基准尚未在本次运行（需要启动网关/渠道/token；脚本 scripts/bench-latency.ps1 提供，运行步骤见脚本头部注释）。下次跑通后才能给 p50/p95 overhead 对比数字。
   - 线上生产基准/部署需用户授权（本台账不替代线上 SLO）。
 - **下次不再重复跑**: 用户设置缓存是否存在的问题；429/4xx 透传正确性（已有测试锁）。若改动 service/billing_session.go 或 middleware/auth.go 的用户读取，重新跑 model+service 测试即可。
+
+## 记录 0002 · T10 三库矩阵真实通过（2026-09-24）
+- **验证范围**: model 全量 conformance（AutoMigrate 幂等 / logs 索引 / 事件去重 / 保留列 / JSON 往返 / FOR UPDATE 锁 / DB 分支）
+- **真实实例**: SQLite（内存）+ MySQL 9.6.0（127.0.0.1:3306）+ PostgreSQL 16.14（127.0.0.1:5432）
+- **命令**: `go test ./model/ -run TestDBConformance -v -count=1`（TEST_MYSQL_DSN/TEST_POSTGRES_DSN 已设）
+- **结果**: 7 测试全 PASS（46.6s），MySQL/PG 均真实连接（日志 `using MySQL as database` / `using PostgreSQL as database`）
+- **结论**: 迁移幂等成立（首次建表 → 二次零 ALTER/INDEX 变更）；logs/task_events 复合索引存在且被测试锁。
+- **下次不再重复跑**: 未改 model/ schema / GORM 依赖 / 迁移逻辑时，跳过三库矩阵；若改到，重跑本记录命令。
+- **注意**: 跑前需 MySQL/PG 服务 Running（`Start-Service MySQL; Start-Service postgresql-x64-16`），
+  并设两个 TEST_DSN env；db-conformance.ps1 的 Start-Service 在服务已运行时会误报（可忽略）。
