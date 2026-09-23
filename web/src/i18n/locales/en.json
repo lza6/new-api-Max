@@ -6646,6 +6646,7 @@
     "Copy user ID": "Copy user ID",
     "Copy ID": "Copy ID",
     "Cost Detail": "Cost Detail",
-    "Equivalent API cost": "Equivalent API cost"
+    "Equivalent API cost": "Equivalent API cost",
+    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "The request timed out waiting for the upstream service. Please try again or switch to streaming."
   }
 }

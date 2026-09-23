@@ -28,6 +28,7 @@ const FRIENDLY_KEYS = [
   'Too many requests. Please try again later.',
   'The upstream service is temporarily unavailable. Please try again later.',
   'The content was blocked by a safety policy.',
+  'The request timed out waiting for the upstream service. Please try again or switch to streaming.',
 ]
 
 function apiError(data: unknown): unknown {
@@ -95,6 +96,18 @@ describe('getFriendlyErrorMessage (B6-2)', () => {
       expect(
         getFriendlyErrorMessage({ response: { data: { error: { message } } } })
       ).toBe(expected)
+    }
+  })
+
+  // T7 C2：504 / gateway timeout / deadline 命中独立超时人话。
+  test('maps 504 timeout to dedicated friendly message', () => {
+    const cases: Array<unknown> = [
+      { response: { data: { error: { message: '504 Gateway Timeout' } } } },
+      { response: { data: { message: 'upstream gateway timeout' } } },
+      { response: { data: { error: { type: 'upstream_timeout', message: 'deadline exceeded' } } } },
+    ]
+    for (const err of cases) {
+      expect(getFriendlyErrorMessage(err)).toBe(FRIENDLY_KEYS[5])
     }
   })
 })

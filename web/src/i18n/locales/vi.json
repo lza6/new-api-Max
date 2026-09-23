@@ -6646,6 +6646,7 @@
     "Copy user ID": "Copy user ID",
     "Copy ID": "Copy ID",
     "Cost Detail": "Chi tiết chi phí",
-    "Equivalent API cost": "Chi phí API tương đương"
+    "Equivalent API cost": "Chi phí API tương đương",
+    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "Yêu cầu đã hết thời gian chờ dịch vụ upstream. Vui lòng thử lại hoặc chuyển sang chế độ streaming."
   }
 }

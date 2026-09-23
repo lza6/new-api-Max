@@ -168,6 +168,7 @@ const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = 
   { pattern: /ip[_ ]?banned|ip banned|banned[_ ]?ip/i, messageKey: 'Your IP address is temporarily banned due to unusual traffic. Please try again later.' },
   // B2-3 模型暂不可用：模型未找到 / 无可用模型。
   { pattern: /model[_ ]?not[_ ]?found|no.*model|model.*unavailable|model.*not.*available/i, messageKey: 'The requested model is not available. Please pick another model.' },
+  { pattern: /504|gateway[_ ]?timeout|timed[_ ]?out|deadline/i, messageKey: 'The request timed out waiting for the upstream service. Please try again or switch to streaming.' },
   { pattern: /upstream|bad[_ ]?gateway|\b502\b|\b503\b/i, messageKey: 'The upstream service is temporarily unavailable. Please try again later.' },
   { pattern: /content[_ ]?(filter|policy)|safety|moderation|prompt[_ ]?block/i, messageKey: 'The content was blocked by a safety policy.' },
 ]

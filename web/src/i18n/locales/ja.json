@@ -6646,6 +6646,7 @@
     "Copy user ID": "Copy user ID",
     "Copy ID": "Copy ID",
     "Cost Detail": "コスト詳細",
-    "Equivalent API cost": "API 相当コスト"
+    "Equivalent API cost": "API 相当コスト",
+    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "アップストリームの応答待ちがタイムアウトしました。再試行するかストリーミングに切り替えてください。"
   }
 }

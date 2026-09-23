@@ -6646,6 +6646,7 @@
     "Copy user ID": "复制用户 ID",
     "Copy ID": "复制 ID",
     "Cost Detail": "费用明细",
-    "Equivalent API cost": "等价 API 成本"
+    "Equivalent API cost": "等价 API 成本",
+    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "请求等待上游服务超时。请重试或改用流式请求。"
   }
 }
