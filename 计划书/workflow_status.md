@@ -656,3 +656,16 @@
   - 验证：用旧库（无 3 列）重启新版本 → 迁移自动 ALTER TABLE ADD COLUMN 补列（26 列）→ 建套餐成功 → 订阅档位 8/350 生效；`go build` 通过
 - 交付：commit 9d14fa898 → tag v1.3.10 + release + CI(GHCR)；本地临时 sqlite/进程已清理
 - 待办（服务器恢复后）：生产部署 v1.3.10 + 线上复验（self rate_limit 三态 + bundle 串 + 订阅功能回归）
+
+## 八十五、服务器宕机救援 + 首字计时/非流式超时修复（v1.3.11，2026-09-23）
+- 事件：机房宕机恢复后 Docker bridge 网络损坏（br- 网桥无 IPv4、路由表缺 172.18.0.0/16 → 宿主机到容器不通 → 3000 全挂/503）；SSH host key 变更（供应商维护换机）
+- 救援：`systemctl restart docker` 重建全部网络/路由/iptables，容器 restart:always 自动拉起；验证 127.0.0.1:3000 → 200、Caddy 443 → 200、pricing 三模型正常；新 plink hostkey 已更新
+- Caddy QUIC 复核：`protocols h1 h2` 配置仍在（adapt 输出 h1/h2、无 alt-svc、无 UDP 443）→ Electron ERR_QUIC_PROTOCOL_ERROR 为客户端本地旧 alt-svc 缓存/网络问题，服务器侧已彻底关闭 h3
+- 生产上线 v1.3.10（profile 生效并发/RPM + 复制 ID + SQLite 迁移修复），version=/pricing 复验通过
+- 用户痛点（长时间无首字 + context canceled/client_gone）：案例 523s、frt=null、非流式，客户端先断开（client_gone）→ 网关取消 → 日志显 context canceled。根因：① 非流式无首字节超时（仅流式 15s 首字超时）；② 非流式路径未记录 FirstResponseTime → frt null → 时间线把总时长全归"首字等待"
+- 修复（v1.3.11）：
+  - 非流式首字节超时：新增 `relay.non_stream_first_byte_timeout`（默认 300s，0=关闭），超时 → 504 明确文案"上流首字节超时（建议 stream=true）"且不 skip retry（可换渠道 failover）——不再让客户端傻等 8.7 分钟
+  - 首字计时修复：TextHelper 拿到上游 200 响应即 `SetFirstResponseTime()`（幂等，流式已由 stream_scanner 设置不覆盖）→ 所有文本路径（含非流式）frt 真实记录
+  - 前端 timeline：ms→人类可读（350ms / 1.5s / 2m 15s / 1h）+ 非流式无 frt 时按总耗时推断 upstream=done/failed（不再误导"skipped"）；单测 8/8
+- 质量：go build + relay/service/setting 单测全过；前端 tsgo/build/oxlint 全绿
+- 交付：commit fd96b436e（后端）+ 08eabaaa1（前端+VERSION）→ tag v1.3.11 + release + CI(GHCR)
