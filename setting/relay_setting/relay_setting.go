@@ -51,6 +51,10 @@ type RelaySetting struct {
 	UserBaseConcurrencyLimit int   `json:"user_base_concurrency_limit"`
 	UserBaseRpmLimit         int   `json:"user_base_rpm_limit"`
 
+	// NonStreamFirstByteTimeout 非流式请求的上游首字节（完整响应头）超时秒数；
+	// 0 = 关闭。超时返回 504 并提示使用流式（不 skip retry，可换渠道重试）。
+	NonStreamFirstByteTimeout int `json:"non_stream_first_byte_timeout"`
+
 	// UserRateLimitExemptModels 限流豁免模型清单：命中这些模型的请求跳过
 	// 每用户/每密钥/订阅档位的并发与 RPM 限速（如免费翻译模型 google-translate，
 	// 对所有用户一律不限并发/不限速率）。空 = 不豁免任何模型。
@@ -83,12 +87,14 @@ const (
 	DefaultGlobalConcurrencyWaitTimeout = 30
 	DefaultUserBaseConcurrencyLimit     = 3   // 每用户基础并发（请求/秒）
 	DefaultUserBaseRpmLimit             = 120 // 每用户基础 RPM
+	DefaultNonStreamFirstByteTimeout    = 300 // 非流式首字节超时默认 300s（0=关闭）
 )
 
 var relaySetting = RelaySetting{
-	StreamFirstTokenTimeout:  DefaultStreamFirstTokenTimeout,
-	UserBaseConcurrencyLimit: DefaultUserBaseConcurrencyLimit,
-	UserBaseRpmLimit:         DefaultUserBaseRpmLimit,
+	StreamFirstTokenTimeout:   DefaultStreamFirstTokenTimeout,
+	UserBaseConcurrencyLimit:  DefaultUserBaseConcurrencyLimit,
+	UserBaseRpmLimit:          DefaultUserBaseRpmLimit,
+	NonStreamFirstByteTimeout: DefaultNonStreamFirstByteTimeout,
 }
 
 func init() {
@@ -141,6 +147,14 @@ func GetUserRateLimitExemptModels() []string {
 		return s.UserRateLimitExemptModels
 	}
 	return nil
+}
+
+// GetNonStreamFirstByteTimeout 返回非流式请求上游首字节超时秒数（0=关闭）。
+func GetNonStreamFirstByteTimeout() int {
+	if s := GetRelaySetting(); s != nil {
+		return s.NonStreamFirstByteTimeout
+	}
+	return DefaultNonStreamFirstByteTimeout
 }
 
 // GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：

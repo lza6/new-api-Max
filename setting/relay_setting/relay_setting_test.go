@@ -79,3 +79,12 @@ func TestGetUserRateLimitExemptModelsDefaultEmpty(t *testing.T) {
 	GetRelaySetting().UserRateLimitExemptModels = []string{"google-translate"}
 	assert.Equal(t, []string{"google-translate"}, GetUserRateLimitExemptModels())
 }
+func TestGetNonStreamFirstByteTimeout(t *testing.T) {
+	prev := GetRelaySetting().NonStreamFirstByteTimeout
+	t.Cleanup(func() { GetRelaySetting().NonStreamFirstByteTimeout = prev })
+	assert.Equal(t, DefaultNonStreamFirstByteTimeout, GetNonStreamFirstByteTimeout())
+	GetRelaySetting().NonStreamFirstByteTimeout = 0
+	assert.Equal(t, 0, GetNonStreamFirstByteTimeout())
+	GetRelaySetting().NonStreamFirstByteTimeout = 60
+	assert.Equal(t, 60, GetNonStreamFirstByteTimeout())
+}

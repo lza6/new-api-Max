@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	"context"
+	"errors"
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
@@ -17,7 +19,9 @@ import (
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/model_setting"
 	"github.com/lza6/new-api-Max/setting/ratio_setting"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 	"github.com/samber/lo"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -150,8 +154,23 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	}
 
 	var httpResp *http.Response
-	resp, err := adaptor.DoRequest(c, info, requestBody)
+	var resp any
+	// 非流式请求：给上游首字节（响应头）加可配置超时，超时返回 504 并提示改用流式，
+	// 不 skip retry（可换渠道 failover）。流式请求仍由 stream_scanner 的首字超时负责。
+	if !info.IsStream && relay_setting.GetNonStreamFirstByteTimeout() > 0 {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(relay_setting.GetNonStreamFirstByteTimeout())*time.Second)
+		defer cancel()
+		originalRequest := c.Request
+		c.Request = c.Request.WithContext(ctx)
+		resp, err = adaptor.DoRequest(c, info, requestBody)
+		c.Request = originalRequest
+	} else {
+		resp, err = adaptor.DoRequest(c, info, requestBody)
+	}
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return types.NewOpenAIError(fmt.Errorf("upstream first-byte timeout after %ds (use stream=true for realtime progress)", relay_setting.GetNonStreamFirstByteTimeout()), types.ErrorCodeDoRequestFailed, http.StatusGatewayTimeout)
+		}
 		return types.NewOpenAIError(err, types.ErrorCodeDoRequestFailed, http.StatusInternalServerError)
 	}
 
@@ -160,6 +179,10 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 	if resp != nil {
 		httpResp = resp.(*http.Response)
 		info.IsStream = info.IsStream || strings.HasPrefix(httpResp.Header.Get("Content-Type"), "text/event-stream")
+		if httpResp.StatusCode == http.StatusOK {
+			// 上游已返回首个响应（流式首个 chunk 已由 stream_scanner 设置，此处兜底非流式）
+			info.SetFirstResponseTime()
+		}
 		if httpResp.StatusCode != http.StatusOK {
 			newApiErr := service.RelayErrorHandler(c.Request.Context(), httpResp, false)
 			// reset status code 重置状态码
