@@ -105,6 +105,10 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	other.SetPublic("model_price", modelPrice)
 	other.SetPublic("user_group_ratio", userGroupRatio)
 	other.SetPublic("frt", float64(relayInfo.FirstResponseTime.UnixMilli()-relayInfo.StartTime.UnixMilli()))
+	// T5-2 时间线 span 化：把请求阶段写成结构化数组（name/elapsed_ms/status），
+	// 前端 request-timeline 优先消费真实耗时，不再纯推测。数据全部来自
+	// StartTime/FirstResponseTime 真实时间戳；未设置时该字段省略（旧日志兼容）。
+	other.SetPublic("timeline_stages", buildTimelineStages(relayInfo))
 	if relayInfo.ReasoningEffort != "" {
 		other.SetPublic("reasoning_effort", relayInfo.ReasoningEffort)
 	}
@@ -351,5 +355,23 @@ func InjectTieredBillingInfo(other *model.LogOther, relayInfo *relaycommon.Relay
 		if snap.EstimatedFixedPrice != nil {
 			other.SetPublic("fixed_price", *snap.EstimatedFixedPrice)
 		}
+	}
+}
+
+// buildTimelineStages T5-2：将请求真实时间点结构化为时间线 stage 数组。
+// 仅在 FirstResponseTime 有效（晚于 StartTime）时返回非空；否则返回 nil
+// （旧路径/未首响应不伪造阶段，前端继续用旧推测逻辑）。
+func buildTimelineStages(info *relaycommon.RelayInfo) []map[string]any {
+	if info == nil || info.StartTime.IsZero() || !info.FirstResponseTime.After(info.StartTime) {
+		return nil
+	}
+	totalMs := info.FirstResponseTime.Sub(info.StartTime).Milliseconds()
+	if totalMs < 0 {
+		totalMs = 0
+	}
+	return []map[string]any{
+		{"name": "inbound", "elapsed_ms": 0, "status": "done"},
+		{"name": "upstream_first_byte", "elapsed_ms": totalMs, "status": "done"},
+		{"name": "total_to_first_response", "elapsed_ms": totalMs, "status": "done"},
 	}
 }

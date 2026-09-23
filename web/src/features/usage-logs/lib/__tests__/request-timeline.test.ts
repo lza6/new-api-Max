@@ -154,4 +154,43 @@ describe('buildRequestTimeline non-stream upstream inference', () => {
     expect(upstream?.durationMs).toBe(2000)
     expect(tl.ok).toBe(true)
   })
+
+  test('T5-2: backend timeline_stages take priority over inferred phases', () => {
+    const src: TimelineSource = {
+      created_at: 1_700_000_000,
+      use_time: 3.2,
+      frt: 480,
+      request_path: '/v1/chat/completions',
+      stream_status: { status: 'ok', end_reason: 'done', end_error: '' },
+      timeline_stages: [
+        { name: 'inbound', elapsed_ms: 0, status: 'done' },
+        { name: 'upstream_first_byte', elapsed_ms: 480, status: 'done' },
+        { name: 'total_to_first_response', elapsed_ms: 480, status: 'done' },
+      ],
+    }
+    const tl = buildRequestTimeline(src)
+    expect(tl.ok).toBe(true)
+    const keys = tl.phases.map((p) => p.key)
+    // real stages win: no inferred auth/channel/upstream/complete phases
+    expect(keys).toEqual(['inbound', 'first_token', 'first_token'])
+    const firstToken = tl.phases.find((p) => p.key === 'first_token')
+    expect(firstToken?.offsetMs).toBe(480)
+  })
+
+  test('T5-2: failed backend stages preserve failure state', () => {
+    const src: TimelineSource = {
+      created_at: 1_700_000_000,
+      use_time: 5,
+      timeline_stages: [
+        { name: 'inbound', elapsed_ms: 0, status: 'done' },
+        { name: 'upstream', elapsed_ms: 3000, status: 'failed' },
+      ],
+      stream_status: { status: 'error', end_error: 'upstream boom' },
+    }
+    const tl = buildRequestTimeline(src)
+    expect(tl.ok).toBe(false)
+    expect(tl.failReason).toBe('upstream boom')
+    expect(tl.phases.find((p) => p.key === 'upstream')?.status).toBe('failed')
+  })
+
 })

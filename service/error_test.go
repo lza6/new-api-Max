@@ -8,9 +8,11 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/stretchr/testify/require"
 )
@@ -170,6 +172,56 @@ func TestRelayErrorHandlerPreserves4xxStatus(t *testing.T) {
 			apiErr := RelayErrorHandler(context.Background(), resp, false)
 			require.NotNil(t, apiErr)
 			require.Equal(t, code, apiErr.StatusCode, "upstream 4xx must pass through unchanged, not become 500")
+		})
+	}
+}
+
+// TestBuildTimelineStages T5-2：时间线 span 化——只在首响应有效时返回真实
+// stage 数组；无效/未设置时返回 nil（旧日志兼容，不伪造阶段）。
+func TestBuildTimelineStages(t *testing.T) {
+	base := time.Now()
+	tests := []struct {
+		name       string
+		info       *relaycommon.RelayInfo
+		wantStages bool
+	}{
+		{
+			name: "first response after start returns stages",
+			info: &relaycommon.RelayInfo{
+				StartTime:         base,
+				FirstResponseTime: base.Add(480 * time.Millisecond),
+			},
+			wantStages: true,
+		},
+		{
+			name: "zero start time returns nil",
+			info: &relaycommon.RelayInfo{},
+		},
+		{
+			name: "first response before start returns nil",
+			info: &relaycommon.RelayInfo{
+				StartTime:         base,
+				FirstResponseTime: base.Add(-time.Second),
+			},
+		},
+		{
+			name: "nil info returns nil",
+			info: nil,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			stages := buildTimelineStages(tc.info)
+			if !tc.wantStages {
+				require.Nil(t, stages)
+				return
+			}
+			require.NotNil(t, stages)
+			require.Len(t, stages, 3)
+			require.Equal(t, "inbound", stages[0]["name"])
+			require.Equal(t, "upstream_first_byte", stages[1]["name"])
+			require.Equal(t, int64(480), stages[1]["elapsed_ms"])
+			require.Equal(t, "done", stages[2]["status"])
 		})
 	}
 }

@@ -69,6 +69,12 @@ export interface TimelineSource {
     error_count?: number
   }
   request_path?: string
+  /** T5-2：后端结构化的时间线 stage（name/elapsed_ms/status）；存在时优先消费。 */
+  timeline_stages?: Array<{
+    name: string
+    elapsed_ms: number
+    status?: string
+  }>
 }
 
 /** 从 consume log 构造请求时间线。老日志缺字段时优雅降级。 */
@@ -92,6 +98,37 @@ export function formatDurationMs(ms: number): string {
 }
 
 export function buildRequestTimeline(src: TimelineSource): RequestTimeline {
+  // T5-2：后端已提供结构化 stage 时直接消费（真实耗时），不再纯推测。
+  // 旧日志无 timeline_stages 时走下方原有推导逻辑（向后兼容）。
+  if (Array.isArray(src.timeline_stages) && src.timeline_stages.length > 0) {
+    const phases: TimelinePhase[] = []
+    for (const stage of src.timeline_stages) {
+      const offsetMs = Math.max(0, Math.round(stage.elapsed_ms || 0))
+      const status: TimelinePhase['status'] =
+        stage.status === 'failed'
+          ? 'failed'
+          : stage.status === 'info'
+            ? 'info'
+            : stage.status === 'skipped'
+              ? 'skipped'
+              : 'done'
+      const key = stageMnemonic(stage.name)
+      phases.push({ key, status, offsetMs, durationMs: offsetMs })
+    }
+    const stream = src.stream_status
+    const failed =
+      !!stream &&
+      (stream.status === 'error' ||
+        stream.status === 'failed' ||
+        !!stream.end_error ||
+        (typeof stream.error_count === 'number' && stream.error_count > 0))
+    const failReason = stream?.end_error || stream?.end_reason || undefined
+    if (phases.length === 0) {
+      phases.push({ key: 'inbound', status: 'done', offsetMs: 0 })
+    }
+    return { ok: !failed, failReason, phases }
+  }
+
   const totalMs = Math.max(0, Math.round((src.use_time || 0) * 1000))
   const frtMs = src.frt != null && src.frt > 0 ? Math.round(src.frt) : undefined
 
@@ -210,3 +247,25 @@ export function exportTimelineJson(
   )
 }
 //PROBE
+
+/** stageMnemonic T5-2：后端 stage 名 → 前端稳定 phase key（i18n 后缀兼容）。 */
+function stageMnemonic(name: string): string {
+  switch (name) {
+    case 'inbound':
+      return 'inbound'
+    case 'auth':
+      return 'auth'
+    case 'channel':
+      return 'channel'
+    case 'upstream':
+      return 'upstream'
+    case 'upstream_first_byte':
+      return 'first_token'
+    case 'complete':
+      return 'complete'
+    case 'total_to_first_response':
+      return 'first_token'
+    default:
+      return name.replace(/[^a-z0-9_]/gi, '_').toLowerCase() || 'inbound'
+  }
+}
