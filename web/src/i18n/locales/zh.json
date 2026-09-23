@@ -6638,6 +6638,9 @@
     "Unable to load traffic data": "流量数据加载失败",
     "No traffic data yet": "暂无流量数据",
     "Rate limit exempt models (comma separated)": "限流豁免模型（逗号分隔）",
-    "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.": "命中这些模型的请求对所有用户一律不限并发/不限速率（如免费翻译模型 google-translate = 不限）。其他模型仍按用户自身速率与并发限制。"
+    "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.": "命中这些模型的请求对所有用户一律不限并发/不限速率（如免费翻译模型 google-translate = 不限）。其他模型仍按用户自身速率与并发限制。",
+    "Anthropic Compatible": "兼容 Anthropic",
+    "Codex / Responses": "Codex / Responses",
+    "OpenAI / Responses": "OpenAI / Responses"
   }
 }

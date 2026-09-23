@@ -193,11 +193,11 @@ export function ToolIntegrationSection() {
             <p className="text-muted-foreground">{t('Model mapping intro')}</p>
             <div className="bg-muted/30 overflow-x-auto rounded-md border p-3 font-mono text-xs">
               <div className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
-                <span className="text-muted-foreground">OpenAI / Responses</span>
+                <span className="text-muted-foreground">{t('OpenAI / Responses')}</span>
                 <span>{SITE_MODEL}</span>
-                <span className="text-muted-foreground">Anthropic</span>
+                <span className="text-muted-foreground">{t('Anthropic')}</span>
                 <span>{SITE_MODEL}</span>
-                <span className="text-muted-foreground">Codex</span>
+                <span className="text-muted-foreground">{t('Codex')}</span>
                 <span>{SITE_MODEL}</span>
               </div>
             </div>

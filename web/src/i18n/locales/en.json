@@ -6638,6 +6638,9 @@
     "Unable to load traffic data": "Unable to load traffic data",
     "No traffic data yet": "No traffic data yet",
     "Rate limit exempt models (comma separated)": "Rate limit exempt models (comma separated)",
-    "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.": "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits."
+    "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.": "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.",
+    "Anthropic Compatible": "Anthropic Compatible",
+    "Codex / Responses": "Codex / Responses",
+    "OpenAI / Responses": "OpenAI / Responses"
   }
 }

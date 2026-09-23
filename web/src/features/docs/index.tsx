@@ -119,11 +119,11 @@ export function Docs() {
           </p>
           <div className="bg-muted/30 overflow-x-auto rounded-md border p-3 font-mono text-xs">
             <div className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
-              <span className="text-muted-foreground">OpenAI Compatible</span>
+              <span className="text-muted-foreground">{t('OpenAI Compatible')}</span>
               <span>{baseUrl}/v1</span>
-              <span className="text-muted-foreground">Anthropic Compatible</span>
+              <span className="text-muted-foreground">{t('Anthropic Compatible')}</span>
               <span>{baseUrl}/v1</span>
-              <span className="text-muted-foreground">Codex / Responses</span>
+              <span className="text-muted-foreground">{t('Codex / Responses')}</span>
               <span>{baseUrl}/v1</span>
             </div>
           </div>
