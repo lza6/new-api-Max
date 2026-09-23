@@ -57,6 +57,12 @@ export interface UserProfile {
   request_count: number
   /** Account status (1=启用, 2=禁用, 3=待审核, 4=已删除) */
   status: number
+  /** Current effective rate limit (concurrency/sec + RPM), 0 = unlimited */
+  rate_limit?: {
+    concurrency: number
+    rpm: number
+    source: 'user' | 'group' | 'base' | 'subscription' | 'off'
+  }
   /** Access token (system token) */
   access_token?: string
   /** Affiliate code */

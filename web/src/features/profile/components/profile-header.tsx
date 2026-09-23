@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { Activity, BarChart3, WalletCards } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
+import { CopyButton } from '@/components/copy-button'
 import { StatusBadge } from '@/components/status-badge'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Card, CardContent } from '@/components/ui/card'
@@ -159,6 +160,15 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
                   <span className='truncate'>{profile.group}</span>
                 </>
               )}
+              <CopyButton
+                value={String(profile.id)}
+                size='sm'
+                variant='outline'
+                tooltip={t('Copy user ID')}
+                aria-label={t('Copy user ID')}
+              >
+                {t('Copy ID')}
+              </CopyButton>
             </div>
           </div>
         </div>
@@ -186,6 +196,67 @@ export function ProfileHeader({ profile, loading }: ProfileHeaderProps) {
           ))}
         </div>
       </div>
+      {profile.rate_limit && (
+        <div className='border-t'>
+          <div className='flex flex-wrap items-center justify-between gap-2 px-4 py-2 sm:px-5'>
+            <span className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
+              {t('Effective rate limit')}
+            </span>
+            {rateSourceBadge(t, profile.rate_limit.source, profile.group)}
+          </div>
+          <div className='grid grid-cols-2 divide-x'>
+            <div className='min-w-0 px-4 py-3 sm:px-5 sm:py-3.5'>
+              <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
+                {t('Concurrency per second')}
+              </div>
+              <div className='text-foreground mt-1 font-mono text-lg font-bold tabular-nums sm:text-xl'>
+                {rateValueText(profile.rate_limit.concurrency, t)}
+              </div>
+            </div>
+            <div className='min-w-0 px-4 py-3 sm:px-5 sm:py-3.5'>
+              <div className='text-muted-foreground text-xs font-medium tracking-wider uppercase'>
+                {t('RPM (requests per minute)')}
+              </div>
+              <div className='text-foreground mt-1 font-mono text-lg font-bold tabular-nums sm:text-xl'>
+                {rateValueText(profile.rate_limit.rpm, t)}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </Card>
   )
 }
+
+type RateSource = 'user' | 'group' | 'base' | 'subscription' | 'off'
+
+function rateSourceBadge(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  source: RateSource,
+  group?: string
+) {
+  if (source === 'subscription') {
+    return <StatusBadge label={t('Subscription tier')} variant='info' copyable={false} />
+  }
+  if (source === 'user') {
+    return <StatusBadge label={t('User override')} variant='info' copyable={false} />
+  }
+  if (source === 'group') {
+    return (
+      <StatusBadge
+        label={t('Group override ({{group}})', { group: group || '-' })}
+        variant='warning'
+        copyable={false}
+      />
+    )
+  }
+  if (source === 'base') {
+    return <StatusBadge label={t('System default')} variant='neutral' copyable={false} />
+  }
+  return <StatusBadge label={t('Base limit disabled')} variant='danger' copyable={false} />
+}
+
+function rateValueText(value: number, t: (key: string, options?: Record<string, unknown>) => string): string {
+  return value > 0 ? String(value) : t('Unlimited')
+}
+

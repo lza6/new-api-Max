@@ -6641,6 +6641,9 @@
     "Models that bypass the per-user concurrency and RPM base limits for everyone (e.g. the free translation model google-translate = unlimited). Other models keep per-user limits.": "命中這些模型的請求對所有用戶一律不限並發/不限速率（如免費翻譯模型 google-translate = 不限）。其他模型仍按用戶自身速率與並發限制。",
     "Anthropic Compatible": "相容 Anthropic",
     "Codex / Responses": "Codex / Responses",
-    "OpenAI / Responses": "OpenAI / Responses"
+    "OpenAI / Responses": "OpenAI / Responses",
+    "Subscription tier": "訂閱檔位",
+    "Copy user ID": "複製用戶 ID",
+    "Copy ID": "複製 ID"
   }
 }
