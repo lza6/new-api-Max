@@ -1,0 +1,33 @@
+{
+  "type": "pass-through-timeout-fix-acceptance",
+  "version": "v1.3.15",
+  "date": "2026-09-24",
+  "bug": "透传模式误杀已返回内容的上游（504 upstream request timed out / 500 upstream stream timeout）",
+  "root_cause": {
+    "stream": "first-token timer only stopped on content/tool_call; long reasoning_content phase exceeded threshold",
+    "non_stream": "first-byte deadline wrapped whole request; slow body after headers hit deadline"
+  },
+  "fix": {
+    "stream": "any SSE data (incl reasoning) renews first-token timer; empty-shell detection preserved",
+    "non_stream": "cancel first-byte deadline once headers received; body bounded by RelayTimeout only"
+  },
+  "production_verification": {
+    "container": "new-api ghcr.io/lza6/new-api-max:v1.3.15 Up healthy",
+    "version_header": "X-New-Api-Version: v1.3.15",
+    "real_request": {
+      "model": "deepseek-v4-flash",
+      "stream": true,
+      "sse_events": 159,
+      "has_reasoning": true,
+      "has_content": true,
+      "http": 200,
+      "note": "same channel 38 / stable-99 scenario as user's failing logs; now passes through fully"
+    }
+  },
+  "regression_tests": [
+    "TestStreamScannerHandler_ReasoningRenewsFirstTokenTimeout (2.8s PASS)",
+    "TestStreamScannerHandler_FalloverOnReasoningOnlyStream (PASS, empty-shell preserved)",
+    "TestStreamScannerHandler_FalloverThreeChannelScenario (PASS)",
+    "TestIsUsefulStreamData (PASS, content/tool_call semantics kept)"
+  ]
+}
