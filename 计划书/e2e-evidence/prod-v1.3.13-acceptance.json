@@ -1,0 +1,20 @@
+{
+  "type": "prod-acceptance",
+  "version": "v1.3.13",
+  "date": "2026-09-24",
+  "host": "103.233.252.213",
+  "evidence": {
+    "container": "new-api ghcr.io/lza6/new-api-max:v1.3.13 Up healthy",
+    "image_digest": "sha256:5689aadb2ca124de5589e0967a6900349b39ec7eda8291e890995f58dac73310",
+    "compose_backup": "docker-compose.yml.bak-pre-v1311",
+    "status_200": true,
+    "x_new_api_version": "v1.3.13",
+    "env": {
+      "MEMORY_CACHE_ENABLED": "true",
+      "LOG_FLUSH_ENABLED": "true",
+      "LOG_FLUSH_INTERVAL": "1000",
+      "LOG_FLUSH_BATCH": "500"
+    }
+  },
+  "rollback": "cd /opt/new-api && cp docker-compose.yml.bak-pre-v1311 docker-compose.yml && docker compose up -d new-api"
+}
