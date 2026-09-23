@@ -612,3 +612,23 @@
 - 实测规格（生产服务器探测，供简介）：grok-4.3 单轮输入建议 ≤8000 字符（13000 可用但不稳定）、最大输出约 1300 字符；claude-haiku-4.5 单轮输入上限约 32000 字符（33000 触发上游 414）、最大输出约 1600 字符；google-translate 单次输入上限 5000 字符
 - 真实 E2E（临时账号，已清理）：grok-4.3/claude-haiku-4.5 200（改名生效）；google-translate en→zh「你好，今天过得怎么样？」200、zh→en 200；订阅用户翻译 200；billing delta=0；**豁免压测 40并发×4轮=160 请求全 200 零 429**；对照 grok-4.3 6并发→1×429（普通模型限流照常）；订阅用户 40 并发零 429（订阅档位同样豁免）
 - 交付：commit bd96a6ecf/2a2a13c83（限流豁免+前端）/a5c4dc071（kilwa 改名）/52199918c（VERSION）→ tag v1.3.7 + release + CI(GHCR 多架构) + 生产 pull 热更新（version=v1.3.7 healthy）
+
+## 八十一、/docs 与工具接入残留硬编码英文 i18n 化（v1.3.8，2026-09-23）
+- 存量项：用户反馈 "/docs 等页面大量 key（Step 1、Tool Integration 等）在顶层命名空间 → 部分英文"
+- 复核：7 语言 locale 顶层 key 已全部为 0（v1.3.3 已把 49 个并入 translation）；Step 1 / Tool Integration / 使用文档 等 zh 译文齐全且正确（probe 实证 zh 值）
+- 真实剩余缺口（本次修复）：`/docs` 的 Protocols & Models 卡片 3 处与工具接入 Model mapping 卡片 3 处**硬编码英文标签**（非 i18n）：OpenAI Compatible / Anthropic Compatible / Codex / Responses / OpenAI / Responses / Anthropic / Codex
+- 修复：`web/src/features/docs/index.tsx` 与 `web/src/features/tool-setup/tool-integration-section.tsx` 三处/三处改为 `t()`；7 语言补 3 个缺失 key（Anthropic Compatible 等；zh=兼容 Anthropic，产品名 OpenAI/Anthropic/Codex 中英一致）
+- 验证：zh 值 probe（兼容 OpenAI/兼容 Anthropic/Codex / Responses…）；tsgo -b / rsbuild build / oxlint 全绿；全量顶层 key=0 复核
+- 交付：commit a28c4270b → tag v1.3.8 + release + CI(GHCR) + 生产热更新
+
+## 八十二、CI tag 推送不触发根因查明：fork 平台限制（证据闭环，2026-09-23）
+- 存量项：docker-build.yml 声明 push tags 自动构建，v1.3.5/6/7 三次 push tag 均未触发，全靠手动 dispatch
+- 调查（只读子代理 + gh API 证据）：
+  - `gh repo view` → **isFork=true**，parent=QuantumNous/new-api
+  - Actions 已启用：`actions/permissions` → enabled=true, allowed_actions=all
+  - 全部 50 条 runs **100% workflow_dispatch、0 条 push**（完整历史 <100）
+  - workflow `on:` 块合法：push branches=[main] tags=['*','!nightly*']，无 paths/concurrency 抑制；`'*'+'!nightly*'` 为正通配+负过滤标准写法
+  - 时间线：v1.3.5/6/7 push 提交时刻 Actions 已启用、workflow active、tag 存在，仍零 push run
+  - 旁证：上游 QuantumNous/new-api 同配置最近 100 runs 存在 event=push → 排除配置问题
+- 结论：**根因 = GitHub fork 平台限制**（fork 仓库默认不运行 push/release 触发的工作流，仅 workflow_dispatch 可用；release 事件在 fork 同样不触发——v1.3.5 已实证）。workflow 文件无需改动
+- 规避（发布 SOP 固化）：每次发版 = push main + push tag + `gh release create` + **`gh workflow run docker-build.yml --ref <tag> -f tag=<tag>`**（可靠）；若未来要 push 即自动构建，需把仓库脱离 fork 迁为独立仓库（GitHub 无 unfork 操作，需新建仓库迁移，登记为用户决策项）
