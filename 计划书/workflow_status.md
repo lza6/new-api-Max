@@ -632,3 +632,11 @@
   - 旁证：上游 QuantumNous/new-api 同配置最近 100 runs 存在 event=push → 排除配置问题
 - 结论：**根因 = GitHub fork 平台限制**（fork 仓库默认不运行 push/release 触发的工作流，仅 workflow_dispatch 可用；release 事件在 fork 同样不触发——v1.3.5 已实证）。workflow 文件无需改动
 - 规避（发布 SOP 固化）：每次发版 = push main + push tag + `gh release create` + **`gh workflow run docker-build.yml --ref <tag> -f tag=<tag>`**（可靠）；若未来要 push 即自动构建，需把仓库脱离 fork 迁为独立仓库（GitHub 无 unfork 操作，需新建仓库迁移，登记为用户决策项）
+
+## 八十三、个人资料页显示生效并发/RPM + 一键复制 ID（v1.3.9，2026-09-23）
+- 需求：每个用户个人资料页清晰看到「当前生效」的并发/每秒与 RPM 真实数字；提供一键复制用户 ID 按钮（便于提供 ID 给开发者充值等）
+- 后端：新增 `service.ResolveUserRateLimit(userId, group)` —— 语义与热路径限流一致：**active 订阅档位（套餐+单订阅覆盖）> 用户覆盖 > 分组覆盖 > 系统默认（3/s + 120RPM，可关闭=0/0 不限）**，返回 concurrency/rpm/source；`/api/user/self`（buildSelfUserData）新增 `rate_limit{concurrency,rpm,source}` 字段；单测 3/3（base 默认 / user+group 覆盖 / 基础关闭）
+- 前端：`ProfileHeader`（个人资料头部卡片）新增「当前生效限速」区块：并发/秒 + RPM（0 显示"无限制"）+ 来源徽标（订阅档位/用户覆盖/分组覆盖（组）/系统默认/基础限速已关闭）；「复制 ID」按钮（CopyButton，outline+文字，复制用户 ID）；UserProfile 类型补 `rate_limit`；7 语言补 3 key（订阅档位/复制用户 ID/复制 ID）
+- 质量：go build + service 单测全过；前端 tsgo / build / oxlint 全绿
+- 交付：commit cf72a430a（后端）+ fa8cc51d3（前端+VERSION）→ tag v1.3.9 + release + CI(GHCR)
+- 备注：发版时本机到服务器网络短暂中断（22/80/443 全超时），CI 云端正常构建；部署+线上 E2E 待网络恢复后补跑并记录
