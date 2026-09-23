@@ -1,0 +1,35 @@
+{
+  "ts": "20260924-051155",
+  "direct": "http://127.0.0.1:18080/v1/chat/completions",
+  "gateway": "http://127.0.0.1:3000/v1/chat/completions",
+  "n": 60,
+  "sequential": {
+    "direct": {
+      "count": 60,
+      "min": 45.79,
+      "p50": 59.21,
+      "p90": 103.22,
+      "p95": 120.17,
+      "max": 1203.21
+    },
+    "gateway": {
+      "count": 60,
+      "min": 92.27,
+      "p50": 182.65,
+      "p90": 272.37,
+      "p95": 315.0,
+      "max": 362.19
+    },
+    "overhead_p50": 123.44
+  },
+  "concurrent20": {
+    "direct": 316.58146999999997,
+    "gateway": 314.31534,
+    "gateway_overhead_s": -2.27
+  },
+  "concurrent50": {
+    "direct": 204.61062600000002,
+    "gateway": 286.067656,
+    "gateway_overhead_s": 81.46
+  }
+}

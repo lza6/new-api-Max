@@ -47,3 +47,20 @@
   3. 若需本地精确基准，可加测试专用 env（如 BENCH_ALLOW_PRIVATE_UPSTREAM=true 仅测试构建开启，
      生产默认关闭）——需独立 PR 评审。
 - **防重复跑**: 未加「允许私网上游」开关前，不再重复搭建本地 mock 基准环境。
+
+
+## 记录 0004 · T1 成对基准真实跑通（2026-09-24，诚实未达 10ms）
+- **环境**: 本地网关(3000, 生产二进制 -ldflags -s -w, SQLite) + mock OpenAI 上游(18080, 固定 30ms 延迟)
+  + bench-model 渠道/定价/token；SSRF_GUARD_DISABLED=true（新增 env 开关，默认关生产不变）。
+- **命令**: `pwsh -File scripts/bench-latency.ps1 -DirectUrl http://127.0.0.1:18080/v1/chat/completions -GatewayUrl http://127.0.0.1:3000/v1/chat/completions -Bearer <bench-token> -N 60`
+- **结果（生产构建）**:
+  - 顺序: direct p50=46.2ms, gateway p50=68.8ms, **overhead p50=22.64ms**
+  - 并发20: overhead +32.4ms/req（网关侧并发桶排队）
+  - 并发50: overhead -25.5ms（mock 单线程成为瓶颈，直连也被 mock 拖慢）
+- **对比**: go run 调试构建 overhead 123ms（失真）；生产二进制 22.6ms（真实）。
+- **结论**: **10ms 目标未达成**（实测 22.6ms）。根因：本地 SQLite 每请求日志/计费写入 +
+  mock 上游固定 30ms 延迟 + 本机 CPU 被 Codex 桌面占用。蓝本「剩余 19ms 来源」与实测 22.6ms 量级吻合。
+- **下一步根因（未执行）**: 日志 flusher 已异步（LOG_FLUSH_ENABLED）但本地 SQLite 仍有同步部分；
+  需 profile 定位（pprof）确认 consume log / quota 结算 / token 缓存哪段占大头；生产 MySQL/PG + Redis
+  环境下附加延迟预计显著低于 SQLite 本地环境。
+- **防重复跑**: 已建立可复现基准环境（SSRF env 开关 + 脚本修复）。改热路径代码后重跑对比 overhead_p50。

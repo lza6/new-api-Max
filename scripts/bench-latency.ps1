@@ -1,4 +1,4 @@
-# bench-latency.ps1 - paired latency: direct mock upstream vs gateway (sequential N + concurrent)
+﻿# bench-latency.ps1 - paired latency: direct mock upstream vs gateway (sequential N + concurrent)
 param(
     [Parameter(Mandatory=$true)][string]$DirectUrl,
     [Parameter(Mandatory=$true)][string]$GatewayUrl,
@@ -20,14 +20,17 @@ function Invoke-One([string]$url) {
 function Get-Summary([double[]]$ms) {
     $sorted = @($ms | Sort-Object)
     $n = $sorted.Count
-    $p = { param($q) $idx=[Math]::Min([int][Math]::Floor($q*$n), $n-1); $sorted[$idx] }
+    function Get-Pct([double]$q) {
+        $idx = [Math]::Min([int][Math]::Floor($q * $n), $n - 1)
+        return $sorted[$idx]
+    }
     return [ordered]@{
         count = $n
         min = [Math]::Round($sorted[0],2)
-        p50 = [Math]::Round(& $p 0.50,2)
-        p90 = [Math]::Round(& $p 0.90,2)
-        p95 = [Math]::Round(& $p 0.95,2)
-        max = [Math]::Round($sorted[-1],2)
+        p50 = [Math]::Round((Get-Pct 0.50),2)
+        p90 = [Math]::Round((Get-Pct 0.90),2)
+        p95 = [Math]::Round((Get-Pct 0.95),2)
+        max = [Math]::Round($sorted[$n-1],2)
     }
 }
 
