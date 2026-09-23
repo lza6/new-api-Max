@@ -32,3 +32,18 @@
 - **下次不再重复跑**: 未改 model/ schema / GORM 依赖 / 迁移逻辑时，跳过三库矩阵；若改到，重跑本记录命令。
 - **注意**: 跑前需 MySQL/PG 服务 Running（`Start-Service MySQL; Start-Service postgresql-x64-16`），
   并设两个 TEST_DSN env；db-conformance.ps1 的 Start-Service 在服务已运行时会误报（可忽略）。
+
+
+## 记录 0003 · T1 成对延迟基准：SSRF 约束下本地 mock 不可行（2026-09-24）
+- **尝试**: 本地网关(3000) + mock OpenAI 上游(18080) + bench-model 渠道；完整环境已搭好
+  （渠道/定价/token 均配置成功，链路验证到 SSRF 层）。
+- **阻断**: `service/url_guard.go` SSRF 二次校验硬编码封禁私网段（127.0.0.0/8、192.168.0.0/16 等，
+  不可通过 env 放行——纵深防御设计）。本机仅私网 IP（192.168.1.2），mock 上游无法被网关访问。
+- **结论**: 本地「直连 mock vs 经网关」成对基准受安全设计约束不可行，**不是代码缺陷**；
+  10ms 目标仍需在公网 mock 上游或允许私网上游的测试环境验证。
+- **替代路径**:
+  1. 线上观测 frt（已记录：claude-haiku frt=3468ms、glm-5.3 frt=4542ms）作为真实上游延迟参考。
+  2. 用公网可访问的 mock（如临时部署到云函数/公网 VPS）做成对基准。
+  3. 若需本地精确基准，可加测试专用 env（如 BENCH_ALLOW_PRIVATE_UPSTREAM=true 仅测试构建开启，
+     生产默认关闭）——需独立 PR 评审。
+- **防重复跑**: 未加「允许私网上游」开关前，不再重复搭建本地 mock 基准环境。
