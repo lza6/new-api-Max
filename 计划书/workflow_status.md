@@ -583,3 +583,32 @@
   - crontab（root）：`17 4 * * *` 每日维护 + `8 * * * *` 每小时 if-full 守卫；cron 服务 active
 - 实测：维护模式回收 511.7MB（旧 redis/postgres 镜像），磁盘 40%→39%；if-full 在 39% 正确跳过；new-api/postgres/redis/watchtower 全部健康，零停机
 - 说明：悬空卷故意不清理（`--volumes` 不传，数据安全优先）；新版本部署走 GHCR pull + compose up -d，配合本清理不会再有磁盘堆积
+
+## 七十八、订阅后分组收窄修复：subscriber 组可用全部公开模型（2026-09-23）
+- 用户反馈：订阅"天卡无限"后只能调 deepseek，glm-5.3-flash 报"模型不在当前订阅套餐可用模型内"
+- 根因（两层）：
+  1. 套餐模型白名单：三档"无限"套餐 models 为空=不限（代码语义），用户此前收到矩阵拒绝应为早期白名单/缓存；已确认 DB 空 → PlanAllowsModel=true
+  2. **真凶 = 分组路由**：订阅后 upgrade_group=subscriber，用户被切到 subscriber 组；而公开模型（glm-5.3-flash/logfare/glm-5.3/kilwa-grok/kilwa-claude/mimo/omen/Qwen）渠道 group 只有 default，仅 deepseek 渠道 20 是 default,subscriber → subscriber 组只剩 deepseek 可用
+- 修复：把启用中的公开渠道分组扩到 `default,subscriber`（ch 29/30/31/32/33）→ `POST /api/channel/fix` 重建 abilities（8 模型 × default+subscriber 全绿）；subscriber 分组倍率与 default 相同（0.1），无计费影响
+- E2E：新注册用户授天卡订阅 + 置 subscriber 组 → glm-5.3-flash / kilwa-claude / kilwa-grok / deepseek-v4-flash 全部 200（此前 glm-5.3-flash 被拒）
+- 环境：无需发版（纯渠道配置）；临时账号已清理
+
+## 七十九、ERR_QUIC_PROTOCOL_ERROR 修复：Caddy 关闭 HTTP/3（2026-09-23）
+- 用户侧浏览器报 `net::ERR_QUIC_PROTOCOL_ERROR`（Kilwa Claude 等长流请求）
+- 根因：站点由 Caddy v2.11.4 前置反代，默认开启 HTTP/3（监听 UDP 443 + 下发 `alt-svc: h3`）；国内多网络/UDP 被丢或损坏 → QUIC 握手失败 → 浏览器持续报错
+- 修复（服务器配置，无代码）：Caddyfile 全局加 `servers { protocols h1 h2 }`，关闭 h3；`caddy validate` 通过后 `systemctl reload caddy`（零停机）
+- 验证：`caddy adapt` 输出 protocols=["h1","h2"]；UDP 443 监听消失；响应不再带 alt-svc；站点 HTTP/2 200；备份 /etc/caddy/Caddyfile.bak.*
+
+## 八十、v1.3.7：Kilwa 真实模型名 + 限流豁免 + googletranslate-2api 翻译接入（2026-09-23）
+- 需求：① kilwa 模型改真实名（grok-4.3 / claude-haiku-4.5），简介写实测上下文/最大输出，标签去掉 KILWA；② 接入 googletranslate-2api（谷歌翻译，OpenAI 兼容，0 费用，Google 图标，翻译必备）；③ 翻译模型对所有用户**不限并发/不限速率**，其余模型仍按用户自身限速
+- 代码（已提交+发版 v1.3.7）：
+  - `relay/channel/kilwa/adaptor.go`：ModelList → grok-4.3 / claude-haiku-4.5；`kilwaUpstreamPath` 按模型名路由 /kilwa-grok|/kilwa-claude；单测 12/12（新增路径选择三态）
+  - 限流豁免：`relay_setting.UserRateLimitExemptModels []string`（选项 `relay.user_rate_limit_exempt_models`）；新增 `middleware/rate-limit-exempt.go`（安全 peek 请求体 model+还原，context 缓存）；`UserRateLimit`/`TokenRateLimit`/`ModelRequestRateLimit`/`SubscriptionRateLimit` 四闸接入；单测全过（body 还原/豁免命中/默认空）
+  - 前端：「用户基本速率限制」页新增"限流豁免模型（逗号分隔）"输入（types/registry/section/i18n 7 语言）；tsgo/build/oxlint 全绿
+  - 前端全量测试 138 files / 1234 tests：全量 1 例环境 flaky（marketplace-install-dialog，TimeoutNaNWarning+6 worker 争用，超慢主机已知模式），单文件重跑 22/22 通过，与本次改动无关
+- 翻译服务部署（生产 /opt/googletranslate-2api）：代码+.env 传入服务器，`docker build -t googletranslate-2api:local`（157MB）；并入 /opt/new-api/docker-compose.yml（app/translate-nginx/translate-redis 于 new-api-network，不暴露公网；nginx upstream app:8000；REDIS_URL 指向自带 redis；app-data 卷持久化）；三容器 healthy
+- SSRF 兼容：渠道级 url_guard 不读 fetch_setting，走 `URL_GUARD_ALLOWLIST` 环境变量 → new-api 服务加 `URL_GUARD_ALLOWLIST=googletranslate-2api-nginx` 重建容器
+- 生产配置：渠道 32/33 改名（grok-4.3 / claude-haiku-4.5）+ 模型元数据改名/实测简介/去 KILWA 标签；新增渠道 34 Google Translate（type 1 base http://googletranslate-2api-nginx:80 key=API_MASTER_KEY models google-translate group default,subscriber）；模型元数据 id=76（icon=Google G png，status=1）；ModelPrice 三模型=0；`relay.user_rate_limit_exempt_models=["google-translate"]`；channel-fix 9/9
+- 实测规格（生产服务器探测，供简介）：grok-4.3 单轮输入建议 ≤8000 字符（13000 可用但不稳定）、最大输出约 1300 字符；claude-haiku-4.5 单轮输入上限约 32000 字符（33000 触发上游 414）、最大输出约 1600 字符；google-translate 单次输入上限 5000 字符
+- 真实 E2E（临时账号，已清理）：grok-4.3/claude-haiku-4.5 200（改名生效）；google-translate en→zh「你好，今天过得怎么样？」200、zh→en 200；订阅用户翻译 200；billing delta=0；**豁免压测 40并发×4轮=160 请求全 200 零 429**；对照 grok-4.3 6并发→1×429（普通模型限流照常）；订阅用户 40 并发零 429（订阅档位同样豁免）
+- 交付：commit bd96a6ecf/2a2a13c83（限流豁免+前端）/a5c4dc071（kilwa 改名）/52199918c（VERSION）→ tag v1.3.7 + release + CI(GHCR 多架构) + 生产 pull 热更新（version=v1.3.7 healthy）
