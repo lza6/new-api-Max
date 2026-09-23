@@ -51,6 +51,7 @@ import {
   LogIn,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 
 import { Dialog } from '@/components/dialog'
 import { StatusBadge, type StatusBadgeProps } from '@/components/status-badge'
@@ -59,6 +60,7 @@ import { Label } from '@/components/ui/label'
 import { DynamicPricingBreakdown } from '@/features/pricing/components/dynamic-pricing-breakdown'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
+import { getLogCostDetail } from '../../api'
 import { formatBillingCurrencyFromUSD } from '@/lib/currency'
 import { formatLogQuota, formatTokens, formatUseTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -1256,6 +1258,11 @@ export function DetailsDialog(props: DetailsDialogProps) {
         {/* Fee explanation (B5-1)：老日志无 explain 字段时优雅降级不渲染 */}
         {other?.explain && <ExplainBreakdown other={other} />}
 
+        {/* Cost detail (T4-2/B5-2)：用户版费用明细（分段 + 影子价），消费日志展示 */}
+        {isConsume && !isViolation && props.log.id != null && (
+          <CostDetailPanel logId={Number(props.log.id)} />
+        )}
+
         {/* Request timeline (B2-2)：黑匣子打开——阶段时间线 + JSON 导出 */}
         {isDisplayableType(props.log.type) && other && (
           <RequestTimelineCard
@@ -1453,6 +1460,63 @@ export function DetailsDialog(props: DetailsDialogProps) {
     </Dialog>
   )
 }
+
+/** T4-2/B5-2 用户版费用明细：GET /api/log/usage/:id/cost-detail。
+ *  展示计费分段（model/group/completion/cache ratio）、命中的 tier 与影子价。
+ *  接口未开/失败时静默隐藏（不打断详情查看）。 */
+export function CostDetailPanel(props: { logId: number }) {
+  const { t } = useTranslation()
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['log-cost-detail', props.logId],
+    queryFn: () => getLogCostDetail(props.logId),
+    staleTime: 60_000,
+    retry: 1,
+  })
+  if (isLoading) {
+    return (
+      <DetailSection label={t('Cost Detail')}>
+        <p className='text-muted-foreground text-xs'>{t('Loading')}...</p>
+      </DetailSection>
+    )
+  }
+  if (isError || !data) {return null}
+  const ratios = [
+    { label: t('Model ratio'), value: data.model_ratio },
+    { label: t('Group ratio'), value: data.group_ratio },
+    { label: t('Completion ratio'), value: data.completion_ratio },
+    { label: t('Cache ratio'), value: data.cache_ratio },
+  ]
+  return (
+    <DetailSection label={t('Cost Detail')}>
+      <div className='min-w-0 overflow-hidden rounded-md border'>
+        {ratios.map((item, index) => (
+          <div
+            key={`${item.label}-${index}`}
+            className={cn(
+              'grid grid-cols-[minmax(0,1fr)_minmax(0,1.5fr)] gap-2 px-2 py-1 text-xs',
+              index % 2 === 1 && 'bg-muted/40'
+            )}
+          >
+            <span className='text-muted-foreground min-w-0 truncate font-mono'>{item.label}</span>
+            <span className='min-w-0 text-right font-mono break-all'>{item.value ?? '-'}</span>
+          </div>
+        ))}
+      </div>
+      {data.tier_matched != null && (
+        <div className='flex flex-wrap items-center gap-2 pt-2 text-xs'>
+          <span className='text-muted-foreground'>{t('Matched tier')}:</span>
+          <span className='font-mono'>{String(data.tier_matched)}</span>
+        </div>
+      )}
+      {data.shadow_known && data.api_equivalent_usd != null && (
+        <p className='text-muted-foreground pt-2 text-xs'>
+          {t('Equivalent API cost')}: ${(data.api_equivalent_usd / 1_000_000).toFixed(6)} USD
+        </p>
+      )}
+    </DetailSection>
+  )
+}
+
 
 function isDisplayableType(type: number): boolean {
   return [0, 2, 5, 6].includes(type)

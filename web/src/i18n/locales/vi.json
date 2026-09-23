@@ -6644,6 +6644,8 @@
     "OpenAI / Responses": "OpenAI / Responses",
     "Subscription tier": "Subscription tier",
     "Copy user ID": "Copy user ID",
-    "Copy ID": "Copy ID"
+    "Copy ID": "Copy ID",
+    "Cost Detail": "Chi tiết chi phí",
+    "Equivalent API cost": "Chi phí API tương đương"
   }
 }

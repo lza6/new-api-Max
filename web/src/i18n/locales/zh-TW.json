@@ -6644,6 +6644,8 @@
     "OpenAI / Responses": "OpenAI / Responses",
     "Subscription tier": "訂閱檔位",
     "Copy user ID": "複製用戶 ID",
-    "Copy ID": "複製 ID"
+    "Copy ID": "複製 ID",
+    "Cost Detail": "費用明細",
+    "Equivalent API cost": "等價 API 成本"
   }
 }

@@ -216,3 +216,27 @@ export async function getTaskArtifacts(taskId: string) {
   )
   return parseTaskArtifactsResponse(response.data)
 }
+
+export interface LogCostDetail {
+  log_id: number
+  model_name: string
+  quota: number
+  prompt_tokens: number
+  completion_tokens: number
+  model_ratio: number
+  group_ratio: number
+  completion_ratio: number
+  cache_ratio: number
+  tier_matched?: unknown
+  api_equivalent_usd?: number
+  shadow_known?: boolean
+}
+
+/** T4-2：用户版费用明细（B5-2 接口前端接入）。
+ *  返回单条消费日志的计费分段与影子价，供日志详情「费用明细」面板渲染。 */
+export async function getLogCostDetail(logId: number): Promise<LogCostDetail> {
+  const res = await api.get<{ success: boolean; data: LogCostDetail }>(
+    `/api/log/usage/${logId}/cost-detail`
+  )
+  return res.data.data
+}
