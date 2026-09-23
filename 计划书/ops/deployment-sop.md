@@ -40,3 +40,23 @@ curl -s https://freeapi.tingfengai.art/api/status | grep version   # 确认回�
 ## 5. 演练与备份
 - 干跑：STAGING 同版本模拟「build→up→curl→回滚」；恢复演练记录留 `计划书/ops/`。
 - 备份：compose 快照 + DB dump（pg_dump）+ 计划书证据目录；保留策略：最近 1-2 个备份。
+
+## 5. 透传模式 token 计费说明（上游决定）
+
+### 现状（已确认）
+- **结算/日志 token + 缓存 token 全部以上游 usage 为准**：`summary.CacheTokens = usage.PromptTokensDetails.CachedTokens`
+  （service/text_quota.go:265），`usage_billing_path=upstream`（生产实测日志证据）。
+- **网关不覆盖上游 token/cache 计数**；`local_count_tokens` 仅用于「上游未返回 usage」的降级路径
+  （gemini/audio 等特殊渠道强制本地计数）。
+
+### 预扣费估算（网关唯一"算 token"处）
+- 预扣用 `EstimateRequestToken`（本地估算，`CountToken` env 默认 true）——**仅用于预扣防欠费**，
+  结算按上游 usage 多退少补，**不改变最终计费**。
+- 若希望透传渠道完全由上游决定 + 降低首字延迟/CPU：
+  - compose 设 `CountToken=false` → 预扣估算返回 0（token_counter.go:182），预扣走最小额，
+    结算仍按上游 usage 补扣。**权衡**：低额度用户瞬时可用额变大（结算前可能超用），
+    免费/信任用户无影响。**回滚**：改回 true 重启。
+
+### 推荐
+- 免费/公益网关：`CountToken=false`（省 CPU、首字更快，预扣风险可接受）。
+- 商业计费网关：保持 `CountToken=true`（预扣精度优先，避免超用）。
