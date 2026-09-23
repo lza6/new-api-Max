@@ -445,3 +445,31 @@
 ## 效果预期
 - 超时类 500 显著下降：慢 prefill 可跑到 15 分钟；真正超时上报 504（可观测、不与真实 500 混淆）
 - 429/502 仍为上游单渠道超卖所致 → 需增加 deepseek 活跃渠道（用户侧）
+
+---
+
+# 2026-09-23 追加段：T1 热路径性能冲刺（Spec 003，待 push/tag/Release）
+
+> 本段按用户「全部授权、真实落地、诚实证据」要求记录。详细 spec/plan/tasks/checklist 见 `.specify/specs/003-hotpath-perf-t1/`；验证台账见 `计划书/audit/perf-verification-ledger.md`。
+
+## 关键审计结论（修正任务卡前提）
+- `GetUserSetting` 已 **Redis 缓存**（model/user.go:1323）——任务卡“用户设置未缓存”的前提已过时，未重复造缓存。
+- 热路径每请求 `GetUserCache` 被加载 3 次（middleware/auth TokenAuth → NewBillingSession.GetUserQuota → RecordConsumeLog.GetUserSetting），每次 = Redis HGETALL + auth-version MGET = 2 往返。
+- 429 退避 + 4xx 透传**已正确**；缺 4xx 透传回归测试。
+
+## 落地实现
+- `model/log.go`：新增 `userSettingRecordIp(c, userId)` 复用请求内 `ContextKeyUserSetting` 判定 `RecordIpLog`（RecordConsumeLog / RecordErrorLog 两处），行为等价，消除每请求 2 次 Redis 往返。
+- `service/billing_session.go`：`NewBillingSession.tryWallet` 复用请求内 `ContextKeyUserQuota`（typed ok 判定，无权值时回退 `GetUserQuota`），消除第 2 次用户缓存加载。
+- 测试：`model/consume_log_flusher_test.go` US1（上下文复用，2 子用例 PASS）；`service/error_test.go` US2（4xx 透传 5/5 PASS）。
+- 脚本：`scripts/bench-latency.ps1`（直连 vs 网关成对基准，顺序+并发 20/50，输出到 `plan书/e2e-evidence/`）。
+
+## 验证证据（真实运行）
+- `go build ./...` → exit 0
+- `go vet ./model/ ./service/` → exit 0
+- `go test ./model/ ./service/ ./common/` → exit 0（model 47.4s / service 5.5s）
+- `gofmt -l`（4 个改动文件）→ 空
+- 说明：US1/US2 为本次真实运行；“完整网关+mock+渠道”的成对基准需另起本地运行环境（方法在脚本头部），线上基准需授权。
+
+## 前状态（承接上段）
+- 上段到 v1.3.6（记录 kling/sora、kilwa、signage）之前内容读本文件上方。
+- 本段不覆盖上方记录；待收尾项：本地成对基准 + 是否进入 T2（渠道健康路由）。
