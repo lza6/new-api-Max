@@ -1,0 +1,29 @@
+{
+  "type": "upstream-decides-tokens-acceptance",
+  "version": "v1.3.15",
+  "date": "2026-09-24",
+  "claim": "Pass-through: token counts incl. cached tokens are decided by upstream, not the gateway",
+  "production_evidence": {
+    "channel": 38,
+    "channel_name": "稳定渠道99",
+    "model": "deepseek-v4-flash",
+    "log": {
+      "usage_billing_path": "upstream",
+      "cache_tokens": 47104,
+      "prompt_tokens": 50866,
+      "completion_tokens": 1374,
+      "explain_facts_cached_tokens": 47104,
+      "request_id": "20260923231619825894997fd097e04k4SwAD4s"
+    }
+  },
+  "code_paths_confirmed": {
+    "settlement": "summary.CacheTokens = usage.PromptTokensDetails.CachedTokens (service/text_quota.go:265)",
+    "effective_usage": "effectiveBillingUsage returns upstream usage (service/billing_usage.go:23)",
+    "passthrough": "OpenAI chat/responses relay upstream usage unchanged when present",
+    "local_fallback_only": "ResponseText2Usage only when upstream usage missing (TotalTokens==0) — necessary billing fallback, not override"
+  },
+  "remaining_optional": {
+    "CountToken=false": "skips pre-consume local estimation (minimal pre-charge, settle on upstream) — ops trade-off, documented in deployment-sop",
+    "include_usage": "stream_options.include_usage=true for supported stream channels — upstream usage in stream tail, not first-token latency"
+  }
+}
