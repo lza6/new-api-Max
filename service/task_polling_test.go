@@ -1029,3 +1029,36 @@ func TestUpdateBatchTasksPollClassification(t *testing.T) {
 		})
 	}
 }
+
+// TestApplyStructuredTaskProgressMergesWithoutClobbering 锁 B5-3 Data 合并验收：
+// 1) 结构化 "current/total step" 合并写 progress 且保留 refund/resolution；
+// 2) 纯字符串（如 "30%"）零破坏；3) nil 守卫不 panic。
+func TestApplyStructuredTaskProgressMergesWithoutClobbering(t *testing.T) {
+	t.Run("structured progress merged, existing fields preserved", func(t *testing.T) {
+		task := &model.Task{Data: []byte(`{"refund":true,"resolution":"ok"}`)}
+		applyStructuredTaskProgress(task, &relaycommon.TaskInfo{Progress: "5/10 images"})
+		var data map[string]any
+		require.NoError(t, task.GetData(&data))
+		prog, ok := data["progress"].(map[string]any)
+		require.True(t, ok, "structured progress must be merged")
+		require.EqualValues(t, 5, prog["current"])
+		require.EqualValues(t, 10, prog["total"])
+		require.Equal(t, "images", prog["step"])
+		require.Equal(t, "generate", prog["event_type"])
+		require.Equal(t, true, data["refund"], "refund marker must survive merge")
+		require.Equal(t, "ok", data["resolution"], "resolution field must survive merge")
+	})
+	t.Run("pure string progress is zero-damage", func(t *testing.T) {
+		task := &model.Task{Data: []byte(`{"refund":true}`)}
+		applyStructuredTaskProgress(task, &relaycommon.TaskInfo{Progress: "30%"})
+		var data map[string]any
+		require.NoError(t, task.GetData(&data))
+		require.Equal(t, true, data["refund"])
+		_, hasProgress := data["progress"]
+		require.False(t, hasProgress, "unparseable progress must not be written")
+	})
+	t.Run("nil guards do not panic", func(t *testing.T) {
+		applyStructuredTaskProgress(nil, &relaycommon.TaskInfo{Progress: "1/2 x"})
+		applyStructuredTaskProgress(&model.Task{}, nil)
+	})
+}
