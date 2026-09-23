@@ -64,3 +64,21 @@
   需 profile 定位（pprof）确认 consume log / quota 结算 / token 缓存哪段占大头；生产 MySQL/PG + Redis
   环境下附加延迟预计显著低于 SQLite 本地环境。
 - **防重复跑**: 已建立可复现基准环境（SSRF env 开关 + 脚本修复）。改热路径代码后重跑对比 overhead_p50。
+
+
+## 记录 0005 · T1 根因定位（pprof CPU profile，2026-09-24）
+- **方法**: 本地基准环境（生产二进制 + ENABLE_PPROF + mock）压测 200 并发请求时抓
+  `debug/pprof/profile?seconds=15`（`计划书/e2e-evidence/cpu-profile-t1-rootcause.pprof`）。
+- **证据（go tool pprof -top）**:
+  - `runtime.cgocall` flat 78.87%（SQLite 驱动 modernc.org 的 cgo 模拟调用）
+  - `database/sql.withLock` cum 15.36%、`gorm.Commit` cum 11.66%、`_sqlite3VdbeExec` cum 14.26%
+- **根因结论**: 每请求**同步计费事务**（PreConsume 预扣 + PostConsume 结算，各 1 次 DB commit）
+  + consume log 写入是 SQLite 本地环境的绝对热点；flusher 已异步 log 本身，但计费流水
+  **刻意保持同步**（AGENTS 计费安全：预扣/结算必须原子，不得异步）。
+- **影响评估**: 22.6ms overhead 主要来自 SQLite 单机 cgo 模拟 VDBE + 每请求 2 次计费 commit；
+  生产 MySQL/PG + Redis 缓存（token/用户/设置已缓存）预期显著更低；本地 SQLite 基准不代表生产。
+- **决策**: **不将计费改异步**（违反 AGENTS 计费安全不变式）；T1 10ms 目标在本地 SQLite 环境
+  记为「根因已定位、目标受计费同步约束 + SQLite 本地放大影响」——诚实未达，生产环境需用
+  MySQL/PG + 压测另行验证。
+- **防重复跑**: 已在 ENABLE_PPROF + SSRF_GUARD_DISABLED 下可复现 profile；下次优化热路径后
+  重跑基准对比 overhead_p50 与 profile 热点。
