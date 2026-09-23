@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func clearSSRFCache(t *testing.T) {
@@ -151,4 +152,22 @@ func TestValidateChannelURLCache(t *testing.T) {
 	err := ValidateChannelURL("http://cached-deny.example/v1")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unit-test deny")
+}
+
+// TestSSRFGuardDisabledSwitch T1：SSRF_GUARD_DISABLED / SetSSRFGuardDisabled
+// 仅测试/基准用；默认关闭时私网字面 IP 仍被拒（生产安全不变）。
+func TestSSRFGuardDisabledSwitch(t *testing.T) {
+	prev := ssrfGuardSkipped
+	t.Cleanup(func() { ssrfGuardSkipped = prev })
+
+	ssrfGuardSkipped = false
+	err := ValidateChannelURL("http://127.0.0.1:18080/v1")
+	require.Error(t, err, "default must reject loopback literal IP")
+
+	SetSSRFGuardDisabled(true)
+	require.NoError(t, ValidateChannelURL("http://127.0.0.1:18080/v1"), "disabled switch must allow loopback for local bench")
+
+	SetSSRFGuardDisabled(false)
+	err = ValidateChannelURL("http://127.0.0.1:18080/v1")
+	require.Error(t, err, "re-enable must reject loopback again")
 }

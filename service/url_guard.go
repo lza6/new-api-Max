@@ -87,6 +87,11 @@ func init() {
 			ssrfAllowlisted[host] = true
 		}
 	}
+	// SSRF_GUARD_DISABLED 仅供本地基准/CI 测试（默认 false，生产安全不变）。
+	// 注意：这只会跳过整体守卫，私网段 allowlist 仍然不可配置（纵深防御）。
+	if strings.EqualFold(os.Getenv("SSRF_GUARD_DISABLED"), "true") {
+		ssrfGuardSkipped = true
+	}
 }
 
 // lookupSSRF 解析 host 全部 A/AAAA 记录，任一命中私网段即拒绝。
