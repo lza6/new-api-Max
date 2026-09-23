@@ -66,3 +66,36 @@ func TestChannelHealthSnapshotCoolingReflectsCooldown(t *testing.T) {
 	assert.True(t, snap2.CoolingDown)
 	assert.Equal(t, until.Unix(), snap2.CoolUntil)
 }
+
+// TestComputeHealthScoreBoundaries 锁 B3-3 评分边界：1.5s 满分、10s 零分、线性插值、零成功率零分。
+func TestComputeHealthScoreBoundaries(t *testing.T) {
+	tests := []struct {
+		name string
+		rate float64
+		p95  int64
+		want float64
+	}{
+		{"all success p95<1.5s -> 100", 1.0, 1000, 100.0},
+		{"all success p95=1.5s -> 100", 1.0, 1500, 100.0},
+		{"all success p95=10s -> latency 0 -> 70", 1.0, 10000, 70.0},
+		{"all success p95=5.75s midpoint -> 85", 1.0, 5750, 85.0},
+		{"zero success rate -> 0", 0.0, 1000, 0.0},
+		{"0.5 rate fast -> 50", 0.5, 1000, 50.0},
+		{"all fail no latency -> 0", 0.0, 0, 0.0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := computeHealthScore(tc.rate, tc.p95)
+			assert.InDelta(t, tc.want, got, 0.001)
+		})
+	}
+}
+
+// TestChannelHealthSnapshotEmptyReturnsZero 无样本渠道返回全零且不 panic（冷启动/从未命中渠道）。
+func TestChannelHealthSnapshotEmptyReturnsZero(t *testing.T) {
+	resetChannelHealthForTest(t)
+	snap := GetChannelHealthSnapshot(7777)
+	assert.Zero(t, snap.SampleCount)
+	assert.Zero(t, snap.Score)
+	assert.False(t, snap.CoolingDown)
+}
