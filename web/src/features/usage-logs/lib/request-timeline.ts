@@ -72,6 +72,25 @@ export interface TimelineSource {
 }
 
 /** 从 consume log 构造请求时间线。老日志缺字段时优雅降级。 */
+/** 把毫秒换算成人类可读时长：350ms / 1.5s / 2m 15s / 1h。 */
+export function formatDurationMs(ms: number): string {
+  if (!Number.isFinite(ms) || ms < 0) return '0ms'
+  if (ms < 1000) return Math.round(ms) + 'ms'
+  const totalSec = ms / 1000
+  if (totalSec < 60) {
+    const s = Math.round(totalSec * 10) / 10
+    return s + 's'
+  }
+  const m = Math.floor(totalSec / 60)
+  const s = Math.round(totalSec % 60)
+  if (m < 60) {
+    return s > 0 ? m + 'm ' + s + 's' : m + 'm'
+  }
+  const h = Math.floor(m / 60)
+  const remM = m % 60
+  return remM > 0 ? h + 'h ' + remM + 'm' : h + 'h'
+}
+
 export function buildRequestTimeline(src: TimelineSource): RequestTimeline {
   const totalMs = Math.max(0, Math.round((src.use_time || 0) * 1000))
   const frtMs = src.frt != null && src.frt > 0 ? Math.round(src.frt) : undefined
@@ -124,10 +143,17 @@ export function buildRequestTimeline(src: TimelineSource): RequestTimeline {
   }
 
   // 上游调用 + 首包。
+  let upstreamStatus: TimelinePhase['status'] = 'skipped'
+  if (frtMs != null) {
+    upstreamStatus = 'done'
+  } else if (totalMs > 0) {
+    upstreamStatus = failed ? 'failed' : 'done'
+  }
   phases.push({
     key: 'upstream',
-    status: frtMs != null ? 'done' : 'skipped',
+    status: upstreamStatus,
     offsetMs: 0,
+    durationMs: frtMs == null && totalMs > 0 ? totalMs : undefined,
   })
   if (frtMs != null) {
     phases.push({
@@ -143,7 +169,7 @@ export function buildRequestTimeline(src: TimelineSource): RequestTimeline {
     key: 'complete',
     status: failed ? 'failed' : 'done',
     offsetMs: totalMs,
-    durationMs: Math.max(0, totalMs - (frtMs ?? 0)),
+    durationMs: frtMs != null ? Math.max(0, totalMs - frtMs) : 0,
     detail: failReason,
     detailRaw: failReason,
   })
@@ -183,3 +209,4 @@ export function exportTimelineJson(
     2
   )
 }
+//PROBE

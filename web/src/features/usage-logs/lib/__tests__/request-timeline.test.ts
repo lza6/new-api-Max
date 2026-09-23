@@ -21,6 +21,7 @@ import { describe, expect, test } from 'vitest'
 import {
   buildRequestTimeline,
   exportTimelineJson,
+  formatDurationMs,
   type TimelineSource,
 } from '../request-timeline'
 
@@ -112,5 +113,45 @@ describe('exportTimelineJson', () => {
       expect(typeof p.phase).toBe('string')
       expect(typeof p.offset_ms).toBe('number')
     }
+  })
+})
+
+describe('formatDurationMs', () => {
+  test('converts ms to human-readable units', () => {
+    expect(formatDurationMs(350)).toBe('350ms')
+    expect(formatDurationMs(1500)).toBe('1.5s')
+    expect(formatDurationMs(135000)).toBe('2m 15s')
+    expect(formatDurationMs(90000)).toBe('1m 30s')
+    expect(formatDurationMs(3600000)).toBe('1h')
+    expect(formatDurationMs(0)).toBe('0ms')
+    expect(formatDurationMs(-5)).toBe('0ms')
+  })
+})
+
+describe('buildRequestTimeline non-stream upstream inference', () => {
+  test('failed non-stream request marks upstream failed with duration', () => {
+    const src: TimelineSource = {
+      created_at: 1_700_000_000,
+      use_time: 135,
+      frt: null,
+      stream_status: { status: 'error', end_reason: 'error', end_error: 'Upstream request failed' },
+    }
+    const tl = buildRequestTimeline(src)
+    const upstream = tl.phases.find((p) => p.key === 'upstream')
+    expect(upstream?.status).toBe('failed')
+    expect(upstream?.durationMs).toBe(135000)
+    const complete = tl.phases.find((p) => p.key === 'complete')
+    expect(complete?.status).toBe('failed')
+    expect(complete?.durationMs).toBe(0)
+    expect(tl.ok).toBe(false)
+  })
+
+  test('successful non-stream request marks upstream done with duration', () => {
+    const src: TimelineSource = { created_at: 1_700_000_000, use_time: 2, frt: null }
+    const tl = buildRequestTimeline(src)
+    const upstream = tl.phases.find((p) => p.key === 'upstream')
+    expect(upstream?.status).toBe('done')
+    expect(upstream?.durationMs).toBe(2000)
+    expect(tl.ok).toBe(true)
   })
 })

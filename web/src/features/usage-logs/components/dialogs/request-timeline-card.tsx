@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
-import type { RequestTimeline, TimelinePhase } from '../../lib/request-timeline'
+import { formatDurationMs, type RequestTimeline, type TimelinePhase } from '../../lib/request-timeline'
 import { DetailSection } from './log-detail-layout'
 
 const STATUS_TONE: Record<TimelinePhase['status'], string> = {
@@ -78,7 +78,7 @@ function PhaseRow(props: { phase: TimelinePhase }) {
           <span className={cn('text-[11px]', STATUS_TONE[phase.status])}>{statusLabel}</span>
           {phase.durationMs != null && (
             <span className='text-muted-foreground font-mono text-[11px]'>
-              +{phase.durationMs}ms
+              +{formatDurationMs(phase.durationMs)}
             </span>
           )}
         </div>
