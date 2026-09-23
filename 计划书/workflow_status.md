@@ -640,3 +640,19 @@
 - 质量：go build + service 单测全过；前端 tsgo / build / oxlint 全绿
 - 交付：commit cf72a430a（后端）+ fa8cc51d3（前端+VERSION）→ tag v1.3.9 + release + CI(GHCR)
 - 备注：发版时本机到服务器网络短暂中断（22/80/443 全超时），CI 云端正常构建；部署+线上 E2E 待网络恢复后补跑并记录
+
+## 八十四、个人资料限速展示本地全量验证 + SQLite 订阅表迁移修复（v1.3.9/v1.3.10，2026-09-23）
+- 背景：生产服务器宕机（公网 22/80/443/3000 多网络出口不可达），按用户要求转为**本地起服务真实 E2E**
+- 本地验证（Windows 本机编译 + SQLite + 端口 3100，隐藏窗口启动）：
+  - `go build` 全新二进制；`/api/status` 200
+  - 注册 3 用户 → u1 提权管理员 → 确认支付合规 → 建"天卡"套餐（8/350）→ 授予 u2 订阅
+  - **/api/user/self 三态全过**：
+    - 普通用户 → `{concurrency:3, rpm:120, source:"base"}`
+    - u3 设置用户覆盖 50/1000 → `{concurrency:50, rpm:1000, source:"user"}`
+    - u2 订阅"天卡" → `{concurrency:8, rpm:350, source:"subscription"}`
+  - 前端 bundle 实证：`当前生效限速 / 订阅档位 / 复制 ID / 复制用户 ID / 无限制` 全 HIT
+- **顺带发现并修复真 bug（v1.3.10）**：`model/main.go ensureSubscriptionPlanTableSQLite` 的建表 DDL 与补列 required 列表**缺少 concurrency_limit / rpm_limit / models 三列**（SQLite 专属路径；MySQL/PG 走 AutoMigrate 自动补齐所以生产未暴露）→ SQLite 下建套餐报"no column named concurrency_limit"
+  - 修复：CREATE TABLE DDL + required 列表同步补 3 列（`int DEFAULT 0` / `text DEFAULT ''` 与 struct 一致）
+  - 验证：用旧库（无 3 列）重启新版本 → 迁移自动 ALTER TABLE ADD COLUMN 补列（26 列）→ 建套餐成功 → 订阅档位 8/350 生效；`go build` 通过
+- 交付：commit 9d14fa898 → tag v1.3.10 + release + CI(GHCR)；本地临时 sqlite/进程已清理
+- 待办（服务器恢复后）：生产部署 v1.3.10 + 线上复验（self rate_limit 三态 + bundle 串 + 订阅功能回归）
