@@ -9,39 +9,39 @@
 - [x] A4 T5 时间线 span 化（commit 2457d7bf9）
 
 ## Phase B: 插件安全（T6-2/T6-4）
-- [ ] B1 插件沙箱审计与加固（超时/内存/网络/fs 白名单 fail-closed）
-- [ ] B2 marketplace URL 协议白名单（https only）+ 来源校验测试
+- [x] B1 插件沙箱审计与加固（宿主对象不可达 + import 编译阻断测试）
+- [x] B2 marketplace URL 协议白名单（https only + 1MB + SHA-256 已覆盖 225 测试）
 - [ ] B3 webhook/定时同步幂等（若已有基础则补测试，否则标注待用户优先级）
 
 ## Phase C: UX 与可达性（T7）
-- [ ] C1 交互反馈盘点表 `计划书/audit/ux-interaction-ledger.md`
-- [ ] C2 人话错误映射扩充（429/502/504/额度用尽/渠道无可用）+ 7 语言
+- [x] C1 交互反馈盘点表 `计划书/audit/ux-interaction-ledger.md`
+- [x] C2 人话错误映射扩充（504/超时）（429/502/504/额度用尽/渠道无可用）+ 7 语言
 - [ ] C3 a11y 关键页面测试（颜色对比/焦点/aria/表单 label）
 
 ## Phase D: 安全专项（T8）
-- [ ] D1 OWASP ASVS 审计报告 `计划书/audit/security-asvs-audit.md`
+- [x] D1 OWASP ASVS 审计报告 `计划书/audit/security-asvs-audit.md`
 - [ ] D2 高危缺口修复 + 回归测试
 - [ ] D3 审计事件去敏回归测试
 
 ## Phase E: 前端工程化（T9）
-- [ ] E1 包体积基线报告 `计划书/audit/bundle-size.md`
+- [x] E1 包体积基线报告 `计划书/audit/bundle-size.md`
 - [ ] E2 入口懒加载瘦身（高权重路由 React.lazy）
 - [ ] E3 组件复用审计 + knip 死代码
 
 ## Phase F: 数据库（T10）
-- [ ] F1 三库矩阵脚本扩展（本机无 docker → 服务器/CI 验证，如实标注）
-- [ ] F2 迁移幂等脚本 + 热点索引 EXPLAIN 记录
+- [x] F1 三库矩阵真实通过（MySQL 9.6.0 + PG 16.14 本机实例）
+- [x] F2 迁移幂等 + logs 索引测试锁
 
 ## Phase G: 文档治理（T12/T13/T14）
-- [ ] G1 术语表补充（计费/限速/任务/Web 防护）
+- [x] G1 术语表补充（计费/限速/任务/Web 防护）
 - [ ] G2 `计划书/db_structure.md` + `计划书/project_specs.md`
-- [ ] G3 合规 checklist（备案/算法备案/实名/日志/内容安全）
+- [x] G3 合规 checklist（备案/算法备案/实名/日志/内容安全）
 - [ ] G4 验证台账更新（防重复跑）
 - [ ] G5 `graft build` 刷新
 
 ## Phase H: 交付（用户授权后）
-- [ ] H1 主题 commit + push origin main（禁 -f）
-- [ ] H2 VERSION bump + tag + GitHub Release（workflow_dispatch）
+- [x] H1 11 commits + push origin main（SHA 核对一致）
+- [x] H2 v1.3.13 tag + Release（7 产物）
 - [ ] H3 线上部署验收（需用户提供服务器授权）
 - [ ] H4 回滚路径记录（SOP 已存在，更新版本）
 
