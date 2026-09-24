@@ -606,3 +606,27 @@ func TestIsRequestTimeout(t *testing.T) {
 	assert.False(t, isRequestTimeout(fmt.Errorf("boom")))
 	assert.False(t, isRequestTimeout(context.Canceled))
 }
+
+func TestResolveRelayTimeout(t *testing.T) {
+	global := 900
+	nilOverride := (*int)(nil)
+	zero := 0
+	positive := 3600
+	negative := -5
+
+	sec, overridden := resolveRelayTimeout(global, nilOverride)
+	assert.False(t, overridden, "nil override keeps global")
+	assert.Equal(t, global, sec)
+
+	sec, overridden = resolveRelayTimeout(global, &positive)
+	assert.True(t, overridden, "positive override applies")
+	assert.Equal(t, 3600, sec)
+
+	sec, overridden = resolveRelayTimeout(global, &zero)
+	assert.True(t, overridden, "zero override disables timeout (passthrough)")
+	assert.Equal(t, 0, sec)
+
+	sec, overridden = resolveRelayTimeout(global, &negative)
+	assert.False(t, overridden, "negative override falls back to global")
+	assert.Equal(t, global, sec)
+}

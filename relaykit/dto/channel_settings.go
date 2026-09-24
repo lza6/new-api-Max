@@ -20,9 +20,14 @@ type ChannelSettings struct {
 	// 透传/慢上游场景开启后：首包缓冲保留，但不再因首包等待超过
 	// stream_first_token_timeout 判定渠道失败——由持续流超时（STREAMING_TIMEOUT）
 	// 与空壳流兜底，避免把正常慢流误杀成 500/504。仅 StreamFallover 开启时有效。
-	DisableStreamFirstTokenTimeout bool   `json:"disable_stream_first_token_timeout,omitempty"`
-	SystemPrompt                   string `json:"system_prompt,omitempty"`
-	SystemPromptOverride           bool   `json:"system_prompt_override,omitempty"`
+	DisableStreamFirstTokenTimeout bool `json:"disable_stream_first_token_timeout,omitempty"`
+	// RelayTimeoutSeconds 渠道级整请求超时（秒）覆盖（透传语义）：
+	// nil = 沿用全局 RELAY_TIMEOUT；0 = 不设整请求超时（交上游决定，慎用）；
+	// >0 = 用该值覆盖全局（http.Client.Timeout 全链路含流式 body）。
+	// 解决「上游正常但拖满 15min 全局 RELAY_TIMEOUT 被 kill 成 504」。
+	RelayTimeoutSeconds  *int   `json:"relay_timeout_seconds,omitempty"`
+	SystemPrompt         string `json:"system_prompt,omitempty"`
+	SystemPromptOverride bool   `json:"system_prompt_override,omitempty"`
 	// HTTPProtocol controls outbound HTTP version negotiation for this channel.
 	// Accepted values: "", "auto" (default), "http1".
 	HTTPProtocol string `json:"http_protocol,omitempty"`

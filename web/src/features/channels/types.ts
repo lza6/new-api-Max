@@ -87,6 +87,7 @@ export interface ChannelSettings {
   proxy?: string
   pass_through_body_enabled?: boolean
   disable_stream_first_token_timeout?: boolean
+  relay_timeout_seconds?: number
   system_prompt?: string
   system_prompt_override?: boolean
   http_protocol?: 'auto' | 'http1' | string

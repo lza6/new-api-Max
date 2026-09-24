@@ -265,6 +265,12 @@ export const channelFormSchema = z
     http2_connection_shards: z.number().int().optional(),
     pass_through_body_enabled: z.boolean().optional(),
     disable_stream_first_token_timeout: z.boolean().optional(),
+    relay_timeout_seconds: z
+      .number()
+      .int()
+      .min(0)
+      .max(31536000)
+      .optional(),
     system_prompt: z.string().optional(),
     system_prompt_override: z.boolean().optional(),
     // Type-specific settings (stored in settings JSON)
@@ -447,6 +453,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   http2_connection_shards: 1,
   pass_through_body_enabled: false,
   disable_stream_first_token_timeout: false,
+  relay_timeout_seconds: undefined,
   system_prompt: '',
   system_prompt_override: false,
   // Type-specific settings
@@ -489,6 +496,7 @@ export function transformChannelToFormDefaults(
     http2_connection_shards: 1,
     pass_through_body_enabled: false,
     disable_stream_first_token_timeout: false,
+    relay_timeout_seconds: undefined,
     system_prompt: '',
     system_prompt_override: false,
   }
@@ -510,6 +518,10 @@ export function transformChannelToFormDefaults(
         pass_through_body_enabled: parsed.pass_through_body_enabled || false,
         disable_stream_first_token_timeout:
           parsed.disable_stream_first_token_timeout || false,
+        relay_timeout_seconds:
+          typeof parsed.relay_timeout_seconds === 'number'
+            ? parsed.relay_timeout_seconds
+            : undefined,
         system_prompt: parsed.system_prompt || '',
         system_prompt_override: parsed.system_prompt_override || false,
       }
@@ -648,6 +660,11 @@ export function buildSettingJSON(formData: ChannelFormValues): string {
     settingObj.http_protocol = HTTP_PROTOCOL_HTTP1
   } else if (shards > 1) {
     settingObj.http2_connection_shards = shards
+  }
+
+  // 渠道级整请求超时（秒）：undefined 不写（沿用全局）；0 显式关闭（透传）。
+  if (formData.relay_timeout_seconds !== undefined) {
+    settingObj.relay_timeout_seconds = formData.relay_timeout_seconds
   }
 
   return JSON.stringify(settingObj)

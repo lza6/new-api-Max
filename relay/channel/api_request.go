@@ -498,6 +498,18 @@ func isRequestTimeout(err error) bool {
 	return errors.As(err, &ne) && ne.Timeout()
 }
 
+// resolveRelayTimeout 解析渠道级整请求超时覆盖（透传语义）：
+// override == nil → 沿用全局 globalSeconds（不覆盖）；
+// override < 0 → 非法值，回退全局；
+// override == 0 → 显式关闭整请求超时（交给上游决定，真正的透传）；
+// override > 0 → 渠道自定义超时秒数。
+func resolveRelayTimeout(globalSeconds int, override *int) (seconds int, overridden bool) {
+	if override == nil || *override < 0 {
+		return globalSeconds, false
+	}
+	return *override, true
+}
+
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	// B1-2 SSRF 二次解析：在即将发起上游请求时再次校验目标地址（防 DNS
 	// rebinding「保存合法、使用时解析到内网」窗口）。结果按 host 缓存 5 分钟。
@@ -518,6 +530,17 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	// transparent stream retries.
 	relayClient := *client
 	relayClient.CheckRedirect = keepUpstreamRedirectResponse
+	// [修复防御] 渠道级整请求超时覆盖（透传语义）：上游慢但正常的长请求
+	// （如 /v1/responses 非流/流式长输出）不再被全局 RELAY_TIMEOUT 到点 kill
+	// 成 504 —— 由渠道设置 relay_timeout_seconds 决定（0=不设超时）。
+	if seconds, overridden := resolveRelayTimeout(common2.RelayTimeout, info.ChannelSetting.RelayTimeoutSeconds); overridden {
+		if seconds > 0 {
+			relayClient.Timeout = time.Duration(seconds) * time.Second
+		} else {
+			relayClient.Timeout = 0
+		}
+		logger.LogInfo(c, fmt.Sprintf("channel relay timeout override: %ds", seconds))
+	}
 	if common2.DebugEnabled && req != nil && req.URL != nil {
 		policy := service.NormalizeHTTPTransportPolicy(info.ChannelSetting)
 		logger.LogDebug(c, fmt.Sprintf(

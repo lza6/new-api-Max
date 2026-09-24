@@ -4285,6 +4285,40 @@ export function ChannelMutateDrawer({
 
                               <FormField
                                 control={form.control}
+                                name='relay_timeout_seconds'
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>
+                                      {t('Relay Timeout (seconds)')}
+                                    </FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type='number'
+                                        min={0}
+                                        max={31536000}
+                                        placeholder={t('0 = no timeout (passthrough)')}
+                                        {...field}
+                                        value={field.value ?? ''}
+                                        onChange={(e) => {
+                                          const v = e.target.value
+                                          field.onChange(
+                                            v === '' ? undefined : Number(v)
+                                          )
+                                        }}
+                                      />
+                                    </FormControl>
+                                    <FormDescription>
+                                      {t(
+                                        'Whole-request timeout for this channel; 0 disables the 15-minute default so upstream decides'
+                                      )}
+                                    </FormDescription>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
                                 name='disable_task_polling_sleep'
                                 render={({ field }) => (
                                   <FormItem className='flex items-center justify-between px-4 py-3'>

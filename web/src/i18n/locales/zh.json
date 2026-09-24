@@ -6653,6 +6653,9 @@
     "Equivalent API cost": "等价 API 成本",
     "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "请求等待上游服务超时。请重试或改用流式请求。",
     "Disable Stream First Token Timeout": "关闭流式首包超时",
-    "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "上游首包较慢时不判定渠道失败，由上游决定返回时机（透传）"
+    "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "上游首包较慢时不判定渠道失败，由上游决定返回时机（透传）",
+    "Relay Timeout (seconds)": "中继超时（秒）",
+    "0 = no timeout (passthrough)": "0 = 不设超时（透传）",
+    "Whole-request timeout for this channel; 0 disables the 15-minute default so upstream decides": "该渠道整请求超时；0 表示关闭默认 15 分钟超时，交给上游决定"
   }
 }

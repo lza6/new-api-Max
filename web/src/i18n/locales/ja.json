@@ -6653,6 +6653,9 @@
     "Equivalent API cost": "API 相当コスト",
     "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "アップストリームの応答待ちがタイムアウトしました。再試行するかストリーミングに切り替えてください。",
     "Disable Stream First Token Timeout": "Disable Stream First Token Timeout",
-    "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)"
+    "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)",
+    "Relay Timeout (seconds)": "Relay Timeout (seconds)",
+    "0 = no timeout (passthrough)": "0 = no timeout (passthrough)",
+    "Whole-request timeout for this channel; 0 disables the 15-minute default so upstream decides": "Whole-request timeout for this channel; 0 disables the 15-minute default so upstream decides"
   }
 }
