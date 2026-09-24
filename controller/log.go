@@ -274,16 +274,43 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 // GET /api/log/bandwidth/model-leaderboard?days=30&limit=10
 // queryModelBandwidthLeaderboard 查询 consume 日志并按模型聚合带宽（降序限量），
 // 供管理端 /api/log/bandwidth/model-leaderboard 与公开 /api/rankings/bandwidth 复用。
+// queryModelBandwidthLeaderboard 查询 consume 日志并按模型聚合带宽（降序限量）。
+// [fix-perf] 原实现把 30 天全量行（生产约 37 万行）拉进 Go 内存再聚合，
+// 线上实测 541ms（GET /api/rankings/bandwidth）。改为 SQL GROUP BY 聚合：
+// 数据库只返回 limit 行，传输/内存量从全量行降到 Top-N；COALESCE(NULLIF())
+// 保持与 AggregateBandwidthByModel 相同的空模型名 -> "(unknown)" 语义。
+// 三库兼容：COALESCE/NULLIF/GROUP BY/SUM 是 SQL 标准，GORM 生成无方言 SQL。
 func queryModelBandwidthLeaderboard(days, limit int) ([]service.BandwidthModel, error) {
-	var rows []service.TrafficBytesRecord
-	if err := model.LOG_DB.Model(&model.Log{}).
-		Select("model_name", "request_bytes", "response_bytes").
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume,
-			time.Now().Add(-time.Duration(days)*24*time.Hour).Unix()).
-		Scan(&rows).Error; err != nil {
+	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+	limit = max(limit, 0)
+	type bandwidthRow struct {
+		ModelName string `gorm:"column:model_name"`
+		Requests  int64  `gorm:"column:requests"`
+		Bytes     int64  `gorm:"column:bytes"`
+	}
+	var rows []bandwidthRow
+	q := model.LOG_DB.Model(&model.Log{}).
+		Select(`COALESCE(NULLIF(model_name, ''), '(unknown)') AS model_name`,
+			`COUNT(*) AS requests`,
+			`COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes`).
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
+		Group("model_name").
+		Order("bytes DESC, model_name ASC")
+	if limit > 0 {
+		q = q.Limit(limit)
+	}
+	if err := q.Scan(&rows).Error; err != nil {
 		return nil, err
 	}
-	return service.AggregateBandwidthByModel(rows, limit), nil
+	out := make([]service.BandwidthModel, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, service.BandwidthModel{
+			Model:    r.ModelName,
+			Requests: r.Requests,
+			Bytes:    r.Bytes,
+		})
+	}
+	return out, nil
 }
 func GetModelBandwidthLeaderboard(c *gin.Context) {
 	days := 30
