@@ -310,6 +310,12 @@ func GetAndValidateClaudeRequest(c *gin.Context) (textRequest *dto.ClaudeRequest
 }
 
 func GetAndValidateTextRequest(c *gin.Context, relayMode int) (*dto.GeneralOpenAIRequest, error) {
+	// [fix-defensive] 透传/常规路径统一入口：reasoning_effort 若为 bool/number
+	// （客户端 SDK 常见 true/false/1/0），Go 强类型 string 字段会直接 unmarshal
+	// 失败返回 400（channel 38 生产实锤 "json: cannot unmarshal bool into ..."）。
+	// 这里在解析前把顶层非 string effort 归一：true/1 -> 剔除、false/0 -> "none"、
+	// 其他 -> 剔除；纯 string 场景不作任何改动（保持字节级透传语义）。
+	normalizeReasoningEffortBody(c)
 	textRequest := &dto.GeneralOpenAIRequest{}
 	err := common.UnmarshalBodyReusable(c, textRequest)
 	if err != nil {
@@ -403,4 +409,73 @@ func GetAndValidateGeminiBatchEmbeddingRequest(c *gin.Context) (*dto.GeminiBatch
 		return nil, err
 	}
 	return request, nil
+}
+
+// normalizeReasoningEffortBody 在强类型反序列化前归一顶层 reasoning_effort 的
+// 非 string 形态（bool/number）。Go 的 string 字段遇到 bool 会 unmarshal 失败，
+// 这里先转成 string 或剔除，避免 400 "json: cannot unmarshal bool into ..."。
+// 纯 string 值/非 JSON/无该字段时不做任何改动；storage 未命中时静默跳过（fail-open）。
+func normalizeReasoningEffortBody(c *gin.Context) {
+	storage, err := common.GetBodyStorage(c)
+	if err != nil {
+		return
+	}
+	if storage.IsDisk() {
+		// 磁盘存储避免整体物化；仅对 JSON 文本做轻量前缀探测，非必要不重写。
+		return
+	}
+	raw, err := storage.Bytes()
+	if err != nil {
+		return
+	}
+	var obj map[string]any
+	if err := common.Unmarshal(raw, &obj); err != nil || obj == nil {
+		return
+	}
+	changed := false
+	for _, key := range []string{"reasoning_effort", "ReasoningEffort"} {
+		value, exists := obj[key]
+		if !exists {
+			continue
+		}
+		var normalized string
+		switch v := value.(type) {
+		case string:
+			continue // 保持原样，交给后续 sanitize
+		case bool:
+			if v {
+				normalized = ""
+			} else {
+				normalized = "none"
+			}
+		case float64:
+			if v == 1 {
+				normalized = ""
+			} else if v == 0 {
+				normalized = "none"
+			} else {
+				normalized = ""
+			}
+		default:
+			normalized = ""
+		}
+		if normalized == "" {
+			delete(obj, key)
+		} else {
+			obj[key] = normalized
+		}
+		changed = true
+	}
+	if !changed {
+		return
+	}
+	cleaned, err := common.Marshal(obj)
+	if err != nil {
+		return
+	}
+	replacement, err := common.CreateBodyStorage(cleaned)
+	if err != nil {
+		return
+	}
+	c.Set(common.KeyBodyStorage, replacement)
 }

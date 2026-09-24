@@ -70,3 +70,53 @@ func TestMaxTokensBounds(t *testing.T) {
 		require.Contains(t, err.Error(), "max_output_tokens is invalid")
 	})
 }
+
+// TestReasoningEffortNonStringNormalized 生产回归：reasoning_effort 为 bool/number
+// 时，Go 强类型 string 字段会 unmarshal 失败 400（channel 38 实锤
+// "json: cannot unmarshal bool into Go struct field ...reasoning_effort"）。
+// 解析入口必须先归一非 string 形态，避免请求在反序列化阶段就失败。
+func TestReasoningEffortNonStringNormalized(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	newJSONContext := func(t *testing.T, body string) *gin.Context {
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/relay", bytes.NewBufferString(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		return c
+	}
+
+	t.Run("bool true normalized away", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi"}],"reasoning_effort":true}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.Equal(t, "", req.ReasoningEffort)
+	})
+
+	t.Run("bool false normalized to none", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi"}],"reasoning_effort":false}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.Equal(t, "none", req.ReasoningEffort)
+	})
+
+	t.Run("number 1 normalized away", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi"}],"reasoning_effort":1}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.Equal(t, "", req.ReasoningEffort)
+	})
+
+	t.Run("string on still passes sanitize later", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi"}],"reasoning_effort":"on"}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.Equal(t, "on", req.ReasoningEffort)
+	})
+
+	t.Run("camelCase bool normalized", func(t *testing.T) {
+		c := newJSONContext(t, `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hi"}],"ReasoningEffort":true}`)
+		req, err := GetAndValidateTextRequest(c, relayconstant.RelayModeChatCompletions)
+		require.NoError(t, err)
+		require.Equal(t, "", req.ReasoningEffort)
+	})
+}
