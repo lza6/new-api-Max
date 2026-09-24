@@ -82,3 +82,18 @@
   MySQL/PG + 压测另行验证。
 - **防重复跑**: 已在 ENABLE_PPROF + SSRF_GUARD_DISABLED 下可复现 profile；下次优化热路径后
   重跑基准对比 overhead_p50 与 profile 热点。
+
+## 记录 0006 · 慢查询猎杀：带宽排行 SQL 聚合（2026-09-25，v1.3.24/25 已上线）
+- **验证范围**: logs 表 bandwidth 聚合类查询（公开 rankings + 管理端 leaderboard + 流量统计）
+- **发现（线上 SLOW SQL 实锤）**:
+  - `GET /api/rankings/bandwidth`（公开）: 拉 37.2 万行 → Go 内存聚合 → **541ms**
+  - `GET /api/log/bandwidth/leaderboard`（管理端按日）: 拉 38.6 万行 → **1273-1490ms**
+  - `GET /api/log/traffic`（管理端流量）: 拉 `other` JSON 列 38.6 万行 → **1448ms**
+- **已修复（v1.3.24/25）**:
+  - rankings/bandwidth → SQL GROUP BY model_name + SUM（COALESCE(NULLIF) 保 (unknown) 语义），测试 TestQueryModelBandwidthLeaderboardSQLAggregation
+  - leaderboard 按日 → SQL 整数日期键 `(created_at+tz_offset)/86400`（三库纯算术无方言），测试 TestGetBandwidthLeaderboardSQLAggregation
+  - 生产验证: 内网 admin_day 0.0016s（原 1273ms）；rows 从 386k → 15/10
+- **未修复（诚实标注，非阻塞）**:
+  - `GET /api/log/traffic` 仍拉 other JSON 全量：因生产 72% 存量日志 request/response_bytes 列为 0（字节只在 other JSON），不能直接切列聚合。需"新写入统一填列 + 存量回填"专项（风险中）。管理端低频，不阻塞公开服务。
+- **运维防护（v1.3.24 部署时一并落）**: new-api 容器加 json-file 日志轮转（max-size 50m × 5）+ mem_limit 2g + cpus 2.0 + stop_grace_period 30s（生产已生效）。
+- **下次不再重复跑**: 未改动这三个 handler / logs 列写入逻辑时，跳过本轮慢查询验证；改到 RecordConsumeLog 字节列写入或 GetLogsTraffic 时重跑。
