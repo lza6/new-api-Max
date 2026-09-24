@@ -1,0 +1,27 @@
+{
+  "type": "reasoning-only-passthrough-acceptance",
+  "version": "v1.3.16",
+  "date": "2026-09-24",
+  "bug": "channel 38 (stable 99) deepseek-v4-flash reasoning-only stream returned 500 'upstream stream empty' even though upstream replied normally",
+  "root_cause": "isUsefulStreamData treated reasoning_content as invalid; reasoning-only streams never committed fallover buffer; EOF -> empty-shell failure",
+  "fix": "reasoning/reasoning_content now count as useful stream data (commit + passthrough); empty-shell detection only for zero-data-event streams",
+  "production_verification": {
+    "container": "new-api ghcr.io/lza6/new-api-max:v1.3.16 Up healthy",
+    "version_header": "X-New-Api-Version: v1.3.16",
+    "request": {
+      "model": "deepseek-v4-flash",
+      "stream": true,
+      "events": 52,
+      "has_content": false,
+      "all_reasoning": true,
+      "http": 200
+    },
+    "stability": "3 consecutive requests all 200 (no 500)"
+  },
+  "regression_tests": [
+    "TestIsUsefulStreamData (reasoning=true)",
+    "TestStreamScannerHandler_FalloverOnReasoningOnlyStream (passthrough)",
+    "TestStreamScannerHandler_FalloverSwitchAfterEmptyShell (vacuous fails, reasoning passes)",
+    "TestStreamScannerHandler_FalloverOnEmptyBody (vacuous fails)"
+  ]
+}
