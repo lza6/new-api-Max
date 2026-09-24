@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient } from '@tanstack/react-query'
 import type { Table } from '@tanstack/react-table'
-import { Eye, EyeOff, Trash2, Copy, Building2, Unlink } from 'lucide-react'
+import { Eye, EyeOff, Trash2, Copy, Building2, Unlink, Percent } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -33,9 +33,11 @@ import {
 import { copyToClipboard } from '@/lib/copy-to-clipboard'
 
 import { handleBatchEnableModels, handleBatchDisableModels } from '../lib'
+import { useCanEditModelPricing } from '@/features/model-pricing/api'
 import type { Model } from '../types'
 import type { VendorOperation } from '../vendor-api'
 import { ModelDeleteDialog } from './dialogs/model-delete-dialog'
+import { BulkPricingDialog } from './dialogs/bulk-pricing-dialog'
 import { VendorOperationDialog } from './dialogs/vendor-operation-dialog'
 
 interface DataTableBulkActionsProps<TData> {
@@ -46,10 +48,12 @@ export function DataTableBulkActions<TData>({
   table,
 }: DataTableBulkActionsProps<TData>) {
   const { t } = useTranslation()
+  const canEditPricing = useCanEditModelPricing()
   const queryClient = useQueryClient()
   const [vendorOperation, setVendorOperation] =
     useState<VendorOperation | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showBulkPricing, setShowBulkPricing] = useState(false)
 
   const selectedRows = table.getFilteredSelectedRowModel().rows
   const selectedIds = selectedRows.reduce<number[]>((ids, row) => {
@@ -92,6 +96,13 @@ export function DataTableBulkActions<TData>({
 
   return (
     <>
+      {showBulkPricing && (
+        <BulkPricingDialog
+          models={selectedModels}
+          onClose={() => setShowBulkPricing(false)}
+          onSuccess={handleClearSelection}
+        />
+      )}
       {vendorOperation && (
         <VendorOperationDialog
           selection={vendorOperation}
@@ -120,6 +131,17 @@ export function DataTableBulkActions<TData>({
             </TooltipContent>
           </Tooltip>
         )}
+        <Button
+          variant='outline'
+          size='icon'
+          className='size-8'
+          disabled={!selectedIds.length || !canEditPricing}
+          title={t('Bulk set model pricing')}
+          aria-label={t('Bulk set model pricing')}
+          onClick={() => setShowBulkPricing(true)}
+        >
+          <Percent />
+        </Button>
         <Button
           variant='outline'
           size='icon'
