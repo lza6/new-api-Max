@@ -97,3 +97,17 @@
   - `GET /api/log/traffic` 仍拉 other JSON 全量：因生产 72% 存量日志 request/response_bytes 列为 0（字节只在 other JSON），不能直接切列聚合。需"新写入统一填列 + 存量回填"专项（风险中）。管理端低频，不阻塞公开服务。
 - **运维防护（v1.3.24 部署时一并落）**: new-api 容器加 json-file 日志轮转（max-size 50m × 5）+ mem_limit 2g + cpus 2.0 + stop_grace_period 30s（生产已生效）。
 - **下次不再重复跑**: 未改动这三个 handler / logs 列写入逻辑时，跳过本轮慢查询验证；改到 RecordConsumeLog 字节列写入或 GetLogsTraffic 时重跑。
+
+## 记录 0007 · 带宽/流量排行 Redis 缓存根治 SLOW SQL（2026-09-25，v1.3.26 已上线）
+- **背景**: v1.3.24/25 SQL 聚合后 SLOW SQL 仍持续（500-1448ms）——聚合需扫全量行 SUM。
+- **修复**: 三个非实时排行/统计接口加 60s Redis 缓存（common.RedisSet/Get，key 含 days+limit 作用域）：
+  - queryModelBandwidthLeaderboard（公开 rankings + 管理端 model-leaderboard 共用）
+  - GetBandwidthLeaderboard（按日）
+  - GetLogsTraffic（other JSON 全量，最重 1246-1448ms）
+  - Redis 未启用时静默降级为原行为
+- **生产实测（v1.3.26）**:
+  - rank_model 首次 0.211s（冷启动）→ 二次 **0.0009s / 0.001s**（命中缓存）
+  - traffic 二次 **0.0009s**（此前 1246-1448ms）
+  - 2 分钟窗口 SLOW SQL 仅 1 条（冷启动首次），此后为零
+- **回归测试**: TestBandwidthLeaderboardRedisCache（miniredis，二次命中缓存不依赖 DB）
+- **下次不再重复跑**: 未改这三个 handler 的缓存/查询逻辑时不重跑；改到加缓存/清缓存时机时跑该测试。
