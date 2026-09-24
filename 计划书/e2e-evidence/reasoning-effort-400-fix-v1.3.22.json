@@ -1,0 +1,33 @@
+{
+  "type": "reasoning-effort-400-fix-acceptance",
+  "versions": ["v1.3.20", "v1.3.21", "v1.3.22"],
+  "date": "2026-09-24",
+  "bug": "channel 38 (stable 99) returns 400 'field ReasoningEffort invalid, should be one of: low, medium, high, xhigh, none' and 'json: cannot unmarshal bool into Go struct field' for reasoning_effort=on/max/minimal/true/false even though upstream serves other requests fine",
+  "root_cause": "pass-through sanitize only handled string effort and skipped minimal/max; boolean/number effort failed at strong-typed Go unmarshal before any sanitize",
+  "fixes": [
+    "v1.3.21: sanitize bool/number/minimal/max on pass-through; ConvertOpenAIRequest unconditionally sanitizes",
+    "v1.3.22: pre-unmarshal normalize non-string reasoning_effort in GetAndValidateTextRequest"
+  ],
+  "production_verification": {
+    "container": "new-api ghcr.io/lza6/new-api-max:v1.3.22 Up healthy",
+    "version_header": "X-New-Api-Version: v1.3.22",
+    "request": {
+      "host": "127.0.0.1:3000 (container, bypassing public WAF for observed correctness)",
+      "token": "real enabled token id=632",
+      "model": "deepseek-v4-flash"
+    },
+    "results": [
+      {"effort": "on", "status": 200},
+      {"effort": "max", "status": 200},
+      {"effort": "minimal", "status": 200},
+      {"effort": true, "status": 200},
+      {"effort": false, "status": 200}
+    ],
+    "conclusion": "all previously-failing reasoning_effort forms now 200 through the gateway"
+  },
+  "regression_tests": [
+    "TestSanitizeOpenAIPassThroughReasoningEffort (bool/number/minimal/max)",
+    "TestReasoningEffortNonStringNormalized (bool true/false, number, camelCase, string on untouched)",
+    "go test ./relay/ ./relay/helper/ ./relay/common/ all green"
+  ]
+}
