@@ -120,6 +120,25 @@ func StateFromIntent(intent Intent) *dto.ReasoningConversionState {
 	}
 }
 
+// SanitizeEffort 透传渠道的 reasoning_effort 容错归一（生产修复，channel 38
+// 第三方中转 400 "field ReasoningEffort invalid" 实锤）：合法枚举（含 none/
+// minimal/max）原样保留；"on"/"true"/"yes"/"1"（开启思考的通用表达）-> ""（剔除，
+// 上游用默认，不猜语义）；"off"/"false"/"no"/"0" -> "none"（显式关闭）；
+// 未知值 -> ""（剔除，避免上游 400）。返回 "" 表示应从请求中删除该字段。
+func SanitizeEffort(value string) string {
+	effort := strings.ToLower(strings.TrimSpace(value))
+	switch effort {
+	case "on", "true", "yes", "1":
+		return ""
+	case "off", "false", "no", "0":
+		return "none"
+	}
+	if _, err := ParseEffort(effort); err != nil {
+		return ""
+	}
+	return effort
+}
+
 func ParseEffort(value string) (Effort, error) {
 	effort := Effort(strings.ToLower(strings.TrimSpace(value)))
 	if effort == "" {

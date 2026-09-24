@@ -15,6 +15,7 @@ import (
 	relayconstant "github.com/lza6/new-api-Max/relay/constant"
 	"github.com/lza6/new-api-Max/relay/helper"
 	"github.com/lza6/new-api-Max/relaykit/dto"
+	kitreasoning "github.com/lza6/new-api-Max/relaykit/relayconvert/reasoning"
 	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/model_setting"
@@ -111,7 +112,10 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 				logger.LogDebug(c, "requestBody: %s", debugBytes)
 			}
 		}
-		requestBody = common.NewReplayableBodyReader(storage)
+		// [fix-defensive] OpenAI 透传路径：归一非标准 reasoning_effort（on/true
+		// -> 剔除、off/false -> none）。透传体原样转发，但非法 effort 会触发上游
+		// 400 "field ReasoningEffort invalid"（channel 38 第三方中转实锤）。
+		requestBody = sanitizeOpenAIPassThroughReasoningEffort(common.NewReplayableBodyReader(storage), info.RelayMode)
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
 		if err != nil {
@@ -213,4 +217,42 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 		service.PostTextConsumeQuota(c, info, usage.(*dto.Usage), nil)
 	}
 	return nil
+}
+
+// sanitizeOpenAIPassThroughReasoningEffort 透传模式的 reasoning_effort 归一：
+// 解析 JSON 后把顶层 reasoning_effort 交给 sanitizeReasoningEffortForPassthrough
+// （on/true->剔除、off/false->none、合法值保留、未知值剔除）；非 JSON/解析失败
+// 原样透传（fail-open，不破坏透传语义）。
+func sanitizeOpenAIPassThroughReasoningEffort(body io.Reader, relayMode int) io.Reader {
+	if relayMode != relayconstant.RelayModeChatCompletions {
+		return body
+	}
+	raw, err := io.ReadAll(body)
+	if err != nil {
+		return body
+	}
+	var obj map[string]any
+	if err := common.Unmarshal(raw, &obj); err != nil || obj == nil {
+		return newBytesReader(raw)
+	}
+	if effort, ok := obj["reasoning_effort"].(string); ok {
+		normalized := kitreasoning.SanitizeEffort(effort)
+		if normalized == "" {
+			delete(obj, "reasoning_effort")
+		} else {
+			obj["reasoning_effort"] = normalized
+		}
+	} else if effort, ok := obj["ReasoningEffort"].(string); ok {
+		normalized := kitreasoning.SanitizeEffort(effort)
+		if normalized == "" {
+			delete(obj, "ReasoningEffort")
+		} else {
+			obj["ReasoningEffort"] = normalized
+		}
+	}
+	cleaned, err := common.Marshal(obj)
+	if err != nil {
+		return newBytesReader(raw)
+	}
+	return newBytesReader(cleaned)
 }

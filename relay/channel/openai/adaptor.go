@@ -817,22 +817,7 @@ func (a *Adaptor) GetChannelName() string {
 	}
 }
 
-// sanitizeReasoningEffortForPassthrough 透传渠道的 reasoning_effort 容错归一。
-// 合法值（low/medium/high/xhigh/minimal/max/none）原样保留；空白清理；
-// "on"/"true"（大小写不敏感，开启思考的通用表达）→ 空（剔除，上游用默认，
-// 不猜测语义）；"off"/"false" → "none"（显式关闭）。
+// sanitizeReasoningEffortForPassthrough 委托 relaykit 的归一实现（唯一真源）。
 func sanitizeReasoningEffortForPassthrough(value string) string {
-	effort := strings.ToLower(strings.TrimSpace(value))
-	switch effort {
-	case "on", "true", "yes", "1":
-		return ""
-	case "off", "false", "no", "0":
-		return "none"
-	default:
-		// 合法枚举原样保留；非法值（如随机字符串）剔除，避免上游 400。
-		if _, err := kitreasoning.ParseEffort(effort); err != nil {
-			return ""
-		}
-		return effort
-	}
+	return kitreasoning.SanitizeEffort(value)
 }
