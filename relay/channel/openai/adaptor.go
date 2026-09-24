@@ -259,6 +259,11 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	renderReasoning := len(request.Reasoning) > 0 || len(info.RequestConversionChain) > 1 || request.ReasoningConversion != nil || info.ReasoningState() != nil ||
 		!preserveSuffix && (upstreamEffort != "" || originEffort != "")
 	if info.ChannelType != constant.ChannelTypeOpenRouter && !renderReasoning {
+		// [fix-defensive] 透传渠道对非标准 reasoning_effort 容错归一：
+		// on/true（开启思考的通用表达）→ 剔除，避免上游 400
+		// "field ReasoningEffort invalid"（channel 38 第三方中转实锤）；
+		// off/false → none（显式关闭，deepseek 等上游支持）。
+		request.ReasoningEffort = sanitizeReasoningEffortForPassthrough(request.ReasoningEffort)
 		info.SetReasoningEffort(request.ReasoningEffort)
 	}
 	if info.ChannelType == constant.ChannelTypeOpenRouter {
@@ -809,5 +814,25 @@ func (a *Adaptor) GetChannelName() string {
 		return openrouter.ChannelName
 	default:
 		return ChannelName
+	}
+}
+
+// sanitizeReasoningEffortForPassthrough 透传渠道的 reasoning_effort 容错归一。
+// 合法值（low/medium/high/xhigh/minimal/max/none）原样保留；空白清理；
+// "on"/"true"（大小写不敏感，开启思考的通用表达）→ 空（剔除，上游用默认，
+// 不猜测语义）；"off"/"false" → "none"（显式关闭）。
+func sanitizeReasoningEffortForPassthrough(value string) string {
+	effort := strings.ToLower(strings.TrimSpace(value))
+	switch effort {
+	case "on", "true", "yes", "1":
+		return ""
+	case "off", "false", "no", "0":
+		return "none"
+	default:
+		// 合法枚举原样保留；非法值（如随机字符串）剔除，避免上游 400。
+		if _, err := kitreasoning.ParseEffort(effort); err != nil {
+			return ""
+		}
+		return effort
 	}
 }

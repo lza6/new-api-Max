@@ -278,3 +278,22 @@ func requireOrderedSubstrings(t *testing.T, s string, parts ...string) {
 		offset += idx + len(part)
 	}
 }
+
+// TestSanitizeReasoningEffortForPassthrough 生产回归：OpenAI 透传渠道收到
+// 非标准 reasoning_effort（on/true/off/false）时归一/剔除，避免上游 400
+// "field ReasoningEffort invalid"（channel 38 第三方中转实锤复现）。
+func TestSanitizeReasoningEffortForPassthrough(t *testing.T) {
+	cases := []struct{ in, want string }{
+		{"on", ""}, {"true", ""}, {"ON", ""}, {"yes", ""}, {"1", ""},
+		{"off", "none"}, {"false", "none"}, {"no", "none"}, {"0", "none"},
+		{"high", "high"}, {"medium", "medium"}, {"low", "low"},
+		{"xhigh", "xhigh"}, {"minimal", "minimal"}, {"max", "max"}, {"none", "none"},
+		{"  high  ", "high"}, {"", ""},
+		{"garbage-value", ""},
+	}
+	for _, tc := range cases {
+		if got := sanitizeReasoningEffortForPassthrough(tc.in); got != tc.want {
+			t.Errorf("sanitizeReasoningEffortForPassthrough(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}
