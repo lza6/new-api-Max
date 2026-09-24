@@ -6651,6 +6651,8 @@
     "Copy ID": "Copy ID",
     "Cost Detail": "コスト詳細",
     "Equivalent API cost": "API 相当コスト",
-    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "アップストリームの応答待ちがタイムアウトしました。再試行するかストリーミングに切り替えてください。"
+    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "アップストリームの応答待ちがタイムアウトしました。再試行するかストリーミングに切り替えてください。",
+    "Disable Stream First Token Timeout": "Disable Stream First Token Timeout",
+    "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)"
   }
 }

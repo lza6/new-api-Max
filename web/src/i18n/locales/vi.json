@@ -6651,6 +6651,8 @@
     "Copy ID": "Copy ID",
     "Cost Detail": "Chi tiết chi phí",
     "Equivalent API cost": "Chi phí API tương đương",
-    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "Yêu cầu đã hết thời gian chờ dịch vụ upstream. Vui lòng thử lại hoặc chuyển sang chế độ streaming."
+    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "Yêu cầu đã hết thời gian chờ dịch vụ upstream. Vui lòng thử lại hoặc chuyển sang chế độ streaming.",
+    "Disable Stream First Token Timeout": "Disable Stream First Token Timeout",
+    "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)"
   }
 }

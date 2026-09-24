@@ -56,6 +56,13 @@ func InitEnv() {
 		} else {
 			SessionSecret = ss
 		}
+	} else {
+		// [修复防御] 多实例/滚动发布下不设 SESSION_SECRET：每个进程启动时生成
+		// 各自随机密钥，A 实例签发的会话 JWT/refresh HMAC 在 B 实例校验失败，
+		// Caddy round-robin 会把用户会话随机打失效（表现为「会话过期」循环）。
+		// 单实例可继续免配置；多实例必须在所有实例注入同一个 SESSION_SECRET。
+		log.Println("WARNING: SESSION_SECRET is not set; this process uses a random secret. Multi-instance deployments MUST set the same SESSION_SECRET on every instance, otherwise sessions expire randomly.")
+		log.Println("警告：未设置 SESSION_SECRET，当前进程使用随机密钥。多实例/滚动发布必须在所有实例配置一致的 SESSION_SECRET，否则会话会随机过期。")
 	}
 	if os.Getenv("CRYPTO_SECRET") != "" {
 		CryptoSecret = os.Getenv("CRYPTO_SECRET")

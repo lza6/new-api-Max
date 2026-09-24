@@ -6651,6 +6651,8 @@
     "Copy ID": "Copy ID",
     "Cost Detail": "Cost Detail",
     "Equivalent API cost": "Equivalent API cost",
-    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "The request timed out waiting for the upstream service. Please try again or switch to streaming."
+    "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "The request timed out waiting for the upstream service. Please try again or switch to streaming.",
+    "Disable Stream First Token Timeout": "Disable Stream First Token Timeout",
+    "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)"
   }
 }
