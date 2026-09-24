@@ -60,3 +60,38 @@ curl -s https://freeapi.tingfengai.art/api/status | grep version   # 确认回�
 ### 推荐
 - 免费/公益网关：`CountToken=false`（省 CPU、首字更快，预扣风险可接受）。
 - 商业计费网关：保持 `CountToken=true`（预扣精度优先，避免超用）。
+
+## 6. 生产加固基线（2026-09-25 v1.3.26 实机验证）
+
+> 下列加固已在 freeapi.tingfengai.art 生效，新环境按此基线部署。
+
+### 容器资源与日志
+- **日志轮转**（docker json-file）：`logging: {driver: json-file, options: {max-size: "50m", max-file: "5"}}`
+  → 容器 stdout 日志有界，防磁盘撑爆。
+- **资源限制**：`mem_limit: 2g` + `cpus: "2.0"` + `stop_grace_period: 30s`
+  → 单容器不耗尽宿主机（生产实测峰值 ~150MB / 3% CPU）。
+- **应用日志**：`command: --log-dir /app/logs` 内部按时间段自动切文件（有界）。
+
+### 自更新
+- **Watchtower**（仅更新 new-api）：compose 给 new-api 加
+  `labels: com.centurylinklabs.watchtower.enable=true`；watchtower 容器
+  `--restart always --poll-interval 300 --label-enable`。
+
+### 性能 env（生产验证）
+```yaml
+MEMORY_CACHE_ENABLED=true  SYNC_FREQUENCY=60
+LOG_FLUSH_ENABLED=true     LOG_FLUSH_INTERVAL=1000  LOG_FLUSH_BATCH=500
+RELAY_TIMEOUT=900          RELAY_429_RETRY_DELAY=1000  RELAY_429_MAX_RETRIES=2
+SQL_MAX_OPEN_CONNS=64      SQL_MAX_IDLE_CONNS=16   SQL_MAX_LIFETIME=300
+```
+
+### 数据库备份（P0，2026-09-25 建立）
+- 脚本：`/usr/local/bin/backup-newapi.sh`（docker exec pg_dump + gzip → /opt/backup/new-api/）
+- Cron：每日 03:10（`10 3 * * *`），保留 7 天（`find -mtime +7 -delete`）
+- 验证：首次备份 40MB / 43 张表 / gzip 完整 / users/channels/logs/tokens 均在。
+- 恢复：`zcat /opt/backup/new-api/newapi-<TS>.sql.gz | docker exec -i postgres psql -U newapi -d new-api`
+
+### 慢查询防护（v1.3.24-26）
+- 带宽/流量排行已 SQL 聚合 + 60s Redis 缓存（SLOW SQL 从 25 条/2h → 0）。
+- 排查命令：`docker logs new-api --since 2h | grep 'SLOW SQL'`；命中后查
+  `controller/log.go` 对应 handler（queryModelBandwidthLeaderboard / GetBandwidthLeaderboard / GetLogsTraffic）。
