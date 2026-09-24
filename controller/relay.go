@@ -534,6 +534,11 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		// timeout/bad_request/capability/ok）落到错误日志，前端可直接人话映射，
 		// 排障不再需要人工比对状态码。
 		other.SetPublic("error_class", service.RelayErrorClassString(errClass))
+		// [修复防御] 错误日志记录请求体字节（排障：确认是网关转发问题还是上游拒绝；
+		// 此前 request_bytes=0 无法判断请求是否正常发出）。
+		if relayInfo != nil && relayInfo.RequestBytes > 0 {
+			other.SetPublic("request_bytes", relayInfo.RequestBytes)
+		}
 		service.AppendRelayLogAdminInfo(c, relayInfo, other)
 		service.AppendTaskPluginContextAuditInfo(c, other)
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
