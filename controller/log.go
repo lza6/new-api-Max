@@ -171,6 +171,30 @@ func GetLogsTraffic(c *gin.Context) {
 			days = min(n, 90)
 		}
 	}
+	// [fix-perf] 管理端流量统计：原实现拉窗口内全量 other JSON（生产 38 万行）
+	// 实测 1246-1448ms（线上 SLOW SQL 最多）。数据非实时敏感，加 60s Redis 缓存
+	// 根治重复全表扫描；Redis 未启用时静默跳过。
+	cacheKey := fmt.Sprintf("traffic:day:%d", days)
+	if common.RedisEnabled {
+		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
+			var cachedPayload struct {
+				Rows   []service.TrafficRecord
+				ByDay  []service.DailyTraffic
+				Total  int64
+				ReqCnt int64
+			}
+			if common.Unmarshal([]byte(cached), &cachedPayload) == nil && cachedPayload.ByDay != nil {
+				common.ApiSuccess(c, gin.H{
+					"days":           days,
+					"total_requests": cachedPayload.ReqCnt,
+					"total_bytes":    cachedPayload.Total,
+					"total_mb":       float64(cachedPayload.Total) / (1024 * 1024),
+					"by_day":         cachedPayload.ByDay,
+				})
+				return
+			}
+		}
+	}
 	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
 	var rows []service.TrafficRecord
 	if err := model.LOG_DB.Model(&model.Log{}).
@@ -184,6 +208,17 @@ func GetLogsTraffic(c *gin.Context) {
 	var total int64
 	for i := range byDay {
 		total += byDay[i].Bytes
+	}
+	if common.RedisEnabled {
+		payload := struct {
+			Rows   []service.TrafficRecord `json:"rows"`
+			ByDay  []service.DailyTraffic  `json:"by_day"`
+			Total  int64                   `json:"total"`
+			ReqCnt int64                   `json:"req_cnt"`
+		}{Rows: rows, ByDay: byDay, Total: total, ReqCnt: int64(len(rows))}
+		if raw, err := common.Marshal(payload); err == nil {
+			_ = common.RedisSet(cacheKey, string(raw), time.Minute)
+		}
 	}
 	common.ApiSuccess(c, gin.H{
 		"days":           days,
@@ -248,6 +283,28 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 			limit = min(n, 1000)
 		}
 	}
+	// [fix-perf] 管理端按日带宽排行：SQL 聚合仍需扫全量行 SUM（500-1100ms）。
+	// 排行数据非实时敏感，加 60s Redis 缓存根治重复全表扫描。
+	cacheKey := fmt.Sprintf("bandwidth:day:%d:%d", days, limit)
+	if common.RedisEnabled {
+		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
+			var cachedRows []service.BandwidthDay
+			if common.Unmarshal([]byte(cached), &cachedRows) == nil && cachedRows != nil {
+				type cachedRow struct {
+					Date      string `json:"date"`
+					Requests  int64  `json:"requests"`
+					Bytes     int64  `json:"bytes"`
+					BytesText string `json:"bytes_text"`
+				}
+				out := make([]cachedRow, 0, len(cachedRows))
+				for _, d := range cachedRows {
+					out = append(out, cachedRow{Date: d.Date, Requests: d.Requests, Bytes: d.Bytes, BytesText: common.FormatBytes(d.Bytes)})
+				}
+				common.ApiSuccess(c, gin.H{"days": days, "limit": limit, "leaderboard": out})
+				return
+			}
+		}
+	}
 	// [fix-perf] 原实现把窗口内全量行（生产 38 万行）拉进 Go 内存再按日聚合，
 	// 线上 SLOW SQL 实测 1273-1490ms。改为 SQL 聚合：按 (created_at + 时区偏移)
 	// / 86400 整除得到本地日期整数键，数据库只返回日期行（≤days 组）；时区偏移
@@ -278,6 +335,11 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 		date := time.Unix(r.DayKey*86400-tzOffset, 0).In(time.Local).Format("2006-01-02")
 		byDay = append(byDay, service.BandwidthDay{Date: date, Requests: r.Requests, Bytes: r.Bytes})
 	}
+	if common.RedisEnabled {
+		if raw, err := common.Marshal(byDay); err == nil {
+			_ = common.RedisSet(cacheKey, string(raw), time.Minute)
+		}
+	}
 	type row struct {
 		Date      string `json:"date"`
 		Requests  int64  `json:"requests"`
@@ -295,13 +357,24 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 // GET /api/log/bandwidth/model-leaderboard?days=30&limit=10
 // queryModelBandwidthLeaderboard 查询 consume 日志并按模型聚合带宽（降序限量），
 // 供管理端 /api/log/bandwidth/model-leaderboard 与公开 /api/rankings/bandwidth 复用。
-// queryModelBandwidthLeaderboard 查询 consume 日志并按模型聚合带宽（降序限量）。
 // [fix-perf] 原实现把 30 天全量行（生产约 37 万行）拉进 Go 内存再聚合，
 // 线上实测 541ms（GET /api/rankings/bandwidth）。改为 SQL GROUP BY 聚合：
 // 数据库只返回 limit 行，传输/内存量从全量行降到 Top-N；COALESCE(NULLIF())
 // 保持与 AggregateBandwidthByModel 相同的空模型名 -> "(unknown)" 语义。
 // 三库兼容：COALESCE/NULLIF/GROUP BY/SUM 是 SQL 标准，GORM 生成无方言 SQL。
 func queryModelBandwidthLeaderboard(days, limit int) ([]service.BandwidthModel, error) {
+	// [fix-perf] 公开+管理端模型带宽排行共用：SQL 聚合仍需扫窗口内全量行做 SUM，
+	// 线上 SLOW SQL 实测 500-800ms。排行数据非实时敏感，加 60s Redis 缓存根治
+	// 重复全表扫描（Redis 未启用时静默跳过，行为不变）。
+	cacheKey := fmt.Sprintf("bandwidth:model:%d:%d", days, limit)
+	if common.RedisEnabled {
+		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
+			var out []service.BandwidthModel
+			if common.Unmarshal([]byte(cached), &out) == nil {
+				return out, nil
+			}
+		}
+	}
 	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
 	limit = max(limit, 0)
 	type bandwidthRow struct {
@@ -330,6 +403,11 @@ func queryModelBandwidthLeaderboard(days, limit int) ([]service.BandwidthModel, 
 			Requests: r.Requests,
 			Bytes:    r.Bytes,
 		})
+	}
+	if common.RedisEnabled {
+		if raw, err := common.Marshal(out); err == nil {
+			_ = common.RedisSet(cacheKey, string(raw), time.Minute)
+		}
 	}
 	return out, nil
 }

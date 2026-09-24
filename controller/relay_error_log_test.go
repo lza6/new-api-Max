@@ -14,8 +14,10 @@ import (
 	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/lza6/new-api-Max/service"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
+	"github.com/go-redis/redis/v8"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -320,4 +322,53 @@ func queryBandwidthLeaderboardSQL(t *testing.T, days, limit int, tzOffset int64)
 		out = append(out, service.BandwidthDay{Date: date, Requests: r.Requests, Bytes: r.Bytes})
 	}
 	return out, nil
+}
+
+// TestBandwidthLeaderboardRedisCache 验证带宽排行 Redis 缓存：启用 Redis 时
+// 首次查询写缓存，二次查询命中缓存（不再触发 DB 全表聚合）。miniredis 模拟。
+func TestBandwidthLeaderboardRedisCache(t *testing.T) {
+	previousDB, previousLogDB := model.DB, model.LOG_DB
+	previousMainDatabaseType := common.MainDatabaseType()
+	previousLogDatabaseType := common.LogDatabaseType()
+	previousRedisEnabled := common.RedisEnabled
+	oldRDB := common.RDB
+
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	require.NoError(t, database.AutoMigrate(&model.Log{}))
+	model.DB, model.LOG_DB = database, database
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+
+	server := miniredis.RunT(t)
+	common.RDB = redis.NewClient(&redis.Options{Addr: server.Addr(), MaxRetries: -1})
+	common.RedisEnabled = true
+	t.Cleanup(func() {
+		_ = common.RDB.Close()
+		common.RDB = oldRDB
+		common.RedisEnabled = previousRedisEnabled
+		model.DB, model.LOG_DB = previousDB, previousLogDB
+		common.SetDatabaseTypes(previousMainDatabaseType, previousLogDatabaseType)
+		require.NoError(t, sqlDB.Close())
+	})
+
+	now := time.Now().Unix()
+	logs := []*model.Log{
+		{Type: model.LogTypeConsume, ModelName: "m1", RequestBytes: 100, ResponseBytes: 900, CreatedAt: now},
+		{Type: model.LogTypeConsume, ModelName: "m2", RequestBytes: 50, ResponseBytes: 10, CreatedAt: now},
+	}
+	require.NoError(t, database.Create(&logs).Error)
+
+	// 首次：走 DB 聚合 + 写缓存
+	first, err := queryModelBandwidthLeaderboard(30, 10)
+	require.NoError(t, err)
+	require.Len(t, first, 2)
+	require.True(t, server.Exists("bandwidth:model:30:10"), "缓存 key 应已写入")
+
+	// 二次：应命中缓存（清空 DB 数据不影响结果 = 证明未查 DB）
+	require.NoError(t, database.Delete(&logs).Error)
+	second, err := queryModelBandwidthLeaderboard(30, 10)
+	require.NoError(t, err)
+	require.Equal(t, first, second, "缓存命中应返回相同数据且不依赖 DB")
 }
