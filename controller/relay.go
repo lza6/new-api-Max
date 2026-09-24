@@ -539,6 +539,10 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		if relayInfo != nil && relayInfo.RequestBytes > 0 {
 			other.SetPublic("request_bytes", relayInfo.RequestBytes)
 		}
+		// [修复防御] 上游响应体（截断脱敏预览）写入错误日志，排障可见完整拒绝原因。
+		if len(err.Metadata) > 0 {
+			other.SetAdmin("upstream_response", string(err.Metadata))
+		}
 		service.AppendRelayLogAdminInfo(c, relayInfo, other)
 		service.AppendTaskPluginContextAuditInfo(c, other)
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)

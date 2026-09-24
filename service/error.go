@@ -95,6 +95,11 @@ func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFai
 	var errResponse dto.GeneralErrorResponse
 	responseBodyText := string(responseBody)
 	responseBodyPreview := common.LocalLogPreview(responseBodyText)
+	// [fix-defensive] upstream response preview (truncated+sanitized) into error
+	// metadata so error logs can show the full rejection reason.
+	if meta, mErr := common.Marshal(map[string]any{"upstream_response": responseBodyPreview}); mErr == nil {
+		newApiErr.Metadata = meta
+	}
 	buildErrWithBody := func(message string) error {
 		if message == "" {
 			return fmt.Errorf("bad response status code %d, body: %s", resp.StatusCode, responseBodyText)
