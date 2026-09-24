@@ -1,0 +1,15 @@
+{
+  "type": "400-triage-acceptance",
+  "version": "v1.3.17",
+  "date": "2026-09-24",
+  "bug": "channel 38 deepseek-v4-flash returns 400 'inference request is invalid' for cctoken user at high frequency",
+  "root_cause": "Upstream third-party relay (166.1.232.146:8080) rejects specific client request content. Gateway passthrough is correct.",
+  "verification": {
+    "direct_key1": "200 stream (same model/body via channel key 1)",
+    "direct_key2": "200 stream (channel key 2)",
+    "direct_with_stream_options": "200 stream (stream_options.include_usage injected by gateway also OK)",
+    "via_gateway_cctoken": "200 stream (same token hello request OK)",
+    "conclusion": "400 is upstream rejecting specific request content; not a gateway construction bug"
+  },
+  "fix": "error log now records request_bytes (was 0) so future 400 triage can confirm the request was sent and its size"
+}
