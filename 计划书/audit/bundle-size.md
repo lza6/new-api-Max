@@ -52,3 +52,16 @@ Top 10 chunk（原始/gzip）：
 - **结论**: 入口已是最优结构（重依赖全异步 + 路由级 autoCodeSplitting）；进一步瘦身需拆共享层，
   收益低风险高，**不推荐**。首屏 JS ≈ 1.25MB gzip 为合理基线。
 - **防重复跑**: 不再重复全量 build 仅看 index 体积；改动入口/共享层后再对比。
+
+## 记录 0003 · T9-E2/E3 最终核验（2026-09-24 第二轮）
+- **E2 入口复测**: `bun run build` 实测 index.js **4379.4 kB（gzip 1246.2 kB）**，与记录 0002
+  （4377.6 kB）一致 → 入口结构稳定，重依赖全异步分包 + 路由级 autoCodeSplitting 已是最优，
+  **维持"不推荐进一步瘦身"结论**（拆共享层收益低风险高）。
+- **E3 knip 死代码**: 收紧 `knip.config.ts`（移除过时的 tailwindcss/tw-animate-css
+  ignoreDependencies，二者已被 rsbuild 插件追踪为使用）；配置提示 3→1，仅剩
+  routeTree.gen.ts（TanStack Router 生成文件，保留 ignore 正确）。
+  **无新增死代码**：批量定价组件（BulkPricingDialog）被 data-table-bulk-actions 引用，
+  未被 knip 标记；68 个历史未使用文件/类型属存量，不清理（风险高、非本批范围）。
+- **测试 mock 类型修复**: bulk-pricing-dialog.test.tsx 的 `options: {}` 缺 PricingOptions
+  全字段导致 tsgo 报错，补齐 10 个 key → typecheck 绿 + vitest 3/3 绿。
+- **结论**: T9-E2/E3 **闭环**。首屏 JS ≈ 1.25MB gzip 为合理基线；改动入口/共享层后再对比。
