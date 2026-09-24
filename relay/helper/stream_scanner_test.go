@@ -17,6 +17,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/constant"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/lza6/new-api-Max/setting/relay_setting"
@@ -863,4 +864,66 @@ func TestStreamScannerHandler_ReasoningRenewsFirstTokenTimeout(t *testing.T) {
 
 	assert.Nil(t, fatalErr, "reasoning 持续流超过首包超时阈值后到达 content 必须正常结束，不得误杀为 upstream stream timeout")
 	assert.Contains(t, recorder.Body.String(), "FINAL-ANSWER", "客户端应收到最终 content")
+}
+
+// TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_PassthroughSlowFirstToken
+// 生产回归（用户日志：上游正常但慢首包，网关默认 15s 首包超时误杀成 500
+// upstream stream timeout）。渠道 DisableStreamFirstTokenTimeout=true 后：
+// 首包等待超过 1s 阈值仍必须正常结束并透传，不得返回 fatalErr。
+func TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_PassthroughSlowFirstToken(t *testing.T) {
+	rs := relay_setting.GetRelaySetting()
+	oldFallover := rs.StreamFallover
+	oldTimeout := rs.StreamFirstTokenTimeout
+	rs.StreamFallover = true
+	rs.StreamFirstTokenTimeout = 1 // 1s 首包超时，加速测试
+	t.Cleanup(func() {
+		rs.StreamFallover = oldFallover
+		rs.StreamFirstTokenTimeout = oldTimeout
+	})
+
+	pipeR, pipeW := io.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		time.Sleep(2500 * time.Millisecond) // > 1s 阈值：慢首包
+		_, _ = pipeW.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"FINAL-ANSWER\"}}]}\n"))
+		_, _ = pipeW.Write([]byte("data: [DONE]\n"))
+		_ = pipeW.Close()
+	}()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	resp := &http.Response{Body: io.NopCloser(pipeR)}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{
+		ChannelSetting: dto.ChannelSettings{DisableStreamFirstTokenTimeout: true},
+	}}
+
+	var got []string
+	fatalErr := StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {
+		got = append(got, data)
+		_, _ = c.Writer.WriteString(data + "\n")
+	})
+	<-done
+
+	assert.Nil(t, fatalErr, "渠道透传关闭首包超时后，慢首包必须正常结束，不得误杀为 upstream stream timeout")
+	assert.Contains(t, recorder.Body.String(), "FINAL-ANSWER", "客户端应收到最终 content")
+	assert.Len(t, got, 1)
+}
+
+// TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_EmptyBodyStillFails
+// 兜底防资损：渠道关闭首包超时绝不放松空壳流判定——空响应体（仅 [DONE]）仍返回 fatalErr。
+func TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_EmptyBodyStillFails(t *testing.T) {
+	rs := relay_setting.GetRelaySetting()
+	oldFallover := rs.StreamFallover
+	rs.StreamFallover = true
+	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+
+	body := "data: [DONE]\n"
+	c, resp, info := setupStreamTest(t, strings.NewReader(body))
+	info.ChannelMeta.ChannelSetting.DisableStreamFirstTokenTimeout = true
+
+	fatalErr := StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {})
+	require.NotNil(t, fatalErr, "空响应体 + fallover on 仍必须判定失败（空壳流兜底不因透传开关放松）")
+	assert.Equal(t, types.ErrorCodeDoRequestFailed, fatalErr.GetErrorCode())
 }

@@ -135,6 +135,16 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 	var bufferWriter *FirstPacketBufferWriter
 	var firstTokenTimer *time.Timer
 	firstTokenTimedOut := false
+	// [修复防御] 渠道级「流式直通（透传）」：稳定/中转渠道开启
+	// DisableStreamFirstTokenTimeout 后，首包缓冲与空壳兜底保留，但不再按
+	// stream_first_token_timeout（默认 15s）判首包超时——上游慢但正常（排队、
+	// 长 reasoning 后才有首 token）的流不再被网关策略误杀成 500/504；
+	// 仍由持续流超时（STREAMING_TIMEOUT）与空壳流检测兜底。
+	firstTokenTimeout := relay_setting.GetStreamFirstTokenTimeout()
+	if info != nil && info.ChannelMeta != nil && info.ChannelSetting.DisableStreamFirstTokenTimeout {
+		firstTokenTimeout = 0
+		logger.LogInfo(c, "channel disables stream first-token timeout (passthrough)")
+	}
 	// B1-1 修复：保存原始 writer，函数返回前恢复。否则渠道重试链上
 	// 第二次调用会嵌套包装上一次未 commit 的 bufferWriter，导致提交数据
 	// 写进旧缓冲而无法透传到客户端（真实 bug：三渠道 fallover 场景验证暴露）。
@@ -143,8 +153,12 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		bufferWriter = NewFirstPacketBufferWriter(c.Writer)
 		c.Writer = bufferWriter
 		info.DisablePing = true
-		firstTokenTimer = time.NewTimer(time.Duration(relay_setting.GetStreamFirstTokenTimeout()) * time.Second)
-		defer firstTokenTimer.Stop()
+		// 渠道透传开关关闭首包超时时不建定时器（firstTokenCh 为 nil，
+		// 主 select 永不命中该分支），由缓冲+空壳/持续流超时兜底。
+		if firstTokenTimeout > 0 {
+			firstTokenTimer = time.NewTimer(time.Duration(firstTokenTimeout) * time.Second)
+			defer firstTokenTimer.Stop()
+		}
 		// 成功路径：buffer 已 commit 写穿到 originalWriter，恢复后 dataHandler
 		// 直接写原始 writer（等价直通）；失败路径：缓冲丢弃，客户端零字节，
 		// 重试链干净地换下一候选。

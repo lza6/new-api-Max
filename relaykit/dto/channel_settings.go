@@ -16,8 +16,13 @@ type ChannelSettings struct {
 	ThinkingToContent      bool   `json:"thinking_to_content,omitempty"`
 	Proxy                  string `json:"proxy"`
 	PassThroughBodyEnabled bool   `json:"pass_through_body_enabled,omitempty"`
-	SystemPrompt           string `json:"system_prompt,omitempty"`
-	SystemPromptOverride   bool   `json:"system_prompt_override,omitempty"`
+	// DisableStreamFirstTokenTimeout 按渠道关闭「流式首包超时」（默认关，透传语义）。
+	// 透传/慢上游场景开启后：首包缓冲保留，但不再因首包等待超过
+	// stream_first_token_timeout 判定渠道失败——由持续流超时（STREAMING_TIMEOUT）
+	// 与空壳流兜底，避免把正常慢流误杀成 500/504。仅 StreamFallover 开启时有效。
+	DisableStreamFirstTokenTimeout bool   `json:"disable_stream_first_token_timeout,omitempty"`
+	SystemPrompt                   string `json:"system_prompt,omitempty"`
+	SystemPromptOverride           bool   `json:"system_prompt_override,omitempty"`
 	// HTTPProtocol controls outbound HTTP version negotiation for this channel.
 	// Accepted values: "", "auto" (default), "http1".
 	HTTPProtocol string `json:"http_protocol,omitempty"`
