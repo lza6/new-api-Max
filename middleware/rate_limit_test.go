@@ -273,3 +273,58 @@ func TestIsRateLimitExemptModel(t *testing.T) {
 	assert.True(t, isRateLimitExemptModel(newCtx(`{"model":"google-translate"}`)))
 	assert.False(t, isRateLimitExemptModel(newCtx(`{"model":"deepseek-v4-flash"}`)))
 }
+
+func TestIsHealthProbePath(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/api/status", true},
+		{"/api/uptime/status", true},
+		{"/api/status/", false},
+		{"/api/status/test", false},
+		{"/api/models", false},
+		{"/", false},
+	}
+	for _, tc := range cases {
+		assert.Equal(t, tc.want, isHealthProbePath(tc.path), "path=%q", tc.path)
+	}
+}
+
+// TestGlobalAPIRateLimitSkipsHealthProbe 生产回归：Caddy 1s 活跃健康检查打
+// /api/status 曾打爆 GA 限流桶→429→后端全部被摘→公网 503。健康探针路径
+// 必须豁免全局 API 限流；非探针路径限流行为保持不变。
+func TestGlobalAPIRateLimitSkipsHealthProbe(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	prevEnable := common.GlobalApiRateLimitEnable
+	prevNum := common.GlobalApiRateLimitNum
+	prevDuration := common.GlobalApiRateLimitDuration
+	common.GlobalApiRateLimitEnable = true
+	common.GlobalApiRateLimitNum = 1 // 窗口内只放 1 次：探针必须仍无限通过
+	common.GlobalApiRateLimitDuration = 60
+	t.Cleanup(func() {
+		common.GlobalApiRateLimitEnable = prevEnable
+		common.GlobalApiRateLimitNum = prevNum
+		common.GlobalApiRateLimitDuration = prevDuration
+	})
+
+	_, _ = useRateLimitMiniRedis(t) // Redis 限流桶（与包内其他限流测试一致）
+	router := gin.New()
+	require.NoError(t, router.SetTrustedProxies(nil))
+	router.GET("/api/status", GlobalAPIRateLimit(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+	router.GET("/api/limited", GlobalAPIRateLimit(), func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+
+	for range 3 {
+		assert.Equal(t, http.StatusNoContent,
+			performRateLimitRequest(router, "/api/status", "10.0.0.1:1234").Code,
+			"健康探针路径必须豁免 GA 全局限流")
+	}
+	assert.Equal(t, http.StatusNoContent,
+		performRateLimitRequest(router, "/api/limited", "10.0.0.2:1234").Code)
+	assert.Equal(t, http.StatusTooManyRequests,
+		performRateLimitRequest(router, "/api/limited", "10.0.0.2:1234").Code)
+}

@@ -173,10 +173,26 @@ func GlobalWebRateLimit() func(c *gin.Context) {
 }
 
 func GlobalAPIRateLimit() func(c *gin.Context) {
-	if common.GlobalApiRateLimitEnable {
-		return rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+	if !common.GlobalApiRateLimitEnable {
+		return defNext
 	}
-	return defNext
+	limiter := rateLimitFactory(common.GlobalApiRateLimitNum, common.GlobalApiRateLimitDuration, "GA")
+	return func(c *gin.Context) {
+		// [修复防御] 健康检查/探针自伤：Caddy 等 LB 以本机 IP 高频打
+		// /api/status(/api/uptime/status) 做活跃健康检查，若计入 GA 全局
+		// 限流桶，探针会先打爆桶→429→后端被误判不健康→公网 503。
+		// 探活端点仅返回静态/低开销状态，无鉴权风险面，豁免不计费。
+		if c.Request.Method == http.MethodGet && isHealthProbePath(c.Request.URL.Path) {
+			c.Next()
+			return
+		}
+		limiter(c)
+	}
+}
+
+// isHealthProbePath 判定是否 LB 健康检查探针路径（只读、低成本、无敏感数据）。
+func isHealthProbePath(path string) bool {
+	return path == "/api/status" || path == "/api/uptime/status"
 }
 
 func CriticalRateLimit() func(c *gin.Context) {
