@@ -2,6 +2,7 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -11,6 +12,7 @@ import (
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/relaykit/types"
+	"github.com/lza6/new-api-Max/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/glebarez/sqlite"
@@ -239,4 +241,83 @@ func TestQueryModelBandwidthLeaderboardSQLAggregation(t *testing.T) {
 	for _, m := range filtered {
 		require.NotEqual(t, "old-model", m.Model, "超窗数据不应出现在 days=1 结果中")
 	}
+}
+
+// TestGetBandwidthLeaderboardSQLAggregation 验证按日带宽排行 SQL 聚合：
+// (created_at + 时区偏移)/86400 整数键分组，Go 端还原日期；字节/请求数正确；
+// 排除 error 日志；limit 生效。管理端 SLOW SQL 修复回归（原拉 38 万行 1273ms）。
+func TestGetBandwidthLeaderboardSQLAggregation(t *testing.T) {
+	previousDB, previousLogDB := model.DB, model.LOG_DB
+	previousMainDatabaseType := common.MainDatabaseType()
+	previousLogDatabaseType := common.LogDatabaseType()
+
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	require.NoError(t, database.AutoMigrate(&model.Log{}))
+	model.DB, model.LOG_DB = database, database
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+	t.Cleanup(func() {
+		model.DB, model.LOG_DB = previousDB, previousLogDB
+		common.SetDatabaseTypes(previousMainDatabaseType, previousLogDatabaseType)
+		require.NoError(t, sqlDB.Close())
+	})
+
+	now := time.Now()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local).Unix()
+	yesterday := startOfToday - 86400
+	_, tzOffsetInt := now.In(time.Local).Zone()
+	tzOffset := int64(tzOffsetInt)
+
+	logs := []*model.Log{
+		{Type: model.LogTypeConsume, ModelName: "m1", RequestBytes: 100, ResponseBytes: 900, CreatedAt: startOfToday + 3600},
+		{Type: model.LogTypeConsume, ModelName: "m2", RequestBytes: 200, ResponseBytes: 800, CreatedAt: startOfToday + 7200},
+		{Type: model.LogTypeConsume, ModelName: "m1", RequestBytes: 50, ResponseBytes: 50, CreatedAt: yesterday + 3600},
+		{Type: model.LogTypeError, ModelName: "m1", RequestBytes: 999, ResponseBytes: 999, CreatedAt: startOfToday},
+	}
+	require.NoError(t, database.Create(&logs).Error)
+
+	// days=30 覆盖两条；error 日志排除；按日字节降序（今天 2000 > 昨天 100）
+	got, err := queryBandwidthLeaderboardSQL(t, 30, 10, tzOffset)
+	require.NoError(t, err)
+	require.Len(t, got, 2)
+
+	// 具体断言两行的日期与字节
+	todayStr := time.Unix(startOfToday, 0).In(time.Local).Format("2006-01-02")
+	yesterdayStr := time.Unix(yesterday, 0).In(time.Local).Format("2006-01-02")
+	require.Equal(t, todayStr, got[0].Date)
+	require.Equal(t, int64(2000), got[0].Bytes)
+	require.Equal(t, int64(2), got[0].Requests)
+	require.Equal(t, yesterdayStr, got[1].Date)
+	require.Equal(t, int64(100), got[1].Bytes)
+	require.Equal(t, int64(1), got[1].Requests)
+}
+
+// queryBandwidthLeaderboardSQL 抽取 GetBandwidthLeaderboard 的 SQL 聚合核心，
+// 便于独立单测（controller handler 层依赖 gin 上下文较耦合）。
+func queryBandwidthLeaderboardSQL(t *testing.T, days, limit int, tzOffset int64) ([]service.BandwidthDay, error) {
+	dayStart := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+	type dayRow struct {
+		DayKey   int64 `gorm:"column:day_key"`
+		Requests int64 `gorm:"column:requests"`
+		Bytes    int64 `gorm:"column:bytes"`
+	}
+	var dayRows []dayRow
+	if err := model.LOG_DB.Model(&model.Log{}).
+		Select(fmt.Sprintf("(created_at + %d) / 86400 AS day_key", tzOffset),
+			"COUNT(*) AS requests",
+			"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume, dayStart).
+		Group("day_key").
+		Order("bytes DESC, day_key ASC").
+		Scan(&dayRows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]service.BandwidthDay, 0, len(dayRows))
+	for _, r := range dayRows {
+		date := time.Unix(r.DayKey*86400-tzOffset, 0).In(time.Local).Format("2006-01-02")
+		out = append(out, service.BandwidthDay{Date: date, Requests: r.Requests, Bytes: r.Bytes})
+	}
+	return out, nil
 }

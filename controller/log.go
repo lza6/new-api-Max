@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -247,16 +248,36 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 			limit = min(n, 1000)
 		}
 	}
-	var rows []service.TrafficBytesRecord
+	// [fix-perf] 原实现把窗口内全量行（生产 38 万行）拉进 Go 内存再按日聚合，
+	// 线上 SLOW SQL 实测 1273-1490ms。改为 SQL 聚合：按 (created_at + 时区偏移)
+	// / 86400 整除得到本地日期整数键，数据库只返回日期行（≤days 组）；时区偏移
+	// 用 Go 当前本地时区（Asia/Shanghai 无 DST，生产 TZ 固定），纯整数算术
+	// SQLite/MySQL/PG 三库一致，无方言日期函数。
+	_, tzOffsetInt := time.Now().In(time.Local).Zone()
+	tzOffset := int64(tzOffsetInt)
+	dayStart := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+	type dayRow struct {
+		DayKey   int64 `gorm:"column:day_key"`
+		Requests int64 `gorm:"column:requests"`
+		Bytes    int64 `gorm:"column:bytes"`
+	}
+	var dayRows []dayRow
 	if err := model.LOG_DB.Model(&model.Log{}).
-		Select("created_at", "request_bytes", "response_bytes").
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume,
-			time.Now().Add(-time.Duration(days)*24*time.Hour).Unix()).
-		Scan(&rows).Error; err != nil {
+		Select(fmt.Sprintf("(created_at + %d) / 86400 AS day_key", tzOffset),
+			"COUNT(*) AS requests",
+			"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume, dayStart).
+		Group("day_key").
+		Order("bytes DESC, day_key ASC").
+		Scan(&dayRows).Error; err != nil {
 		common.ApiErrorMsg(c, "failed to query bandwidth leaderboard: "+err.Error())
 		return
 	}
-	byDay := service.AggregateBandwidthByDay(rows, time.Local, limit)
+	byDay := make([]service.BandwidthDay, 0, len(dayRows))
+	for _, r := range dayRows {
+		date := time.Unix(r.DayKey*86400-tzOffset, 0).In(time.Local).Format("2006-01-02")
+		byDay = append(byDay, service.BandwidthDay{Date: date, Requests: r.Requests, Bytes: r.Bytes})
+	}
 	type row struct {
 		Date      string `json:"date"`
 		Requests  int64  `json:"requests"`
