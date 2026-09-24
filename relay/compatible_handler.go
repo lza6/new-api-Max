@@ -235,21 +235,55 @@ func sanitizeOpenAIPassThroughReasoningEffort(body io.Reader, relayMode int) io.
 	if err := common.Unmarshal(raw, &obj); err != nil || obj == nil {
 		return newBytesReader(raw)
 	}
-	if effort, ok := obj["reasoning_effort"].(string); ok {
-		normalized := kitreasoning.SanitizeEffort(effort)
-		if normalized == "" {
-			delete(obj, "reasoning_effort")
-		} else {
-			obj["reasoning_effort"] = normalized
+	// [fix-defensive] 归一非标准 reasoning_effort：字符串（on/off/未知值）与
+	// bool/number（true/1、false/0）都统一交给 SanitizeEffort；minimal/max 虽
+	// 是通用合法枚举，但 channel 38 第三方中转只接受 low/medium/high/xhigh/none，
+	// 透传=镜像转发给单一上游，遇不认的枚举必然 400，故透传场景一并剔除（fail-open，
+	// 上游用默认）。规避 Phase 1 推演：非 string 类型（bool true）原样透传导致上游
+	// 400 "field ReasoningEffort invalid" 的连锁反应。
+	sanitizeReasoningKey := func(key string) {
+		value, exists := obj[key]
+		if !exists {
+			return
 		}
-	} else if effort, ok := obj["ReasoningEffort"].(string); ok {
-		normalized := kitreasoning.SanitizeEffort(effort)
+		var normalized string
+		switch v := value.(type) {
+		case string:
+			normalized = kitreasoning.SanitizeEffort(v)
+			// 透传=镜像转发给单一上游：minimal/max 虽为通用合法枚举，但
+			// channel 38 第三方中转只接受 low/medium/high/xhigh/none，
+			// 保留必 400，故透传场景剔除（上游用默认，不猜语义）。
+			if normalized == string(kitreasoning.EffortMinimal) || normalized == string(kitreasoning.EffortMax) {
+				normalized = ""
+			}
+		case bool:
+			// true -> 开启思考的通用表达（剔除）；false -> 显式关闭（none）
+			if v {
+				normalized = ""
+			} else {
+				normalized = string(kitreasoning.EffortNone)
+			}
+		case float64:
+			// 1/0 数字表达；其他数字视为未知（剔除，避免上游 400）
+			if v == 1 {
+				normalized = ""
+			} else if v == 0 {
+				normalized = string(kitreasoning.EffortNone)
+			} else {
+				normalized = ""
+			}
+		default:
+			// 数组/对象等无法映射的形态：剔除，透传语义由上游默认决定
+			normalized = ""
+		}
 		if normalized == "" {
-			delete(obj, "ReasoningEffort")
+			delete(obj, key)
 		} else {
-			obj["ReasoningEffort"] = normalized
+			obj[key] = normalized
 		}
 	}
+	sanitizeReasoningKey("reasoning_effort")
+	sanitizeReasoningKey("ReasoningEffort")
 	cleaned, err := common.Marshal(obj)
 	if err != nil {
 		return newBytesReader(raw)

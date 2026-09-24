@@ -68,6 +68,16 @@ func TestSanitizeOpenAIPassThroughReasoningEffort(t *testing.T) {
 		{`{"model":"x","reasoning_effort":"off"}`, `{"model":"x","reasoning_effort":"none"}`},
 		{`{"model":"x","reasoning_effort":"high"}`, `{"model":"x","reasoning_effort":"high"}`},
 		{`{"model":"x","ReasoningEffort":"on"}`, `{"model":"x"}`},
+		// v1.3.21 生产回归：非 string 类型（SDK 常用 bool/数字）此前被透传，
+		// channel 38 上游 400 "field ReasoningEffort invalid" 实锤。
+		{`{"model":"x","reasoning_effort":true}`, `{"model":"x"}`},
+		{`{"model":"x","reasoning_effort":false}`, `{"model":"x","reasoning_effort":"none"}`},
+		{`{"model":"x","reasoning_effort":1}`, `{"model":"x"}`},
+		{`{"model":"x","reasoning_effort":0}`, `{"model":"x","reasoning_effort":"none"}`},
+		// minimal/max 是通用枚举但 channel 38 只认 low/medium/high/xhigh/none；
+		// 透传=镜像给单一上游，剔除避免 400，上游用默认。
+		{`{"model":"x","reasoning_effort":"minimal"}`, `{"model":"x"}`},
+		{`{"model":"x","reasoning_effort":"max"}`, `{"model":"x"}`},
 		{`not-json`, `not-json`},
 	}
 	for _, tc := range cases {

@@ -258,11 +258,14 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 	originEffort, _ := reasoning.ParseOpenAIReasoningEffortFromModelSuffix(info.OriginModelName)
 	renderReasoning := len(request.Reasoning) > 0 || len(info.RequestConversionChain) > 1 || request.ReasoningConversion != nil || info.ReasoningState() != nil ||
 		!preserveSuffix && (upstreamEffort != "" || originEffort != "")
-	if info.ChannelType != constant.ChannelTypeOpenRouter && !renderReasoning {
+	if info.ChannelType != constant.ChannelTypeOpenRouter {
 		// [fix-defensive] 透传渠道对非标准 reasoning_effort 容错归一：
 		// on/true（开启思考的通用表达）→ 剔除，避免上游 400
 		// "field ReasoningEffort invalid"（channel 38 第三方中转实锤）；
 		// off/false → none（显式关闭，deepseek 等上游支持）。
+		// 注意：此前仅在 !renderReasoning 时归一，renderReasoning=true（如
+		// conversion chain 非空）会跳过并把原始非法值透传给上游 → 400。
+		// 现在无条件先归一（合法值保留，conversion 后续仍可基于已归一值覆盖）。
 		request.ReasoningEffort = sanitizeReasoningEffortForPassthrough(request.ReasoningEffort)
 		info.SetReasoningEffort(request.ReasoningEffort)
 	}
