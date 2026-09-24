@@ -31,7 +31,18 @@ vi.mock('@/features/model-pricing/api', async (importOriginal) => {
     useCanEditModelPricing: () => true,
     getModelPricing: vi.fn().mockResolvedValue({
       entries: [],
-      options: {},
+      options: {
+        ModelPrice: '',
+        ModelRatio: '',
+        CompletionRatio: '',
+        CacheRatio: '',
+        CreateCacheRatio: '',
+        ImageRatio: '',
+        AudioRatio: '',
+        AudioCompletionRatio: '',
+        'billing_setting.billing_mode': '',
+        'billing_setting.billing_expr': '',
+      },
       empty_version: 'empty-v1',
     }),
   }
@@ -75,7 +86,18 @@ describe('BulkPricingDialog', () => {
       entries: [
         { model_name: 'a', version: 'v-1', configured: {}, effective: {} },
       ],
-      options: {},
+      options: {
+        ModelPrice: '',
+        ModelRatio: '',
+        CompletionRatio: '',
+        CacheRatio: '',
+        CreateCacheRatio: '',
+        ImageRatio: '',
+        AudioRatio: '',
+        AudioCompletionRatio: '',
+        'billing_setting.billing_mode': '',
+        'billing_setting.billing_expr': '',
+      },
       empty_version: 'empty-v1',
     })
     const user = userEvent.setup()
