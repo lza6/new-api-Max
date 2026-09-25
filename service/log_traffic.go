@@ -58,10 +58,10 @@ func AggregateTrafficByDay(records []TrafficRecord, loc *time.Location) []DailyT
 		var other map[string]any
 		if r.Other != "" && common.Unmarshal([]byte(r.Other), &other) == nil {
 			if v, ok := other["request_bytes"].(float64); ok {
-				req = int64(v)
+				req = int64(common.QuotaFromFloat(v))
 			}
 			if v, ok := other["response_bytes"].(float64); ok {
-				resp = int64(v)
+				resp = int64(common.QuotaFromFloat(v))
 			}
 		}
 		t := time.Unix(r.CreatedAt, 0).In(loc)

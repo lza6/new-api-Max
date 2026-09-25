@@ -111,3 +111,24 @@
   - 2 分钟窗口 SLOW SQL 仅 1 条（冷启动首次），此后为零
 - **回归测试**: TestBandwidthLeaderboardRedisCache（miniredis，二次命中缓存不依赖 DB）
 - **下次不再重复跑**: 未改这三个 handler 的缓存/查询逻辑时不重跑；改到加缓存/清缓存时机时跑该测试。
+
+
+## 记录 0008 · T1-3 慢查询复核：/api/log/traffic other 全量 + 最小饱和修复（2026-09-25）
+- **复核范围**: GET /api/log/traffic（controller/log.go GetLogsTraffic）+ service/log_traffic.go 聚合。
+- **证据（复核时点 HEAD 71dd4c44f v1.3.28）**:
+  - controller/log.go:198-206 仍 `Select("created_at", "other")` 拉窗口内 consume 日志的 **other JSON 全量** 再 Go 内存解析聚合——记录 0006 标注的未修复缺口**依然存在**（v1.3.26 已加 60s Redis 缓存缓解冷启动/重复扫描，但缓存未命中时仍全表扫 other；存量 72% 行字节只在 other，不能直接切列聚合）。
+  - 存量回填/切列聚合属风险中专项（需「新写入统一填列 + 存量回填」），本次按任务边界**不做该重构**，只做最小安全修复。
+- **最小修复（本轮入库）**:
+  - service/log_traffic.go:61/64 `req = int64(v)` / `resp = int64(v)`（other JSON float64 裸转换）→ `int64(common.QuotaFromFloat(v))`：聚合前饱和，杜绝超大/负值 other 字节在 int64 上回绕成负数总带宽（历史行值来自上游/用户可控字段，属计费乘数同源风险面）。
+  - 回归测试：service/log_traffic_test.go `TestAggregateTrafficByDaySaturatesOtherBytes`（1.84e19/-1.84e19 字节行 → 饱和求和 300）。
+- **验证**: go test ./service/ -run 'TestAggregateTraffic' → exit 0（见本批次验证记录）。
+- **下次不再重复跑**: 未改 GetLogsTraffic 查询列或写入列逻辑时不重跑；若做「写入填列 + 存量回填 + 切列聚合」专项，跑本记录 + 0006/0007 对应用例。
+
+## 记录 0009 · T1-1 基准复测：环境不可行 → BLOCKED（2026-09-25）
+- **目标**: 本机 127.0.0.1 + 生产二进制 + mock 上游成对基准 N=60，产出 paired-latency-bench-v1.3.28.json。
+- **检查**: scripts/bench-latency.ps1（存在）、.deploy/mock_upstream.py（存在，默认端口 3020）、service/url_guard.go:90-92 SSRF_GUARD_DISABLED 开关（存在，默认 false 生产不变）。
+- **BLOCKED 原因（诚实记录，不假装成功）**:
+  - 本机当前无 3000/3020/18080/8080 监听（Get-NetTCPConnection 无命中），无本地 SQLite 库文件、无生产二进制（new-api*.exe 不存在）；Codex 桌面会话可用但基准所需网关/渠道/token 配置链路需重建。
+  - 重建完整基准环境（生产二进制 -ldflags -s -w + SQLite + 渠道/定价/token + mock 上游）属环境搭建动作，超出本次「只读复核 + 台账」任务边界；且 0004 已证明该环境可复现（SSRF env 开关 + 脚本修复），0003 记录过私网 SSRF 默认阻断。
+- **结论**: 本次不产出伪造基准 JSON；下一次在有授权且环境就绪时按 0004 步骤重跑并回填本记录。
+- **防重复跑**: 未新增基准脚本改动前，跳过本轮基准；重建环境授权后再跑。

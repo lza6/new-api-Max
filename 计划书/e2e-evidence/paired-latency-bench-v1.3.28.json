@@ -1,0 +1,12 @@
+{
+  "ts": "20260925-0000",
+  "version": "v1.3.28",
+  "status": "BLOCKED",
+  "reason": "bench environment not reproducible on this host: no listeners on 3000/3020/18080/8080, no local sqlite db, no production binary (new-api*.exe); rebuilding gateway/channel/token+mock-upstream pipeline is out of scope for this ledger-only batch. See perf-verification-ledger.md record 0009.",
+  "n": 60,
+  "direct": null,
+  "gateway": null,
+  "sequential": null,
+  "concurrent20": null,
+  "concurrent50": null
+}

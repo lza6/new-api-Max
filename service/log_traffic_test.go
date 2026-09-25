@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/lza6/new-api-Max/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -102,4 +103,33 @@ func TestMergeModelStats(t *testing.T) {
 
 	empty := MergeModelStats(nil, nil, nil, nil)
 	require.Empty(t, empty)
+}
+
+// TestAggregateTrafficByDaySaturatesOtherBytes guards the aggregation against
+// legacy other JSON rows whose request_bytes/response_bytes are absurdly large
+// (production 72% legacy rows only carry bytes in other, and the value is
+// user/upstream-controlled): the float->int conversion must saturate via
+// common.QuotaFromFloat instead of wrapping into a negative byte total.
+func TestAggregateTrafficByDaySaturatesOtherBytes(t *testing.T) {
+	loc := time.FixedZone("CST", 8*3600)
+	day1 := time.Date(2026, 9, 20, 10, 0, 0, 0, loc).Unix()
+	records := []TrafficRecord{
+		{CreatedAt: day1, Other: `{"request_bytes": 18446744073686646784, "response_bytes": 900}`},
+		{CreatedAt: day1, Other: `{"request_bytes": -18446744073686646784, "response_bytes": 100}`},
+		{CreatedAt: day1, Other: `{"request_bytes": 100, "response_bytes": 200}`},
+	}
+	got := AggregateTrafficByDay(records, loc)
+	require.Len(t, got, 1)
+	require.Equal(t, 3, got[0].Requests)
+	// int64(float64) would wrap to negative values; saturation must keep the
+	// total strictly positive and bounded.
+	require.GreaterOrEqual(t, got[0].Bytes, int64(0))
+	require.Equal(t, getSaturatedTrafficTotal(), got[0].Bytes)
+}
+
+// getSaturatedTrafficTotal returns the exact expected sum for the saturated
+// fixture rows: request_bytes 1.84e19 -> common.MaxQuota, -1.84e19 ->
+// common.MinQuota, then the plain 900+100+300 response bytes.
+func getSaturatedTrafficTotal() int64 {
+	return int64(common.MaxQuota) + int64(common.MinQuota) + 1300
 }

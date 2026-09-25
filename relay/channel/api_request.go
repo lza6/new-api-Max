@@ -50,6 +50,12 @@ func ApplyUpstreamBodyMetadata(req *http.Request, body io.Reader) {
 }
 
 func SetupApiRequestHeader(info *common.RelayInfo, c *gin.Context, req *http.Header) {
+	// T5: 网关 request-id 全链路透传——中继把网关生成的 request-id 带给上游，
+	// 便于上游回包/日志关联；显式 Header Override 在 SetupRequestHeader 之后应用，
+	// 仍可覆盖此默认值（现有 applyHeaderOverrideToRequest 后置）。
+	if requestID := c.GetString(common2.RequestIdKey); requestID != "" {
+		req.Set(common2.RequestIdKey, requestID)
+	}
 	if info.RelayMode == constant.RelayModeAudioTranscription || info.RelayMode == constant.RelayModeAudioTranslation {
 		// multipart/form-data
 	} else if info.RelayMode == constant.RelayModeRealtime {
