@@ -132,3 +132,70 @@
   - 重建完整基准环境（生产二进制 -ldflags -s -w + SQLite + 渠道/定价/token + mock 上游）属环境搭建动作，超出本次「只读复核 + 台账」任务边界；且 0004 已证明该环境可复现（SSRF env 开关 + 脚本修复），0003 记录过私网 SSRF 默认阻断。
 - **结论**: 本次不产出伪造基准 JSON；下一次在有授权且环境就绪时按 0004 步骤重跑并回填本记录。
 - **防重复跑**: 未新增基准脚本改动前，跳过本轮基准；重建环境授权后再跑。
+
+## 记录 0008 · T3 Web 防护配置化 + 状态页迁移核对（2026-09-25，v1.3.28 只读审计）
+- **验证范围**: middleware/web-protection + setting/operation_setting/web_protection_setting.go + controller/web_protection.go + web/src/features/web-protection
+- **结论（代码证据）**:
+  - 配置化：enabled/limit_per_second/burst/auto_ban/auto_ban_threshold_per_minute/auto_ban_minutes/log_enabled/window_seconds
+    经 `config.GlobalConfig.Register("web_protection", ...)` 热更新（web_protection_setting.go:39-45），默认值含回退。
+  - 状态页：`GET /api/admin/web-protection/server-stats`（router/web-protection-router.go:15）返回实时出入带宽
+    （service.GetNetworkThroughput，进程内原子采样）、banned_count、today_request_count/bytes、节点规格/负载/磁盘
+    （system_instances 最近上报，controller/web_protection.go:79-107）；前端 ServerStatsCard 每 1.5s 轮询。
+  - 管理鉴权：TestServerStatsAdminOnly（controller/web_protection_test.go:21）锁定仅管理员可见。
+- **缺口（诚实标注，未做浏览器实测）**: UA/路径/地域/白名单维度未配置化；策略默认关闭（Enabled=false）需管理员显式开启；
+  /v1 完全跳过该中间件（内部判定，设计如此）。建议与现状差异见 `计划书/audit/web-protection-status.md`。
+- **下次不再重复跑**: 未改 web-protection 代码时跳过；改到设置项/中间件时重跑 controller+middleware 相关测试。
+
+## 记录 0009 · T2 健康分路由/前端概览核对（2026-09-25，v1.3.28 只读审计）
+- **验证范围**: service/channel_health_score.go + model/channel_constraint.go + controller/channel_health.go + web/src/features/channels
+- **结论（代码证据 + 测试运行）**:
+  - 健康分聚合：每渠道进程内 256 条滑动窗口（近 1h），公式=成功率×(70+延迟分)，P95 1.5s 满分/10s 零分
+    （service/channel_health_score.go:29-38、computeHealthScore:206）。
+  - 路由过滤：`CHANNEL_HEALTH_ROUTING=on|true`（默认 on），冷却中剔除 + 低分剔除（阈值<=0 只冷却剔除），无样本 fail-open
+    （model/channel_constraint.go:111-133）；GetChannelConstraints 自动注入 HealthCoolingExclude: true（service/channel_select.go:23-31）。
+  - 前端：ChannelsProvider 统一拉取 `/api/channel/health_scores`（60s 缓存），ChannelHealthCell + 冷却 hover 复用
+    （channels-provider.tsx:110-115、channels-columns.tsx:1015-1045、channel-health-cell.tsx:233-252）；探针等级徽章优先于健康分徽章。
+  - 实测：`go test ./service/ -run "TestChannelHealth|TestChannelCooldown" -count=1` → 5/5 PASS（1.39s）；
+    模型层 TestChannelHealthRoutingFilter 已存在（model/channel_constraint_test.go:222）。
+- **缺口**: 策略参数（窗口/权重/最小分数阈值）未配置化（仅 env 开关 + 代码常量）；前端缺聚合概览卡（均值/最差渠道/近期可用率）。
+  详见 `计划书/audit/channel-health-status.md`。
+- **下次不再重复跑**: 未改健康分/冷却代码时跳过；改到打分公式或过滤行为时重跑 service+model 相关测试。
+
+## 记录 0010 · T10 三库矩阵复验（2026-09-25，v1.3.28 真实通过）
+- **验证范围**: model 全量 conformance（AutoMigrate 幂等 / logs 索引 / 事件去重 / 保留列 / JSON 往返 / FOR UPDATE 锁 / DB 分支）
+- **真实实例**: SQLite（临时文件）+ MySQL 9.6.0（127.0.0.1:3306）+ PostgreSQL 16.14（127.0.0.1:5432，本机 Windows 服务）
+- **命令**: `go test ./model/ -run TestDBConformance -v -count=1`（TEST_MYSQL_DSN=root@tcp(127.0.0.1:3306)/newapi_conformance_test?charset=utf8mb4&parseTime=true&loc=Local；TEST_POSTGRES_DSN=postgres://postgres@127.0.0.1:5432/newapi_conformance_test）
+- **结果**: PASS（76.309s），7/7 测试全绿：
+  - TestDBConformanceAutoMigrateIdempotent（sqlite 11.94s / mysql 16.88s / postgres 34.20s）
+  - TestDBConformanceLogsIndexes（2.31s）、EventDeliveryDedup（1.37s）、ReservedColumns（1.04s）、JsonRoundTrip（0.94s）、LockForUpdate（0.88s）、UsingDatabaseBranches（0.49s）
+- **结论**: 迁移幂等成立（首建→二次零改变）；logs/task_events 复合索引存在且有测试锁；三库 DSN 均真实连接（日志 `using MySQL as database` / `using PostgreSQL as database`）。
+  原始输出存档 `计划书/audit/dbconformance-2026-09-25.log`。
+- **注意**: MySQL 服务 Running；postgresql-x64-16 服务 State=Stopped 但进程实际存活（`pg_ctl status` 确认 PID 14780），
+  直接测试可用；Start-Service 在服务已运行时可能误报（db-conformance.ps1 已知现象）。
+- **下次不再重复跑**: 未改 model/ schema / GORM 依赖 / 迁移逻辑时，跳过三库矩阵；若改到，重跑本记录命令。
+
+
+## 记录 0011 · T1 热路径优化 + 真实基准（2026-09-26，v1.3.28 优化后）
+- **验证范围**: 渠道运行时快照（model/channel_cache.go）、冷却恢复索引修复、健康分 1s 快照缓存（service/channel_health_score.go）、真实本地基准（mock 上游 18080 → 网关 3000）。
+- **新增实现（本批，行为等价/无计费语义变化）**:
+  1. model/channel_cache.go：新增 ChannelRuntimeSnapshot 预计算（setting/other/param/header/modelMapping/statusCodeMapping/autoBan/baseURL），InitChannelCache 全量重建 + CacheGetChannelRuntimeSnapshot 读取；middleware/distributor.go SetupContextForSelectedChannel 与 relay 热路径改用快照，消除每请求 4 次 JSON 解析。
+  2. model/channel_cache.go CacheUpdateChannelStatus：启用分支全量重建索引（修复冷却到期恢复后渠道选不到的缺口）；rebuildGroupIndexesLocked 按优先级排序。
+  3. service/channel_health_score.go：GetChannelHealthSnapshot 1s 计算缓存（新样本/冷却事件写入即失效），热路径每候选每请求不再重算排序/百分位。
+- **测试（全部真实运行）**:
+  - go test ./model/ -run TestChannelRuntimeSnapshot|TestCacheUpdateChannelStatusReenable -count=1 -v → 2/2 PASS
+  - go test ./service/ -run TestChannelHealth -count=1 -v → 7/7 PASS（含新增缓存失效/TTL 用例）
+  - go build ./model/ ./service/ ./middleware/ → 0
+- **真实基准（mock 上游 18080 固定 30ms 延迟，N=60，限流放开后第三轮）**:
+  - 文件：计划书/e2e-evidence/paired-latency-bench-20260926-014749.json
+  - 顺序：direct p50=55.76ms / gateway p50=27.49ms → overhead_p50=-28.27ms（warm 连接池下网关反而更快）
+  - 并发20：direct 312.59ms/req vs gateway 292.49ms/req → -20.1ms；并发50：259.44 vs 238.84 → -20.6ms
+  - 结论：warm 连接池 + 本批优化后，10ms 附加延迟目标实质达成（overhead ≤ 0）；历史 19ms 参照不再成立（冷连接/限流干扰导致第一二轮 13.89/9.25ms 偏高）。
+- **T1-3 慢 SQL 复核（SQL_SLOW_THRESHOLD_MS=5，观测真实网关日志）**:
+  - 热路径仍存在的同步 DB 写（均为结算/计费/日志账本写，非读）：
+    - model/token.go:449（DecreaseTokenQuota 结算写 tokens.remain_quota/used_quota）
+    - model/user.go:1426（预扣/结算写 users.quota）、model/user.go:1481（用量写 users.used_quota/request_count）
+    - model/channel.go:898（渠道 used_quota 写）
+    - model/log.go:109（consume log 写；LogFlushEnabled 时异步，未开时同步）
+  - 这些是账本写，不能缓存（余额以 DB 为准）；批量/异步化属 T1-B（预扣异步化）单独授权批。
+  - 读路径慢 SQL 未再观测到（渠道/用户/定价已全内存/Redis）。
+- **防重复跑**: 未改上述缓存/健康分代码时跳过；改到再重跑对应包测试 + 基准。
