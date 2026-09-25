@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { ChannelHealthSettingsSection } from '../general/channel-health-settings-section'
 import { SystemBehaviorSection } from '../general/system-behavior-section'
 import { EmailSettingsSection } from '../integrations/email-settings-section'
 import { MonitoringSettingsSection } from '../integrations/monitoring-settings-section'
@@ -27,6 +28,22 @@ import type { OperationsSettings } from '../types'
 import { createSectionRegistry } from '../utils/section-registry'
 
 const OPERATIONS_SECTIONS = [
+  {
+    id: 'channel-health',
+    titleKey: 'Channel Health',
+    build: (settings: OperationsSettings) => (
+      <ChannelHealthSettingsSection
+        defaultValues={{
+          window_seconds: settings['channel_health.window_seconds'] ?? 3600,
+          ring_size: settings['channel_health.ring_size'] ?? 256,
+          success_weight: settings['channel_health.success_weight'] ?? 70,
+          latency_best_ms: settings['channel_health.latency_best_ms'] ?? 1500,
+          latency_worst_ms: settings['channel_health.latency_worst_ms'] ?? 10000,
+          min_score: settings['channel_health.min_score'] ?? 0,
+        }}
+      />
+    ),
+  },
   {
     id: 'behavior',
     titleKey: 'System Behavior',

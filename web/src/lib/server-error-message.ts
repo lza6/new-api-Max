@@ -80,6 +80,8 @@ const serverErrorMessageKeys = {
   TELEGRAM_BIND_USER_DELETED: 'This user account no longer exists.',
   TELEGRAM_BIND_USER_DISABLED: 'This user account is disabled.',
   TELEGRAM_BIND_INTERNAL_ERROR: 'Telegram binding failed. Please try again.',
+  CHANNEL_SINGLE_POINT_FAILURE:
+    'Only one channel serves this model and it is currently unavailable. Consider adding another channel.',
 } as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -160,6 +162,8 @@ const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = 
   { pattern: /cooldown|cooling[_ ]?down|is cooling/i, messageKey: 'This channel is cooling down after recent failures. Please try again in a moment.' },
   // G1 无可用渠道：冷却/无渠道的真实出口（get_channel_failed / channel_no_available_key / 可用渠道不存在）。
   { pattern: /get[_ ]?channel[_ ]?failed|channel[_ ]?no[_ ]?available[_ ]?key|可用渠道不存在/i, messageKey: 'No available channel for this model right now. Please try again in a moment or choose another model.' },
+  // G1b 唯一渠道过载：当前仅一个渠道服务该模型（含已禁用/冷却），建议管理端添加渠道。
+  { pattern: /only[_ ]?one[_ ]?channel|single[_ ]?channel|唯一[_ ]?渠道|仅[_ ]?1[_ ]?个渠道|channel.*only/i, messageKey: 'Only one channel serves this model and it is currently unavailable. Consider adding another channel.' },
   // G2 channel 域保留码（后端不改写，如 channel:invalid_key / channel:no_available_key）。
   { pattern: /channel\s*:/i, messageKey: 'The channel connection has an issue. Contact the administrator or try again later.' },
   // G3 内部技术码：计费/传输类失败，映射为对应人话。
@@ -278,3 +282,4 @@ export function requireServerSuccess<T>(response: T): T {
   }
   return response
 }
+

@@ -150,6 +150,37 @@ describe('friendly error message mapping (B2-3)', () => {
     ).toBeNull()
   })
 
+  test('maps the single-channel overload to an add-channel explainer', () => {
+    expect(
+      getFriendlyErrorMessage({
+        response: {
+          data: {
+            error: {
+              type: 'only_one_channel',
+              message: 'only one channel serves this model and it is currently unavailable',
+            },
+          },
+        },
+      })
+    ).toBe(
+      'Only one channel serves this model and it is currently unavailable. Consider adding another channel.'
+    )
+    expect(
+      getFriendlyErrorMessage({
+        message: '分组 default 下模型 deepseek-v4-flash 仅 1 个渠道且当前不可用',
+      })
+    ).toBe(
+      'Only one channel serves this model and it is currently unavailable. Consider adding another channel.'
+    )
+  })
+
+  test('maps the single-channel preserved code to the dedicated key', () => {
+    expect(
+      getServerErrorMessageKey({ code: 'CHANNEL_SINGLE_POINT_FAILURE' })
+    ).toBe(
+      'Only one channel serves this model and it is currently unavailable. Consider adding another channel.'
+    )
+  })
   test('never overrides dedicated security messages with friendly text', () => {
     expect(
       getFriendlyErrorMessage({
@@ -159,3 +190,4 @@ describe('friendly error message mapping (B2-3)', () => {
     ).toBeNull()
   })
 })
+

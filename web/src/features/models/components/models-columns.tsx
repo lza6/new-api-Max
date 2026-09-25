@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { ColumnDef } from '@tanstack/react-table'
 import { useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { TriangleAlert } from 'lucide-react'
 
 import { CopyButton } from '@/components/copy-button'
 import { BadgeListCell, TruncatedCell } from '@/components/data-table'
@@ -41,7 +42,7 @@ import { getLobeIcon } from '@/lib/lobe-icon'
 
 import { getNameRuleConfig } from '../constants'
 import { parseModelTags, formatEndpointsDisplay } from '../lib'
-import { getModelChannelState } from '../lib/model-utils'
+import { getChannelSuggestion, getModelChannelState } from '../lib/model-utils'
 import type { Model, Vendor } from '../types'
 import { DataTableRowActions } from './data-table-row-actions'
 import { DescriptionCell } from './description-cell'
@@ -211,8 +212,32 @@ export function useModelsColumns(
       enableSorting: false,
       cell: ({ row }) => {
         const state = getModelChannelState(row.original)
+        const suggestion = getChannelSuggestion(row.original)
+        const suggestionLabel = suggestion ? t(suggestion.label) : undefined
+        const suggestionMessage = suggestion ? t(suggestion.message) : undefined
         return (
           <div className='min-w-0 text-sm'>
+            {suggestion ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <span
+                      tabIndex={0}
+                      role='img'
+                      aria-label={suggestionLabel}
+                      title={suggestionMessage}
+                      aria-description={suggestionMessage}
+                      className='mr-1 inline-flex cursor-help text-warning'
+                    >
+                      <TriangleAlert className='size-3.5' />
+                    </span>
+                  }
+                >
+                  <span className='sr-only'>{suggestionLabel}</span>
+                </TooltipTrigger>
+                <TooltipContent role='tooltip'>{suggestionMessage}</TooltipContent>
+              </Tooltip>
+            ) : null}
             <Tooltip>
               <TooltipTrigger
                 render={
@@ -367,3 +392,5 @@ export function useModelsColumns(
     },
   ]
 }
+
+

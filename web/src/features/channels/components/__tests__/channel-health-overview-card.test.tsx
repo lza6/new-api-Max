@@ -35,20 +35,27 @@ vi.mock('../channels-provider', () => ({
 
 const mockedUseChannels = vi.mocked(useChannels)
 
+const mockSetOpen = vi.fn()
+const mockSetCurrentRow = vi.fn()
+
 afterEach(() => {
   cleanup()
   mockedUseChannels.mockReset()
+  mockSetOpen.mockReset()
+  mockSetCurrentRow.mockReset()
 })
 
 describe('ChannelHealthOverviewCard (T2-2)', () => {
   test('shows neutral empty state when no health data exists', () => {
-    mockedUseChannels.mockReturnValue({ healthScores: null } as never)
+    mockedUseChannels.mockReturnValue({ healthScores: null, setOpen: mockSetOpen, setCurrentRow: mockSetCurrentRow } as never)
     render(<ChannelHealthOverviewCard />)
     expect(screen.getByText('No health data yet')).toBeInTheDocument()
   })
 
   test('renders aggregate stats from provider scores', () => {
     mockedUseChannels.mockReturnValue({
+      setOpen: mockSetOpen,
+      setCurrentRow: mockSetCurrentRow,
       healthScores: {
         '1': { score: 90, success_rate: 1, p50_latency_ms: 120, p95_latency_ms: 400, cool_count: 0, sample_count: 10, cooling_down: false, cool_until: 0 },
         '2': { score: 60, success_rate: 0.5, p50_latency_ms: 300, p95_latency_ms: 900, cool_count: 1, sample_count: 5, cooling_down: true, cool_until: 1700001000 },
@@ -90,4 +97,22 @@ describe('ChannelHealthOverviewCard (T2-2)', () => {
     rerender(<ChannelHealthOverviewCard />)
     expect(screen.getByText('No health data yet')).toBeInTheDocument()
     expect(container).toBeTruthy()
+  })
+
+
+  test('opens channel detail drawer when clicking worst channel', () => {
+    mockedUseChannels.mockReturnValue({
+      setOpen: mockSetOpen,
+      setCurrentRow: mockSetCurrentRow,
+      healthScores: {
+        '42': { score: 40, success_rate: 0.4, p50_latency_ms: 500, p95_latency_ms: 1200, cool_count: 2, sample_count: 8, cooling_down: false, cool_until: 0 },
+        '7': { score: 95, success_rate: 1, p50_latency_ms: 100, p95_latency_ms: 300, cool_count: 0, sample_count: 20, cooling_down: false, cool_until: 0 },
+      } as never,
+    } as never)
+    render(<ChannelHealthOverviewCard />)
+    // 最差渠道块（value 40）可点击
+    const worstValue = screen.getByText('40')
+    worstValue.click()
+    expect(mockSetCurrentRow).toHaveBeenCalledWith({ id: 42 })
+    expect(mockSetOpen).toHaveBeenCalledWith('update-channel')
   })

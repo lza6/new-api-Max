@@ -196,6 +196,33 @@ export function isModelSyncOfficial(model: Model): boolean {
   return model.sync_official === 1
 }
 
+// T2-C2 管理端多渠道建议：configured_channel_count 含已禁用渠道（管理语义：
+// “仅 1 个渠道承载该模型”），bound_channels 为当前可用启用渠道。返回 null 表示不需要提示。
+export function getChannelSuggestion(model: Model): {
+  kind: 'single-configured-unavailable' | 'single-available'
+  label: string
+  message: string
+} | null {
+  const available = model.bound_channels?.length ?? 0
+  const configured = model.configured_channel_count ?? available
+  if (configured === 1) {
+    if (available === 0) {
+      return {
+        kind: 'single-configured-unavailable',
+        label: 'Single channel unavailable',
+        message:
+          'This model is served by only one configured channel and it is currently unavailable. Add another channel to keep it reachable.',
+      }
+    }
+    return {
+      kind: 'single-available',
+      label: 'Single channel',
+      message:
+        'This model is served by only one channel. Add another channel to avoid a single point of failure.',
+    }
+  }
+  return null
+}
 // Keep table labels compact; the drawer and tooltip share the full explanation.
 export function getModelChannelState(model: Model) {
   const available = model.bound_channels?.length ?? 0
@@ -226,3 +253,4 @@ export function getModelChannelState(model: Model) {
       'Listing also depends on metadata visibility and the user’s group access.',
   }
 }
+

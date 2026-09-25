@@ -368,6 +368,12 @@ export type OperationsSettings = {
   'performance_setting.monitor_memory_threshold': number
   'performance_setting.monitor_disk_threshold': number
   'perf_metrics_setting.enabled': boolean
+  'channel_health.window_seconds'?: number
+  'channel_health.ring_size'?: number
+  'channel_health.success_weight'?: number
+  'channel_health.latency_best_ms'?: number
+  'channel_health.latency_worst_ms'?: number
+  'channel_health.min_score'?: number
   'perf_metrics_setting.flush_interval': number
   'perf_metrics_setting.bucket_time': 'hour' | 'minute' | '5min'
   'perf_metrics_setting.retention_days': number

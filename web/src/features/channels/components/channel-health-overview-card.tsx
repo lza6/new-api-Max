@@ -31,7 +31,7 @@ import { useChannels } from './channels-provider'
  */
 export function ChannelHealthOverviewCard() {
   const { t } = useTranslation()
-  const { healthScores } = useChannels()
+  const { healthScores, setOpen, setCurrentRow } = useChannels()
   const agg = aggregateHealthScores(healthScores)
 
   if (!agg.hasData) {
@@ -58,6 +58,7 @@ export function ChannelHealthOverviewCard() {
     description: string
     icon: typeof Activity
     tone: IconBadgeTone
+    onClick?: () => void
   }> = [
     {
       label: t('Average health score'),
@@ -79,6 +80,10 @@ export function ChannelHealthOverviewCard() {
       description: t('Lowest health score among channels'),
       icon: TrendingDown,
       tone: agg.worst.length > 0 ? 'destructive' : 'neutral',
+      onClick: agg.worst.length > 0 ? () => {
+        setCurrentRow({ id: agg.worst[0].channelId } as never)
+        setOpen('update-channel')
+      } : undefined,
     },
     {
       label: t('Channels cooling down'),
@@ -92,7 +97,14 @@ export function ChannelHealthOverviewCard() {
   return (
     <div className='grid grid-cols-2 divide-x divide-y rounded-lg border sm:grid-cols-4 sm:divide-y-0'>
       {stats.map((item) => (
-        <div key={item.label} className='min-w-0 px-2.5 py-2.5 sm:px-4 sm:py-3'>
+        <div
+          key={item.label}
+          className={`min-w-0 px-2.5 py-2.5 sm:px-4 sm:py-3 ${item.onClick ? 'cursor-pointer hover:bg-muted/40' : ''}`}
+          onClick={item.onClick}
+          role={item.onClick ? 'button' : undefined}
+          tabIndex={item.onClick ? 0 : undefined}
+          onKeyDown={item.onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.onClick?.() } } : undefined}
+        >
           <div className='flex items-center gap-1.5 sm:gap-2'>
             <IconBadge tone={item.tone} size='stat'>
               <item.icon />

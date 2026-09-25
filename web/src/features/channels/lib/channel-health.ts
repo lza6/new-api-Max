@@ -192,7 +192,7 @@ export interface ChannelHealthAggregate {
   /** 有样本渠道的平均健康分（0-100）；无样本/无数据时 0 */
   avgScore: number
   /** 最差渠道（按 score 升序、冷却优先）前 N 条的 score + 冷却标记 */
-  worst: Array<{ score: number; coolingDown: boolean; sampleCount: number }>
+  worst: Array<{ channelId: number; score: number; coolingDown: boolean; sampleCount: number }>
   /** 可用率 = score>=70 且有样本的渠道数 / 有样本渠道数；无样本时 0 */
   availableRate: number
   /** 有样本渠道数 */
@@ -250,7 +250,8 @@ export function aggregateHealthScores(
     }
     return a.view.score - b.view.score
   })
-  const worst = sorted.slice(0, 3).map(({ view }) => ({
+  const worst = sorted.slice(0, 3).map(({ id, view }) => ({
+    channelId: Number(id),
     score: view.score,
     coolingDown: view.coolingDown,
     sampleCount: view.sampleCount,

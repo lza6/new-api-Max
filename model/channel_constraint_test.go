@@ -291,3 +291,38 @@ func TestChannelHealthRoutingFilter(t *testing.T) {
 	}})
 	assert.Equal(t, []int{910002, 910003}, kept)
 }
+
+// TestGetRandomSatisfiedChannelSingleCandidateFiltered 唯一渠道过载：模型仅 1 个
+// 候选且被过滤剔除时返回带「only one channel」的错误（前端 G1b 映射命中）。
+func TestGetRandomSatisfiedChannelSingleCandidateFiltered(t *testing.T) {
+	origMemory := common.MemoryCacheEnabled
+	origIDM := channelsIDM
+	origG2M := group2model2channels
+	origProbe := ChannelHealthProbe
+	t.Cleanup(func() {
+		common.MemoryCacheEnabled = origMemory
+		channelsIDM = origIDM
+		group2model2channels = origG2M
+		ChannelHealthProbe = origProbe
+	})
+
+	common.MemoryCacheEnabled = true
+	ch := &Channel{Id: 910101, Type: constant.ChannelTypeOpenAI, Status: common.ChannelStatusEnabled, Group: "default", Models: "gpt-4"}
+	channelsIDM = map[int]*Channel{910101: ch}
+	group2model2channels = map[string]map[string][]int{
+		"default": {"gpt-4": {910101}},
+	}
+	// 健康分 probe 返回低分 → 唯一候选被剔除
+	ChannelHealthProbe = func(channelID int) (float64, bool, bool) {
+		return 10, false, true
+	}
+
+	chGot, err := GetRandomSatisfiedChannel("default", "gpt-4", 0, []dto.ChannelFilter{{
+		Kind:           dto.FilterChannelHealth,
+		HealthMinScore: 60,
+	}})
+	require.Nil(t, chGot)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "only one channel serves this model")
+	assert.Contains(t, err.Error(), "gpt-4")
+}

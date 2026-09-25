@@ -149,15 +149,26 @@ func GetRandomSatisfiedChannel(
 	defer channelSyncLock.RUnlock()
 
 	// First, try to find channels with the exact model name.
-	channels, _ := filterCandidateIDs(group2model2channels[group][model], model, filters)
+	exactCandidates := group2model2channels[group][model]
+	channels, _ := filterCandidateIDs(exactCandidates, model, filters)
 
 	// If no channels found, try to find channels with the normalized model name.
+	// 记录「唯一渠道」场景：该分组该模型本只有 1 个候选，但被过滤（冷却/健康分/
+	// 任务插件）剔除 → 前端据此提示「唯一渠道过载，建议添加渠道」（G1b）。
+	rawCandidateCount := len(exactCandidates)
 	if len(channels) == 0 {
 		normalizedModel := ratio_setting.RoutingMatchModelName(model)
-		channels, _ = filterCandidateIDs(group2model2channels[group][normalizedModel], model, filters)
+		normalizedCandidates := group2model2channels[group][normalizedModel]
+		rawCandidateCount = len(normalizedCandidates)
+		channels, _ = filterCandidateIDs(normalizedCandidates, model, filters)
 	}
 
 	if len(channels) == 0 {
+		if rawCandidateCount == 1 {
+			return nil, errors.New(fmt.Sprintf(
+				"only one channel serves this model (group %s, model %s) and it is currently unavailable; consider adding another channel",
+				group, model))
+		}
 		return nil, nil
 	}
 

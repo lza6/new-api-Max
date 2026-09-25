@@ -27,6 +27,12 @@ import {
 } from './section-registry.tsx'
 
 const defaultOperationsSettings: OperationsSettings = {
+  'channel_health.window_seconds': 3600,
+  'channel_health.ring_size': 256,
+  'channel_health.success_weight': 70,
+  'channel_health.latency_best_ms': 1500,
+  'channel_health.latency_worst_ms': 10000,
+  'channel_health.min_score': 0,
   DefaultCollapseSidebar: false,
   DemoSiteEnabled: false,
   SelfUseModeEnabled: false,
