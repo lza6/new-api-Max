@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/setting/channel_setting"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -132,4 +133,29 @@ func TestChannelHealthSnapshotCacheHitWithinTTL(t *testing.T) {
 	b := GetChannelHealthSnapshot(cid)
 	assert.Equal(t, a.Score, b.Score)
 	assert.Equal(t, a.SampleCount, b.SampleCount)
+}
+
+// TestComputeHealthScoreParameterized T2-1：覆盖 success_weight/延迟边界后公式生效；
+// 默认值 = 历史行为（70/30、1.5s/10s）由 TestComputeHealthScoreBoundaries 保持。
+func TestComputeHealthScoreParameterized(t *testing.T) {
+	orig := operation_setting.GetChannelHealthSetting()
+	t.Cleanup(func() {
+		*orig = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 1500, LatencyWorstMs: 10000, MinScore: 0}
+	})
+	// 重置为默认
+	*orig = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 1500, LatencyWorstMs: 10000, MinScore: 0}
+
+	// 默认：1.5s 满分 → 100（70+30），5.75s 中点 → 85，10s → 70
+	assert.InDelta(t, 100.0, computeHealthScore(1.0, 1500), 0.001)
+	assert.InDelta(t, 85.0, computeHealthScore(1.0, 5750), 0.001)
+	assert.InDelta(t, 70.0, computeHealthScore(1.0, 10000), 0.001)
+
+	// 权重 80/20 + 边界 2s/20s：2s 满分 → 100（80+20），11s 中点 → 90
+	*orig = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 80, LatencyBestMs: 2000, LatencyWorstMs: 20000, MinScore: 0}
+	assert.InDelta(t, 100.0, computeHealthScore(1.0, 2000), 0.001)
+	assert.InDelta(t, 90.0, computeHealthScore(1.0, 11000), 0.001)
+	assert.InDelta(t, 80.0, computeHealthScore(1.0, 20000), 0.001)
+
+	// 成功率 0.5 折半
+	assert.InDelta(t, 50.0, computeHealthScore(0.5, 2000), 0.001)
 }

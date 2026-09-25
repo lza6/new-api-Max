@@ -10,6 +10,7 @@ import (
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/pkg/jsplugin"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
 func GetChannelConstraints(c *gin.Context) *dto.ChannelConstraints {
@@ -27,6 +28,7 @@ func GetChannelConstraints(c *gin.Context) *dto.ChannelConstraints {
 		constraints.AddFilter(dto.ChannelFilter{
 			Kind:                 dto.FilterChannelHealth,
 			HealthCoolingExclude: true,
+			HealthMinScore:       operation_setting.GetChannelHealthMinScore(),
 		})
 	}
 	common.SetContextKey(c, constant.ContextKeyChannelConstraints, constraints)

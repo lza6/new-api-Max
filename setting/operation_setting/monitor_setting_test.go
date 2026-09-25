@@ -2,6 +2,7 @@ package operation_setting
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -88,4 +89,35 @@ func TestValidateChannelTestConcurrency(t *testing.T) {
 	assert.Error(t, ValidateChannelTestConcurrency("0"))
 	assert.Error(t, ValidateChannelTestConcurrency("33"))
 	assert.Error(t, ValidateChannelTestConcurrency("1.5"))
+}
+
+// TestGetChannelHealthSettingFallsBack T2-1：channel_health getter 非法值独立回退默认，
+// 默认值 = 历史代码常量（行为零变化）。
+func TestGetChannelHealthSettingFallsBack(t *testing.T) {
+	orig := channelHealthSetting
+	t.Cleanup(func() { channelHealthSetting = orig })
+
+	channelHealthSetting = ChannelHealthSetting{}
+	assert.Equal(t, 3600*time.Second, GetChannelHealthWindowTTL())
+	assert.Equal(t, 256, GetChannelHealthRingSize())
+	assert.Equal(t, 70, GetChannelHealthSuccessWeight())
+	best, worst := GetChannelHealthLatencyBounds()
+	assert.Equal(t, 1500*time.Millisecond, best)
+	assert.Equal(t, 10*time.Second, worst)
+	assert.Equal(t, 0, GetChannelHealthMinScore())
+
+	channelHealthSetting = ChannelHealthSetting{WindowSeconds: 7200, RingSize: 512, SuccessWeight: 80, LatencyBestMs: 2000, LatencyWorstMs: 20000, MinScore: 50}
+	assert.Equal(t, 2*time.Hour, GetChannelHealthWindowTTL())
+	assert.Equal(t, 512, GetChannelHealthRingSize())
+	assert.Equal(t, 80, GetChannelHealthSuccessWeight())
+	best, worst = GetChannelHealthLatencyBounds()
+	assert.Equal(t, 2*time.Second, best)
+	assert.Equal(t, 20*time.Second, worst)
+	assert.Equal(t, 50, GetChannelHealthMinScore())
+
+	// 非法值边界
+	channelHealthSetting = ChannelHealthSetting{RingSize: 99999, SuccessWeight: 101, MinScore: -1}
+	assert.Equal(t, 4096, GetChannelHealthRingSize())
+	assert.Equal(t, 70, GetChannelHealthSuccessWeight())
+	assert.Equal(t, 0, GetChannelHealthMinScore())
 }

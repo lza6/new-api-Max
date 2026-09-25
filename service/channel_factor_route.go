@@ -25,6 +25,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
 // FactorWeights 凸组合权重（和恒为 1）。
@@ -82,10 +84,12 @@ type ChannelFactorScores struct {
 	Consistency float64 `json:"consistency"`
 }
 
-// latencyFactor p50 线性映射：<=1.5s 满分，>=10s 零分。
+// latencyFactor p50 线性映射：<=latency_best 满分，>=latency_worst 零分。
+// 边界与健康分公式同源（operation_setting.channel_health），避免双口径。
 func latencyFactor(p50Ms int64) float64 {
-	best := float64(healthLatencyBest.Milliseconds())
-	worst := float64(healthLatencyWorst.Milliseconds())
+	bestD, worstD := operation_setting.GetChannelHealthLatencyBounds()
+	best := float64(bestD.Milliseconds())
+	worst := float64(worstD.Milliseconds())
 	v := (worst - float64(p50Ms)) / (worst - best)
 	if v < 0 {
 		v = 0

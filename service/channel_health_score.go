@@ -31,9 +31,12 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
-// channelHealthRing 每渠道滑动窗口固定 256 条，防多渠道内存膨胀。
+// channelHealthRing 每渠道滑动窗口默认 256 条，防多渠道内存膨胀。
+// 实际尺寸/窗口/延迟区间/权重由 operation_setting.channel_health 热更控制；
+// 以下常量保留为默认值参照（getter 非法值回退也引用它们）。
 const (
 	channelHealthRingSize  = 256
 	channelHealthWindowTTL = time.Hour
@@ -81,7 +84,9 @@ func getHealthRing(channelId int) *channelHealthRing {
 	defer channelHealthMu.Unlock()
 	r, ok := channelHealthTable[channelId]
 	if !ok {
-		r = &channelHealthRing{}
+		r = &channelHealthRing{
+			samples: make([]channelHealthSample, channelHealthRingSize),
+		}
 		channelHealthTable[channelId] = r
 	}
 	return r
@@ -94,7 +99,7 @@ func RecordChannelOutcome(channelId int, success bool, latency time.Duration, cl
 	channelHealthMu.Lock()
 	defer channelHealthMu.Unlock()
 	if r.samples == nil {
-		r.samples = make([]channelHealthSample, channelHealthRingSize)
+		r.samples = make([]channelHealthSample, operation_setting.GetChannelHealthRingSize())
 	}
 	r.samples[r.idx] = channelHealthSample{
 		at:        time.Now(),
@@ -102,7 +107,7 @@ func RecordChannelOutcome(channelId int, success bool, latency time.Duration, cl
 		latencyMs: latency.Milliseconds(),
 		class:     class,
 	}
-	r.idx = (r.idx + 1) % channelHealthRingSize
+	r.idx = (r.idx + 1) % len(r.samples)
 	delete(healthSnapshotCache, channelId)
 }
 
@@ -194,10 +199,10 @@ func computeChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
 	if r.samples == nil {
 		return snap
 	}
-	cutoff := time.Now().Add(-channelHealthWindowTTL)
+	cutoff := time.Now().Add(-operation_setting.GetChannelHealthWindowTTL())
 	var latencies []int64
 	successes, total := 0, 0
-	for i := 0; i < channelHealthRingSize; i++ {
+	for i := 0; i < len(r.samples); i++ {
 		s := r.samples[i]
 		if s.at.IsZero() || s.at.Before(cutoff) {
 			continue
@@ -227,19 +232,22 @@ func computeChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
 func computeHealthScore(successRate float64, p95LatencyMs int64) float64 {
 	latencyScore := 0.0
 	p95 := float64(p95LatencyMs)
-	bestMs := float64(healthLatencyBest / time.Millisecond)
-	worstMs := float64(healthLatencyWorst / time.Millisecond)
+	successWeight := float64(operation_setting.GetChannelHealthSuccessWeight())
+	latencyWeight := 100 - successWeight
+	best, worst := operation_setting.GetChannelHealthLatencyBounds()
+	bestMs := float64(best / time.Millisecond)
+	worstMs := float64(worst / time.Millisecond)
 	if worstMs > bestMs {
 		switch {
 		case p95 <= bestMs:
-			latencyScore = 30
+			latencyScore = latencyWeight
 		case p95 >= worstMs:
 			latencyScore = 0
 		default:
-			latencyScore = (worstMs - p95) / (worstMs - bestMs) * 30
+			latencyScore = (worstMs - p95) / (worstMs - bestMs) * latencyWeight
 		}
 	}
-	return successRate * (70 + latencyScore)
+	return successRate * (successWeight + latencyScore)
 }
 
 func percentileOf(sorted []int64, p float64) int64 {

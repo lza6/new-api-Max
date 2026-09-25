@@ -10,8 +10,10 @@ import (
 	"github.com/glebarez/sqlite"
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/dto"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/setting"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/lza6/new-api-Max/setting/ratio_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -127,3 +129,36 @@ func TestCacheGetRandomSatisfiedChannelUsesTokenAutoGroupsWhenGlobalAutoIsEmpty(
 	assert.Equal(t, "default", selectedGroup)
 	assert.Equal(t, "default", common.GetContextKeyString(ctx, constant.ContextKeyAutoGroup))
 }
+
+// TestGetChannelConstraintsInjectsGlobalMinScore T2-1：默认注入的健康分 filter
+// 必须携带 GetChannelHealthMinScore() 作为 HealthMinScore（0 = 仅冷却剔除）。
+func TestGetChannelConstraintsInjectsGlobalMinScore(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+
+	origEnabled := model.ChannelHealthRoutingEnabled()
+	model.SetChannelHealthRoutingEnabled(ptr(true))
+	defer model.SetChannelHealthRoutingEnabled(&origEnabled)
+
+	origSetting := operation_setting.GetChannelHealthSetting()
+	t.Cleanup(func() {
+		*origSetting = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 1500, LatencyWorstMs: 10000, MinScore: 0}
+	})
+
+	// 默认 0
+	*origSetting = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 1500, LatencyWorstMs: 10000, MinScore: 0}
+	cons := GetChannelConstraints(c)
+	filter := cons.Filters[len(cons.Filters)-1]
+	assert.Equal(t, dto.FilterChannelHealth, filter.Kind)
+	assert.Equal(t, 0, filter.HealthMinScore)
+	assert.True(t, filter.HealthCoolingExclude)
+
+	// 配置 60
+	*origSetting = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 1500, LatencyWorstMs: 10000, MinScore: 60}
+	c2, _ := gin.CreateTestContext(httptest.NewRecorder())
+	cons2 := GetChannelConstraints(c2)
+	filter2 := cons2.Filters[len(cons2.Filters)-1]
+	assert.Equal(t, 60, filter2.HealthMinScore)
+}
+
+func ptr[T any](v T) *T { return &v }
