@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -53,6 +54,17 @@ const PRESETS = [
   { id: "standard", label: "Standard (5/s, burst 40)", perSec: 5, burst: 40 },
   { id: "strict", label: "Strict (2/s, burst 20)", perSec: 2, burst: 20 },
 ]
+
+function listToText(values: string[] | undefined): string {
+  return (values ?? []).join("\n")
+}
+
+function textToList(value: string): string[] {
+  return value
+    .split(/[,\n]/)
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+}
 
 function ServerStatsCard({ t }: { t: (k: string) => string }) {
   const [s, setS] = useState<ServerStats | null>(null)
@@ -101,8 +113,20 @@ function formatUptime(sec: number): string {
 function SettingsTab({ t }: { t: (k: string) => string }) {
   const [s, setS] = useState<WebProtectionSettings | null>(null)
   const [saving, setSaving] = useState(false)
+  const [allowedText, setAllowedText] = useState("")
+  const [blockedText, setBlockedText] = useState("")
+  const [uaText, setUaText] = useState("")
 
-  useEffect(() => { getWebProtectionSettings().then(setS).catch((e) => handleServerError(e)) }, [])
+  useEffect(() => {
+    getWebProtectionSettings()
+      .then((d) => {
+        setS(d)
+        setAllowedText(listToText(d.allowed_paths))
+        setBlockedText(listToText(d.blocked_paths))
+        setUaText(listToText(d.ua_allowlist))
+      })
+      .catch((e) => handleServerError(e))
+  }, [])
 
   const set = (patch: Partial<WebProtectionSettings>) => setS((prev) => (prev ? { ...prev, ...patch } : prev))
 
@@ -119,6 +143,9 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
         auto_ban_minutes: Number(s.auto_ban_minutes) || 0,
         log_enabled: s.log_enabled,
         window_seconds: Number(s.window_seconds) || 0,
+        allowed_paths: textToList(allowedText),
+        blocked_paths: textToList(blockedText),
+        ua_allowlist: textToList(uaText),
       })
       if (res.data?.success) { toast.success(t("Web protection settings saved")) }
     } catch (e) { handleServerError(e) } finally { setSaving(false) }
@@ -162,6 +189,21 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
         </div>
         <div className="flex items-center gap-2"><Switch checked={s.auto_ban} onCheckedChange={(v) => set({ auto_ban: v })} /><Label>{t("Auto ban")}</Label></div>
         <div className="flex items-center gap-2"><Switch checked={s.log_enabled} onCheckedChange={(v) => set({ log_enabled: v })} /><Label>{t("Web request logging")}</Label></div>
+        <div className="space-y-2">
+          <Label htmlFor="wp-allowed-paths">{t("Allowed paths")}</Label>
+          <Textarea id="wp-allowed-paths" value={allowedText} placeholder={t("Allowed paths placeholder")} onChange={(e) => setAllowedText(e.target.value)} />
+          <p className="text-muted-foreground text-xs">{t("Allowed paths description")}</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="wp-blocked-paths">{t("Blocked paths")}</Label>
+          <Textarea id="wp-blocked-paths" value={blockedText} placeholder={t("Blocked paths placeholder")} onChange={(e) => setBlockedText(e.target.value)} />
+          <p className="text-muted-foreground text-xs">{t("Blocked paths description")}</p>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="wp-ua-allowlist">{t("User-Agent allowlist")}</Label>
+          <Textarea id="wp-ua-allowlist" value={uaText} placeholder={t("User-Agent allowlist placeholder")} onChange={(e) => setUaText(e.target.value)} />
+          <p className="text-muted-foreground text-xs">{t("User-Agent allowlist description")}</p>
+        </div>
         <Button type="button" onClick={save} disabled={saving}>{saving ? t("Saving...") : t("Save")}</Button>
       </CardContent>
     </Card>

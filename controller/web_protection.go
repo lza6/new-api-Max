@@ -37,6 +37,15 @@ func UpdateWebProtectionSettings(c *gin.Context) {
 			configMap[key] = strconv.FormatInt(int64(v), 10)
 		case string:
 			configMap[key] = v
+		case []any:
+			// 策略维度数组（allowed_paths/blocked_paths/ua_allowlist）：JSON 编码存字符串，
+			// UpdateConfigFromMap 对 slice 字段反序列化回数组。
+			encoded, err := common.Marshal(v)
+			if err != nil {
+				common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+				return
+			}
+			configMap[key] = string(encoded)
 		default:
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return

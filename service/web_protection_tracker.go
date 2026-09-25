@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"net/http"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -188,6 +189,25 @@ func TrackWebRequestBegin(c *gin.Context) bool {
 	}
 	if strings.HasPrefix(c.Request.URL.Path, "/v1") {
 		return true
+	}
+	// T3-1 策略维度：路径白/黑名单 + UA 白名单（默认空=不启用，零行为变化）。
+	// 先路径维度（blocked 优先，再 allowed），后 UA 维度；拒绝走 429 + Retry-After。
+	allowedPaths, blockedPaths := operation_setting.GetWebProtectionPathPolicy()
+	if len(blockedPaths) > 0 || len(allowedPaths) > 0 {
+		if matchWebBlockedPath(c.Request.URL.Path, blockedPaths) {
+			writeWebProtectionReject(c, webProtectionRetryAfter, "blocked_path", "path blocked")
+			return false
+		}
+		if len(allowedPaths) > 0 && !matchWebAllowedPath(c.Request.URL.Path, allowedPaths) {
+			writeWebProtectionReject(c, webProtectionRetryAfter, "not_allowed_path", "path not allowed")
+			return false
+		}
+	}
+	if allow := operation_setting.GetWebProtectionUAAllowlist(); len(allow) > 0 {
+		if !matchWebUAAllowlist(c.Request.UserAgent(), allow) {
+			writeWebProtectionReject(c, webProtectionRetryAfter, "ua_not_allowed", "user agent not allowed")
+			return false
+		}
 	}
 	now := time.Now()
 	ip := c.ClientIP()
@@ -403,4 +423,43 @@ func writeWebProtectionReject(c *gin.Context, retryAfter int64, code, message st
 			"code":    code,
 		},
 	})
+}
+
+// matchWebBlockedPath 前缀匹配（条目已在 getter 清洗）。
+func matchWebBlockedPath(path string, blocked []string) bool {
+	for _, p := range blocked {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// matchWebAllowedPath glob 或前缀匹配：含 glob 元字符用 path.Match，否则前缀。
+func matchWebAllowedPath(pathStr string, allowed []string) bool {
+	for _, p := range allowed {
+		if webPathPatternMatch(pathStr, p) {
+			return true
+		}
+	}
+	return false
+}
+
+func webPathPatternMatch(pathStr, pattern string) bool {
+	if strings.ContainsAny(pattern, "*?[") {
+		ok, err := path.Match(pattern, pathStr)
+		return err == nil && ok
+	}
+	return strings.HasPrefix(pathStr, pattern)
+}
+
+// matchWebUAAllowlist 大小写不敏感子串匹配。
+func matchWebUAAllowlist(ua string, allow []string) bool {
+	ua = strings.ToLower(ua)
+	for _, a := range allow {
+		if strings.Contains(ua, strings.ToLower(a)) {
+			return true
+		}
+	}
+	return false
 }

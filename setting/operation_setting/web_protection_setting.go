@@ -1,6 +1,10 @@
 package operation_setting
 
-import "github.com/lza6/new-api-Max/setting/config"
+import (
+	"strings"
+
+	"github.com/lza6/new-api-Max/setting/config"
+)
 
 // WebProtectionSetting Web 层防刷/限流/封禁配置（热更新，注册名 "web_protection"）。
 // 仅作用于非 /v1 前缀的请求（Web 管理 API、静态资源、SPA 页面）；
@@ -22,6 +26,12 @@ type WebProtectionSetting struct {
 	LogEnabled bool `json:"log_enabled"`
 	// WindowSeconds 聚合窗口（秒），默认 60。
 	WindowSeconds int64 `json:"window_seconds"`
+	// AllowedPaths 路径白名单（glob 或前缀匹配，空=全部放行）。
+	AllowedPaths []string `json:"allowed_paths"`
+	// BlockedPaths 路径黑名单（前缀匹配，空=不拦截）。
+	BlockedPaths []string `json:"blocked_paths"`
+	// UAAllowlist User-Agent 白名单（子串匹配，大小写不敏感，空=不启用）。
+	UAAllowlist []string `json:"ua_allowlist"`
 }
 
 var webProtectionSetting = WebProtectionSetting{
@@ -89,4 +99,30 @@ func GetAutoBanMinutes() int64 {
 // IsWebLogEnabled Web 请求日志开关。
 func IsWebLogEnabled() bool {
 	return webProtectionSetting.LogEnabled
+}
+
+// GetWebProtectionPathPolicy 返回（允许路径, 拦截路径）策略。
+// 空白条目清洗后丢弃；空列表表示对应维度不启用（非法值回退空）。
+func GetWebProtectionPathPolicy() (allowed, blocked []string) {
+	return cleanStringList(webProtectionSetting.AllowedPaths), cleanStringList(webProtectionSetting.BlockedPaths)
+}
+
+// GetWebProtectionUAAllowlist 返回 UA 白名单（子串匹配，大小写不敏感）。
+// 空列表表示不启用。
+func GetWebProtectionUAAllowlist() []string {
+	return cleanStringList(webProtectionSetting.UAAllowlist)
+}
+
+func cleanStringList(items []string) []string {
+	out := make([]string, 0, len(items))
+	for _, it := range items {
+		it = strings.TrimSpace(it)
+		if it != "" {
+			out = append(out, it)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }

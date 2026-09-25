@@ -27,6 +27,9 @@ export interface WebProtectionSettings {
   auto_ban_minutes: number
   log_enabled: boolean
   window_seconds: number
+  allowed_paths: string[]
+  blocked_paths: string[]
+  ua_allowlist: string[]
 }
 
 export interface WebRequestLogRow {
