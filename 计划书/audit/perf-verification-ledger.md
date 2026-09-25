@@ -120,7 +120,7 @@
   - 存量回填/切列聚合属风险中专项（需「新写入统一填列 + 存量回填」），本次按任务边界**不做该重构**，只做最小安全修复。
 - **最小修复（本轮入库）**:
   - service/log_traffic.go:61/64 `req = int64(v)` / `resp = int64(v)`（other JSON float64 裸转换）→ `int64(common.QuotaFromFloat(v))`：聚合前饱和，杜绝超大/负值 other 字节在 int64 上回绕成负数总带宽（历史行值来自上游/用户可控字段，属计费乘数同源风险面）。
-  - 回归测试：service/log_traffic_test.go `TestAggregateTrafficByDaySaturatesOtherBytes`（1.84e19/-1.84e19 字节行 → 饱和求和 300）。
+  - 回归测试：service/log_traffic_test.go `TestAggregateTrafficByDaySaturatesOtherBytes`（1.84e19/-1.84e19 字节行 → 饱和求和 1300，杜绝 int64 回绕成负数）。
 - **验证**: go test ./service/ -run 'TestAggregateTraffic' → exit 0（见本批次验证记录）。
 - **下次不再重复跑**: 未改 GetLogsTraffic 查询列或写入列逻辑时不重跑；若做「写入填列 + 存量回填 + 切列聚合」专项，跑本记录 + 0006/0007 对应用例。
 
