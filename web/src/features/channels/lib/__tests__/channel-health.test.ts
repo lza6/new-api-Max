@@ -272,3 +272,29 @@ describe('aggregateHealthScores (T2-2)', () => {
     expect(agg.coolingCount).toBe(1)
   })
 })
+
+
+// 终局审计：超大数/越界成功率的域钳制（0-100 / 0-1），防污染聚合。
+test('clamps score and success_rate to their semantic domains', () => {
+  const view = toHealthSnapshotView(
+    { '9': { score: 1e21, success_rate: 999, p50_latency_ms: 0, p95_latency_ms: 0, cool_count: 0, sample_count: 5, cooling_down: false, cool_until: 0 } } as never,
+    9
+  )
+  expect(view.score).toBe(100)
+  expect(view.successRate).toBe(1)
+  const neg = toHealthSnapshotView(
+    { '10': { score: -50, success_rate: -2, p50_latency_ms: 0, p95_latency_ms: 0, cool_count: 0, sample_count: 5, cooling_down: false, cool_until: 0 } } as never,
+    10
+  )
+  expect(neg.score).toBe(0)
+  expect(neg.successRate).toBe(0)
+})
+
+// 终局审计：coolingDown 严格布尔（truthy 非 true 不算冷却）。
+test('coolingDown only true for strict boolean true', () => {
+  const view = toHealthSnapshotView(
+    { '11': { score: 0, success_rate: 0, p50_latency_ms: 0, p95_latency_ms: 0, cool_count: 0, sample_count: 0, cooling_down: 'yes' as never, cool_until: 0 } } as never,
+    11
+  )
+  expect(view.coolingDown).toBe(false)
+})

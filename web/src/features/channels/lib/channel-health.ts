@@ -101,13 +101,16 @@ export function toHealthSnapshotView(
     return EMPTY_HEALTH_SNAPSHOT
   }
   return {
-    score: isFiniteNumber(raw.score) ? raw.score : 0,
-    successRate: isFiniteNumber(raw.success_rate) ? raw.success_rate : 0,
+    // 健康分语义域 0-100、成功率 0-1：钳制防止上游/缓存异常超大数污染聚合。
+    score: isFiniteNumber(raw.score) ? Math.min(100, Math.max(0, raw.score)) : 0,
+    successRate: isFiniteNumber(raw.success_rate)
+      ? Math.min(1, Math.max(0, raw.success_rate))
+      : 0,
     p50LatencyMs: isFiniteNumber(raw.p50_latency_ms) ? raw.p50_latency_ms : 0,
     p95LatencyMs: isFiniteNumber(raw.p95_latency_ms) ? raw.p95_latency_ms : 0,
     coolCount: isFiniteNumber(raw.cool_count) ? raw.cool_count : 0,
     sampleCount: isFiniteNumber(raw.sample_count) ? raw.sample_count : 0,
-    coolingDown: raw.cooling_down === true,
+    coolingDown: raw.cooling_down === true, // 严格布尔，防 truthy 误判
     coolUntil: isFiniteNumber(raw.cool_until) ? raw.cool_until : 0,
     lastCoolClass:
       typeof raw.last_cool_class === 'string' ? raw.last_cool_class : undefined,

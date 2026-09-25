@@ -2628,6 +2628,7 @@
     "Header Value (supports string or JSON mapping)": "Giá trị header (hỗ trợ chuỗi hoặc ánh xạ JSON)",
     "header. Anthropic-formatted endpoints accept the": ". Các endpoint định dạng Anthropic chấp nhận header",
     "Health": "Sức khỏe",
+    "Health data refreshes automatically": "Health data refreshes automatically",
     "Health details": "Health details",
     "Healthy": "Bình thường",
     "Hidden": "Ẩn",

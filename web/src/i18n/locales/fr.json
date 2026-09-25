@@ -2628,6 +2628,7 @@
     "Header Value (supports string or JSON mapping)": "Valeur de l'en-tête (chaîne ou mappage JSON)",
     "header. Anthropic-formatted endpoints accept the": ". Les points de terminaison au format Anthropic acceptent à la place",
     "Health": "Santé",
+    "Health data refreshes automatically": "Health data refreshes automatically",
     "Health details": "Health details",
     "Healthy": "Normal",
     "Hidden": "Masqué",

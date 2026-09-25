@@ -2628,6 +2628,7 @@
     "Header Value (supports string or JSON mapping)": "Значение заголовка (строка или JSON-маппинг)",
     "header. Anthropic-formatted endpoints accept the": ". Эндпоинты формата Anthropic вместо этого принимают",
     "Health": "Здоровье",
+    "Health data refreshes automatically": "Health data refreshes automatically",
     "Health details": "Health details",
     "Healthy": "В норме",
     "Hidden": "Скрыта",

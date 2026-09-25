@@ -40,6 +40,7 @@ export function ChannelHealthOverviewCard() {
         <div className='text-muted-foreground flex min-w-0 items-center gap-2 px-3 py-3 sm:px-5'>
           <HeartPulse className='size-4 shrink-0' />
           <span className='text-xs sm:text-sm'>{t('No health data yet')}</span>
+          <span className='text-muted-foreground/60 text-[11px]'>{t('Health data refreshes automatically')}</span>
         </div>
       </div>
     )
@@ -77,7 +78,7 @@ export function ChannelHealthOverviewCard() {
       value: agg.worst.length > 0 ? String(agg.worst[0].score) : '—',
       description: t('Lowest health score among channels'),
       icon: TrendingDown,
-      tone: 'destructive',
+      tone: agg.worst.length > 0 ? 'destructive' : 'neutral',
     },
     {
       label: t('Channels cooling down'),
@@ -96,7 +97,7 @@ export function ChannelHealthOverviewCard() {
             <IconBadge tone={item.tone} size='stat'>
               <item.icon />
             </IconBadge>
-            <div className='text-muted-foreground truncate text-[11px] font-medium tracking-wider uppercase sm:text-xs'>
+            <div className='text-muted-foreground text-[11px] font-medium tracking-wider uppercase break-words sm:text-xs'>
               {item.label}
             </div>
           </div>

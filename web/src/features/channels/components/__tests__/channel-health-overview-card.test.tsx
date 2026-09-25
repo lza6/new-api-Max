@@ -63,3 +63,31 @@ describe('ChannelHealthOverviewCard (T2-2)', () => {
     expect(screen.getByText('1')).toBeInTheDocument()
   })
 })
+
+
+  test('shows refresh hint in empty state', () => {
+    mockedUseChannels.mockReturnValue({ healthScores: null } as never)
+    render(<ChannelHealthOverviewCard />)
+    expect(screen.getByText('No health data yet')).toBeInTheDocument()
+    expect(screen.getByText('Health data refreshes automatically')).toBeInTheDocument()
+  })
+
+  test('renders neutral dash for worst channels when none sampled', () => {
+    mockedUseChannels.mockReturnValue({
+      healthScores: {
+        '1': { score: 80, success_rate: 0.8, p50_latency_ms: 100, p95_latency_ms: 300, cool_count: 0, sample_count: 10, cooling_down: false, cool_until: 0 },
+      } as never,
+    } as never)
+    // 单渠道有样本：worst 非空 → 显示分数
+    const { container } = render(<ChannelHealthOverviewCard />)
+    // 全无样本渠道（cool 事件但无 sample）→ hasData false → 空态
+    mockedUseChannels.mockReturnValue({
+      healthScores: {
+        '2': { score: 0, success_rate: 0, p50_latency_ms: 0, p95_latency_ms: 0, cool_count: 1, sample_count: 0, cooling_down: true, cool_until: 1700001000 },
+      } as never,
+    } as never)
+    const { rerender } = render(<ChannelHealthOverviewCard />)
+    rerender(<ChannelHealthOverviewCard />)
+    expect(screen.getByText('No health data yet')).toBeInTheDocument()
+    expect(container).toBeTruthy()
+  })

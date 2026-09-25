@@ -2628,6 +2628,7 @@
     "Header Value (supports string or JSON mapping)": "ヘッダー値（文字列またはJSONマッピング対応）",
     "header. Anthropic-formatted endpoints accept the": " ヘッダーが必要です。Anthropic 形式のエンドポイントでは",
     "Health": "ヘルスケア",
+    "Health data refreshes automatically": "Health data refreshes automatically",
     "Health details": "Health details",
     "Healthy": "正常",
     "Hidden": "非表示",
