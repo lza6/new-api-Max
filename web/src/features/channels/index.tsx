@@ -33,6 +33,7 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { getChannelOps } from './api'
+import { ChannelHealthOverviewCard } from './components/channel-health-overview-card'
 import { ChannelsDialogs } from './components/channels-dialogs'
 import { ChannelsPrimaryButtons } from './components/channels-primary-buttons'
 import { ChannelsProvider } from './components/channels-provider'
@@ -98,7 +99,10 @@ export function Channels() {
           <ChannelsPrimaryButtons />
         </SectionPageLayout.Actions>
         <SectionPageLayout.Content>
-          <ChannelsTable />
+          <div className='flex flex-col gap-2.5 sm:gap-3'>
+            <ChannelHealthOverviewCard />
+            <ChannelsTable />
+          </div>
         </SectionPageLayout.Content>
       </SectionPageLayout>
 

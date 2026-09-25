@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { describe, expect, test } from 'vitest'
 
 import {
+  aggregateHealthScores,
   getProbeResults,
   coolClassLabelKey,
   gradeToVariant,
@@ -221,5 +222,53 @@ describe('coolClassLabelKey', () => {
     expect(coolClassLabelKey('ok')).toBe('cool-class.unknown')
     expect(coolClassLabelKey('unknown')).toBe('cool-class.unknown')
     expect(coolClassLabelKey('')).toBe('cool-class.unknown')
+  })
+})
+
+
+describe('aggregateHealthScores (T2-2)', () => {
+  const fixture = (id: string, score: number, sampleCount: number, coolingDown = false) => ({
+    [id]: { score, success_rate: sampleCount > 0 ? 1 : 0, p50_latency_ms: 0, p95_latency_ms: 0, cool_count: 0, sample_count: sampleCount, cooling_down: coolingDown, cool_until: coolingDown ? 1700001000 : 0 },
+  })
+
+  test('returns neutral empty aggregate for null/empty/no-data input', () => {
+    expect(aggregateHealthScores(null)).toMatchObject({ hasData: false, avgScore: 0, totalSampled: 0 })
+    expect(aggregateHealthScores({})).toMatchObject({ hasData: false })
+    // 仅有冷却计数、无样本：hasHealthData=false → 不算数据
+    expect(aggregateHealthScores({ '1': { score: 0, success_rate: 0, p50_latency_ms: 0, p95_latency_ms: 0, cool_count: 1, sample_count: 0, cooling_down: false, cool_until: 0 } } as never)).toMatchObject({ hasData: false })
+  })
+
+  test('computes average only over sampled channels', () => {
+    const scores = { ...fixture('1', 90, 10), ...fixture('2', 50, 5), ...fixture('3', 0, 0) }
+    const agg = aggregateHealthScores(scores as never)
+    expect(agg.hasData).toBe(true)
+    expect(agg.totalSampled).toBe(2)
+    expect(agg.avgScore).toBeCloseTo(70, 5)
+  })
+
+  test('computes available rate with 70+ threshold', () => {
+    const scores = { ...fixture('1', 90, 10), ...fixture('2', 60, 5) }
+    const agg = aggregateHealthScores(scores as never)
+    expect(agg.availableRate).toBeCloseTo(0.5, 5)
+  })
+
+  test('ranks worst channels cooling-first then by score, capped at 3', () => {
+    const scores = {
+      ...fixture('1', 30, 5),
+      ...fixture('2', 88, 8, true),
+      ...fixture('3', 45, 4),
+      ...fixture('4', 99, 9),
+    }
+    const agg = aggregateHealthScores(scores as never)
+    expect(agg.worst).toHaveLength(3)
+    expect(agg.worst[0]).toMatchObject({ score: 88, coolingDown: true })
+    expect(agg.worst[1].score).toBe(30)
+    expect(agg.worst[2].score).toBe(45)
+  })
+
+  test('counts cooling channels across all entries', () => {
+    const scores = { ...fixture('1', 90, 10), ...fixture('2', 80, 8, true) }
+    const agg = aggregateHealthScores(scores as never)
+    expect(agg.coolingCount).toBe(1)
   })
 })

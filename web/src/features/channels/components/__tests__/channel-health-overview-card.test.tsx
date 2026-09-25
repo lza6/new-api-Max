@@ -1,0 +1,65 @@
+/*
+Copyright (C) 2023-2026 QuantumNous
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as
+published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program. If not, see <https://www.gnu.org/licenses/>.
+
+For commercial licensing, please contact support@quantumnous.com
+*/
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, test, vi } from 'vitest'
+
+import { ChannelHealthOverviewCard } from '../channel-health-overview-card'
+import { useChannels } from '../channels-provider'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string) => key,
+    i18n: { resolvedLanguage: 'en', language: 'en' },
+  }),
+}))
+
+vi.mock('../channels-provider', () => ({
+  useChannels: vi.fn(),
+}))
+
+const mockedUseChannels = vi.mocked(useChannels)
+
+afterEach(() => {
+  cleanup()
+  mockedUseChannels.mockReset()
+})
+
+describe('ChannelHealthOverviewCard (T2-2)', () => {
+  test('shows neutral empty state when no health data exists', () => {
+    mockedUseChannels.mockReturnValue({ healthScores: null } as never)
+    render(<ChannelHealthOverviewCard />)
+    expect(screen.getByText('No health data yet')).toBeInTheDocument()
+  })
+
+  test('renders aggregate stats from provider scores', () => {
+    mockedUseChannels.mockReturnValue({
+      healthScores: {
+        '1': { score: 90, success_rate: 1, p50_latency_ms: 120, p95_latency_ms: 400, cool_count: 0, sample_count: 10, cooling_down: false, cool_until: 0 },
+        '2': { score: 60, success_rate: 0.5, p50_latency_ms: 300, p95_latency_ms: 900, cool_count: 1, sample_count: 5, cooling_down: true, cool_until: 1700001000 },
+      } as never,
+    } as never)
+    render(<ChannelHealthOverviewCard />)
+    expect(screen.getByText('Average health score')).toBeInTheDocument()
+    // 均值 (90+60)/2 = 75，可用率 1/2 = 50%
+    expect(screen.getByText('75')).toBeInTheDocument()
+    expect(screen.getByText('50%')).toBeInTheDocument()
+    expect(screen.getByText('Channels cooling down')).toBeInTheDocument()
+    expect(screen.getByText('1')).toBeInTheDocument()
+  })
+})

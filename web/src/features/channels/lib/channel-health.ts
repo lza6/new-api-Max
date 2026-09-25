@@ -179,3 +179,86 @@ export function getProbeResults(report: ProbeReport | null): ProbeCaseResult[] {
   }
   return report.results.filter(isProbeReport)
 }
+
+
+// ============================================================================
+// T2-2 聚合概览
+// ============================================================================
+
+export interface ChannelHealthAggregate {
+  /** 有样本渠道的平均健康分（0-100）；无样本/无数据时 0 */
+  avgScore: number
+  /** 最差渠道（按 score 升序、冷却优先）前 N 条的 score + 冷却标记 */
+  worst: Array<{ score: number; coolingDown: boolean; sampleCount: number }>
+  /** 可用率 = score>=70 且有样本的渠道数 / 有样本渠道数；无样本时 0 */
+  availableRate: number
+  /** 有样本渠道数 */
+  totalSampled: number
+  /** 冷却中渠道数 */
+  coolingCount: number
+  /** 是否存在任何健康数据（有快照且 hasHealthData） */
+  hasData: boolean
+}
+
+const AVAILABLE_SCORE_THRESHOLD = 70
+
+/**
+ * 聚合所有渠道健康分快照（纯前端、零请求）。数据源为 provider 已注入的
+ * healthScores；仅统计「有观测」渠道（hasHealthData），无样本渠道不参与均值，
+ * 避免新渠道拉低概览。可用率沿用 scoreToVariant 的 warning 分界（>=70）。
+ */
+export function aggregateHealthScores(
+  scores: NonNullable<ChannelHealthScoresResponse['data']> | null | undefined
+): ChannelHealthAggregate {
+  const empty: ChannelHealthAggregate = {
+    avgScore: 0,
+    worst: [],
+    availableRate: 0,
+    totalSampled: 0,
+    coolingCount: 0,
+    hasData: false,
+  }
+  if (!scores) {
+    return empty
+  }
+  const entries = Object.entries(scores)
+    .map(([id]) => ({ id, view: toHealthSnapshotView(scores, Number(id)) }))
+    .filter(({ view }) => hasHealthData(view))
+  if (entries.length === 0) {
+    return empty
+  }
+
+  const sampled = entries.filter(({ view }) => view.sampleCount > 0)
+  const totalSampled = sampled.length
+  const avgScore =
+    totalSampled > 0
+      ? sampled.reduce((sum, { view }) => sum + view.score, 0) / totalSampled
+      : 0
+  const availableCount = sampled.filter(
+    ({ view }) => view.score >= AVAILABLE_SCORE_THRESHOLD
+  ).length
+  const availableRate = totalSampled > 0 ? availableCount / totalSampled : 0
+  const coolingCount = entries.filter(({ view }) => view.coolingDown).length
+
+  // 最差渠道：冷却优先（冷却中视为最差），再按 score 升序，取前 3。
+  const sorted = [...entries].sort((a, b) => {
+    if (a.view.coolingDown !== b.view.coolingDown) {
+      return a.view.coolingDown ? -1 : 1
+    }
+    return a.view.score - b.view.score
+  })
+  const worst = sorted.slice(0, 3).map(({ view }) => ({
+    score: view.score,
+    coolingDown: view.coolingDown,
+    sampleCount: view.sampleCount,
+  }))
+
+  return {
+    avgScore,
+    worst,
+    availableRate,
+    totalSampled,
+    coolingCount,
+    hasData: true,
+  }
+}
