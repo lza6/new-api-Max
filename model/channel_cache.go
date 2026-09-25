@@ -24,6 +24,25 @@ var channelsIDM map[int]*Channel                     // all channels include dis
 var channel2advancedCustomConfig map[int]*kitdto.AdvancedCustomConfig
 var channelSyncLock sync.RWMutex
 
+// channelRuntimeSnapshots 缓存渠道“静态可预计算”的运行时配置（设置/其他设置/
+// 参数覆盖/头覆盖/模型映射/状态码映射/自动封禁/baseURL），避免热路径每请求
+// 重复 JSON 解析与 map 分配。动态字段（多 key 轮询索引、启用状态）仍读
+// channelsIDM/Channel.ChannelInfo，不入快照。全量 InitChannelCache 重建；
+// CacheUpdateChannelStatus 只改 Status 不动快照（快照不含状态）。
+var channelRuntimeSnapshots map[int]*ChannelRuntimeSnapshot
+
+// ChannelRuntimeSnapshot 是渠道静态运行时配置的预计算只读快照。
+type ChannelRuntimeSnapshot struct {
+	Settings          kitdto.ChannelSettings
+	OtherSettings     kitdto.ChannelOtherSettings
+	ParamOverride     map[string]any
+	HeaderOverride    map[string]any
+	ModelMapping      string
+	StatusCodeMapping string
+	AutoBan           bool
+	BaseURL           string
+}
+
 func InitChannelCache() {
 	if !common.MemoryCacheEnabled {
 		InvalidatePricingCache()
@@ -96,6 +115,7 @@ func InitChannelCache() {
 	}
 	channelsIDM = newChannelId2channel
 	channel2advancedCustomConfig = newChannel2advancedCustomConfig
+	buildChannelRuntimeSnapshotsLocked(newChannelId2channel)
 	channelSyncLock.Unlock()
 	// Lock ordering: InvalidatePricingCache acquires updatePricingLock, and
 	// GetPricing (holding updatePricingLock) nests channelSyncLock.RLock via
@@ -257,7 +277,12 @@ func CacheUpdateChannelStatus(id int, status int) {
 	if channel, ok := channelsIDM[id]; ok {
 		channel.Status = status
 	}
-	if status != common.ChannelStatusEnabled {
+	// 状态变化统一走全量快照重建（只重建索引+解析快照，不碰 channelsIDM 指针，
+	// 保留多 key 轮询索引等运行时状态）。相比增量增删索引，全量重建避免了
+	// 「冷却到期恢复启用后未重新加回索引导致选不到」的一致性缺口。
+	if status == common.ChannelStatusEnabled {
+		rebuildGroupIndexesLocked()
+	} else {
 		// delete the channel from group2model2channels
 		for group, model2channels := range group2model2channels {
 			for model, channels := range model2channels {
@@ -271,6 +296,57 @@ func CacheUpdateChannelStatus(id int, status int) {
 			}
 		}
 	}
+}
+
+// rebuildGroupIndexesLocked 依据 channelsIDM 重建 group2model2channels 索引。
+// 调用方必须持有 channelSyncLock 写锁。
+func rebuildGroupIndexesLocked() {
+	next := make(map[string]map[string][]int)
+	groups := make(map[string]bool)
+	for _, ch := range channelsIDM {
+		for _, g := range ch.GetGroups() {
+			groups[g] = true
+		}
+	}
+	// 保持稳定顺序（map 值切片后续不排序也无妨，但选择路径按优先级排序过；
+	// 重建后按 id 稳定序，避免随机 map 遍历导致同类渠道选择抖动）。
+	groupNames := sortedGroupNames(groups)
+	for _, g := range groupNames {
+		next[g] = make(map[string][]int)
+	}
+	for _, ch := range channelsIDM {
+		if ch.Status != common.ChannelStatusEnabled {
+			continue
+		}
+		for _, g := range ch.GetGroups() {
+			for _, m := range ch.GetModels() {
+				next[g][m] = append(next[g][m], ch.Id)
+			}
+		}
+	}
+	for g, model2channels := range next {
+		for m, ids := range model2channels {
+			sort.Slice(ids, func(i, j int) bool {
+				a, aok := channelsIDM[ids[i]]
+				b, bok := channelsIDM[ids[j]]
+				if !aok || !bok {
+					return ids[i] < ids[j]
+				}
+				return a.GetPriority() > b.GetPriority()
+			})
+			next[g][m] = ids
+		}
+	}
+	group2model2channels = next
+}
+
+func sortedGroupNames(groups map[string]bool) []string {
+	names := make([]string, 0, len(groups))
+	for g := range groups {
+		names = append(names, g)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func CacheUpdateChannel(channel *Channel) {
@@ -306,4 +382,39 @@ func CacheUpdateChannel(channel *Channel) {
 	// updatePricingLock while holding channelSyncLock would be an AB-BA deadlock.
 	channelSyncLock.Unlock()
 	InvalidatePricingCache()
+}
+
+// buildChannelRuntimeSnapshotsLocked 全量重建渠道运行时快照。调用方必须持有
+// channelSyncLock 写锁（InitChannelCache 内调用）。快照只保存“静态”预计算值；
+// 解析失败时降级为空值/零值，不阻断缓存重建。
+func buildChannelRuntimeSnapshotsLocked(channels map[int]*Channel) {
+	next := make(map[int]*ChannelRuntimeSnapshot, len(channels))
+	for id, ch := range channels {
+		snap := &ChannelRuntimeSnapshot{
+			Settings:          ch.GetSetting(),
+			OtherSettings:     ch.GetOtherSettings(),
+			ModelMapping:      ch.GetModelMapping(),
+			StatusCodeMapping: ch.GetStatusCodeMapping(),
+			AutoBan:           ch.GetAutoBan(),
+			BaseURL:           ch.GetBaseURL(),
+		}
+		snap.ParamOverride = ch.GetParamOverride()
+		snap.HeaderOverride = ch.GetHeaderOverride()
+		next[id] = snap
+	}
+	channelRuntimeSnapshots = next
+}
+
+// CacheGetChannelRuntimeSnapshot 返回渠道预计算运行时快照；缓存关闭或未命中时
+// 返回 nil（调用方回退到 Channel 方法，保持行为等价）。
+func CacheGetChannelRuntimeSnapshot(id int) *ChannelRuntimeSnapshot {
+	if !common.MemoryCacheEnabled {
+		return nil
+	}
+	channelSyncLock.RLock()
+	defer channelSyncLock.RUnlock()
+	if channelRuntimeSnapshots == nil {
+		return nil
+	}
+	return channelRuntimeSnapshots[id]
 }

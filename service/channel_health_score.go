@@ -66,7 +66,15 @@ type channelHealthState struct {
 var (
 	channelHealthMu    sync.RWMutex
 	channelHealthTable = map[int]*channelHealthRing{}
+	// healthSnapshotCache 缓存 GetChannelHealthSnapshot 计算结果，避免热路径
+	// 每候选每请求重复遍历样本环/sort/百分位。TTL 1s，记录时置空。
+	healthSnapshotCache = map[int]healthSnapshotEntry{}
 )
+
+type healthSnapshotEntry struct {
+	snap      ChannelHealthSnapshot
+	expiresAt time.Time
+}
 
 func getHealthRing(channelId int) *channelHealthRing {
 	channelHealthMu.Lock()
@@ -95,6 +103,7 @@ func RecordChannelOutcome(channelId int, success bool, latency time.Duration, cl
 		class:     class,
 	}
 	r.idx = (r.idx + 1) % channelHealthRingSize
+	delete(healthSnapshotCache, channelId)
 }
 
 // RecordChannelCooldownMatch 记录一次冷却事件（B3-1 调用），供健康分聚合。
@@ -114,6 +123,7 @@ func RecordChannelCooldownMatchWithClass(channelId int, class RelayErrorClass) {
 	if class != ErrClassUnknown {
 		r.lastCoolClass = class
 	}
+	delete(healthSnapshotCache, channelId)
 	channelHealthMu.Unlock()
 }
 
@@ -140,8 +150,28 @@ func init() {
 	}
 }
 
-// GetChannelHealthSnapshot 计算渠道健康快照（近 1h 窗口）。
+// GetChannelHealthSnapshot 返回渠道健康快照（近 1h 窗口），带 1s 计算缓存。
+// 热路径（路由过滤/管理 API）会高频读取，缓存避免每候选每请求重复遍历样本环
+// 与排序；任何新样本/冷却事件写入后缓存被置空，最长陈旧 1s。
 func GetChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
+	channelHealthMu.RLock()
+	if e, ok := healthSnapshotCache[channelId]; ok && time.Now().Before(e.expiresAt) {
+		snap := e.snap
+		channelHealthMu.RUnlock()
+		return snap
+	}
+	channelHealthMu.RUnlock()
+	snap := computeChannelHealthSnapshot(channelId)
+	channelHealthMu.Lock()
+	healthSnapshotCache[channelId] = healthSnapshotEntry{snap: snap, expiresAt: time.Now().Add(healthSnapshotCacheTTL)}
+	channelHealthMu.Unlock()
+	return snap
+}
+
+const healthSnapshotCacheTTL = time.Second
+
+// computeChannelHealthSnapshot 计算渠道健康快照（近 1h 窗口），不做缓存。
+func computeChannelHealthSnapshot(channelId int) ChannelHealthSnapshot {
 	channelHealthMu.RLock()
 	defer channelHealthMu.RUnlock()
 	snap := ChannelHealthSnapshot{}

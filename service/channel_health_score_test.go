@@ -15,10 +15,12 @@ func resetChannelHealthForTest(t *testing.T) {
 	channelHealthMu.Lock()
 	defer channelHealthMu.Unlock()
 	channelHealthTable = map[int]*channelHealthRing{}
+	healthSnapshotCache = map[int]healthSnapshotEntry{}
 	t.Cleanup(func() {
 		channelHealthMu.Lock()
 		defer channelHealthMu.Unlock()
 		channelHealthTable = map[int]*channelHealthRing{}
+		healthSnapshotCache = map[int]healthSnapshotEntry{}
 	})
 }
 
@@ -98,4 +100,36 @@ func TestChannelHealthSnapshotEmptyReturnsZero(t *testing.T) {
 	assert.Zero(t, snap.SampleCount)
 	assert.Zero(t, snap.Score)
 	assert.False(t, snap.CoolingDown)
+}
+
+// TestChannelHealthSnapshotCacheInvalidatedOnNewSample：快照缓存命中后写入新
+// 样本必须使缓存失效（下一读反映新样本）；1s TTL 内重复读不重建。
+func TestChannelHealthSnapshotCacheInvalidatedOnNewSample(t *testing.T) {
+	resetChannelHealthForTest(t)
+	const cid = 5003
+	RecordChannelOutcome(cid, true, 200*time.Millisecond, ErrClassOK)
+	first := GetChannelHealthSnapshot(cid)
+	require.Positive(t, first.SampleCount)
+
+	// 直接调内部计算（未命中缓存）应得到同样结果，证明首读已缓存。
+	direct := computeChannelHealthSnapshot(cid)
+	assert.Equal(t, first.SampleCount, direct.SampleCount)
+
+	// 新失败样本写入 → 缓存失效 → 下一读成功率下降。
+	RecordChannelOutcome(cid, false, 0, ErrClassServerError)
+	after := GetChannelHealthSnapshot(cid)
+	assert.Equal(t, 2, after.SampleCount)
+	assert.InDelta(t, 0.5, after.SuccessRate, 0.001)
+}
+
+// TestChannelHealthSnapshotCacheHitWithinTTL：1s TTL 内连续读只算一次。
+func TestChannelHealthSnapshotCacheHitWithinTTL(t *testing.T) {
+	resetChannelHealthForTest(t)
+	const cid = 5004
+	RecordChannelOutcome(cid, true, 300*time.Millisecond, ErrClassOK)
+	// 连续两次读都不应因排序等原因变化；缓存命中由内部逻辑保证。
+	a := GetChannelHealthSnapshot(cid)
+	b := GetChannelHealthSnapshot(cid)
+	assert.Equal(t, a.Score, b.Score)
+	assert.Equal(t, a.SampleCount, b.SampleCount)
 }

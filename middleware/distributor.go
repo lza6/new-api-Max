@@ -647,14 +647,25 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	common.SetContextKey(c, constant.ContextKeyChannelName, channel.Name)
 	common.SetContextKey(c, constant.ContextKeyChannelType, channel.Type)
 	common.SetContextKey(c, constant.ContextKeyChannelCreateTime, channel.CreatedTime)
-	common.SetContextKey(c, constant.ContextKeyChannelSetting, channel.GetSetting())
-	common.SetContextKey(c, constant.ContextKeyChannelOtherSetting, channel.GetOtherSettings())
+	runtimeSnap := model.CacheGetChannelRuntimeSnapshot(channel.Id)
+	channelSetting := channel.GetSetting()
+	channelOther := channel.GetOtherSettings()
+	if runtimeSnap != nil {
+		channelSetting = runtimeSnap.Settings
+		channelOther = runtimeSnap.OtherSettings
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelSetting, channelSetting)
+	common.SetContextKey(c, constant.ContextKeyChannelOtherSetting, channelOther)
 	if channel.Type == constant.ChannelTypeTaskPlugin {
 		c.Set("task_plugin_key", channel.GetSetting().TaskPluginKey)
 	}
 	logTaskPluginChannelDecision(c, channel, modelName, "channel_selected", "")
 	paramOverride := channel.GetParamOverride()
 	headerOverride := channel.GetHeaderOverride()
+	if runtimeSnap != nil {
+		paramOverride = runtimeSnap.ParamOverride
+		headerOverride = runtimeSnap.HeaderOverride
+	}
 	if mergedParam, applied := service.ApplyChannelAffinityOverrideTemplate(c, paramOverride); applied {
 		paramOverride = mergedParam
 	}
@@ -663,9 +674,17 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	if nil != channel.OpenAIOrganization && *channel.OpenAIOrganization != "" {
 		common.SetContextKey(c, constant.ContextKeyChannelOrganization, *channel.OpenAIOrganization)
 	}
-	common.SetContextKey(c, constant.ContextKeyChannelAutoBan, channel.GetAutoBan())
-	common.SetContextKey(c, constant.ContextKeyChannelModelMapping, channel.GetModelMapping())
-	common.SetContextKey(c, constant.ContextKeyChannelStatusCodeMapping, channel.GetStatusCodeMapping())
+	autoBan := channel.GetAutoBan()
+	modelMapping := channel.GetModelMapping()
+	statusCodeMapping := channel.GetStatusCodeMapping()
+	if runtimeSnap != nil {
+		autoBan = runtimeSnap.AutoBan
+		modelMapping = runtimeSnap.ModelMapping
+		statusCodeMapping = runtimeSnap.StatusCodeMapping
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelAutoBan, autoBan)
+	common.SetContextKey(c, constant.ContextKeyChannelModelMapping, modelMapping)
+	common.SetContextKey(c, constant.ContextKeyChannelStatusCodeMapping, statusCodeMapping)
 
 	key, index, newAPIError := channel.GetNextEnabledKey()
 	if newAPIError != nil {
@@ -680,7 +699,11 @@ func SetupContextForSelectedChannel(c *gin.Context, channel *model.Channel, mode
 	}
 	// c.Request.Header.Set("Authorization", fmt.Sprintf("Bearer %s", key))
 	common.SetContextKey(c, constant.ContextKeyChannelKey, key)
-	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, channel.GetBaseURL())
+	channelBaseURL := channel.GetBaseURL()
+	if runtimeSnap != nil {
+		channelBaseURL = runtimeSnap.BaseURL
+	}
+	common.SetContextKey(c, constant.ContextKeyChannelBaseUrl, channelBaseURL)
 
 	common.SetContextKey(c, constant.ContextKeySystemPromptOverride, false)
 

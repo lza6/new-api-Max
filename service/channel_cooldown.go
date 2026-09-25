@@ -102,6 +102,13 @@ func recordChannelCooldown(channelId int, until time.Time, class RelayErrorClass
 		createdAt: time.Now(),
 	}
 	channelCooldownMu.Unlock()
+	// 冷却状态变化会反映到健康分快照（CoolingDown/CoolUntil），必须置空该渠道
+	// 快照缓存，避免 1s TTL 内读到陈旧冷却状态。先释放 cooldown 锁再取 health 锁，
+	// 保持与 GetChannelHealthSnapshot(仅 health) / GetChannelCooldownUntil(仅 cooldown)
+	// 一致的锁序，避免嵌套死锁。
+	channelHealthMu.Lock()
+	delete(healthSnapshotCache, channelId)
+	channelHealthMu.Unlock()
 }
 
 // GetChannelCooldownUntil 返回渠道当前冷却截止时间（零值 = 未冷却）。
@@ -125,7 +132,6 @@ func IsChannelCoolingDown(channelId int) bool {
 func clearExpiredChannelCooldowns() []int {
 	now := time.Now()
 	channelCooldownMu.Lock()
-	defer channelCooldownMu.Unlock()
 	recovered := make([]int, 0, 4)
 	for channelId, entry := range channelCooldownTable {
 		if now.Before(entry.until) {
@@ -133,6 +139,14 @@ func clearExpiredChannelCooldowns() []int {
 		}
 		delete(channelCooldownTable, channelId)
 		recovered = append(recovered, channelId)
+	}
+	channelCooldownMu.Unlock()
+	if len(recovered) > 0 {
+		channelHealthMu.Lock()
+		for _, channelId := range recovered {
+			delete(healthSnapshotCache, channelId)
+		}
+		channelHealthMu.Unlock()
 	}
 	return recovered
 }
