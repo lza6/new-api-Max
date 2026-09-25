@@ -1,8 +1,10 @@
 package service
 
 import (
+	"math"
 	"testing"
 
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -62,4 +64,26 @@ func TestExplainFactorDecisionReadable(t *testing.T) {
 
 func TestFactorDeadlineConfigured(t *testing.T) {
 	assert.Greater(t, int64(factorSelectionDeadline), int64(0), "因子评估有超时保护配置")
+}
+
+// TestLatencyFactorDegenerateConfig 审计 P2-4.3：best>=worst 时 getter 归一化
+// （worst 回退 10000）且 latencyFactor 自带守卫，绝无 0/0 -> NaN。
+func TestLatencyFactorDegenerateConfig(t *testing.T) {
+	orig := operation_setting.GetChannelHealthSetting()
+	t.Cleanup(func() {
+		*orig = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 1500, LatencyWorstMs: 10000, MinScore: 0}
+	})
+	// best == worst 配置：getter 把 worst 回退默认 10000 → best<worst，正常映射
+	*orig = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 2000, LatencyWorstMs: 2000, MinScore: 0}
+	best, worst := operation_setting.GetChannelHealthLatencyBounds()
+	assert.Less(t, best, worst, "getter 必须归一化退化边界")
+	assert.False(t, math.IsNaN(float64(worst)), "边界非 NaN")
+	v := latencyFactor(2000)
+	assert.False(t, math.IsNaN(v), "退化配置不得产生 NaN")
+	assert.InDelta(t, 1.0, v, 1e-6, "p50==best -> 满分")
+	// best > worst 配置：getter worst 回退 10000（best 保持）→ best<worst 正常
+	*orig = operation_setting.ChannelHealthSetting{WindowSeconds: 3600, RingSize: 256, SuccessWeight: 70, LatencyBestMs: 8000, LatencyWorstMs: 2000, MinScore: 0}
+	best2, worst2 := operation_setting.GetChannelHealthLatencyBounds()
+	assert.Less(t, best2, worst2, "getter 归一化 best>worst")
+	assert.False(t, math.IsNaN(latencyFactor(5000)))
 }

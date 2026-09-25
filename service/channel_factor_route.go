@@ -90,6 +90,11 @@ func latencyFactor(p50Ms int64) float64 {
 	bestD, worstD := operation_setting.GetChannelHealthLatencyBounds()
 	best := float64(bestD.Milliseconds())
 	worst := float64(worstD.Milliseconds())
+	// 与 computeHealthScore 守卫对齐：best>=worst 是非法/退化配置，
+	// 返回中性 0.5 避免 0/0 -> NaN 把 factor 候选静默丢弃。
+	if worst <= best {
+		return 0.5
+	}
 	v := (worst - float64(p50Ms)) / (worst - best)
 	if v < 0 {
 		v = 0

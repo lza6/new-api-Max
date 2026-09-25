@@ -10,6 +10,7 @@ import (
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
 // comboRoutingState 组合路由进程内状态：轮询游标 + 粘性计数。
@@ -166,9 +167,15 @@ func ComboNextCandidate(combo *model.ChannelCombo) (*ComboCandidate, error) {
 		defer state.mu.Unlock()
 		best := -1
 		var bestScores ChannelFactorScores
+		minScore := operation_setting.GetChannelHealthMinScore()
 		for _, item := range items {
 			in := ChannelFactorInput{}
 			if snap := GetChannelHealthSnapshot(item.ChannelID); snap.SampleCount > 0 {
+				// 与自动路由 channelMatchesFilter 语义一致：有样本且低于全局
+				// min_score 的候选不参与 factor 选择（无样本 fail-open 保持）。
+				if minScore > 0 && snap.Score < float64(minScore) {
+					continue
+				}
 				in = ChannelFactorInput{
 					HealthScore:  snap.Score,
 					P50LatencyMs: snap.P50LatencyMs,
