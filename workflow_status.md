@@ -493,3 +493,25 @@
 ## 批次台账（防重复）
 - 已锁定“无需重查”：用户设置缓存存在性；429/4xx 透传正确性（error_test.go）；Task.Data 合并行为；健康分公式边界。
 - 待做批次（各自独立 spec→实现→E2E→发布）：T2-2 路由加权、T2-3 stream_fallover 灰度、T2-4 前端健康分概览、T3 Web 防护配置化+状态页、T4 费用解释、T5 request-id/span、T6-2 插件沙箱、T6-4 webhook/定时同步、T7-T15。
+
+---
+
+# 2026-09-26 批次：T1 热路径 + T2 渠道健康（v1.3.29 → v1.3.31）
+
+> 本段为 2026-09-26 批次状态，追加于历史记录之后。完整验证台账见 计划书/audit/perf-verification-ledger.md（记录 0008-0011）。
+
+## 已交付（真实运行验证，全部推送 main + Release）
+- **v1.3.29 (T1 热路径性能冲刺)**：渠道运行时快照（消除每请求 4 次 JSON 解析）+ 健康分 1s 快照缓存 + 冷却恢复索引修复。基准：顺序 overhead_p50 = -28.27ms（warm 连接池，10ms 目标达成）。commit ed02dc44f / 3431449c1 / 9fe504f8c。
+- **v1.3.30 (T2-1 健康分参数化)**：channel_health.* 热更配置（window/ring/weight/latency/min_score），默认=历史常量零行为变化；真实 E2E 热更 + 打分变化。commit 1157f62d4 / fe97c868f。
+- **v1.3.31 (T2-2 前端聚合概览卡)**：渠道页健康分概览（均值/可用率/最差/冷却），纯前端零请求；真实 headless Chrome E2E 截图。commit ae5ce64e5 / 3bfdd1f2f。
+
+## 验证记录（避免重复跑，改到相关区域再重跑）
+- 后端：go vet/build ./model ./service ./middleware ./relay exit 0；relaykit GOWORK=off 独立构建 0；model+service+middleware 全量测试绿；channel_health 相关测试 7/7（缓存）+ 参数化 4 组 + 注入 2 组。
+- 前端：bun run typecheck 0；vitest channels 52 用例绿；bun run build 0（总 JS 59,368 kB）；oxlint 新文件 0；i18n sync 0 missing。
+- E2E：本地网关+mock 上游真实转发；headless Chrome+CDP 登录→/channels 概览卡渲染（截图 计划书/e2e-evidence/）。
+- **防重复跑**：未改 T1/T2 相关代码时跳过上述；改到 service/channel_health*、model/channel_cache*、channel_health_setting、channels 前端再重跑对应项。
+
+## 待办（终局审计后更新）
+- 终局闭环审计结论（见下节 / 由审计子代理补充）
+- T14 旧产物清理（用户确认清单后）
+- H3 线上部署验收、H4 回滚演练（需授权）
