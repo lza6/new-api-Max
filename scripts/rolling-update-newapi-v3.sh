@@ -37,9 +37,9 @@ freeapi.tingfengai.art {
         reverse_proxy %(up)s {
             health_uri /api/status
             health_interval 1s
-            health_timeout 1s
-            health_fails 1
-            health_passes 1
+            health_timeout 2s
+            health_fails 3
+            health_passes 2
             lb_policy round_robin
         }
     }
@@ -47,9 +47,9 @@ freeapi.tingfengai.art {
     reverse_proxy %(up)s {
         health_uri /api/status
         health_interval 1s
-        health_timeout 1s
-        health_fails 1
-        health_passes 1
+        health_timeout 2s
+        health_fails 3
+        health_passes 2
         lb_policy round_robin
         flush_interval -1
         header_up X-Real-IP {remote_host}
@@ -101,8 +101,15 @@ docker run -d --name new-api-next --restart always \
   --env RELAY_TIMEOUT=900 --env SQL_MAX_OPEN_CONNS=32 --env SQL_MAX_IDLE_CONNS=8 --env SQL_MAX_LIFETIME=300 \
   "${IMAGE}" --log-dir /app/logs >/dev/null
 ok=""
-for i in $(seq 1 40); do
-  if curl -sf http://127.0.0.1:3002/api/status >/dev/null 2>&1; then echo "standby healthy after ${i}s"; ok=1; break; fi
+# 预热：连续 3 次健康通过才算 ready，避免切流到半启动实例导致 503。
+passes=0
+for i in $(seq 1 60); do
+  if curl -sf http://127.0.0.1:3002/api/status >/dev/null 2>&1; then
+    passes=$((passes+1))
+    if [ "$passes" -ge 3 ]; then echo "standby healthy after ${i}s (3x)"; ok=1; break; fi
+  else
+    passes=0
+  fi
   sleep 1
 done
 [ -n "$ok" ] || { echo "ERROR: standby not healthy; restoring master-only"; restore_master; exit 1; }
@@ -117,8 +124,15 @@ echo "==> replacing master via compose (new image)"
 sed -i "s#ghcr.io/lza6/new-api-max:.*#${IMAGE}#" docker-compose.yml
 docker compose up -d --no-deps new-api
 ok=""
-for i in $(seq 1 60); do
-  if curl -sf http://127.0.0.1:3000/api/status >/dev/null 2>&1; then echo "master healthy after ${i}s"; ok=1; break; fi
+# 预热：连续 3 次健康通过才算 ready。
+passes=0
+for i in $(seq 1 90); do
+  if curl -sf http://127.0.0.1:3000/api/status >/dev/null 2>&1; then
+    passes=$((passes+1))
+    if [ "$passes" -ge 3 ]; then echo "master healthy after ${i}s (3x)"; ok=1; break; fi
+  else
+    passes=0
+  fi
   sleep 1
 done
 [ -n "$ok" ] || { echo "ERROR: master not healthy; staying on :3002"; restore_standby; exit 1; }
