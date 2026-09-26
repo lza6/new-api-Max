@@ -20,6 +20,9 @@ type GeneralSetting struct {
 	CustomCurrencySymbol string `json:"custom_currency_symbol"`
 	// 自定义货币与美元汇率（1 USD = X Custom）
 	CustomCurrencyExchangeRate float64 `json:"custom_currency_exchange_rate"`
+	// RequestIdForwardingEnabled 是否把网关生成的 X-Oneapi-Request-Id 透传给上游。
+	// 默认开（保持既有全链路贯穿行为），管理员可关闭。
+	RequestIdForwardingEnabled bool `json:"request_id_forwarding_enabled"`
 }
 
 // 默认配置
@@ -30,6 +33,7 @@ var generalSetting = GeneralSetting{
 	QuotaDisplayType:           QuotaDisplayTypeUSD,
 	CustomCurrencySymbol:       "¤",
 	CustomCurrencyExchangeRate: 1.0,
+	RequestIdForwardingEnabled: true,
 }
 
 func init() {
@@ -88,4 +92,9 @@ func GetUsdToCurrencyRate(usdToCny float64) float64 {
 	default:
 		return 1
 	}
+}
+
+// IsRequestIdForwardingEnabled 是否透传网关 request-id 到上游请求头。
+func IsRequestIdForwardingEnabled() bool {
+	return generalSetting.RequestIdForwardingEnabled
 }

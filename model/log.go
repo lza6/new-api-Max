@@ -439,6 +439,9 @@ type RecordTaskBillingLogParams struct {
 	Group     string
 	Other     *LogOther
 	NodeName  string // 任务发起节点；为空时回退当前节点
+	// RequestId 关联发起请求的网关 request-id（T5 全链路贯穿）。
+	// 为空时由 ensureLogRequestId 兜底生成独立 ID。
+	RequestId string
 }
 
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
@@ -465,6 +468,7 @@ func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 		ChannelId: params.ChannelId,
 		TokenId:   params.TokenId,
 		Group:     params.Group,
+		RequestId: params.RequestId,
 		Other:     params.Other.JSONString(),
 	}
 	err := createLog(log)

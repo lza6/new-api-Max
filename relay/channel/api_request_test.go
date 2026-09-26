@@ -11,6 +11,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/stretchr/testify/require"
 )
 
@@ -316,6 +317,42 @@ func TestUpstreamRequestID_FormRequestCarriesID(t *testing.T) {
 			"DoFormRequest 构造的上游请求必须携带网关 request-id")
 	case <-time.After(5 * time.Second):
 		t.Fatal("upstream form request was not captured")
+	}
+}
+
+// T5: 透传开关关闭时，上游请求不携带网关 request-id（默认开保持既有行为）。
+func TestUpstreamRequestID_DisabledBySwitch(t *testing.T) {
+	const requestID = "req-disabled-5"
+	prev := operation_setting.GetGeneralSetting().RequestIdForwardingEnabled
+	operation_setting.GetGeneralSetting().RequestIdForwardingEnabled = false
+	t.Cleanup(func() {
+		operation_setting.GetGeneralSetting().RequestIdForwardingEnabled = prev
+	})
+
+	captured := make(chan http.Header, 1)
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured <- r.Header.Clone()
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer upstream.Close()
+
+	ctx := newRequestIDRelayContext(t, requestID)
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{},
+	}
+	adaptor := &stubRequestIDAdaptor{baseURL: upstream.URL}
+
+	resp, err := DoApiRequest(adaptor, ctx, info, bytes.NewReader([]byte(`{}`)))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	select {
+	case got := <-captured:
+		require.Empty(t, got.Get(common.RequestIdKey),
+			"透传开关关闭时上游请求不得携带网关 request-id")
+	case <-time.After(5 * time.Second):
+		t.Fatal("upstream request was not captured")
 	}
 }
 

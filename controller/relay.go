@@ -545,6 +545,15 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 		}
 		service.AppendRelayLogAdminInfo(c, relayInfo, other)
 		service.AppendTaskPluginContextAuditInfo(c, other)
+		// T5: 错误日志记录请求阶段（上游首字节前/后），供管理端排障快速定位
+		// 失败发生在网关处理、上游响应前还是响应后。
+		if relayInfo != nil && !relayInfo.StartTime.IsZero() {
+			stage := "upstream_response_after_first_byte"
+			if relayInfo.FirstResponseTime.IsZero() || !relayInfo.FirstResponseTime.After(relayInfo.StartTime) {
+				stage = "upstream_before_first_byte"
+			}
+			other.SetAdmin("request_stage", stage)
+		}
 		startTime := common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)
 		if startTime.IsZero() {
 			startTime = time.Now()

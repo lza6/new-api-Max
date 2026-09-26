@@ -246,6 +246,7 @@ func RefundTaskQuota(ctx context.Context, task *model.Task, reason string) bool 
 		TokenId:   task.PrivateData.TokenId,
 		Group:     task.Group,
 		Other:     other,
+		RequestId: taskExecutionRequestID(task),
 	})
 
 	// 5. 资金退款完成后再清除持久化标记。
@@ -371,6 +372,7 @@ func RecalculateTaskQuota(ctx context.Context, task *model.Task, actualQuota int
 		Group:     task.Group,
 		Other:     other,
 		NodeName:  task.PrivateData.NodeName,
+		RequestId: taskExecutionRequestID(task),
 	})
 }
 
@@ -425,4 +427,13 @@ func RecalculateTaskQuotaByTokens(ctx context.Context, task *model.Task, totalTo
 	reason := fmt.Sprintf("token重算：tokens=%d, modelRatio=%.2f, groupRatio=%.2f, otherMultiplier=%.4f", totalTokens, modelRatio, finalGroupRatio, otherMultiplier)
 	RecalculateTaskQuota(ctx, task, actualQuota, reason, clamp)
 	return true
+}
+
+// taskExecutionRequestID 返回任务发起请求的网关 request-id（T5 全链路贯穿）。
+// Execution 快照可能为空（旧任务/测试构造），此时返回空串由 ensureLogRequestId 兜底。
+func taskExecutionRequestID(task *model.Task) string {
+	if task == nil || task.PrivateData.Execution == nil {
+		return ""
+	}
+	return task.PrivateData.Execution.RequestID
 }

@@ -53,8 +53,10 @@ func SetupApiRequestHeader(info *common.RelayInfo, c *gin.Context, req *http.Hea
 	// T5: 网关 request-id 全链路透传——中继把网关生成的 request-id 带给上游，
 	// 便于上游回包/日志关联；显式 Header Override 在 SetupRequestHeader 之后应用，
 	// 仍可覆盖此默认值（现有 applyHeaderOverrideToRequest 后置）。
-	if requestID := c.GetString(common2.RequestIdKey); requestID != "" {
-		req.Set(common2.RequestIdKey, requestID)
+	if operation_setting.IsRequestIdForwardingEnabled() {
+		if requestID := c.GetString(common2.RequestIdKey); requestID != "" {
+			req.Set(common2.RequestIdKey, requestID)
+		}
 	}
 	if info.RelayMode == constant.RelayModeAudioTranscription || info.RelayMode == constant.RelayModeAudioTranslation {
 		// multipart/form-data
@@ -634,6 +636,13 @@ func DoTaskApiRequest(a TaskAdaptor, c *gin.Context, info *common.RelayInfo, req
 	err = a.BuildRequestHeader(c, req, info)
 	if err != nil {
 		return nil, fmt.Errorf("setup request header failed: %w", err)
+	}
+	// T5: 任务提交通道统一透传网关 request-id（受同一开关控制），
+	// 使任务提交的上游请求与发起请求可贯穿关联。
+	if operation_setting.IsRequestIdForwardingEnabled() {
+		if requestID := c.GetString(common2.RequestIdKey); requestID != "" {
+			req.Header.Set(common2.RequestIdKey, requestID)
+		}
 	}
 	resp, err := doRequest(c, req, info)
 	if err != nil {
