@@ -38,14 +38,31 @@ const defaultSettings = {
   ua_allowlist: ['MyAppBot/1.0'],
 }
 
+const statsWithRecent = {
+  network_in_mbps: 0.12,
+  network_out_mbps: 0.34,
+  banned_count: 1,
+  in_flight: 3,
+  recent_bans: [
+    { id: 1, ip: '203.0.113.9', reason: 'e2e:manual_ban_test', banned_at: 1790352000, expires_at: 0, banned_by: 'admin' },
+  ],
+}
+
 beforeEach(() => {
   vi.spyOn(api, 'get').mockImplementation(async (url: string) => {
     if (url === '/api/admin/web-protection/settings') {
       return { data: { data: defaultSettings } }
     }
-    throw new Error(`Unexpected GET ${url}`)
+    if (url === '/api/admin/web-protection/server-stats') {
+      return { data: { data: statsWithRecent } }
+    }
+    if (url === '/api/admin/banned-ips') {
+      return { data: { data: { items: statsWithRecent.recent_bans, total: 1 } } }
+    }
+    throw new Error('Unexpected GET ' + url)
   })
   vi.spyOn(api, 'put').mockResolvedValue({ data: { success: true } } as never)
+  vi.spyOn(api, 'post').mockResolvedValue({ data: { success: true } } as never)
 })
 
 afterEach(() => {
@@ -93,6 +110,28 @@ describe('WebProtectionPage policy dimensions', () => {
           ua_allowlist: ['MyAppBot/1.0', 'healthcheck'],
         })
       )
+    })
+  })
+
+  test('shows in-flight counter and recent bans with unban action', async () => {
+    const user = userEvent.setup()
+    render(<WebProtectionPage />)
+
+    // 在线请求计数
+    expect(await screen.findByText('3')).toBeTruthy()
+    expect(screen.getByText('In-flight requests')).toBeTruthy()
+
+    // 最近封禁列表：IP + 原因 + Badge + 解封按钮
+    await waitFor(() => {
+      expect(screen.getByText('Recent bans')).toBeTruthy()
+      expect(screen.getByText('203.0.113.9')).toBeTruthy()
+      expect(screen.getByText('e2e:manual_ban_test')).toBeTruthy()
+    })
+
+    const unbanBtn = screen.getByRole('button', { name: 'Unban' })
+    await user.click(unbanBtn)
+    await waitFor(() => {
+      expect(api.post).toHaveBeenCalledWith('/api/admin/banned-ips/unban', { ip: '203.0.113.9' })
     })
   })
 })

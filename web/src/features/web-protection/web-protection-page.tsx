@@ -98,6 +98,41 @@ function ServerStatsCard({ t }: { t: (k: string) => string }) {
           <p className="text-lg font-medium">{s.today_request_count ?? 0}</p>
           <p className="text-muted-foreground">↓ {formatBytes(s.today_bytes_received || 0)} / ↑ {formatBytes(s.today_bytes_sent || 0)}</p>
         </div>
+        <div>
+          <p className="text-muted-foreground">{t("In-flight requests")}</p>
+          <p className="text-2xl font-semibold">{s.in_flight ?? 0}</p>
+        </div>
+      </CardContent>
+      <CardContent className="border-t pt-3">
+        <p className="mb-2 text-sm font-medium">{t("Recent bans")}</p>
+        {s.recent_bans && s.recent_bans.length > 0 ? (
+          <ul className="space-y-1.5 text-sm">
+            {s.recent_bans.map((b) => (
+              <li key={b.id} className="flex flex-wrap items-center gap-2 rounded-md border p-2">
+                <span className="font-mono">{b.ip}</span>
+                <Badge variant="outline">{t("Banned")}</Badge>
+                <span className="min-w-0 flex-1 truncate text-muted-foreground">{b.reason}</span>
+                <span className="text-muted-foreground">{new Date(b.banned_at * 1000).toLocaleString()}</span>
+                <Button type="button" size="sm" variant="outline" onClick={() => {
+                  void (async () => {
+                    try {
+                      await unbanIP(b.ip)
+                      toast.success(t("IP unbanned"))
+                      const next = await getServerStats()
+                      setS(next)
+                    } catch (e) {
+                      handleServerError(e)
+                    }
+                  })()
+                }}>
+                  {t("Unban")}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted-foreground text-sm">{t("No recent bans")}</p>
+        )}
       </CardContent>
     </Card>
   )

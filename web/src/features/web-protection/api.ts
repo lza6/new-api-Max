@@ -53,6 +53,11 @@ export interface BannedIPRow {
   expires_at: number; banned_by: string
 }
 
+export interface RecentBanRow {
+  id: number; ip: string; reason: string; banned_at: number;
+  expires_at: number; banned_by: string
+}
+
 export function getWebProtectionSettings(): Promise<WebProtectionSettings> {
   return api.get('/api/admin/web-protection/settings').then((r) => r.data.data)
 }
@@ -94,6 +99,8 @@ export interface ServerStats {
   network_in_mbps: number
   network_out_mbps: number
   banned_count?: number
+  in_flight?: number
+  recent_bans?: RecentBanRow[]
   today_request_count?: number
   today_bytes_sent?: number
   today_bytes_received?: number
