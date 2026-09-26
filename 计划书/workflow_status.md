@@ -805,3 +805,13 @@
 | T14 旧产物清理 | ✅ 删除 log.go.bak-t1 / t6_us.shim / .env.t1bench / pprof 旧文件（未跟踪临时产物） | git status |
 
 > 线上基线：freeapi.tingfengai.art 已 v1.3.41（/api/status 200 + X-New-Api-Version: v1.3.41 + 20/20 健康全绿）；本批 v1.3.42 为 P2 收尾，不改变运行代码（仅 Dockerfile HEALTHCHECK 与 CI/文档）。
+
+
+## 九十三、Web 防护内网来源豁免修复（v1.3.43，2026-09-27）
+
+- **根因**：Web 防护把 Docker 网关 172.18.0.1（宿主机 Caddy 健康检查 NAT 后来源）当外部攻击者按 auto:web_rate_limit 自动封禁 → 健康探针 ip_banned 429 → 双上游摘流 → 公网 503。
+- **修复**：service/web_protection_tracker.go 新增 isWebProtectionTrustedSource()——环回/链路本地/私有网段（10/8、172.16/12、192.168/16，含 172.18.0.1）+ 可配置 IPAllowlist 完全豁免限流与自动封禁（仅计数）；外部来源防御不变。
+- **配置**：operation_setting 新增 ip_allowlist；前端 Web 防护设置页新增 IP 白名单输入框；i18n 7 语言 missing=0。
+- **测试**：TestWebProtectionTrustedSourceBypassesLocalIPs（内网永不封） + TestWebProtectionExternalIPStillRateLimitedAndBanned（外部仍 429+封禁）双绿。
+- **生产验收**：双容器 v1.3.43 success=True；150 连打 /api/status 全 200（修复前必 429）；banned_ips 0 行；公网 200 + 20/20 健康。
+- 证据：计划书/e2e-evidence/v1.3.43-web-protection-internal-exemption.json
