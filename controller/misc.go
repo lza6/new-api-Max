@@ -295,7 +295,14 @@ func ResetPassword(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgUserPasswordResetLinkInvalid)
 		return
 	}
-	password := common.GenerateVerificationCode(12)
+	// T8/G3 修复：临时密码改用 crypto/rand 高熵随机（GenerateRandomCharsKey 内部
+	// 使用 crand.Int，16 字符 62 字符集 ≈ 95 bit 熵），且响应绝不回传明文。
+	password, err := common.GenerateRandomCharsKey(16)
+	if err != nil {
+		common.SysError("failed to generate temporary password: " + err.Error())
+		common.ApiError(c, err)
+		return
+	}
 	err = model.ResetUserPasswordByEmail(req.Email, password)
 	if err != nil {
 		if errors.Is(err, model.ErrEmailNotFound) || errors.Is(err, model.ErrEmailAmbiguous) {
@@ -308,8 +315,7 @@ func ResetPassword(c *gin.Context) {
 	common.DeleteKey(req.Email, common.PasswordResetPurpose)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "",
-		"data":    password,
+		"message": "Password has been reset. Please check your email for the temporary password.",
 	})
 	return
 }

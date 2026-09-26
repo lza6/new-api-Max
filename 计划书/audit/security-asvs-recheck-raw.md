@@ -46,3 +46,31 @@
 ## 三、未修复项说明（诚实标注，不宣称合规）
 - G1/G3/G4/G5 未在本批修复：G1 涉及新增安全验证 scope + 前端交互（较大改动需独立评审）；
   G3/G4 涉及改重置/注册流程 UX（需独立授权）；G5 需 Redis 改造。
+
+
+## 四、v1.3.41 复核增补（2026-09-26）
+
+### 已修复（本批）
+| # | 严重度 | 项 | 修复 |
+|---|--------|-----|------|
+| G3 | 中 | 重置返回明文临时密码 | ✅ **已修**：controller/misc.go:298-304 改用 `common.GenerateRandomCharsKey(16)`（crypto/rand 高熵，≈95bit），响应不再返回 `data` 明文（controller/misc.go:316-320）；前端 reset-password-confirm 移除明文显示/复制。回归测试：`controller/misc_reset_password_test.go`（断言响应无明文 + 旧密码失效 + 无效 token 拒绝）。 |
+| S1 | 中 | 流式 goroutine 泄漏（无缓冲 channel） | ✅ **已修**：zhipu/cohere/palm/xunfei 四个流式 handler 统一改为可取消发送（`select { case ch<-v: case <-stopChan: }`）+ 有缓冲 stopChan + `producerDone` 等待 + 先关 body 再等 goroutine。 |
+| S2 | 中 | 无界 `io.ReadAll` 防 OOM | ✅ **已修**：新增 `relay/helper/limited_body.go`（`ReadLimitedUpstreamBody`，默认 128MB/封顶 512MB），替换 openai/cohere/palm 5 处无界读取；单测 `relay/helper/limited_body_test.go`。 |
+| S7 | 低 | 索引缺失 | ✅ **已修**：`model/banned_ip.go` ExpiresAt 加 `gorm:"index"`；`model/topup.go` CreateTime 加 `gorm:"index"`；SQLite AutoMigrate 冒烟 `model/s7_index_smoke_test.go`。 |
+| S3 | 低 | video_proxy base64 双解码无上限 | ⚪ **已防住（核实）**：`controller/video_proxy.go:575` 已有 `taskMediaDataURLMaxEncodedBytes`（64MB）前置上限 + 流式 `io.Copy` 解码（无全量解码 OOM）；既有单测 `TestWriteVideoDataURLRejectsOversizedPayloadBeforeDecode` 覆盖超限拒绝。本批未重复改动。 |
+
+### 仍为 Gap（诚实标注）
+| # | 严重度 | 项 | 状态 |
+|---|--------|-----|------|
+| G1 | 中高 | relay API key 明文查看无 step-up | ⏳ Gap（需新增验证 scope + 前端弹窗，独立评审） |
+| G4 | 中 | 注册/邮箱验证存在性枚举 | ⏳ Gap（改注册流程 UX，独立授权） |
+| G5 | 低 | 验证码内存存储不跨实例 | ⏳ Gap（建议 Redis） |
+| 基线 | - | controller 全量测试 4 项本机环境失败 | ⏳ 已用 HEAD 干净 worktree 复现为基线（SSRF mock 拦截 127.0.0.1 / 时间戳硬编码 / 无 MySQL-PG 实例），非本批引入 |
+
+### 回归验证（本批）
+- `go vet ./...` ✅
+- `go build ./...` ✅
+- `go test ./service/ ./common/ ./model/ ./middleware/...` ✅
+- `go test ./relay/helper/ ./relay/channel/openai/ ./relay/channel/cohere/ ./relay/channel/palm/ ./relay/channel/zhipu/ ./relay/channel/xunfei/` ✅
+- `go test ./controller/ -run "TestResetPassword|TestChannelFieldsAreClassified" -count=1` ✅（另修复 channel_authz.go 缺失 probe_result 分类，闭环既有 fail-closed 守卫测试）
+- `cd web && bun run typecheck` ✅；`bun run build` ✅

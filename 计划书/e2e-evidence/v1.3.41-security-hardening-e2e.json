@@ -1,0 +1,63 @@
+{
+  "meta": {
+    "title": "v1.3.41 security/hardening E2E acceptance",
+    "version": "v1.3.41",
+    "date": "2026-09-26T20:45:00+08:00",
+    "repo": "github.com/lza6/new-api-Max",
+    "branch": "main",
+    "base": "2c55d7031"
+  },
+  "items": [
+    {
+      "id": "E2E-001",
+      "name": "gateway boot + health check",
+      "result": "PASS",
+      "detail": "bin/new-api-v1.3.41.exe started with temp SQLite; GET /api/status -> HTTP 200, success=true, version field present",
+      "evidence": "out-t41.log, status payload"
+    },
+    {
+      "id": "E2E-002",
+      "name": "register user",
+      "result": "PASS",
+      "detail": "POST /api/user/register -> 200 {success:true}",
+      "evidence": "GIN log request_id 200 POST /api/user/register"
+    },
+    {
+      "id": "E2E-003",
+      "name": "reset password invalid token (no plaintext leak)",
+      "result": "PASS",
+      "detail": "POST /api/user/reset with bogus token -> 200 {success:false, message:'Password reset link is invalid or has expired'}; no data field, no plaintext",
+      "evidence": "GIN log request_id 200 POST /api/user/reset"
+    }
+  ],
+  "tests": [
+    "go vet ./... PASS",
+    "go build ./... PASS",
+    "go test ./service/ ./common/ ./model/ ./middleware/... PASS",
+    "go test ./relay/helper/ ./relay/channel/openai/ ./relay/channel/cohere/ ./relay/channel/palm/ ./relay/channel/zhipu/ ./relay/channel/xunfei/ PASS",
+    "go test ./controller/ -run TestResetPassword -count=1 PASS (2 tests)",
+    "go test ./controller/ -run TestChannelFieldsAreClassified -count=1 PASS",
+    "go test ./model/ -run TestS7IndexAutoMigrateSmoke -count=1 PASS",
+    "cd web && bun run typecheck PASS && bun run build PASS"
+  ],
+  "links": {
+    "code": [
+      "relay/helper/limited_body.go",
+      "relay/helper/limited_body_test.go",
+      "controller/misc.go (ResetPassword high-entropy, no plaintext)",
+      "controller/misc_reset_password_test.go",
+      "controller/channel_authz.go (probe_result read-only)",
+      "relay/channel/zhipu|cohere|palm|xunfei relay-*.go (stream goroutine cancellation)",
+      "model/banned_ip.go, model/topup.go (indexes)",
+      "model/s7_index_smoke_test.go",
+      "web/src/features/auth/reset-password-confirm/index.tsx"
+    ],
+    "audit": "计划书/audit/security-asvs-recheck-raw.md#四"
+  },
+  "gaps": [
+    "G1 relay API key view without step-up remains OPEN",
+    "G4 registration/email enumeration remains OPEN",
+    "G5 verification codes in-memory only remains OPEN",
+    "controller full-suite 4 failures are baseline-environment (SSRF mock loopback/time-based/no MySQL-PG), reproduced on clean HEAD worktree"
+  ]
+}

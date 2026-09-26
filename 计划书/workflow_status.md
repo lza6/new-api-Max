@@ -762,3 +762,32 @@
 - **T7-2 a11y**：`web/src/features/wallet/components/__tests__/a11y-recharge.test.tsx` 用真实组件（RechargeFormCard）+ 表单 fixture 跑 axe-core 扫描（颜色对比/aria/label/焦点），2/2 绿；typecheck + build 全绿。
 - **T7-3 移动端三断点**：真实网关 + headless Chrome 对 channels/wallet/usage-logs 三页在 375/768/1280px 截图 9 张，入库 `计划书/e2e-evidence/browser-e2e-ux/`；截图期间 API 全 200 无 5xx。
 - 交付：commit 4c12b88fd → VERSION v1.3.40 → push main → release。
+
+
+## 九十一、安全加固与容错闭环：G3 + S1/S2/S7 + 基线修复（v1.3.41，2026-09-26）
+
+### 范围
+承接 T8 遗留缺口与审计补充项，全部真实落地 + 回归测试 + E2E。
+
+| 项 | 修复 | 证据 |
+|---|---|---|
+| G3 重置返回明文临时密码 | controller/misc.go ResetPassword 改 GenerateRandomCharsKey(16)（crypto/rand 高熵），响应不再返回明文 data；前端 reset-password-confirm 移除明文展示/剪贴板 | controller/misc_reset_password_test.go（2 用例绿） |
+| S1 流式 goroutine 泄漏 | zhipu/cohere/palm/xunfei 四 handler 统一：可取消发送（select + stopChan）、有缓冲 stopChan、producerDone 等待、先关 body 再等 goroutine | go build ./relay/... 绿 |
+| S2 无界 io.ReadAll 防 OOM | 新增 relay/helper/limited_body.go（默认 128MB/封顶 512MB），替换 openai/cohere/palm 5 处无界读取 | relay/helper/limited_body_test.go（5 子用例绿） |
+| S7 索引缺失 | model/banned_ip.go ExpiresAt + model/topup.go CreateTime 加 index | model/s7_index_smoke_test.go（SQLite AutoMigrate HasIndex 绿） |
+| 基线守卫测试 | channel_authz.go 补 probe_result read-only 分类，闭环 fail-closed 测试 | go test ./controller/ -run TestChannelFieldsAreClassified 绿 |
+| S3 data URL 上限 | 核实已有 64MB 前置上限 + 流式解码，既有单测覆盖，未重复改动 | controller/task_generic_test.go:487 |
+
+### 验证
+- go vet ./... ✅；go build ./... ✅
+- go test ./service/ ./common/ ./model/ ./middleware/... ✅
+- go test ./relay/helper/ ./relay/channel/openai/ ./relay/channel/cohere/ ./relay/channel/palm/ ./relay/channel/zhipu/ ./relay/channel/xunfei/ ✅
+- go test ./controller/ -run "TestResetPassword|TestChannelFieldsAreClassified" ✅
+- cd web && bun run typecheck ✅ && bun run build ✅
+- 真实 E2E：bin/new-api-v1.3.41.exe 启动 → /api/status 200 → 注册 200 → 无效重置 token 返回统一错误无明文（计划书/e2e-evidence/v1.3.41-security-hardening-e2e.json）
+
+### 诚实标注（未闭环项）
+- G1 API key 明文查看无 step-up：Gap（需新增验证 scope + 前端弹窗，独立评审）
+- G4 注册/邮箱验证存在性枚举：Gap（改注册流程 UX）
+- G5 验证码内存存储不跨实例：Gap（建议 Redis）
+- controller 全量 4 项失败（AuditDatabaseMatrix 无 MySQL/PG 实例、SessionLimit 时间戳硬编码、Kling SSRF mock 拦截）：已用 HEAD 干净 worktree 复现为基线环境问题，非本批引入

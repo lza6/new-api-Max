@@ -2,6 +2,7 @@ package cohere
 
 import (
 	"encoding/json"
+	"sync"
 	"io"
 	"net/http"
 	"strings"
@@ -99,16 +100,31 @@ func cohereStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		return 0, nil, nil
 	})
 	dataChan := make(chan string)
-	stopChan := make(chan bool)
+	stopChan := make(chan bool, 1)
+	producerDone := make(chan struct{})
+	var stopOnce sync.Once
+	notifyStop := func() {
+		stopOnce.Do(func() {
+			select {
+			case stopChan <- true:
+			default:
+			}
+		})
+	}
 	go func() {
+		defer close(producerDone)
 		for scanner.Scan() {
 			data := scanner.Text()
-			dataChan <- data
+			select {
+			case dataChan <- data:
+			case <-stopChan:
+				return
+			}
 		}
 		if err := scanner.Err(); err != nil {
 			common.SysLog("error reading stream: " + err.Error())
 		}
-		stopChan <- true
+		notifyStop()
 	}()
 	helper.SetEventStreamHeaders(c)
 	isFirst := true
@@ -168,6 +184,9 @@ func cohereStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 			return false
 		}
 	})
+	service.CloseResponseBodyGracefully(resp)
+	notifyStop()
+	<-producerDone
 	if usage.PromptTokens == 0 {
 		usage = service.ResponseText2Usage(c, responseText, info.UpstreamModelName, info.GetEstimatePromptTokens())
 	}
@@ -176,7 +195,7 @@ func cohereStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 
 func cohereHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
 	createdTime := common.GetTimestamp()
-	responseBody, err := io.ReadAll(resp.Body)
+	responseBody, err := helper.ReadLimitedUpstreamBody(resp.Body)
 	if err != nil {
 		return nil, types.NewError(err, types.ErrorCodeBadResponseBody)
 	}

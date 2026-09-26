@@ -15,7 +15,7 @@ type BannedIP struct {
 	IP        string `json:"ip" gorm:"type:varchar(64);uniqueIndex;not null"`
 	Reason    string `json:"reason" gorm:"type:varchar(256)"`
 	BannedAt  int64  `json:"banned_at"`
-	ExpiresAt int64  `json:"expires_at"`
+	ExpiresAt int64  `json:"expires_at" gorm:"index"`
 	BannedBy  string `json:"banned_by" gorm:"type:varchar(64)"`
 }
 

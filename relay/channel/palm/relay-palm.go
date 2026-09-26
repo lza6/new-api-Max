@@ -2,6 +2,7 @@ package palm
 
 import (
 	"encoding/json"
+	"sync"
 	"io"
 	"net/http"
 
@@ -55,12 +56,23 @@ func palmStreamHandler(c *gin.Context, resp *http.Response) (*types.NewAPIError,
 	responseId := helper.GetResponseID(c)
 	createdTime := common.GetTimestamp()
 	dataChan := make(chan string)
-	stopChan := make(chan bool)
+	stopChan := make(chan bool, 1)
+	producerDone := make(chan struct{})
+	var stopOnce sync.Once
+	notifyStop := func() {
+		stopOnce.Do(func() {
+			select {
+			case stopChan <- true:
+			default:
+			}
+		})
+	}
 	go func() {
-		responseBody, err := io.ReadAll(resp.Body)
+		defer close(producerDone)
+		responseBody, err := helper.ReadLimitedUpstreamBody(resp.Body)
 		if err != nil {
 			common.SysLog("error reading stream response: " + err.Error())
-			stopChan <- true
+			notifyStop()
 			return
 		}
 		service.CloseResponseBodyGracefully(resp)
@@ -68,7 +80,7 @@ func palmStreamHandler(c *gin.Context, resp *http.Response) (*types.NewAPIError,
 		err = json.Unmarshal(responseBody, &palmResponse)
 		if err != nil {
 			common.SysLog("error unmarshalling stream response: " + err.Error())
-			stopChan <- true
+			notifyStop()
 			return
 		}
 		fullTextResponse := streamResponsePaLM2OpenAI(&palmResponse)
@@ -80,11 +92,15 @@ func palmStreamHandler(c *gin.Context, resp *http.Response) (*types.NewAPIError,
 		jsonResponse, err := json.Marshal(fullTextResponse)
 		if err != nil {
 			common.SysLog("error marshalling stream response: " + err.Error())
-			stopChan <- true
+			notifyStop()
 			return
 		}
-		dataChan <- string(jsonResponse)
-		stopChan <- true
+		select {
+		case dataChan <- string(jsonResponse):
+		case <-stopChan:
+			return
+		}
+		notifyStop()
 	}()
 	helper.SetEventStreamHeaders(c)
 	c.Stream(func(w io.Writer) bool {
@@ -97,12 +113,14 @@ func palmStreamHandler(c *gin.Context, resp *http.Response) (*types.NewAPIError,
 			return false
 		}
 	})
+	notifyStop()
+	<-producerDone
 	service.CloseResponseBodyGracefully(resp)
 	return nil, responseText
 }
 
 func palmHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Response) (*dto.Usage, *types.NewAPIError) {
-	responseBody, err := io.ReadAll(resp.Body)
+	responseBody, err := helper.ReadLimitedUpstreamBody(resp.Body)
 	if err != nil {
 		return nil, types.NewOpenAIError(err, types.ErrorCodeReadResponseBodyFailed, http.StatusInternalServerError)
 	}

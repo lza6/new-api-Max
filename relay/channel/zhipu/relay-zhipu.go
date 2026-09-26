@@ -161,8 +161,29 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 	scanner.Split(bufio.ScanLines)
 	dataChan := make(chan string)
 	metaChan := make(chan string)
-	stopChan := make(chan bool)
+	stopChan := make(chan bool, 1)
+	producerDone := make(chan struct{})
+	var stopOnce sync.Once
+	notifyStop := func() {
+		stopOnce.Do(func() {
+			select {
+			case stopChan <- true:
+			default:
+			}
+		})
+	}
 	go func() {
+		defer close(producerDone)
+		// 发送到无缓冲 channel 时同时监听 stopChan：客户端断开（c.Stream 返回
+		// false）后主循环已退出，若这里仍阻塞发送会导致 goroutine 泄漏。
+		send := func(ch chan<- string, v string) bool {
+			select {
+			case ch <- v:
+				return true
+			case <-stopChan:
+				return false
+			}
+		}
 		for scanner.Scan() {
 			data := scanner.Text()
 			lines := strings.Split(data, "\n")
@@ -171,19 +192,25 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 					continue
 				}
 				if line[:5] == "data:" {
-					dataChan <- line[5:]
+					if !send(dataChan, line[5:]) {
+						return
+					}
 					if i != len(lines)-1 {
-						dataChan <- "\n"
+						if !send(dataChan, "\n") {
+							return
+						}
 					}
 				} else if line[:5] == "meta:" {
-					metaChan <- line[5:]
+					if !send(metaChan, line[5:]) {
+						return
+					}
 				}
 			}
 		}
 		if err := scanner.Err(); err != nil {
 			common.SysLog("error reading stream: " + err.Error())
 		}
-		stopChan <- true
+		notifyStop()
 	}()
 	helper.SetEventStreamHeaders(c)
 	c.Stream(func(w io.Writer) bool {
@@ -218,7 +245,10 @@ func zhipuStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.
 			return false
 		}
 	})
+	// 先关闭上游 body 解除 scanner.Scan 阻塞，再等待生产者 goroutine 退出。
 	service.CloseResponseBodyGracefully(resp)
+	notifyStop()
+	<-producerDone
 	return usage, nil
 }
 
