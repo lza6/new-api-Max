@@ -155,6 +155,8 @@ function messageText(value: unknown): string | undefined {
 // B6-2/B2-3 错误码→人话映射：按序匹配，命中即用友好文案替换技术性消息首行。
 // 顺序即优先级：额度 → 密钥 → 限流 → 渠道冷却 → IP 封禁 → 模型不可用 → 上游 → 内容安全。
 const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = [
+  // T7 订阅过期/额度用尽：订阅到期或订阅额度耗尽 → 专属人话（优先于通用额度）。
+  { pattern: /subscription.*(expired|ended|exhausted|insufficient|quota)|订阅.*(过期|结束|额度)|plan.*(expired|ended)|no.*subscription/i, messageKey: 'Your subscription has expired or run out of quota. Please renew or top up to continue.' },
   { pattern: /insufficient[_ ]?(quota|balance|credit)|quota/i, messageKey: 'Insufficient quota. Please top up or redeem a quota card.' },
   { pattern: /key[_ ]?invalid|invalid[_ ]?api[_ ]?key|\b401\b/i, messageKey: 'The key is invalid or expired. Please rotate it on the channels page.' },
   { pattern: /rate[_ ]?limit|\b429\b/i, messageKey: 'Too many requests. Please try again later.' },

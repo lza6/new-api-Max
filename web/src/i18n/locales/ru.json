@@ -2829,6 +2829,7 @@
     "Insufficient balance": "Недостаточно средств",
     "Insufficient permission to adjust this user": "Недостаточно прав для изменения квоты этого пользователя",
     "Insufficient quota. Please top up or redeem a quota card.": "Недостаточно квоты. Пополните баланс или активируйте карту квоты.",
+    "Your subscription has expired or run out of quota. Please renew or top up to continue.": "Your subscription has expired or run out of quota. Please renew or top up to continue.",
     "Integrations": "Интеграции",
     "Integrity check failed": "Проверка целостности не пройдена",
     "Integrity hash": "Хеш целостности",

@@ -2829,6 +2829,7 @@
     "Insufficient balance": "余额不足",
     "Insufficient permission to adjust this user": "无权调整该用户的额度",
     "Insufficient quota. Please top up or redeem a quota card.": "额度不足，请充值或兑换额度卡。",
+    "Your subscription has expired or run out of quota. Please renew or top up to continue.": "您的订阅已过期或额度已用尽，请续费或充值后继续使用。",
     "Integrations": "集成",
     "Integrity check failed": "完整性校验失败",
     "Integrity hash": "完整性哈希",

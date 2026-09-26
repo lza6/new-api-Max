@@ -2829,6 +2829,7 @@
     "Insufficient balance": "Solde insuffisant",
     "Insufficient permission to adjust this user": "Droits insuffisants pour modifier ce quota",
     "Insufficient quota. Please top up or redeem a quota card.": "Quota insuffisant. Rechargez ou utilisez une carte de quota.",
+    "Your subscription has expired or run out of quota. Please renew or top up to continue.": "Your subscription has expired or run out of quota. Please renew or top up to continue.",
     "Integrations": "Intégrations",
     "Integrity check failed": "Échec du contrôle d’intégrité",
     "Integrity hash": "Empreinte d’intégrité",

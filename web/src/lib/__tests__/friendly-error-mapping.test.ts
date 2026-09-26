@@ -29,6 +29,7 @@ const FRIENDLY_KEYS = [
   'The upstream service is temporarily unavailable. Please try again later.',
   'The content was blocked by a safety policy.',
   'The request timed out waiting for the upstream service. Please try again or switch to streaming.',
+  'Your subscription has expired or run out of quota. Please renew or top up to continue.',
 ]
 
 function apiError(data: unknown): unknown {
@@ -129,6 +130,31 @@ describe('getFriendlyErrorMessage (B6-2)', () => {
       [
         { type: 'pre_consume_token_quota_failed', message: 'pre_consume_token_quota_failed' },
         'Insufficient quota. Please top up or redeem a quota card.',
+      ],
+    ]
+    for (const [err, expected] of cases) {
+      expect(getFriendlyErrorMessage(apiError(err))).toBe(expected)
+    }
+  })
+  // T7：订阅过期 / 订阅额度用尽 → 专属人话（区别于通用额度不足）。
+  test('maps subscription expiry / exhausted quota to dedicated message', () => {
+    const subKey = 'Your subscription has expired or run out of quota. Please renew or top up to continue.'
+    const cases: Array<[unknown, string]> = [
+      [
+        { type: 'subscription_expired', message: 'subscription has expired' },
+        subKey,
+      ],
+      [
+        { type: 'subscription_quota_exhausted', message: 'subscription quota exhausted' },
+        subKey,
+      ],
+      [
+        { type: 'plan_expired', message: 'plan ended' },
+        subKey,
+      ],
+      [
+        { type: 'pre_consume_subscription_quota_failed', message: 'pre_consume_subscription_quota_failed' },
+        subKey,
       ],
     ]
     for (const [err, expected] of cases) {

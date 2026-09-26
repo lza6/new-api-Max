@@ -2829,6 +2829,7 @@
     "Insufficient balance": "Số dư không đủ",
     "Insufficient permission to adjust this user": "Không đủ quyền điều chỉnh hạn mức của người dùng này",
     "Insufficient quota. Please top up or redeem a quota card.": "Không đủ hạn mức. Vui lòng nạp thêm hoặc dùng thẻ hạn mức.",
+    "Your subscription has expired or run out of quota. Please renew or top up to continue.": "Your subscription has expired or run out of quota. Please renew or top up to continue.",
     "Integrations": "Tích hợp",
     "Integrity check failed": "Kiểm tra tính toàn vẹn thất bại",
     "Integrity hash": "Mã băm toàn vẹn",

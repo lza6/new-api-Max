@@ -2829,6 +2829,7 @@
     "Insufficient balance": "残高が不足しています",
     "Insufficient permission to adjust this user": "このユーザーのクォータを調整する権限がありません",
     "Insufficient quota. Please top up or redeem a quota card.": "残高が不足しています。チャージまたはクォータカードをご利用ください。",
+    "Your subscription has expired or run out of quota. Please renew or top up to continue.": "Your subscription has expired or run out of quota. Please renew or top up to continue.",
     "Integrations": "統合",
     "Integrity check failed": "整合性チェックに失敗しました",
     "Integrity hash": "整合性ハッシュ",
