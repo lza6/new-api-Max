@@ -815,3 +815,26 @@
 - **测试**：TestWebProtectionTrustedSourceBypassesLocalIPs（内网永不封） + TestWebProtectionExternalIPStillRateLimitedAndBanned（外部仍 429+封禁）双绿。
 - **生产验收**：双容器 v1.3.43 success=True；150 连打 /api/status 全 200（修复前必 429）；banned_ips 0 行；公网 200 + 20/20 健康。
 - 证据：计划书/e2e-evidence/v1.3.43-web-protection-internal-exemption.json
+
+
+## 九十四、t1-t8 深挖文档闭环 + 生产 Caddyfile 事故修复（v1.3.44，2026-09-27）
+
+### 文档闭环（7 份全部回填闭环状态 + 核对证据）
+- t1-perf-deepdive：基准由 ledger 0011 达成（overhead ≤ 0），10ms 目标实质闭环。
+- t2-t3-gap-options：健康分参数化（channel_health_setting.go）与 Web 防护 path/UA/IP 白名单（v1.3.43 ip_allowlist）已落地；geo_mode 无 GeoIP 库明确不做。
+- t4-billing-quota-safety：裸转换审计 PASS（ledger 0013，3 处命中全为非计费路径）。
+- t5-observability-deepdive：前端 upstream_request_id 展示 + 过滤已确认（details-dialog.tsx:787）。
+- t6-plugin-market-safety：applyStructuredTaskProgress 验收测试已存在（task_polling_test.go:1033）。
+- t7-ux-a11y-path：v1.3.40 已闭环（a11y + 三断点 + 错误映射）。
+- t8-security-asvs-deepdive：ASVS 复核已按现行代码回填；G2/G3/S1/S2/S7 已修，G1/G4/G5 仍为 Gap（诚实标注不宣称合规）。
+
+### 生产事故修复（Caddyfile 损坏 → 首页空 body）
+- 现象：公网 / 返回 200 空 body（Content-Length:0）；/api/status 200、容器 healthy。
+- 根因：v1.3.43 blue-green 部署脚本用 python re.sub 片段替换损坏 Caddyfile（health 块被贪婪匹配删除，670B vs 完整 1192B），reload 后 / 代理异常。
+- 修复：整文件 heredoc 重写 Caddyfile（双后端 3000+3002、health 2s/2s/3/2、header_up、transport h1/h2）+ validate + reload。
+- 验收：ROOT 200 size=1302；/api/status v1.3.43 success=True；index.js 200 4.42MB；css 200 427KB；10/10 健康全 200。
+- 纪律：Caddyfile 禁止片段正则替换，一律整文件写入；部署后验证 wc -c 非 0 且含 <html。
+
+### 验证
+- go build/vet PASS；go test ./service/ ./middleware/（audit/security/web-protection/task-progress 组）PASS。
+- 证据：计划书/e2e-evidence/v1.3.44-docs-closure-incident.json

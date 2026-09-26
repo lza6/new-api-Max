@@ -57,3 +57,24 @@ curl -sf https://freeapi.tingfengai.art/api/status | head -c 200; echo
 ## 五、根因归属（诚实标注）
 - 已确认：后端容器不健康（非 Caddy 配置问题，v1.3.39 健康参数已生效但无法拯救僵死后端）。
 - 未确认：容器挂的具体原因（panic/OOM/DB）需服务器日志定位——本机无 SSH 凭据，等授权后按 §二 执行。
+
+
+## 六、2026-09-27 Caddyfile 损坏事故（v1.3.43 后，根路径空 body）
+
+### 现象
+- 公网 https://freeapi.tingfengai.art/ 返回 200 但空 body（Content-Length: 0）；/api/status 200、后端容器 healthy——仅首页空白。
+- 服务器 curl /api/status 200 success=True version=v1.3.43；容器内 wget / 返回完整 HTML；经 Caddy 代理后 / 变空。
+
+### 根因（部署脚本缺陷，非运行时问题）
+- 上一轮 blue-green 部署用 python re.sub 改写 Caddyfile，正则 [^}]* 贪婪匹配到 health 配置块并将其删除 → Caddyfile 结构损坏（缺 health、缺闭合、缺 header_up），reload 后 Caddy 对 / 代理返回空 body。
+- 证据：/etc/caddy/Caddyfile 时间戳 04:32 仅 670 字节；备份 bak-zd-*（1192B）结构完整。
+
+### 修复
+1. 整文件 heredoc 写入正确 Caddyfile（双后端 3000+3002、health 2s/2s/3/2、header_up X-Real-IP/X-Forwarded-For、transport h1/h2、/assets immutable）。
+2. caddy validate → systemctl reload caddy → 验证 / 返回 1302B HTML。
+3. 公网复核：ROOT 200 size=1302；/api/status success=True v1.3.43；index.js 200 4.42MB；css 200 427KB；logo 200；连续 10 次健康全 200。
+
+### 纪律（防复发）
+- Caddyfile 禁止片段正则替换：一律整文件 heredoc 全量写入（脚本 gen_caddy 模式）。
+- 部署后必须验证 "curl -s https://域名/ | wc -c" 非 0 且含 <html（不仅看 200）。
+- 保留最近 2 份完整 Caddyfile 备份（bak-zd-* 1192B 的是完整版）。

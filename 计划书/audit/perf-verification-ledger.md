@@ -212,3 +212,13 @@
   - task_events 清理：`Seq Scan`（表 0 行；`idx_task_events_created_at` 已存在，数据量大后自动启用）
 - **线上索引清单核对**：pg_indexes 确认 logs 17 个索引（含 request_id/upstream_request_id/traffic/复合）、task_events 4 个、top_ups 4 个、banned_ips 3 个（含 ip 唯一）全部存在。
 - **防重复跑**：仅 schema 变更后重查；本记录作为权威索引核验基线。
+
+
+## 记录 0013 · T4 裸转换审计（2026-09-27，v1.3.44）
+- **范围**：全仓 relay/ service/ common/ pkg/ 扫描 `int(float64(...))` / `int(math.Round(...))` / `int(decimal.IntPart())` 裸转换。
+- **结论**：计费纪律已满足——全部 3 处命中项均为非计费路径，无需改动：
+  1. service/channel_health_score.go:257 percentileOf 索引计算（sorted 长度有界，非配额）。
+  2. service/token_counter.go:158-168 图像像素尺寸缩放（最终 token 经 common.QuotaRound，:152）。
+  3. common/utils.go:155-158 字节大小格式化展示（非计费）。
+- **防御确认**：计费/额度转换全部走 common.QuotaFromFloat*/QuotaRound*/QuotaFromDecimal*（+ *Checked 变体）；倍率 map 经 AddOtherRatio 守卫。
+- **防重复跑**：新增计费路径时按 t4-billing-quota-safety.md §4 锚点自查；本记录为全仓基线。
