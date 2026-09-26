@@ -210,9 +210,16 @@ func main() {
 		port = strconv.Itoa(*common.Port)
 	}
 
+	// HTTP server 明确超时：ReadHeaderTimeout 防慢速攻击/悬挂连接，
+	// IdleTimeout 关闭空闲 keep-alive 连接（避免前端代理复用死连接导致
+	// ERR_CONNECTION_RESET），ReadTimeout 兜底。ReadHeaderTimeout 必须显式
+	// 设置——Go 默认 0 表示不设超时，会使慢客户端长占连接。
 	srv := &http.Server{
-		Addr:    ":" + port,
-		Handler: server,
+		Addr:              ":" + port,
+		Handler:           server,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       0,
+		IdleTimeout:       120 * time.Second,
 	}
 
 	go func() {
@@ -232,11 +239,16 @@ func main() {
 
 	// SSE streams may run for minutes; give them time to finish before forced exit
 	shutdownTimeout := time.Duration(common.GetEnvOrDefault("SHUTDOWN_TIMEOUT_SECONDS", 120)) * time.Second
+	// 零停机关键：先停 keep-alive（新连接不再复用空闲连接，旧空闲连接关闭），
+	// 再 Shutdown 等待活跃请求/SSE 流自然结束（最多 shutdownTimeout），
+	// 最后关闭残余空闲连接。Caddy 反代会在探测到端口关闭后把流量切到备用实例。
+	srv.SetKeepAlivesEnabled(false)
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		common.SysError(fmt.Sprintf("server forced to shutdown: %v", err))
 	}
+	// http.Server.Shutdown 已关闭空闲连接；此处无需再 CloseIdleConnections。
 	// 内存中的看板数据保存入库，避免重启丢失未落库数据 (issue #5679)
 	if common.DataExportEnabled {
 		model.SaveQuotaDataCache()
