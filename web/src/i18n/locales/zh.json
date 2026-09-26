@@ -4582,6 +4582,7 @@
     "Request Header Overrides": "请求头覆盖",
     "Request headers must be a JSON object with string values.": "请求头必须是值为字符串的 JSON 对象。",
     "Request ID": "请求 ID",
+    "View related logs": "查看全部相关日志",
     "Request Limits": "请求限制",
     "Request Model": "请求模型",
     "Request Model:": "请求模型：",
@@ -6699,6 +6700,10 @@
     "Single channel": "单一渠道",
     "Single channel unavailable": "唯一渠道不可用",
     "This model is served by only one configured channel and it is currently unavailable. Add another channel to keep it reachable.": "该模型仅由一个已配置渠道承载，且该渠道当前不可用。请再添加一个渠道，确保其始终可访问。",
-    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "该模型仅由一个渠道承载。建议再添加一个渠道，避免单点故障。"
+    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "该模型仅由一个渠道承载。建议再添加一个渠道，避免单点故障。",
+    "Estimated cost range": "预估费用区间",
+    "Estimated token usage": "预估 token 用量",
+    "Estimated multiplier for {{fields}}": "按 {{fields}} 倍率估算",
+    "Estimate is for reference only, actual billing prevails": "预估仅供参考，实际以结算为准"
   }
 }

@@ -4582,6 +4582,7 @@
     "Request Header Overrides": "Remplacements d'en-têtes de requête",
     "Request headers must be a JSON object with string values.": "Les en-têtes doivent être un objet JSON dont les valeurs sont des chaînes.",
     "Request ID": "ID de requête",
+    "View related logs": "View related logs",
     "Request Limits": "Limites de requêtes",
     "Request Model": "Modèle demandé",
     "Request Model:": "Modèle demandé :",
@@ -6699,6 +6700,10 @@
     "Single channel": "Canal unique",
     "Single channel unavailable": "Canal unique indisponible",
     "This model is served by only one configured channel and it is currently unavailable. Add another channel to keep it reachable.": "Ce modèle n’est desservi que par un seul canal configuré, actuellement indisponible. Ajoutez un autre canal pour le garder accessible.",
-    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "Ce modèle n’est desservi que par un seul canal. Ajoutez un autre canal pour éviter un point de défaillance unique."
+    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "Ce modèle n’est desservi que par un seul canal. Ajoutez un autre canal pour éviter un point de défaillance unique.",
+    "Estimated cost range": "Estimated cost range",
+    "Estimated token usage": "Estimated token usage",
+    "Estimated multiplier for {{fields}}": "Estimated multiplier for {{fields}}",
+    "Estimate is for reference only, actual billing prevails": "Estimate is for reference only, actual billing prevails"
   }
 }

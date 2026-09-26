@@ -4582,6 +4582,7 @@
     "Request Header Overrides": "Ghi đè Tiêu đề Yêu cầu",
     "Request headers must be a JSON object with string values.": "Tiêu đề yêu cầu phải là đối tượng JSON có giá trị chuỗi.",
     "Request ID": "ID yêu cầu",
+    "View related logs": "View related logs",
     "Request Limits": "Hạn mức yêu cầu",
     "Request Model": "Mô hình yêu cầu",
     "Request Model:": "Mô hình yêu cầu:",
@@ -6699,6 +6700,10 @@
     "Single channel": "Kênh duy nhất",
     "Single channel unavailable": "Kênh duy nhất không khả dụng",
     "This model is served by only one configured channel and it is currently unavailable. Add another channel to keep it reachable.": "Mô hình này chỉ được phục vụ bởi một kênh đã cấu hình và hiện kênh đó không khả dụng. Hãy thêm một kênh khác để duy trì khả năng truy cập.",
-    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "Mô hình này chỉ được phục vụ bởi một kênh. Hãy thêm một kênh khác để tránh điểm lỗi đơn lẻ."
+    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "Mô hình này chỉ được phục vụ bởi một kênh. Hãy thêm một kênh khác để tránh điểm lỗi đơn lẻ.",
+    "Estimated cost range": "Estimated cost range",
+    "Estimated token usage": "Estimated token usage",
+    "Estimated multiplier for {{fields}}": "Estimated multiplier for {{fields}}",
+    "Estimate is for reference only, actual billing prevails": "Estimate is for reference only, actual billing prevails"
   }
 }

@@ -51,6 +51,7 @@ import {
   LogIn,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from '@tanstack/react-router'
 import { useQuery } from '@tanstack/react-query'
 
 import { Dialog } from '@/components/dialog'
@@ -541,6 +542,7 @@ function ExplainBreakdown(props: { other: LogOtherData }) {
 
 export function DetailsDialog(props: DetailsDialogProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { copiedText, copyToClipboard } = useCopyToClipboard({ notify: false })
   const other = parseLogOther(props.log.other)
   const typeConfig = getLogTypeConfig(props.log.type)
@@ -761,6 +763,26 @@ export function DetailsDialog(props: DetailsDialogProps) {
               value={props.log.request_id}
               mono
             />
+          )}
+          {props.log.request_id && (
+            <div className="pt-1">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const match = window.location.pathname.match(/\/usage-logs\/([^/]+)/)
+                  const section = match ? match[1] : 'common'
+                  void navigate({
+                    to: '/usage-logs/$section',
+                    params: { section },
+                    search: { requestId: props.log.request_id },
+                  })
+                }}
+              >
+                {t('View related logs')}
+              </Button>
+            </div>
           )}
           {props.log.upstream_request_id && (
             <DetailRow

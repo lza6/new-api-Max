@@ -10,11 +10,6 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-For commercial licensing, please contact support@quantumnous.com
 */
 import { PlaygroundChat } from './components/chat/playground-chat'
 import { PlaygroundInput } from './components/input/playground-input'
@@ -24,6 +19,7 @@ import {
   usePlaygroundOptions,
   usePlaygroundState,
 } from './hooks'
+import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 
 export function Playground() {
   const {
@@ -74,6 +70,11 @@ export function Playground() {
     updateConfig,
   })
 
+  const { models: pricingModels } = usePricingData()
+
+  const estimateModel =
+    pricingModels.find((item) => item.model_name === config.model) ?? null
+
   return (
     <div className='relative flex size-full min-h-0 flex-col overflow-hidden'>
       {/* Full-width scroll container: scrolling works even over side whitespace */}
@@ -113,6 +114,7 @@ export function Playground() {
           onSubmit={handleSendMessage}
           parameterEnabled={parameterEnabled}
           hasMessages={messages.length > 0}
+          estimateModel={estimateModel}
         />
       </div>
     </div>

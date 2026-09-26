@@ -10,11 +10,6 @@ This program is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program. If not, see <https://www.gnu.org/licenses/>.
-
-For commercial licensing, please contact support@quantumnous.com
 */
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -27,6 +22,12 @@ import {
 } from '@/components/ai-elements/prompt-input'
 
 import { getSubmittableInputText } from '../../lib'
+import {
+  getEstimateGroups,
+  getEstimatePlan,
+  type EstimateGroup,
+  type EstimatePlan,
+} from '../../lib/cost-estimate'
 import type {
   ModelOption,
   GroupOption,
@@ -35,6 +36,7 @@ import type {
 } from '../../types'
 import { PlaygroundInputControls } from './playground-input-controls'
 import { PlaygroundInputTools } from './playground-input-tools'
+import { CostEstimateHint } from './cost-estimate-hint'
 
 interface PlaygroundInputProps {
   config: PlaygroundConfig
@@ -60,6 +62,20 @@ interface PlaygroundInputProps {
     value: boolean
   ) => void
   parameterEnabled: ParameterEnabled
+  estimateModel?: {
+    model_name: string
+    enable_groups: string[]
+    group_ratio?: Record<string, number>
+    billing_expr?: string
+    billing_usage_schema?: Record<
+      string,
+      { type?: 'number' | 'boolean'; unit?: string }
+    >
+    billing_usage_examples?: {
+      label: string
+      facts: Record<string, number | string>
+    }[]
+  } | null
 }
 
 export function PlaygroundInput({
@@ -80,6 +96,7 @@ export function PlaygroundInput({
   onClearMessages,
   onParameterEnabledChange,
   parameterEnabled,
+  estimateModel,
 }: PlaygroundInputProps) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
@@ -91,6 +108,13 @@ export function PlaygroundInput({
     onSubmit(submittableText)
     setText('')
   }
+
+  const estimatePlan: EstimatePlan | null = estimateModel
+    ? getEstimatePlan(estimateModel as never, groupValue)
+    : null
+  const estimateGroups: EstimateGroup[] = estimateModel
+    ? getEstimateGroups(estimateModel as never, groupValue)
+    : []
 
   return (
     <div className='grid shrink-0 gap-4 px-1 md:pb-4'>
@@ -112,6 +136,14 @@ export function PlaygroundInput({
         />
 
         <PromptInputFooter className='border-border/60 bg-muted/20 dark:bg-muted/10 border-t px-3 py-2.5 backdrop-blur'>
+          {estimatePlan && (
+            <CostEstimateHint
+              plan={estimatePlan}
+              groups={estimateGroups}
+              promptTokens={1000}
+              completionTokens={500}
+            />
+          )}
           <PlaygroundInputControls
             disabled={disabled}
             groups={groups}

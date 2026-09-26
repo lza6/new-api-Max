@@ -4582,6 +4582,7 @@
     "Request Header Overrides": "リクエストヘッダーの上書き",
     "Request headers must be a JSON object with string values.": "リクエストヘッダーは値が文字列の JSON オブジェクトである必要があります。",
     "Request ID": "リクエストID",
+    "View related logs": "View related logs",
     "Request Limits": "リクエスト制限",
     "Request Model": "リクエストモデル",
     "Request Model:": "リクエストモデル：",
@@ -6699,6 +6700,10 @@
     "Single channel": "単一チャネル",
     "Single channel unavailable": "唯一のチャネルが利用不可",
     "This model is served by only one configured channel and it is currently unavailable. Add another channel to keep it reachable.": "このモデルは設定済みチャネルが1つだけで、現在そのチャネルは利用できません。到達可能性を保つため、別のチャネルを追加してください。",
-    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "このモデルは1つのチャネルだけで提供されています。単一障害点を避けるため、別のチャネルを追加してください。"
+    "This model is served by only one channel. Add another channel to avoid a single point of failure.": "このモデルは1つのチャネルだけで提供されています。単一障害点を避けるため、別のチャネルを追加してください。",
+    "Estimated cost range": "Estimated cost range",
+    "Estimated token usage": "Estimated token usage",
+    "Estimated multiplier for {{fields}}": "Estimated multiplier for {{fields}}",
+    "Estimate is for reference only, actual billing prevails": "Estimate is for reference only, actual billing prevails"
   }
 }
