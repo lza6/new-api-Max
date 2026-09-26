@@ -757,3 +757,8 @@
   - standby/master 就绪改为「连续 3 次 /api/status 通过」才切流（避免切到半启动实例）；等待窗口 standby 40→60s、master 60→90s。
 - **验证**：bash -n 语法通过；3x 连续健康逻辑对本地真实实例实测通过（HEALTHY_3X）。
 - **部署**：生产执行 `scripts/rolling-update-newapi-v3.sh v1.3.39`（同时携带零停机排空 + 健康检查加固）。
+
+## 九十、T7 交互反馈闭环：a11y + 移动端断点（v1.3.40，2026-09-26）
+- **T7-2 a11y**：`web/src/features/wallet/components/__tests__/a11y-recharge.test.tsx` 用真实组件（RechargeFormCard）+ 表单 fixture 跑 axe-core 扫描（颜色对比/aria/label/焦点），2/2 绿；typecheck + build 全绿。
+- **T7-3 移动端三断点**：真实网关 + headless Chrome 对 channels/wallet/usage-logs 三页在 375/768/1280px 截图 9 张，入库 `计划书/e2e-evidence/browser-e2e-ux/`；截图期间 API 全 200 无 5xx。
+- 交付：commit 4c12b88fd → VERSION v1.3.40 → push main → release。
