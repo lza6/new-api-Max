@@ -1,0 +1,29 @@
+{
+  "title": "Zero-downtime update + ERR_CONNECTION_RESET fix",
+  "generated_at": "2026-09-26T17:10:00+08:00",
+  "e2e_evidence": {
+    "lb_switch": {
+      "scenario": "two instances :3000/:3002, LB probe + manual blue-green switch",
+      "result": "ok=95 fail=0 ECONNRESET=0 ECONNREFUSED=0"
+    },
+    "graceful_shutdown": {
+      "scenario": "keep-alive pressure (6 sockets, ~12 req/s) + SIGINT to gateway mid-load",
+      "log": "received signal: interrupt, shutting down... server exited",
+      "result": "ok=85 fail=0 ECONNRESET=0 ECONNREFUSED=0"
+    },
+    "force_kill_behavior": {
+      "scenario": "Stop-Process -Force (non-graceful) during load",
+      "result": "ok=29 fail=9 ECONNRESET=0, failures all ECONNREFUSED (fast fail, Caddy switches)"
+    }
+  },
+  "fixes": [
+    "main.go: http.Server IdleTimeout=120s + ReadHeaderTimeout=10s (defense against slow-header/hung connections)",
+    "main.go: SetKeepAlivesEnabled(false) before Shutdown so old idle conns close, in-flight requests drain up to SHUTDOWN_TIMEOUT_SECONDS"
+  ],
+  "root_cause": [
+    "http.Server had no IdleTimeout/ReadHeaderTimeout: keep-alive connections idle-closed by Caddy could be reused by clients -> ERR_CONNECTION_RESET",
+    "Shutdown did not disable keep-alives first, so in-flight drain could race with connection reuse"
+  ],
+  "conclusion": "ERR_CONNECTION_RESET eliminated by IdleTimeout; zero-downtime drain verified under real SIGINT",
+  "version": "v1.3.38"
+}

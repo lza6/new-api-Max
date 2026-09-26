@@ -717,3 +717,29 @@
 - 前端：`bun run typecheck` + `bunx vitest run src/features/usage-logs src/features/playground src/features/pricing`（39 files/414 tests 全绿）+ `bun run build` 全绿。
 - 证据：`计划书/e2e-evidence/t45-e2e-audit.json` + `browser-e2e-t45-cost-estimate/playground-cost-estimate.png`。
 - 交付：commit（见 git log）→ VERSION v1.3.36 → push main → release（无 -f，先 fetch 核对远端 SHA）。
+
+## 八十八、生产 ERR_CONNECTION_RESET 修复 + 零停机更新验证 + T7/T8（v1.3.38，2026-09-26）
+
+### 生产问题：ERR_CONNECTION_RESET（用户报告"网站经常无法访问，连接已重置"）
+- **根因**：`main.go` http.Server 未设 IdleTimeout/ReadHeaderTimeout。Caddy 反代与后端 keep-alive 连接空闲后被某端静默关闭，客户端复用死连接 → ERR_CONNECTION_RESET。
+- **修复（main.go）**：
+  - `IdleTimeout: 120s`（关闭空闲 keep-alive，避免复用死连接）
+  - `ReadHeaderTimeout: 10s`（防慢速头部/悬挂连接）
+  - 停机先 `SetKeepAlivesEnabled(false)` 再 `Shutdown`（零停机排空：旧空闲连接关闭、在途请求自然完成）
+- **真实 E2E**（证据 `计划书/e2e-evidence/zero-downtime-v1.3.38.json`）：
+  - 优雅停机：压力请求 + SIGINT → received signal: interrupt, shutting down... server exited；**ok=85 fail=0 ECONNRESET=0 ECONNREFUSED=0**
+  - LB 切换（:3000/:3002 blue-green）：**ok=95 fail=0 ECONNRESET=0**
+  - 强杀（非优雅）：fail=9 全 ECONNREFUSED（快速拒绝，Caddy 健康检查切换），ECONNRESET=0
+
+### T7 UI/UX（P1）
+- **T7-1 交互反馈盘点表刷新**：`计划书/audit/ux-interaction-ledger.md`（31 features 全量，√/- 标记 + 行号证据 + P0/P1/P2）。核心剩余 P1：pricing 查询失败态、auth OAuth 回调重试；P2 若干（web-protection 空封禁列表、about/legal 错误态、wallet affiliate 等）。
+- **T7-4 人话错误映射扩充**：`server-error-message.ts` 新增订阅过期/额度用尽专属人话（优先于通用额度），i18n 7 语言；`friendly-error-mapping.test.ts` 7/7 绿。
+
+### T8 安全（P1，OWASP ASVS V2/V3/V4 复核）
+- **T8-1 复核产物**：`计划书/audit/security-asvs-recheck-raw.md`。已满足：登录防枚举、OAuth state、会话撤销传播、审计去敏、TOTP/备用码/passkey 单次。缺口：G2 验证码可重放（已修）、G1 API key 无 step-up、G3 重置明文临时密码、G4 邮箱枚举、G5 验证码内存存储。
+- **T8-2 G2 修复**：`common/verification.go` 新增 `VerifyCodeWithKeyConsume`（校验即删除，一次性消费），`controller/user.go` 注册邮箱验证改用之——关闭 10 分钟验证码重放窗口。
+
+### 质量
+- 后端：go build/vet 全绿；go test ./common/ ./controller/ 相关组全绿。
+- 前端：bun run typecheck + vitest（friendly-error-mapping 7/7）全绿。
+- 交付：commit（见 git log）→ VERSION v1.3.38 → push main → release（无 -f，先 fetch 核对远端 SHA）。
