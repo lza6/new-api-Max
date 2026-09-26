@@ -151,6 +151,7 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
   const [allowedText, setAllowedText] = useState("")
   const [blockedText, setBlockedText] = useState("")
   const [uaText, setUaText] = useState("")
+  const [ipText, setIpText] = useState("")
 
   useEffect(() => {
     getWebProtectionSettings()
@@ -159,6 +160,7 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
         setAllowedText(listToText(d.allowed_paths))
         setBlockedText(listToText(d.blocked_paths))
         setUaText(listToText(d.ua_allowlist))
+        setIpText(listToText(d.ip_allowlist))
       })
       .catch((e) => handleServerError(e))
   }, [])
@@ -181,6 +183,7 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
         allowed_paths: textToList(allowedText),
         blocked_paths: textToList(blockedText),
         ua_allowlist: textToList(uaText),
+        ip_allowlist: textToList(ipText),
       })
       if (res.data?.success) { toast.success(t("Web protection settings saved")) }
     } catch (e) { handleServerError(e) } finally { setSaving(false) }

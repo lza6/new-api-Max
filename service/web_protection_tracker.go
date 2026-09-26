@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"net"
 	"net/http"
 	"path"
 	"strconv"
@@ -13,6 +14,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/lza6/new-api-Max/common"
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
@@ -179,6 +181,31 @@ func (t *webProtectionTracker) isIPBannedCached(ip string, now time.Time) bool {
 	return banned
 }
 
+// isWebProtectionTrustedSource 判定请求来源是否「内部/信任」：
+// 环回、链路本地、私有网段（Docker 网关 172.18.0.1 命中 172.16/12），或命中
+// 管理端配置的 IPAllowlist（单 IP 或 CIDR）。信任来源完全豁免限流与自动封禁，
+// 只计数——Web 防护仅防外部恶意攻击，内网自身流量（健康检查/管理端直连）不受影响。
+func isWebProtectionTrustedSource(ip string) bool {
+	parsed := net.ParseIP(ip)
+	if parsed != nil && common.IsPrivateIP(parsed) {
+		return true
+	}
+	for _, allow := range operation_setting.GetWebProtectionIPAllowlist() {
+		allow = strings.TrimSpace(allow)
+		if allow == "" {
+			continue
+		}
+		if strings.Contains(allow, "/") {
+			if _, network, err := net.ParseCIDR(allow); err == nil && network.Contains(parsed) {
+				return true
+			}
+		} else if allowIP := net.ParseIP(allow); allowIP != nil && allowIP.Equal(parsed) {
+			return true
+		}
+	}
+	return false
+}
+
 // TrackWebRequestBegin 在请求进入时判定：/v1 放行、封禁拒绝、超限拒绝、放行并计数。
 // 返回 false 表示请求已被 429 终止。
 func TrackWebRequestBegin(c *gin.Context) bool {
@@ -212,10 +239,37 @@ func TrackWebRequestBegin(c *gin.Context) bool {
 	}
 	now := time.Now()
 	ip := c.ClientIP()
-	perSec, burst, windowSec := operation_setting.GetWebProtectionLimit()
-
 	t := webProtectionTrackerInstance
 	t.mu.Lock()
+	perSec, burst, windowSec := operation_setting.GetWebProtectionLimit()
+	// 内部/信任来源完全豁免限流与封禁（仅计数聚合）：
+	// 环回（127.0.0.1/::1）、链路本地、私有网段（10/8、172.16/12、192.168/16）
+	// 覆盖 Docker 网关（172.18.0.1）等健康检查来源。Web 防护只防外部恶意攻击，
+	// 内网自身流量（Caddy 健康检查、管理端直连、内网服务）不应被限流/自动封禁。
+	if isWebProtectionTrustedSource(ip) {
+		st := t.ipState[ip]
+		windowStart := webProtectionWindowStart(now, windowSec)
+		if st == nil {
+			st = &webIPState{
+				bucket: &webTokenBucket{rate: float64(perSec), capacity: float64(burst)},
+				window: newWebWindowAgg(windowStart),
+			}
+			t.ipState[ip] = st
+		} else if st.window.windowStart != windowStart {
+			t.closeWindowLocked(ip, st, windowSec)
+			st.window = newWebWindowAgg(windowStart)
+		}
+		st.lastSeen = now
+		st.window.count++
+		if c.Request.ContentLength > 0 {
+			st.window.bytesReceived += c.Request.ContentLength
+		}
+		st.window.lastAt = now.Unix()
+		c.Set(webProtectionContextKey, ip)
+		t.mu.Unlock()
+		t.inFlight.Add(1)
+		return true
+	}
 	if t.isIPBannedCached(ip, now) {
 		t.mu.Unlock()
 		writeWebProtectionReject(c, webProtectionRetryAfter, "ip_banned", "ip banned")

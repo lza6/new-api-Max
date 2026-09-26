@@ -108,3 +108,72 @@ func TestWebProtectionInFlightMidRequestDisable(t *testing.T) {
 	TrackWebRequestEnd(c, http.StatusOK)
 	assert.Equal(t, base, GetWebProtectionInFlight())
 }
+
+// webProtectionTestCtxIP 构造指定来源 IP 的 gin 上下文（默认 198.51.100.7 外部）。
+func webProtectionTestCtxIP(remoteIP, requestPath string) *gin.Context {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodGet, requestPath, nil)
+	c.Request.RemoteAddr = remoteIP + ":4444"
+	return c
+}
+
+// TestWebProtectionTrustedSourceBypassesLocalIPs 回归：Docker 网关/环回/内网
+// 来源完全豁免限流与自动封禁（只计数）——Web 防护只防外部恶意攻击，
+// 内网自身流量（Caddy 健康检查 172.18.0.1）绝不能被误封。
+func TestWebProtectionTrustedSourceBypassesLocalIPs(t *testing.T) {
+	settings := operation_setting.GetWebProtectionSetting()
+	prev := *settings
+	t.Cleanup(func() { *settings = prev })
+	webProtectionTestDB(t)
+
+	settings.Enabled = true
+	settings.AutoBan = true            // 自动封禁开启，确保内部来源仍不被封
+	settings.LimitPerSecond = 1        // 极低速率：外部来源必被限流
+	settings.Burst = 1
+	settings.AutoBanThresholdPerMinute = 1
+	settings.AutoBanMinutes = 60
+
+	for _, ip := range []string{"172.18.0.1", "127.0.0.1", "10.0.0.5", "192.168.1.10"} {
+		// 连打 5 发远超 burst=1：内部来源必须全部放行
+		for i := 0; i < 5; i++ {
+			c := webProtectionTestCtxIP(ip, "/dashboard")
+			require.True(t, TrackWebRequestBegin(c), "trusted IP %s should bypass rate limit", ip)
+			TrackWebRequestEnd(c, http.StatusOK)
+		}
+	}
+	// 内部来源绝不能进 banned_ips
+	var count int64
+	require.NoError(t, model.DB.Model(&model.BannedIP{}).Count(&count).Error)
+	assert.Zero(t, count, "trusted internal IPs must never be auto-banned")
+}
+
+// TestWebProtectionExternalIPStillRateLimitedAndBanned 回归：外部来源保持原有
+// 防御——超限触发 429 + 自动封禁，防御能力不因内部豁免而削弱。
+func TestWebProtectionExternalIPStillRateLimitedAndBanned(t *testing.T) {
+	settings := operation_setting.GetWebProtectionSetting()
+	prev := *settings
+	t.Cleanup(func() { *settings = prev })
+	webProtectionTestDB(t)
+
+	settings.Enabled = true
+	settings.AutoBan = true
+	settings.LimitPerSecond = 1
+	settings.Burst = 1
+	settings.AutoBanThresholdPerMinute = 2
+	settings.AutoBanMinutes = 60
+
+	external := "203.0.113.9"
+	rejected := 0
+	for i := 0; i < 6; i++ {
+		c := webProtectionTestCtxIP(external, "/dashboard")
+		if !TrackWebRequestBegin(c) {
+			rejected++
+		}
+		TrackWebRequestEnd(c, http.StatusTooManyRequests)
+	}
+	require.GreaterOrEqual(t, rejected, 3, "external IP should be rate limited")
+	// 触发自动封禁后，后续请求直接 ip_banned 拒绝
+	_, banned := model.IsIPBanned(external)
+	assert.True(t, banned, "external misbehaving IP should be auto-banned")
+}

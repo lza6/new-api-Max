@@ -30,6 +30,7 @@ export interface WebProtectionSettings {
   allowed_paths: string[]
   blocked_paths: string[]
   ua_allowlist: string[]
+  ip_allowlist: string[]
 }
 
 export interface WebRequestLogRow {

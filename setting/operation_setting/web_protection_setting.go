@@ -32,6 +32,10 @@ type WebProtectionSetting struct {
 	BlockedPaths []string `json:"blocked_paths"`
 	// UAAllowlist User-Agent 白名单（子串匹配，大小写不敏感，空=不启用）。
 	UAAllowlist []string `json:"ua_allowlist"`
+	// IPAllowlist 内部/信任来源 IP 或 CIDR 白名单（空=不启用）。
+	// 命中白名单（或环回/链路本地/私有网段）的请求完全豁免限流与自动封禁，
+	// 仅计数聚合——Web 防护只防外部恶意攻击，内网自身流量不应被误封。
+	IPAllowlist []string `json:"ip_allowlist"`
 }
 
 var webProtectionSetting = WebProtectionSetting{
@@ -111,6 +115,11 @@ func GetWebProtectionPathPolicy() (allowed, blocked []string) {
 // 空列表表示不启用。
 func GetWebProtectionUAAllowlist() []string {
 	return cleanStringList(webProtectionSetting.UAAllowlist)
+}
+
+// GetWebProtectionIPAllowlist 返回内部/信任来源 IP/CIDR 白名单（空=不启用）。
+func GetWebProtectionIPAllowlist() []string {
+	return cleanStringList(webProtectionSetting.IPAllowlist)
 }
 
 func cleanStringList(items []string) []string {
