@@ -87,7 +87,76 @@ func TestServerStatsAdminOnly(t *testing.T) {
 	assert.Contains(t, body.Data, "network_out_mbps")
 }
 
-// TestWebProtectionPathAndUAPolicy T3-1：策略维度（路径白/黑名单 + UA 白名单）
+// TestServerStatsIncludesInFlightAndRecentBans T3：server-stats 返回在线请求数与近期封禁列表
+// （含手动解封闭环：封禁 → 状态页可见 → 解封 → 状态页消失）。
+func TestServerStatsIncludesInFlightAndRecentBans(t *testing.T) {
+	previousDB := model.DB
+	previousRedis := common.RedisEnabled
+	previousSecret := common.SessionSecret
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.BannedIP{}))
+	model.DB = db
+	common.RedisEnabled = false
+	common.SessionSecret = "web-protection-stats-test-secret-2"
+	t.Cleanup(func() {
+		model.DB = previousDB
+		common.RedisEnabled = previousRedis
+		common.SessionSecret = previousSecret
+	})
+
+	admin := &model.User{
+		Username: "wp-admin-stats2", Password: "unused", AffCode: "ef56", Role: common.RoleAdminUser,
+		Status: common.UserStatusEnabled, Group: "default", AuthVersion: 1,
+	}
+	require.NoError(t, db.Create(admin).Error)
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/api/admin/web-protection/server-stats", middleware.AdminAuth(), GetServerStats)
+
+	adminSession, err := service.CreateLoginSession(admin.Id, "password", "127.0.0.1", "wp-admin-stats2")
+	require.NoError(t, err)
+	fetch := func() map[string]any {
+		req := httptest.NewRequest(http.MethodGet, "/api/admin/web-protection/server-stats", nil)
+		req.Header.Set("Authorization", "Bearer "+adminSession.AccessToken)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+		var body struct {
+			Success bool                   `json:"success"`
+			Data    map[string]interface{} `json:"data"`
+		}
+		require.NoError(t, common.Unmarshal(w.Body.Bytes(), &body))
+		require.True(t, body.Success)
+		return body.Data
+	}
+
+	data := fetch()
+	assert.Contains(t, data, "in_flight")
+	assert.EqualValues(t, 0, data["in_flight"])
+	assert.Contains(t, data, "recent_bans")
+	assert.Empty(t, data["recent_bans"])
+
+	// 封禁一个 IP → 状态页 recent_bans 出现（含 IP/reason/expires_at）。
+	require.NoError(t, model.BanIP("203.0.113.9", "e2e:manual_ban_test", "admin", 30))
+	data = fetch()
+	bans, ok := data["recent_bans"].([]any)
+	require.True(t, ok)
+	require.Len(t, bans, 1)
+	ban := bans[0].(map[string]any)
+	assert.Equal(t, "203.0.113.9", ban["ip"])
+	assert.Equal(t, "e2e:manual_ban_test", ban["reason"])
+
+	// 解封 → 状态页清空。
+	require.NoError(t, model.UnbanIP("203.0.113.9"))
+	data = fetch()
+	assert.Empty(t, data["recent_bans"])
+}
+
 // 经真实中间件判定；默认空配置零行为变化；各维度独立生效。
 func TestWebProtectionPathAndUAPolicy(t *testing.T) {
 	gin.SetMode(gin.TestMode)

@@ -92,6 +92,20 @@ func GetServerStats(c *gin.Context) {
 		"network_out_mbps": roundMBps(outMBps),
 	}
 	// B1-3：当前生效封禁数 + 今日请求量/带宽（Web 防刷可见性，供状态页展示）。
+	data["in_flight"] = service.GetWebProtectionInFlight()
+	// Recent bans (latest 10, active only) for the real-time status page + manual unban.
+	if items, _, err := model.ListBannedIPs(1, 10); err == nil {
+		recent := make([]model.BannedIP, 0, len(items))
+		nowUnix := time.Now().Unix()
+		for _, it := range items {
+			if it.ExpiresAt == 0 || it.ExpiresAt > nowUnix {
+				recent = append(recent, it)
+			}
+		}
+		data["recent_bans"] = recent
+	} else {
+		data["recent_bans"] = []model.BannedIP{}
+	}
 	if banned, err := model.CountActiveBannedIPs(0); err == nil {
 		data["banned_count"] = banned
 	} else {

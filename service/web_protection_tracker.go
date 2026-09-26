@@ -96,6 +96,7 @@ type webProtectionTracker struct {
 	lastFlush   time.Time
 	banCache    map[string]webBanCacheEntry
 	pendingRows []model.WebRequestLog
+	inFlight    atomic.Int64
 }
 
 // 全流量网络吞吐统计（覆盖所有请求，含 /v1；仅计量不限流），
@@ -257,17 +258,24 @@ func TrackWebRequestBegin(c *gin.Context) bool {
 	st.window.lastAt = now.Unix()
 	c.Set(webProtectionContextKey, ip)
 	t.mu.Unlock()
+	t.inFlight.Add(1)
 	return true
 }
 
 // TrackWebRequestEnd 在请求结束后聚合计数/字节并周期落库。
 func TrackWebRequestEnd(c *gin.Context, status int) {
-	if c == nil || !operation_setting.IsWebProtectionEnabled() {
+	if c == nil || c.Request == nil || c.Request.URL == nil {
 		return
 	}
 	ipVal, ok := c.Get(webProtectionContextKey)
 	ip, _ := ipVal.(string)
-	if !ok || ip == "" || c.Request == nil || c.Request.URL == nil {
+	if !ok || ip == "" {
+		return
+	}
+	// Begin 已计数；即使防护在请求中途被关闭，也必须回减，避免计数泄漏。
+	t := webProtectionTrackerInstance
+	t.inFlight.Add(-1)
+	if !operation_setting.IsWebProtectionEnabled() {
 		return
 	}
 	now := time.Now()
@@ -279,7 +287,6 @@ func TrackWebRequestEnd(c *gin.Context, status int) {
 	if _, _, ws := operation_setting.GetWebProtectionLimit(); ws > 0 {
 		windowSec = ws
 	}
-	t := webProtectionTrackerInstance
 	t.mu.Lock()
 	st := t.ipState[ip]
 	if st == nil {
@@ -462,4 +469,11 @@ func matchWebUAAllowlist(ua string, allow []string) bool {
 		}
 	}
 	return false
+}
+
+// GetWebProtectionInFlight returns current in-flight request count (process-local atomic counter).
+// Counts requests admitted into the decision chain (incl. non-/v1); rejected requests never reach End.
+func GetWebProtectionInFlight() int64 {
+	t := webProtectionTrackerInstance
+	return t.inFlight.Load()
 }
