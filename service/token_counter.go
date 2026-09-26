@@ -216,12 +216,11 @@ func CountRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relayco
 				return 0, fmt.Errorf("error getting audio duration: %v", err)
 			}
 			// duration 来自用户上传文件的元数据，可被伪造成天文数字或负数。
-			// 负值会让 token 估算变成负数（低估预扣费），先钳到 0 再转换。
-			if duration < 0 {
-				duration = 0
-			}
+			// 钳到 [0, MaxTaskDurationSeconds] 并记录饱和事件（管理员可审计）。
+			duration, durationClamp := ClampAudioDurationSeconds(duration)
+			noteQuotaClamp(info, durationClamp)
 			// 一分钟 1000 token，与 $price / minute 对齐。
-			audioToken := common.QuotaRound(math.Ceil(duration) / 60.0 * 1000)
+			audioToken, _ := common.QuotaRoundChecked(math.Ceil(duration) / 60.0 * 1000)
 			// 累加饱和到 int32 边界：多文件 + 天文数字时长不得让总和溢出成负数。
 			if audioToken > 0 && totalAudioToken > common.MaxQuota-audioToken {
 				totalAudioToken = common.MaxQuota
@@ -324,10 +323,11 @@ func CountTokenRealtime(info *relaycommon.RelayInfo, request dto.RealtimeEvent, 
 		}
 	case dto.RealtimeEventResponseAudioDelta:
 		// count audio token
-		atk, err := CountAudioTokenOutput(request.Delta, info.OutputAudioFormat)
+		atk, clamp, err := CountAudioTokenOutput(request.Delta, info.OutputAudioFormat)
 		if err != nil {
 			return 0, 0, fmt.Errorf("error counting audio token: %v", err)
 		}
+		noteQuotaClamp(info, clamp)
 		audioToken += atk
 	case dto.RealtimeEventResponseAudioTranscriptionDelta, dto.RealtimeEventResponseFunctionCallArgumentsDelta:
 		// count text token
@@ -335,10 +335,11 @@ func CountTokenRealtime(info *relaycommon.RelayInfo, request dto.RealtimeEvent, 
 		textToken += tkm
 	case dto.RealtimeEventInputAudioBufferAppend:
 		// count audio token
-		atk, err := CountAudioTokenInput(request.Audio, info.InputAudioFormat)
+		atk, clamp, err := CountAudioTokenInput(request.Audio, info.InputAudioFormat)
 		if err != nil {
 			return 0, 0, fmt.Errorf("error counting audio token: %v", err)
 		}
+		noteQuotaClamp(info, clamp)
 		audioToken += atk
 	case dto.RealtimeEventConversationItemCreated:
 		if request.Item != nil {
@@ -387,28 +388,39 @@ func CountTokenInput(input any, model string) int {
 	return CountTokenInput(fmt.Sprintf("%v", input), model)
 }
 
-func CountAudioTokenInput(audioBase64 string, audioFormat string) (int, error) {
+func CountAudioTokenInput(audioBase64 string, audioFormat string) (int, *common.QuotaClamp, error) {
 	if audioBase64 == "" {
-		return 0, nil
+		return 0, nil, nil
 	}
 	duration, err := parseAudio(audioBase64, audioFormat)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	// duration 来自用户提供的音频元数据，饱和转换防止 int 回绕
-	return common.QuotaFromFloat(duration / 60 * 100 / 0.06), nil
+	// duration 来自用户提供的音频元数据：先钳制上界（防伪造成天文数字），
+	// 再用 Checked 转换并返回饱和事件供审计。
+	duration, clamp := ClampAudioDurationSeconds(duration)
+	quota, convClamp := common.QuotaFromFloatChecked(duration / 60 * 100 / 0.06)
+	if convClamp != nil {
+		clamp = convClamp
+	}
+	return quota, clamp, nil
 }
 
-func CountAudioTokenOutput(audioBase64 string, audioFormat string) (int, error) {
+func CountAudioTokenOutput(audioBase64 string, audioFormat string) (int, *common.QuotaClamp, error) {
 	if audioBase64 == "" {
-		return 0, nil
+		return 0, nil, nil
 	}
 	duration, err := parseAudio(audioBase64, audioFormat)
 	if err != nil {
-		return 0, err
+		return 0, nil, err
 	}
-	// duration 来自上游返回的音频元数据，饱和转换防止 int 回绕
-	return common.QuotaFromFloat(duration / 60 * 200 / 0.24), nil
+	// duration 来自上游返回的音频元数据：先钳制上界，再用 Checked 转换并返回饱和事件。
+	duration, clamp := ClampAudioDurationSeconds(duration)
+	quota, convClamp := common.QuotaFromFloatChecked(duration / 60 * 200 / 0.24)
+	if convClamp != nil {
+		clamp = convClamp
+	}
+	return quota, clamp, nil
 }
 
 // CountTextToken 统计文本的token数量，仅OpenAI模型使用tokenizer，其余模型使用估算
@@ -447,4 +459,23 @@ func clampImageDimensions(width, height int) (int, int) {
 		height = 0
 	}
 	return width, height
+}
+
+// ClampAudioDurationSeconds bounds an audio duration parsed from
+// user/upstream-controlled metadata before it becomes a token estimate.
+// Durations outside [0, relaycommon.MaxTaskDurationSeconds] are clamped and
+// reported as a *common.QuotaClamp so billing callers can audit the event.
+// Negative/NaN clamp to 0 with an underflow/nan marker; oversized clamp to the
+// task duration ceiling with an overflow marker.
+func ClampAudioDurationSeconds(duration float64) (float64, *common.QuotaClamp) {
+	switch {
+	case math.IsNaN(duration):
+		return 0, &common.QuotaClamp{Op: "AudioDurationClamp", Kind: common.QuotaClampNaN, Original: duration, Clamped: 0}
+	case duration > float64(relaycommon.MaxTaskDurationSeconds):
+		return float64(relaycommon.MaxTaskDurationSeconds), &common.QuotaClamp{Op: "AudioDurationClamp", Kind: common.QuotaClampOverflow, Original: duration, Clamped: relaycommon.MaxTaskDurationSeconds}
+	case duration < 0:
+		return 0, &common.QuotaClamp{Op: "AudioDurationClamp", Kind: common.QuotaClampUnderflow, Original: duration, Clamped: 0}
+	default:
+		return duration, nil
+	}
 }

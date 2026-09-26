@@ -53,7 +53,38 @@ func TestCalcViolationFeeQuotaSaturates(t *testing.T) {
 	common.QuotaPerUnit = 500_000
 	t.Cleanup(func() { common.QuotaPerUnit = oldQuotaPerUnit })
 
-	require.Equal(t, common.MaxQuota, calcViolationFeeQuota(1e20, 1))
+	got, clamp := calcViolationFeeQuota(1e20, 1)
+	require.Equal(t, common.MaxQuota, got)
+	require.NotNil(t, clamp, "超界违规费金额必须产生饱和审计事件")
+	require.Equal(t, common.QuotaClampOverflow, clamp.Kind)
+}
+
+// TestClampAudioDurationSecondsAuditsOutOfRange T4-2b：音频时长必须先钳制再
+// 转换；超界值产生饱和审计事件，正常值 clamp 为 nil 且结果不变。
+func TestClampAudioDurationSecondsAuditsOutOfRange(t *testing.T) {
+	// 正常值：不钳制、无饱和事件。
+	d, clamp := ClampAudioDurationSeconds(30)
+	require.Equal(t, 30.0, d)
+	require.Nil(t, clamp)
+
+	// 超界值：钳到任务时长上限并返回 overflow 审计事件。
+	d, clamp = ClampAudioDurationSeconds(1e9)
+	require.Equal(t, float64(relaycommon.MaxTaskDurationSeconds), d)
+	require.NotNil(t, clamp)
+	require.Equal(t, common.QuotaClampOverflow, clamp.Kind)
+	require.Equal(t, "AudioDurationClamp", clamp.Op)
+
+	// 负值：钳到 0 并返回 underflow 审计事件。
+	d, clamp = ClampAudioDurationSeconds(-5)
+	require.Equal(t, 0.0, d)
+	require.NotNil(t, clamp)
+	require.Equal(t, common.QuotaClampUnderflow, clamp.Kind)
+
+	// NaN：钳到 0 并返回 nan 审计事件。
+	d, clamp = ClampAudioDurationSeconds(math.NaN())
+	require.Equal(t, 0.0, d)
+	require.NotNil(t, clamp)
+	require.Equal(t, common.QuotaClampNaN, clamp.Kind)
 }
 
 func TestCalcOpenRouterCacheCreateTokensDoesNotWrap(t *testing.T) {

@@ -1433,7 +1433,11 @@ func (a *TaskAdaptor) validatedCompletionUsageFacts(facts any) (map[string]any, 
 			if !numeric || math.IsNaN(number) || math.IsInf(number, 0) || number < 0 {
 				return nil, fmt.Errorf("plugin usage value must be a finite non-negative number")
 			}
-			validated[key] = float64(common.QuotaFromFloat(number))
+			quota, clamp := common.QuotaFromFloatChecked(number)
+			if clamp != nil {
+				logger.LogWarn(context.Background(), fmt.Sprintf("quota saturation on plugin usage validation: key=%s op=%s kind=%s original=%g clamped=%d", key, clamp.Op, clamp.Kind, clamp.Original, clamp.Clamped))
+			}
+			validated[key] = float64(quota)
 		}
 	}
 	return validated, nil
@@ -1563,12 +1567,20 @@ func positiveInt(value any) int {
 		if number <= 0 {
 			return 0
 		}
-		return common.QuotaFromFloat(float64(number))
+		quota, clamp := common.QuotaFromFloatChecked(float64(number))
+		if clamp != nil {
+			logger.LogWarn(context.Background(), fmt.Sprintf("quota saturation on plugin positiveInt: op=%s kind=%s original=%g clamped=%d", clamp.Op, clamp.Kind, clamp.Original, clamp.Clamped))
+		}
+		return quota
 	case float64:
 		if number <= 0 {
 			return 0
 		}
-		return common.QuotaFromFloat(number)
+		quota, clamp := common.QuotaFromFloatChecked(number)
+		if clamp != nil {
+			logger.LogWarn(context.Background(), fmt.Sprintf("quota saturation on plugin positiveInt: op=%s kind=%s original=%g clamped=%d", clamp.Op, clamp.Kind, clamp.Original, clamp.Clamped))
+		}
+		return quota
 	default:
 		return 0
 	}

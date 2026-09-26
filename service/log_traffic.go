@@ -1,10 +1,12 @@
 package service
 
 import (
+	"fmt"
 	"sort"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/logger"
 )
 
 // TrafficRecord 流量统计输入行（consume log 的 created_at + other）。
@@ -58,10 +60,18 @@ func AggregateTrafficByDay(records []TrafficRecord, loc *time.Location) []DailyT
 		var other map[string]any
 		if r.Other != "" && common.Unmarshal([]byte(r.Other), &other) == nil {
 			if v, ok := other["request_bytes"].(float64); ok {
-				req = int64(common.QuotaFromFloat(v))
+				quota, clamp := common.QuotaFromFloatChecked(v)
+				if clamp != nil {
+					logger.LogWarn(nil, fmt.Sprintf("quota saturation on traffic aggregation: op=%s kind=%s original=%g clamped=%d field=request_bytes", clamp.Op, clamp.Kind, clamp.Original, clamp.Clamped))
+				}
+				req = int64(quota)
 			}
 			if v, ok := other["response_bytes"].(float64); ok {
-				resp = int64(common.QuotaFromFloat(v))
+				quota, clamp := common.QuotaFromFloatChecked(v)
+				if clamp != nil {
+					logger.LogWarn(nil, fmt.Sprintf("quota saturation on traffic aggregation: op=%s kind=%s original=%g clamped=%d field=response_bytes", clamp.Op, clamp.Kind, clamp.Original, clamp.Clamped))
+				}
+				resp = int64(quota)
 			}
 		}
 		t := time.Unix(r.CreatedAt, 0).In(loc)

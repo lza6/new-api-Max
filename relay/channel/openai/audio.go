@@ -104,8 +104,13 @@ func OpenaiTTSHandler(c *gin.Context, resp *http.Response, info *relaycommon.Rel
 			usage.CompletionTokenDetails.AudioTokens = estimatedTokens
 		} else if duration > 0 {
 			// 计算 token: ceil(duration) / 60.0 * 1000，即每分钟 1000 tokens。
-			// duration 解析自上游返回的音频元数据，饱和转换防止 int 回绕。
-			completionTokens := common.QuotaRound(math.Ceil(duration) / 60.0 * 1000)
+			// duration 解析自上游返回的音频元数据：先钳制上界并记录饱和事件，
+			// 再用 Checked 转换，超界值也会被 attachQuotaSaturation 审计。
+			duration, durationClamp := service.ClampAudioDurationSeconds(duration)
+			if durationClamp != nil && info != nil && info.QuotaClamp == nil {
+				info.QuotaClamp = durationClamp
+			}
+			completionTokens, _ := common.QuotaRoundChecked(math.Ceil(duration) / 60.0 * 1000)
 			usage.CompletionTokens = completionTokens
 			usage.CompletionTokenDetails.AudioTokens = completionTokens
 		}

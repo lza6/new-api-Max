@@ -81,21 +81,21 @@ func shouldChargeViolationFee(err *types.NewAPIError) bool {
 	return HasCSAMViolationMarker(err)
 }
 
-func calcViolationFeeQuota(amount, groupRatio float64) int {
+func calcViolationFeeQuota(amount, groupRatio float64) (int, *common.QuotaClamp) {
 	if amount <= 0 {
-		return 0
+		return 0, nil
 	}
 	if groupRatio <= 0 {
-		return 0
+		return 0, nil
 	}
-	quota := common.QuotaFromDecimal(decimal.NewFromFloat(amount).
+	quota, clamp := common.QuotaFromDecimalChecked(decimal.NewFromFloat(amount).
 		Mul(decimal.NewFromFloat(common.QuotaPerUnit)).
 		Mul(decimal.NewFromFloat(groupRatio)).
 		Round(0))
 	if quota <= 0 {
-		return 0
+		return 0, clamp
 	}
-	return quota
+	return quota, clamp
 }
 
 // ChargeViolationFeeIfNeeded charges an additional fee after the normal flow finishes (including refund).
@@ -117,10 +117,12 @@ func ChargeViolationFeeIfNeeded(ctx *gin.Context, relayInfo *relaycommon.RelayIn
 	}
 
 	groupRatio := relayInfo.PriceData.GroupRatioInfo.GroupRatio
-	feeQuota := calcViolationFeeQuota(settings.ViolationDeductionAmount, groupRatio)
+	feeQuota, feeClamp := calcViolationFeeQuota(settings.ViolationDeductionAmount, groupRatio)
 	if feeQuota <= 0 {
 		return false
 	}
+	// 违规费金额来自管理配置，但仍可能因异常组倍率/配置饱和；记录饱和事件供审计。
+	noteQuotaClamp(relayInfo, feeClamp)
 
 	if err := PostConsumeQuota(relayInfo, feeQuota, 0, true); err != nil {
 		logger.LogError(ctx, fmt.Sprintf("failed to charge violation fee: %s", err.Error()))
@@ -147,6 +149,7 @@ func ChargeViolationFeeIfNeeded(ctx *gin.Context, relayInfo *relaycommon.RelayIn
 		"violation_fee_marker": CSAMViolationMarker,
 	})
 
+	attachQuotaSaturation(ctx, relayInfo, other)
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
 		ChannelId:      relayInfo.ChannelId,
 		ModelName:      relayInfo.OriginModelName,
