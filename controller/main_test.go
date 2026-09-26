@@ -55,5 +55,7 @@ func TestMain(m *testing.M) {
 		panic("failed to migrate controller test db: " + err.Error())
 	}
 
-	os.Exit(m.Run())
+	code := m.Run()
+	_ = sqlDB.Close()
+	os.Exit(code)
 }

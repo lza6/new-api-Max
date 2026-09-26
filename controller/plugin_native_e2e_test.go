@@ -75,6 +75,9 @@ func TestKlingNativeRouteSubmitPollSettleAndQuery(t *testing.T) {
 	previousRedisEnabled := common.RedisEnabled
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, database.AutoMigrate(&model.User{}, &model.Channel{}, &model.Task{}, &model.Log{}))
 	model.DB = database
 	model.LOG_DB = database

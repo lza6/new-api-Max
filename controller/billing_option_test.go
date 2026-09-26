@@ -113,6 +113,9 @@ func setupBillingAliasOptionDB(t *testing.T) {
 	previousRedis := common.RedisEnabled
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.Option{}, &model.Log{}, &model.AuditLog{}, &model.User{}))
 	model.DB = database
 	model.LOG_DB = database

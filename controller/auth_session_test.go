@@ -22,6 +22,10 @@ func TestAuthLogoutRejectsRefreshCookieSessionMismatch(t *testing.T) {
 	previousSecret := common.SessionSecret
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
 	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}))
 	model.DB = db
 	common.RedisEnabled = false
@@ -115,6 +119,10 @@ func TestSessionLimitDoesNotRecordRejectedLoginAsSuccessful(t *testing.T) {
 	previousIssuanceWindow := common.UserSessionIssuanceWindowSeconds
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
+
 	require.NoError(t, db.AutoMigrate(&model.User{}, &model.UserSession{}, &model.TwoFA{}, &model.PasskeyCredential{}))
 	model.DB = db
 	common.RedisEnabled = false

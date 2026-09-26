@@ -659,6 +659,9 @@ func setupAuthFlowControllerTest(t *testing.T) *authFlowTestOAuthProvider {
 	previousType := common.MainDatabaseType()
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, db.AutoMigrate(&model.AuthFlow{}, &model.User{}, &model.UserSession{}, &model.AuditLog{}))
 	model.DB, model.LOG_DB = db, db
 	common.SetMainDatabaseType(common.DatabaseTypeSQLite)

@@ -34,6 +34,9 @@ func setupCostDetailDB(t *testing.T) {
 	previousDB, previousLogDB := model.DB, model.LOG_DB
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, db.AutoMigrate(&model.Log{}))
 	model.DB, model.LOG_DB = db, db
 	t.Cleanup(func() {

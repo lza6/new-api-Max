@@ -30,6 +30,7 @@ func setupTaskPluginBindChannelTest(t *testing.T) {
 	require.NoError(t, err)
 	sqlDB, err := database.DB()
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	sqlDB.SetMaxOpenConns(1)
 	require.NoError(t, database.AutoMigrate(&model.Channel{}, &model.Ability{}, &model.CasbinRule{}, &model.AuthzRole{}, &model.Log{}, &model.AuditLog{}, &model.User{}))
 	model.DB = database

@@ -440,6 +440,9 @@ func newAuditTestDatabase(t *testing.T, kind, dsn string) (*gorm.DB, string) {
 		path := t.TempDir() + "/audit.db"
 		db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 		require.NoError(t, err)
+		sqlDB, dbErr := db.DB()
+		require.NoError(t, dbErr)
+		t.Cleanup(func() { _ = sqlDB.Close() })
 		return db, path
 	}
 	require.NotEmpty(t, dsn)

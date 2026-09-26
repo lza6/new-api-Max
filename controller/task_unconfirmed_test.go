@@ -42,6 +42,9 @@ func TestPersistUnconfirmedTask(t *testing.T) {
 	originalDB := model.DB
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, database.AutoMigrate(&model.Task{}, &model.TaskEvent{}, &model.User{}, &model.Token{}))
 	model.DB = database
 	t.Cleanup(func() { model.DB = originalDB })
@@ -104,6 +107,9 @@ func TestPersistUnconfirmedTaskWithoutHint(t *testing.T) {
 	originalDB := model.DB
 	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = sqlDB.Close() })
 	require.NoError(t, database.AutoMigrate(&model.Task{}, &model.TaskEvent{}, &model.User{}, &model.Token{}))
 	model.DB = database
 	t.Cleanup(func() { model.DB = originalDB })
