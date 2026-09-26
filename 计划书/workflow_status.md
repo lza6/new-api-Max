@@ -669,3 +669,22 @@
   - 前端 timeline：ms→人类可读（350ms / 1.5s / 2m 15s / 1h）+ 非流式无 frt 时按总耗时推断 upstream=done/failed（不再误导"skipped"）；单测 8/8
 - 质量：go build + relay/service/setting 单测全过；前端 tsgo/build/oxlint 全绿
 - 交付：commit fd96b436e（后端）+ 08eabaaa1（前端+VERSION）→ tag v1.3.11 + release + CI(GHCR)
+
+## 八十六、T3 Web 防护实时状态页闭环: 在线请求数 + 近期封禁事件 + UI 解封（v1.3.35，2026-09-26）
+
+- 需求（T3 任务卡缺口）：实时状态页补「在线请求计数 + 近 5 分钟封禁事件表 + 手动解封」；策略配置化（T3-1）已在 v1.3.34 闭环（路径白/黑名单 + UA 白名单 + 配置热更单测 + 前端表单保存回读）。
+- 后端（v1.3.35）：
+  - `service/web_protection_tracker.go`：`webProtectionTracker` 增 `inFlight atomic.Int64`；`TrackWebRequestBegin` 放行路径 `Add(1)`；`TrackWebRequestEnd` 先按 context key 回减 `Add(-1)` 再判定（**中途关闭防护仍回减，避免计数泄漏**）；新增 `GetWebProtectionInFlight()`。
+  - `controller/web_protection.go` `GetServerStats`：新增 `in_flight`（进程内原子计数）+ `recent_bans`（最新 10 条生效封禁，含 IP/reason/banned_at/expires_at/banned_by）。
+  - 测试：`service/web_protection_tracker_test.go` 4 用例（Begin+1/End-1、拒绝不计数、关闭不计数、中途关闭仍回减）；`controller/web_protection_test.go` 新增 `TestServerStatsIncludesInFlightAndRecentBans`（封禁→status 可见→解封→清空）。
+- 前端（v1.3.35）：
+  - `api.ts`：`ServerStats` 增 `in_flight` / `recent_bans`，新增 `RecentBanRow`。
+  - `web-protection-page.tsx` ServerStatsCard：新增「当前在线请求」数值卡（1.5s 轮询）+「最近封禁」列表（IP/原因/时间/Badge/解封按钮，解封后即时刷新）；i18n en/zh/zh-TW/fr/ru/ja/vi 7 语言 4 key。
+  - 测试：`web-protection-page.test.tsx` 新增「in-flight + recent bans + Unban 调用」断言（2/2 PASS）。
+- 质量：`go build ./...` + `go vet ./...` 无错误；`go test ./service/ ./controller/` 相关组全绿；`bun run typecheck` + `bunx vitest run src/features/web-protection`（2/2）+ `bun run build` 全绿。
+- 真实 E2E（本机网关 + Chrome headless CDP，证据入 `计划书/e2e-evidence/browser-e2e-web-protection/` 5 张截图）：
+  - 策略真实生效：Mozilla+/dashboard → 200；curl+/dashboard → 429；Mozilla+/admin/users → 429。
+  - 并发 30/40 请求下 `in_flight` 实时 >0（状态页「当前在线请求」= 1）。
+  - 封禁（API 与 UI 均验证）→ 状态页「最近封禁」出现该 IP → UI 解封按钮点击 → 页面实时消失。
+- 诚实边界：in-flight 为进程内计数（多实例各实例独立，与令牌桶语义一致）；地域过滤、多实例全局统一限流为显式待办（P2），未宣称完成。
+- 交付：commit （见 git log）→ VERSION v1.3.35 → push main → release（无 -f，先 fetch 核对远端 SHA）。
