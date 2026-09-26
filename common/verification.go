@@ -55,6 +55,24 @@ func VerifyCodeWithKey(key string, code string, purpose string) bool {
 	return code == value.code
 }
 
+// VerifyCodeWithKeyConsume 校验验证码并原子消费（一次性）。
+// T8：防止验证码在有效窗口内被重放用于多次注册/绑定。校验成功后立即删除，
+// 与重置路径"成功后 DeleteKey"语义对齐。
+func VerifyCodeWithKeyConsume(key string, code string, purpose string) bool {
+	verificationMutex.Lock()
+	defer verificationMutex.Unlock()
+	value, okay := verificationMap[purpose+key]
+	now := time.Now()
+	if !okay || int(now.Sub(value.time).Seconds()) >= VerificationValidMinutes*60 {
+		return false
+	}
+	if code != value.code {
+		return false
+	}
+	delete(verificationMap, purpose+key)
+	return true
+}
+
 func DeleteKey(key string, purpose string) {
 	verificationMutex.Lock()
 	defer verificationMutex.Unlock()
