@@ -743,3 +743,17 @@
 - 后端：go build/vet 全绿；go test ./common/ ./controller/ 相关组全绿。
 - 前端：bun run typecheck + vitest（friendly-error-mapping 7/7）全绿。
 - 交付：commit（见 git log）→ VERSION v1.3.38 → push main → release（无 -f，先 fetch 核对远端 SHA）。
+
+## 八十九、生产 503 修复：blue-green 健康检查加固（v1.3.39，2026-09-26）
+
+### 生产问题：freeapi.tingfengai.art 返回 HTTP ERROR 503
+- **现象**：公网 503（Caddy 无可用后端）。
+- **排查结论（本机验证）**：
+  - v1.3.38 代码无回归：/api/status 健康探针 20/20 稳定 200（本地真实实例实测）。
+  - `/api/status` 与 `/api/uptime/status` 已被限流豁免（middleware/rate-limit.go:195），非限流导致。
+- **根因（部署层）**：`scripts/rolling-update-newapi-v3.sh` 的 Caddy 健康检查 `health_fails=1` / `health_timeout=1s` 过于激进——后端任何一次 >1s 响应（GC 暂停/DB 抖动）立即被摘流 → Caddy 判后端不健康 → 503；且新实例就绪判定为「单次 curl 通过即切流」，可能切到半启动实例。
+- **修复（scripts/rolling-update-newapi-v3.sh）**：
+  - Caddy `health_fails 1→3`、`health_passes 1→2`、`health_timeout 1s→2s`（容忍瞬时抖动，不误摘流）。
+  - standby/master 就绪改为「连续 3 次 /api/status 通过」才切流（避免切到半启动实例）；等待窗口 standby 40→60s、master 60→90s。
+- **验证**：bash -n 语法通过；3x 连续健康逻辑对本地真实实例实测通过（HEALTHY_3X）。
+- **部署**：生产执行 `scripts/rolling-update-newapi-v3.sh v1.3.39`（同时携带零停机排空 + 健康检查加固）。
