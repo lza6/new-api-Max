@@ -23,6 +23,19 @@
 | P2 | T14 旧产物清理 | ⛔ 需用户授权 | 见下一步改进指南 T14 |
 | P2 | T15 未来方向 | ✅ 模型同步 dry-run 已落地；任务品类扩展已立项（待上游凭证） | ops/t15-task-cards.md |
 
+## P2 批次六任务（v1.3.42，2026-09-27）
+
+| 任务 | 状态 | 证据 |
+|---|---|---|
+| T9 前端体积 | ✅ 基线刷新 v1.3.41 + knip 复验 + 性能预算测试 | bundle-size.md（记录 0004）+ 预算测试 |
+| T10 数据库 | ✅ CI 三库矩阵 job + 幂等脚本 + EXPLAIN 复查 + 日志归档开关 | .github/workflows + db-conformance.ps1 + perf-ledger |
+| T11 部署 SOP | ✅ 503 事故教训入库（Caddy 1s/1/1 + banned_ips 封 172.18.0.1 根因）+ Dockerfile 瘦身 + CI 校验 | ops/deployment-sop.md + Dockerfile |
+| T12 i18n/合规 | ✅ 术语表补计费/限速/任务插件/Web防护 + 键集测试 + 合规 AI 标识 | docs/translation-glossary.md + locale-consistency.test.ts |
+| T13 知识沉淀 | ✅ db_structure 回填 S7 索引 + project_specs 回填 + graft build | db_structure.md + graft/ |
+| T14 旧产物清理 | ⛔ 清单已列，等用户逐项批准 | 见 T14 清单 |
+
+> v1.3.41（2026-09-26）已闭环：生产 503 根因=Web 防护封禁 Docker 网关 172.18.0.1（auto:web_rate_limit）→ Caddy 健康检查 429 → 双上游摘流；已删封禁 + 升级 v1.3.41 + Caddyfile 加固（3s/2s/3/2）。线上验收：/api/status 200 + X-New-Api-Version: v1.3.41 + 20/20 健康检查全绿。
+
 ## 在办批次（本轮 · 2026-09-25）
 - T13 文档治理：project_specs.md / db_structure.md / README.md 恢复；perf-ledger 追加记录 0010；T3/T2 审计两篇。
 - T11 SOP 更新 v1.3.28 + rolling-update-newapi-v3.sh 衔接（a0d0589f5）。

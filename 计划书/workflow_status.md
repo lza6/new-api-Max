@@ -791,3 +791,17 @@
 - G4 注册/邮箱验证存在性枚举：Gap（改注册流程 UX）
 - G5 验证码内存存储不跨实例：Gap（建议 Redis）
 - controller 全量 4 项失败（AuditDatabaseMatrix 无 MySQL/PG 实例、SessionLimit 时间戳硬编码、Kling SSRF mock 拦截）：已用 HEAD 干净 worktree 复现为基线环境问题，非本批引入
+
+
+## 九十二、P2 批次六任务闭环：T9-T14（v1.3.42，2026-09-27）
+
+| 任务 | 状态 | 证据 |
+|---|---|---|
+| T9 前端体积 | ✅ 基线刷新 v1.3.41（Total 59,408.8 kB / index 4,419.7 kB）+ 性能预算回归测试（3/3 绿） | bundle-size.md 记录 0004 + bundle-budget.test.ts |
+| T10 数据库 | ✅ CI 三库矩阵已存在（ci.yml）+ 线上真实 PG EXPLAIN 核对（ledger 0012，S7 索引全生效）+ TASK_EVENT_RETENTION_DAYS 归档已有 | perf-verification-ledger.md 记录 0012 |
+| T11 部署 SOP | ✅ 503 事故复盘入库（Caddy 1s/1/1 + banned_ips 封 172.18.0.1 根因链）+ Dockerfile HEALTHCHECK + release.yml 版本串校验 | deployment-sop.md §4.1 + Dockerfile + release.yml |
+| T12 i18n/合规 | ✅ 术语表补计费过程段 + 键集测试 2/2 绿 + AI 生成标识 checklist | translation-glossary.md + t12-i18n-compliance.md §6 |
+| T13 知识沉淀 | ✅ db_structure 回填 S7 索引 + project_specs 回填 + graft build（18,928 节点） | db_structure.md + project_specs.md |
+| T14 旧产物清理 | ✅ 删除 log.go.bak-t1 / t6_us.shim / .env.t1bench / pprof 旧文件（未跟踪临时产物） | git status |
+
+> 线上基线：freeapi.tingfengai.art 已 v1.3.41（/api/status 200 + X-New-Api-Version: v1.3.41 + 20/20 健康全绿）；本批 v1.3.42 为 P2 收尾，不改变运行代码（仅 Dockerfile HEALTHCHECK 与 CI/文档）。

@@ -199,3 +199,16 @@
   - 这些是账本写，不能缓存（余额以 DB 为准）；批量/异步化属 T1-B（预扣异步化）单独授权批。
   - 读路径慢 SQL 未再观测到（渠道/用户/定价已全内存/Redis）。
 - **防重复跑**: 未改上述缓存/健康分代码时跳过；改到再重跑对应包测试 + 基准。
+
+
+## 记录 0012 · T10-3 索引 EXPLAIN 复查（2026-09-27，v1.3.41 线上 PG 实测）
+- **范围**：生产 PostgreSQL（freeapi.tingfengai.art，docker exec postgres psql）真实 EXPLAIN，核对热点索引。
+- **结论**：全部热点索引已在线上生效（v1.3.41 AutoMigrate 正确执行），无缺失。
+- **证据（真实 EXPLAIN，COSTS OFF）**：
+  - logs 按时间：`Index Scan Backward using logs_pkey`（无慢）
+  - logs 按 user+time：`BitmapAnd(idx_created_at_id, idx_logs_user_id)`（高效）
+  - banned_ips 过期清扫：`Index Scan using idx_banned_ips_expires_at`（v1.3.41 S7 索引命中）
+  - top_ups 分页：`Index Scan using idx_top_ups_user_id` + create_time Filter（表 0 行，小表优化器行为；`idx_top_ups_create_time` 已存在）
+  - task_events 清理：`Seq Scan`（表 0 行；`idx_task_events_created_at` 已存在，数据量大后自动启用）
+- **线上索引清单核对**：pg_indexes 确认 logs 17 个索引（含 request_id/upstream_request_id/traffic/复合）、task_events 4 个、top_ups 4 个、banned_ips 3 个（含 ip 唯一）全部存在。
+- **防重复跑**：仅 schema 变更后重查；本记录作为权威索引核验基线。

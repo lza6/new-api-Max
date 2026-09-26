@@ -1,6 +1,6 @@
 # 数据库结构权威源（db_structure.md）
 
-> 生成：2026-09-24 · 从 `model/` GORM 标签抽取（真实代码证据 文件:行号）。
+> 基线版本：2026-09-25 · 从 git HEAD（a0d0589f5, v1.3.28）恢复，内容与 HEAD 版本一致（生成 2026-09-24，从 `model/` GORM 标签抽取）。
 > 更新纪律：任何 schema 变更（模型字段/索引/迁移）后**必须回填本文件**并跑三库矩阵。
 > 兼容矩阵：SQLite / MySQL ≥5.7.8 / PostgreSQL ≥9.6（AGENTS 硬性要求）。
 
@@ -46,7 +46,7 @@
 | upstream_request_id | varchar(128) | idx_logs_upstream_request_id |
 
 ### channels（model/channel.go:23）
-- 核心列：id、name、type、key、base_url、models、group、status、weight、priority。
+- 核心列：id、name、type、key、base_url、models、group、status、weight、priority、probe_result（text，B4 probe 报告 JSON）。
 - 说明：渠道-模型-分组映射经 `abilities` 表（model/ability.go:18，group+model+enabled+priority 复合查询）。
 
 ### tokens（model/token.go:14）
@@ -59,6 +59,18 @@
 ### user_subscriptions（model/subscription.go:263）
 - 核心列：id、user_id、plan_id、start_at、end_at、status。
 
+### system_instances（model/system_instance.go）
+- 核心列：id、node_name、started_at、last_seen_at、info（节点规格/负载/磁盘上报，供 server-stats 状态页）。
+- 约束：node_name 唯一；stale 判定 SystemInstanceStaleAfterSeconds。
+
+### banned_ips（model/banned_ip.go:14，Web 防刷封禁）
+- 核心列：id、ip、reason、banned_at、expires_at、banned_by。
+- 约束：ip 唯一（uniqueIndex）；expires_at 索引（v1.3.41 S7：DeleteExpiredBannedIPs 按 expires_at 范围清扫）。
+
+### top_ups（model/topup.go:15，充值/兑换入账）
+- 核心列：id、user_id、amount、money、trade_no、payment_method、payment_provider、create_time、complete_time、status。
+- 约束：user_id 索引；trade_no 唯一；create_time 索引（v1.3.41 S7：user_id + create_time 范围分页查询）。
+
 ## 索引策略（慢查询猎杀结论）
 - logs 复合索引覆盖高频查询：按时间（idx_created_at_id）、按用户（idx_user_id_id）、
   按类型+时间（idx_log_type_created_id）、按用户+类型+时间（idx_log_user_type_created）、
@@ -66,5 +78,10 @@
 - users 唯一索引防重复注册：username / aff_code / access_token。
 
 ## 验证
-- 三库矩阵真实通过：2026-09-24 SQLite + MySQL 9.6.0 + PG 16.14，7/7 conformance PASS
-  （含 AutoMigrate 幂等：首次建表 → 二次零变更）。见 perf-verification-ledger.md 记录 0002。
+- HEAD 版记录：三库矩阵真实通过 2026-09-24 SQLite + MySQL 9.6.0 + PG 16.14，7/7 conformance PASS（ledger 0002）。
+- v1.3.41：新增 banned_ips.expires_at / top_ups.create_time 索引，SQLite AutoMigrate 冒烟
+  `go test ./model/ -run TestS7IndexAutoMigrateSmoke -count=1` PASS（HasIndex 断言）。
+- 本次复验：2026-09-25 v1.3.28 重新跑 `go test ./model/ -run TestDBConformance -v -count=1`，7/7 PASS（76.3s），
+  MySQL 9.6.0 + PG 16.14 真实连接（含 AutoMigrate 幂等：首次建表 → 二次零变更）。见 perf-verification-ledger.md 记录 0010
+  与原始输出 `计划书/audit/dbconformance-2026-09-25.log`。
+- schema 未变更：本次文档治理轮次不产生迁移；后续 schema 改动后必须重跑矩阵并回填本文件。

@@ -1,0 +1,93 @@
+{
+  "meta": {
+    "title": "P2 batch six tasks acceptance (T9-T14)",
+    "version": "v1.3.42",
+    "date": "2026-09-27T01:10:00+08:00",
+    "repo": "github.com/lza6/new-api-Max",
+    "branch": "main",
+    "base": "835cd3c7c"
+  },
+  "tasks": {
+    "T9": {
+      "status": "DONE",
+      "items": [
+        "bundle-size.md record 0004 refreshed with v1.3.41 build (Total 59,408.8 kB / gzip 17,129.7 kB; index 4,419.7 kB)",
+        "bundle-budget.test.ts new: index<5MB raw, total<70MB raw, max async chunk<8MB raw — 3/3 PASS against real dist"
+      ],
+      "evidence": [
+        "计划书/audit/bundle-size.md#记录-0004",
+        "web/src/lib/__tests__/bundle-budget.test.ts"
+      ]
+    },
+    "T10": {
+      "status": "DONE (verified pre-existing)",
+      "items": [
+        "CI three-db matrix already in ci.yml (SQLite+MySQL8.4+PG16, TestDBConformance)",
+        "db-conformance.ps1 idempotent fresh+upgrade covered by TestDBConformance",
+        "ledger 0012: real PG EXPLAIN on production — all hot indexes present incl S7 (idx_banned_ips_expires_at, idx_top_ups_create_time, idx_task_events_created_at)",
+        "task-event retention TASK_EVENT_RETENTION_DAYS already in service/task_event_cleanup.go"
+      ],
+      "evidence": [
+        ".github/workflows/ci.yml#db-conformance",
+        "计划书/audit/perf-verification-ledger.md#记录-0012"
+      ]
+    },
+    "T11": {
+      "status": "DONE",
+      "items": [
+        "503 incident postmortem in deployment-sop.md §4.1 (root cause: web-protection banned Docker gateway 172.18.0.1 -> Caddy health 429 -> dual upstream removed)",
+        "Dockerfile HEALTHCHECK added (wget /api/status success:true, 30s/5s/15s/3)",
+        "release.yml Verify embedded version step (grep -a VERSION in binary)"
+      ],
+      "evidence": [
+        "计划书/ops/deployment-sop.md#4.1",
+        "Dockerfile",
+        ".github/workflows/release.yml"
+      ]
+    },
+    "T12": {
+      "status": "DONE",
+      "items": [
+        "glossary added Billing Flow section (pre-consume/settlement/delta/cost explanation/estimate/per-call)",
+        "locale-consistency.test.ts 2/2 PASS",
+        "AI-generated content disclosure checklist added to t12-i18n-compliance.md §6"
+      ],
+      "evidence": [
+        "docs/translation-glossary.md#计费过程",
+        "web/src/i18n/locale-consistency.test.ts",
+        "计划书/docs/t12-i18n-compliance.md#6"
+      ]
+    },
+    "T13": {
+      "status": "DONE",
+      "items": [
+        "db_structure.md backfilled S7 indexes (banned_ips.expires_at, top_ups.create_time) + v1.3.41 validation",
+        "project_specs.md backfilled P2 batch six (v1.3.42) + v1.3.41 503 closure",
+        "graft build refreshed (18,928 nodes, no errors)"
+      ],
+      "evidence": [
+        "计划书/db_structure.md",
+        "计划书/project_specs.md",
+        "graft/"
+      ]
+    },
+    "T14": {
+      "status": "DONE",
+      "items": [
+        "deleted model/log.go.bak-t1, t6_us.shim, .env.t1bench, pprof/cpu-*.pprof (all untracked temp artifacts, zero refs)",
+        "kept .codex/ (audit tools w/ prod credentials, untracked) and specs/001-* placeholders"
+      ],
+      "evidence": [
+        "git status clean for these paths"
+      ]
+    }
+  },
+  "verification": [
+    "go build ./... PASS",
+    "go vet ./... PASS",
+    "go test ./model/ -run TestS7IndexAutoMigrateSmoke|TestDBConformance PASS",
+    "cd web && bun run typecheck PASS",
+    "bun run build PASS (59,408.8 kB total)",
+    "bunx vitest run bundle-budget + locale-consistency 5/5 PASS"
+  ]
+}

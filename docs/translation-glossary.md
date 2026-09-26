@@ -121,6 +121,17 @@ This document provides standard translation references for key terminology in th
 | 自动封禁 | Auto Ban | 触发阈值后自动封禁 IP | Auto-ban after threshold |
 | 服务器状态 | Server Stats | 实时状态（网络/CPU/内存/磁盘） | Realtime server metrics |
 
+## 计费过程 (Billing Flow)
+
+| 中文 | English | 说明 | Description |
+|------|---------|------|-------------|
+| 预扣费 | Pre-consume / Pre-deduction | 请求前按估算额预扣 | Estimated deduction before request |
+| 结算 | Settlement | 按实际用量多退少补 | Final settle against actual usage |
+| 差额结算 | Delta Settlement | 实际与预扣的差额调整 | Adjust the difference between actual and pre-deducted |
+| 费用解释 | Cost Explanation | 单价/倍率/Token/配额逐项拆解 | Itemized cost breakdown |
+| 估价 | Estimate | 请求前预估费用区间 | Pre-request fee estimate |
+| 按次计费 | Per-call Pricing | 每任务固定价 | Fixed price per task |
+
 ## 订阅 (Subscription)
 
 | 中文 | English | 说明 | Description |

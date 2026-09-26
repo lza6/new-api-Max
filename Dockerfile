@@ -39,3 +39,8 @@ COPY LICENSE NOTICE THIRD-PARTY-LICENSES.md /licenses/
 EXPOSE 3000
 WORKDIR /data
 ENTRYPOINT ["/new-api"]
+
+# T11：容器健康检查（Caddy/编排依赖 /api/status 探活；v1.3.41 起该路径豁免 GA 限流）
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+  CMD wget -q -O - http://127.0.0.1:3000/api/status | grep -q '"success":\s*true' || exit 1
+

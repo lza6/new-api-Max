@@ -65,3 +65,15 @@ Top 10 chunk（原始/gzip）：
 - **测试 mock 类型修复**: bulk-pricing-dialog.test.tsx 的 `options: {}` 缺 PricingOptions
   全字段导致 tsgo 报错，补齐 10 个 key → typecheck 绿 + vitest 3/3 绿。
 - **结论**: T9-E2/E3 **闭环**。首屏 JS ≈ 1.25MB gzip 为合理基线；改动入口/共享层后再对比。
+## 记录 0004 · T9 基线刷新 + 性能预算（2026-09-27，v1.3.41）
+- **实测**：`cd web && bun run build`（v1.3.41 代码）→ Total **59,408.8 kB**（gzip 17,129.7 kB），
+  入口 index.js **4,419.7 kB**（gzip 1,256.4 kB）。与 0002/0003（59,352 kB / 4,378 kB）基本一致，
+  重依赖全异步分包 + 路由级 autoCodeSplitting 结构稳定；入口 +41 kB 为业务代码增量，无异常。
+- **Top 10 chunk（原始/gzip）**：
+  1. 9926: 6,827 / 2,751 · 2. 6685: 5,468 / 1,030 · 3. 9197: 5,372 / 1,204 · 4. 3898: 5,088 / 1,968
+  5. index: 4,420 / 1,256 · 6. 8496: 3,164 / 374 · 7. vendor-charts: 2,307 / 618
+  8. 5143: 2,148 / 478 · 9. 240: 2,120 / 561 · 10. 3239: 1,962 / 418
+- **性能预算回归测试（新增）**：`web/src/lib/__tests__/bundle-budget.test.ts`
+  断言入口 index chunk（原始）< 5 MB、总 JS < 70 MB、gzip 总 < 25 MB（CI 可跑，阈值留余量防 flaky）。
+- **结论**：首屏 JS ≈ 1.25 MB gzip 为稳定基线；拆共享层收益低风险高，维持「不推荐进一步瘦身」。
+- **防重复跑**：改动入口/共享层/重依赖后再跑 build 对比本记录。
