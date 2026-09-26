@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"context"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -13,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
+	"os"
 )
 
 func TestPricingSyncExpressionPriority(t *testing.T) {
@@ -139,4 +141,72 @@ func TestPricingSyncCompleteSourcesAndArrayFormats(t *testing.T) {
 	assert.Equal(t, float64(4), response.Data.Prices["sync-token"].Upstreams["Expressions(1)"]["completion_ratio"])
 	assert.Equal(t, float64(0), response.Data.Prices["sync-token"].Upstreams["Expressions(1)"]["cache_ratio"])
 	assert.Equal(t, float64(0), response.Data.Prices["sync-free"].Upstreams["Legacy(2)"]["model_ratio"])
+}
+
+// TestV1PricingPublicRoute B5-4：/v1/pricing 公开只读价目端点无鉴权返回价目结构。
+func TestV1PricingPublicRoute(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/v1/pricing", GetV1Pricing)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/pricing", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code)
+	var body struct {
+		Success bool  `json:"success"`
+		Data    []any `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(w.Body.Bytes(), &body))
+	require.True(t, body.Success)
+	require.NotNil(t, body.Data)
+}
+
+// TestPricingSyncTaskIdempotentMerge B5-4：pricing_sync 幂等 merge——
+// 上游覆盖的模型被合并进本地，未出现的模型保持原值；再次执行收敛一致。
+func TestPricingSyncTaskIdempotentMerge(t *testing.T) {
+	_ = modelManagementDB(t, "sqlite", "")
+
+	// 本地初始：model-a=1, model-b=2
+	origRatio := ratio_setting.GetModelRatioCopy()
+	ratio_setting.UpdateModelRatioByJSONString(`{"model-a":1,"model-b":2}`)
+	t.Cleanup(func() {
+		raw, _ := common.Marshal(origRatio)
+		_ = ratio_setting.UpdateModelRatioByJSONString(string(raw))
+		_ = os.Unsetenv("PRICING_SYNC_UPSTREAMS")
+		_ = os.Unsetenv("PRICING_SYNC_TASK_ENABLED")
+	})
+
+	// mock 上游返回 model-a=9（覆盖）+ model-c=3（新增）
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"success":true,"data":[{"model_name":"model-a","model_ratio":9},{"model_name":"model-c","model_ratio":3}]}`))
+	}))
+	defer upstream.Close()
+
+	_ = os.Setenv("PRICING_SYNC_UPSTREAMS", `[{"name":"mock","base_url":"`+upstream.URL+`"}]`)
+
+	summary := runPricingSyncTaskOnce(context.Background())
+	require.True(t, len(summary.Fetched) > 0, "mock upstream must be fetched")
+	require.Empty(t, summary.Errors)
+
+	merged := ratio_setting.GetModelRatioCopy()
+	require.Equal(t, 9.0, merged["model-a"], "上游值必须覆盖本地 model-a")
+	require.Equal(t, 2.0, merged["model-b"], "未出现模型 model-b 必须保持原值（保护既有配置）")
+	require.Equal(t, 3.0, merged["model-c"], "上游新增模型 model-c 必须被合并")
+
+	// 幂等：再次执行结果不变。
+	_ = ratio_setting.UpdateModelRatioByJSONString(`{"model-a":5}`)
+	summary2 := runPricingSyncTaskOnce(context.Background())
+	require.Empty(t, summary2.Errors)
+	merged2 := ratio_setting.GetModelRatioCopy()
+	require.Equal(t, 9.0, merged2["model-a"], "第二次同步必须把被改回 5 的 model-a 重新收敛到上游 9")
+}
+
+// TestPricingSyncTaskSkippedWithoutConfig B5-4：无上游配置时空转不报错。
+func TestPricingSyncTaskSkippedWithoutConfig(t *testing.T) {
+	_ = os.Unsetenv("PRICING_SYNC_UPSTREAMS")
+	summary := runPricingSyncTaskOnce(context.Background())
+	require.True(t, summary.Skipped)
+	require.Empty(t, summary.Errors)
 }

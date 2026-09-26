@@ -36,6 +36,17 @@ func filterPricingByUsableGroups(pricing []model.Pricing, usableGroup map[string
 }
 
 func GetPricing(c *gin.Context) {
+	c.JSON(200, buildPricingResponse(c))
+}
+
+// GetV1Pricing B5-4：公开只读价目端点，供客户端/外部直接读取当前站点价目。
+// 与 /api/pricing 同源（buildPricingResponse），无鉴权；在 /v1 前缀下被
+// Web 防护中间件跳过，仅挂轻量 IP 限流。
+func GetV1Pricing(c *gin.Context) {
+	c.JSON(200, buildPricingResponse(c))
+}
+
+func buildPricingResponse(c *gin.Context) gin.H {
 	pricing := model.GetPricing()
 	userId, exists := c.Get("id")
 	usableGroup := map[string]string{}
@@ -69,7 +80,7 @@ func GetPricing(c *gin.Context) {
 		pricing[i].GroupRatio = groupRatio
 	}
 
-	c.JSON(200, gin.H{
+	return gin.H{
 		"success":            true,
 		"data":               pricing,
 		"vendors":            model.GetVendors(),
@@ -78,7 +89,7 @@ func GetPricing(c *gin.Context) {
 		"supported_endpoint": model.GetSupportedEndpointMap(),
 		"auto_groups":        service.GetUserAutoGroup(group),
 		"pricing_version":    "a42d372ccf0b5dd13ecf71203521f9d2",
-	})
+	}
 }
 
 func ResetModelRatio(c *gin.Context) {

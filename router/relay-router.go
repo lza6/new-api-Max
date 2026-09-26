@@ -16,6 +16,14 @@ func SetRelayRouter(router *gin.Engine) {
 	router.Use(middleware.BodyStorageCleanup()) // 清理请求体存储
 	router.Use(middleware.StatsMiddleware())
 	// https://platform.openai.com/docs/api-reference/introduction
+	// B5-4: 公开只读价目端点（无鉴权，仅轻量 IP 限流；/v1 前缀跳过 Web 防护）。
+	pricingV1Router := router.Group("/v1")
+	pricingV1Router.Use(middleware.RouteTag("relay"))
+	pricingV1Router.Use(middleware.CriticalRateLimit())
+	{
+		pricingV1Router.GET("/pricing", controller.GetV1Pricing)
+	}
+
 	modelsRouter := router.Group("/v1/models")
 	modelsRouter.Use(middleware.RouteTag("relay"))
 	modelsRouter.Use(middleware.TokenAuth())

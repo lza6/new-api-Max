@@ -24,6 +24,7 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(asyncTaskPollHandler{})
 	service.RegisterSystemTaskHandler(cooldownRecoveryHandler{})
 	service.RegisterSystemTaskHandler(probeScheduledChannelsHandler{})
+	service.RegisterSystemTaskHandler(pricingSyncHandler{})
 }
 
 // cooldownRecoveryHandler periodically recovers channels whose B3-1 cooldown
@@ -182,4 +183,34 @@ func finishSystemTaskHandler(task *model.SystemTask, runnerID string, status mod
 	if err := model.FinishSystemTask(task.TaskID, runnerID, status, result, errorMessage); err != nil {
 		common.SysLog(fmt.Sprintf("system task %s failed to persist result: %v", task.TaskID, err))
 	}
+}
+
+// pricingSyncHandler B5-4：定时同步上游价目到本地 ratio 表（幂等，失败仅告警）。
+// Enablement 与周期走环境变量，默认 6h；无上游配置时空转。
+type pricingSyncHandler struct{}
+
+func (pricingSyncHandler) Type() string { return model.SystemTaskTypePricingSync }
+
+func (pricingSyncHandler) Enabled() bool {
+	return common.GetEnvOrDefaultBool("PRICING_SYNC_TASK_ENABLED", true)
+}
+
+func (pricingSyncHandler) Interval() time.Duration {
+	intervalMinutes := common.GetEnvOrDefault("PRICING_SYNC_TASK_INTERVAL_MINUTES", 360)
+	if intervalMinutes < 1 {
+		intervalMinutes = 360
+	}
+	return time.Duration(intervalMinutes) * time.Minute
+}
+
+func (pricingSyncHandler) NewPayload() any { return nil }
+
+func (pricingSyncHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	var payload struct{}
+	if err := task.DecodePayload(&payload); err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, err)
+		return
+	}
+	summary := runPricingSyncTaskOnce(ctx)
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
 }

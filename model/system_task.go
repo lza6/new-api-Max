@@ -23,6 +23,7 @@ const (
 	SystemTaskTypeAsyncTaskPoll    = "async_task_poll"
 	SystemTaskTypeCooldownRecovery = "channel_cooldown_recovery"
 	SystemTaskTypeChannelProbe     = "channel_probe"
+	SystemTaskTypePricingSync      = "pricing_sync"
 )
 
 var ErrSystemTaskLockLost = errors.New("system task lock lost")
