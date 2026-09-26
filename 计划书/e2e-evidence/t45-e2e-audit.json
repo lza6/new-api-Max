@@ -1,0 +1,82 @@
+{
+  "tasks": {
+    "T5": {
+      "frontend_trace_link": {
+        "status": "CLOSED",
+        "button": "DetailsDialog 'View related logs' -> /usage-logs/{section}?requestId=...",
+        "i18n_7langs": true
+      },
+      "request_id_end_to_end": {
+        "status": "CLOSED",
+        "gateway_header": "X-Oneapi-Request-Id",
+        "consume_log_request_id": "20260926044314741798700fd097e04tHRsHNLM",
+        "e2e": "gateway req-id 20260926044314741798700fd097e04tHRsHNLM == mock upstream captured xOneapi (verified identical)"
+      },
+      "task_billing_request_id": {
+        "field": "RecordTaskBillingLogParams.RequestId (from task.PrivateData.Execution.RequestID, nil-safe)",
+        "status": "CLOSED"
+      },
+      "upstream_forwarding_switch": {
+        "tests": [
+          "TestUpstreamRequestID_PassthroughAndUpstreamRecord",
+          "TestUpstreamRequestID_DisabledBySwitch",
+          "TestUpstreamRequestID_FormRequestCarriesID",
+          "TestUpstreamRequestID_HeaderOverrideWins"
+        ],
+        "status": "CLOSED",
+        "setting": "general_setting.request_id_forwarding_enabled (default ON, backward compatible)",
+        "task_channel": "DoTaskApiRequest now forwards request-id under same switch"
+      },
+      "error_log_stage": {
+        "field": "other.admin_info.request_stage (upstream_before_first_byte / upstream_response_after_first_byte)",
+        "status": "CLOSED"
+      }
+    },
+    "T4": {
+      "quota_saturation_audit": {
+        "status": "CLOSED",
+        "tests": [
+          "TestClampAudioDurationSecondsAuditsOutOfRange",
+          "TestCalcViolationFeeQuotaSaturates"
+        ],
+        "new_paths_checked": [
+          "service/token_counter.go:224,399,411",
+          "relay/channel/openai/audio.go:108",
+          "service/violation_fee.go:91",
+          "service/log_traffic.go:61-64",
+          "relay/channel/task/jsplugin/adaptor.go positiveInt+validateUsageNumberLimit"
+        ],
+        "all_green": true
+      },
+      "explain_breakdown_user_edition": {
+        "evidence": "GET /api/log/self consume log: other.explain contains prompt_tokens/completion_tokens/model_ratio/completion_ratio/group_ratio/channels_considered; admin_info stripped for user view",
+        "status": "CLOSED",
+        "request_id": "20260926044314741798700fd097e04tHRsHNLM"
+      },
+      "v1_pricing": {
+        "e2e_data_count": 2,
+        "status": "CLOSED",
+        "pricing_sync_task": "SystemTaskTypePricingSync registered; idempotent merge tests green; skipped-without-config green",
+        "first_model": "gpt-4o-mini",
+        "e2e_status": 200,
+        "endpoint": "GET /v1/pricing (public, no auth)"
+      },
+      "cost_estimate_hint": {
+        "status": "CLOSED",
+        "tests": "4 component tests green; playground loads in real browser; screenshot saved",
+        "files": [
+          "web/src/features/playground/lib/cost-estimate.ts",
+          "web/src/features/playground/components/input/cost-estimate-hint.tsx"
+        ]
+      }
+    }
+  },
+  "honest_boundaries": [
+    "in-flight/request-id are process-local; multi-instance global trace not implemented (documented TODO)",
+    "cost-estimate hint renders only when model has billing_expr (progressive enhancement by design)",
+    "pricing_sync merges model_ratio/model_price/completion_ratio only; billing_expr sync via admin UI remains manual",
+    "SSRF_GUARD_DISABLED=true needed for local mock E2E (environment, not code)"
+  ],
+  "version": "v1.3.36",
+  "generated_at": "2026-09-26T12:50:00+08:00"
+}

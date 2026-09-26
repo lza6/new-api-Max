@@ -688,3 +688,32 @@
   - 封禁（API 与 UI 均验证）→ 状态页「最近封禁」出现该 IP → UI 解封按钮点击 → 页面实时消失。
 - 诚实边界：in-flight 为进程内计数（多实例各实例独立，与令牌桶语义一致）；地域过滤、多实例全局统一限流为显式待办（P2），未宣称完成。
 - 交付：commit （见 git log）→ VERSION v1.3.35 → push main → release（无 -f，先 fetch 核对远端 SHA）。
+
+## 八十七、T4 计费透明度与安全 + T5 全链路可观测性（v1.3.36，2026-09-26）
+
+### T4 计费透明度与安全
+- **费用解释用户版闭环**（已审计确认已闭环 + 真实 E2E 佐证）：`model/log.go formatUserLogs` 用户视图剥离 admin_info/root_info/audit_info + legacySensitiveLogOtherKeys；`service/billing_usage.go appendBillingExplain` 生成 other.explain facts/inferences；详情弹窗 ExplainBreakdown（isAdmin=false 渲染，无费用编辑权限）；后端 `billing_usage_test.go` + 前端 `explain-breakdown.test.tsx`。
+- **新计费路径饱和度审计**：8 处边缘裸转换改 *Checked + 审计——
+  - `service/token_counter.go:224`（转录估算 duration 先 ClampAudioDurationSeconds 钳到 [0,MaxTaskDurationSeconds] + QuotaRoundChecked + noteQuotaClamp）
+  - `service/token_counter.go:399/411`（CountAudioTokenInput/Output 改返回 (int,*QuotaClamp,error)，CountTokenRealtime 挂 noteQuotaClamp）
+  - `relay/channel/openai/audio.go:108`（TTS duration 钳制 + QuotaRoundChecked + info.QuotaClamp）
+  - `service/violation_fee.go:91`（calcViolationFeeQuota 改 (int,*QuotaClamp)，ChargeViolationFeeIfNeeded 挂 noteQuotaClamp + attachQuotaSaturation）
+  - `service/log_traffic.go:61-64`（QuotaFromFloatChecked + LogWarn）
+  - `relay/channel/task/jsplugin/adaptor.go`（positiveInt/validateUsageNumberLimit 改 QuotaFromFloatChecked + LogWarn）
+  - 新增导出 `service.ClampAudioDurationSeconds`；回归测试 `TestClampAudioDurationSecondsAuditsOutOfRange` + `TestCalcViolationFeeQuotaSaturates`（更新签名）。
+- **B5-4 /v1/pricing + 定时同步**：`controller/pricing.go` 抽 `buildPricingResponse`，新增 `GetV1Pricing`；`router/relay-router.go` 注册 `GET /v1/pricing`（公开 + CriticalRateLimit）；`model/system_task.go` 新增 `SystemTaskTypePricingSync`；`controller/pricing_sync.go` 实现幂等 merge（仅覆盖上游出现模型，不删本地）；`controller/system_task_handlers.go` 注册 `pricingSyncHandler`（6h，env 开关，无配置空转）。测试：`TestV1PricingPublicRoute` + `TestPricingSyncTaskIdempotentMerge` + `TestPricingSyncTaskSkippedWithoutConfig`。
+- **用户默认可负担性提示**（T4-4）：`web/src/features/playground/lib/cost-estimate.ts` + `components/input/cost-estimate-hint.tsx`（发送区折叠式预估费用区间，task 模型含 n/duration 乘数输入，token 模型含用量预设；无 billing_expr 不渲染）；playground-input/index 接线；i18n 7 语言；4 组件测试。
+- 真实 E2E：`/v1/pricing` 200 + 2 模型；consume log other.explain 含 6 facts + admin_info 剥离。
+
+### T5 全链路可观测性
+- **request-id 贯穿**（审计确认 consume/error 日志已带 request_id；补 task 结算日志）：`model/log.go RecordTaskBillingLogParams` 加 `RequestId` 字段，`service/task_billing.go` 两处结算/退款从 `task.PrivateData.Execution.RequestID` 填充（nil 安全 helper `taskExecutionRequestID`）。
+- **上游透传开关**：`setting/operation_setting/general_setting.go` 加 `RequestIdForwardingEnabled`（默认 ON 保持现状向后兼容）；`relay/channel/api_request.go SetupApiRequestHeader` 按开关透传；`DoTaskApiRequest` 任务通道补透传（同开关）。测试：`TestUpstreamRequestID_DisabledBySwitch` 新增 + 既有 3 测试保持绿。
+- **错误日志 stage**：`controller/relay.go processChannelError` 错误日志 `other.admin_info.request_stage`（upstream_before_first_byte / upstream_response_after_first_byte）。
+- **前端时间线跳转**：`details-dialog.tsx` Request ID 行加「View related logs」按钮（navigate 到 /usage-logs/{section}?requestId=...）；i18n 7 语言。
+- 真实 E2E（mock 上游截获）：网关 `X-Oneapi-Request-Id=20260926044314741798700fd097e04tHRsHNLM` 与 mock 收到的 `xOneapi` **完全一致**；consume log request_id 同值。
+
+### 质量
+- 后端：`go build ./...` + `go vet` 全绿；`go test ./service/ ./pkg/billingexpr/ ./common/ ./relay/... ./controller/ ./middleware/...` 全绿（relay jsplugin 需 `SSRF_GUARD_DISABLED=true`，环境约束非代码问题）。
+- 前端：`bun run typecheck` + `bunx vitest run src/features/usage-logs src/features/playground src/features/pricing`（39 files/414 tests 全绿）+ `bun run build` 全绿。
+- 证据：`计划书/e2e-evidence/t45-e2e-audit.json` + `browser-e2e-t45-cost-estimate/playground-cost-estimate.png`。
+- 交付：commit（见 git log）→ VERSION v1.3.36 → push main → release（无 -f，先 fetch 核对远端 SHA）。
