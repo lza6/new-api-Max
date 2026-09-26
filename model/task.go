@@ -591,8 +591,11 @@ func TaskBulkUpdateByID(ids []int64, params map[string]any) error {
 	if len(ids) == 0 {
 		return nil
 	}
+	// CAS 防御：批量终态写入排除已经终态的任务（FAILURE/SUCCESS/UNCONFIRMED），
+	// 避免覆盖已被结算/退款路径处理的终态行，杜绝重复退款/重复结算窗口。
 	return DB.Model(&Task{}).
 		Where("id in (?)", ids).
+		Where("status NOT IN ?", []string{string(TaskStatusFailure), string(TaskStatusSuccess), string(TaskStatusUnconfirmed)}).
 		Updates(params).Error
 }
 

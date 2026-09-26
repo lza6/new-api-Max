@@ -348,3 +348,48 @@ func TestUpdateWithStatus_PersistsPluginStateAndPollFailures(t *testing.T) {
 	assert.JSONEq(t, `{"req_key":"new"}`, string(reloaded.PrivateData.PluginState))
 	assert.Equal(t, 4, reloaded.PrivateData.PollFailures)
 }
+
+// TestTaskBulkUpdateByID_SkipsTerminalStates T6：批量终态写入必须排除已终态任务，
+// 防止覆盖已被结算/退款路径处理的终态行（杜绝重复退款/重复结算窗口）。
+func TestTaskBulkUpdateByID_SkipsTerminalStates(t *testing.T) {
+	truncateTables(t)
+
+	active := &Task{TaskID: "bulk_active", Status: TaskStatusInProgress, Quota: 1000, Data: json.RawMessage("{}")}
+	insertTask(t, active)
+	done := &Task{TaskID: "bulk_done", Status: TaskStatusSuccess, Quota: 0, Data: json.RawMessage("{}")}
+	insertTask(t, done)
+	failed := &Task{TaskID: "bulk_failed", Status: TaskStatusFailure, Quota: 1000, Data: json.RawMessage("{}")}
+	insertTask(t, failed)
+
+	err := TaskBulkUpdateByID([]int64{active.ID, done.ID, failed.ID}, map[string]any{
+		"status": "FAILURE", "progress": "100%", "fail_reason": "poll sweep",
+	})
+	require.NoError(t, err)
+
+	var reloadedActive, reloadedDone, reloadedFailed Task
+	require.NoError(t, DB.First(&reloadedActive, active.ID).Error)
+	require.NoError(t, DB.First(&reloadedDone, done.ID).Error)
+	require.NoError(t, DB.First(&reloadedFailed, failed.ID).Error)
+
+	// 非终态任务被置 FAILURE。
+	require.EqualValues(t, TaskStatusFailure, reloadedActive.Status)
+	require.Equal(t, "100%", reloadedActive.Progress)
+	// 已终态（SUCCESS/FAILURE）任务不被批量覆盖。
+	require.EqualValues(t, TaskStatusSuccess, reloadedDone.Status)
+	require.EqualValues(t, TaskStatusFailure, reloadedFailed.Status)
+}
+
+// TestTaskBulkUpdateByID_NoRowsWhenAllTerminal T6：全部为终态时批量更新不误伤。
+func TestTaskBulkUpdateByID_NoRowsWhenAllTerminal(t *testing.T) {
+	truncateTables(t)
+
+	done := &Task{TaskID: "bulk_all_done", Status: TaskStatusSuccess, Quota: 0, Data: json.RawMessage("{}")}
+	insertTask(t, done)
+
+	err := TaskBulkUpdateByID([]int64{done.ID}, map[string]any{"status": "FAILURE", "progress": "100%"})
+	require.NoError(t, err)
+
+	var reloaded Task
+	require.NoError(t, DB.First(&reloaded, done.ID).Error)
+	require.EqualValues(t, TaskStatusSuccess, reloaded.Status)
+}

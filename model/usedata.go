@@ -1,6 +1,7 @@
 package model
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -15,7 +16,7 @@ type QuotaData struct {
 	UserID    int    `json:"user_id" gorm:"index"`
 	Username  string `json:"username" gorm:"index:idx_qdt_model_user_name,priority:2;size:64;default:''"`
 	ModelName string `json:"model_name" gorm:"index:idx_qdt_model_user_name,priority:1;size:64;default:''"`
-	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_qdt_created_at,priority:2"`
+	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_qdt_created_at,priority:2;index:idx_qdt_created_at_2"`
 	UseGroup  string `json:"use_group" gorm:"index;size:64;default:''"`
 	TokenID   int    `json:"token_id" gorm:"index;default:0"`
 	ChannelID int    `json:"channel_id" gorm:"index;default:0"`
@@ -101,31 +102,35 @@ func SaveQuotaDataCache() {
 	CacheQuotaDataLock.Lock()
 	defer CacheQuotaDataLock.Unlock()
 	size := len(CacheQuotaData)
-	// 如果缓存中有数据，就保存到数据库中
-	// 1. 先查询数据库中是否有数据
-	// 2. 如果有数据，就更新数据
-	// 3. 如果没有数据，就插入数据
+	// 多实例防重复计数：每个 key 的「查→增/插」放进单事务 + 行锁。
+	// MySQL/PG 下 SELECT ... FOR UPDATE 串行化并发节点对同一 key 的读改写；
+	// SQLite 单写者模型天然串行。事务外不再有 First→Create 竞态窗口。
 	for _, quotaData := range CacheQuotaData {
-		quotaDataDB := &QuotaData{}
-		DB.Table("quota_data").
-			Where("user_id = ? and username = ? and model_name = ? and created_at = ? and use_group = ? and token_id = ? and channel_id = ? and node_name = ?",
-				quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.CreatedAt, quotaData.UseGroup, quotaData.TokenID, quotaData.ChannelID, quotaData.NodeName).
-			First(quotaDataDB)
-		if quotaDataDB.Id > 0 {
-			//quotaDataDB.Count += quotaData.Count
-			//quotaDataDB.Quota += quotaData.Quota
-			//DB.Table("quota_data").Save(quotaDataDB)
-			increaseQuotaData(quotaData)
-		} else {
-			DB.Table("quota_data").Create(quotaData)
+		err := DB.Transaction(func(tx *gorm.DB) error {
+			quotaDataDB := &QuotaData{}
+			err := lockForUpdate(tx.Table("quota_data")).
+				Where("user_id = ? and username = ? and model_name = ? and created_at = ? and use_group = ? and token_id = ? and channel_id = ? and node_name = ?",
+					quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.CreatedAt, quotaData.UseGroup, quotaData.TokenID, quotaData.ChannelID, quotaData.NodeName).
+				First(quotaDataDB).Error
+			if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+			if quotaDataDB.Id > 0 {
+				return increaseQuotaDataTx(tx, quotaData)
+			}
+			return tx.Table("quota_data").Create(quotaData).Error
+		})
+		if err != nil {
+			common.SysLog(fmt.Sprintf("SaveQuotaDataCache key error: %s", err))
 		}
 	}
 	CacheQuotaData = make(map[string]*QuotaData)
 	common.SysLog(fmt.Sprintf("保存数据看板数据成功，共保存%d条数据", size))
 }
 
-func increaseQuotaData(quotaData *QuotaData) {
-	err := DB.Table("quota_data").
+// increaseQuotaDataTx 在指定事务内做增量更新（供 SaveQuotaDataCache 使用）。
+func increaseQuotaDataTx(tx *gorm.DB, quotaData *QuotaData) error {
+	err := tx.Table("quota_data").
 		Where("user_id = ? and username = ? and model_name = ? and created_at = ? and use_group = ? and token_id = ? and channel_id = ? and node_name = ?",
 			quotaData.UserID, quotaData.Username, quotaData.ModelName, quotaData.CreatedAt, quotaData.UseGroup, quotaData.TokenID, quotaData.ChannelID, quotaData.NodeName).
 		Updates(map[string]any{
@@ -134,8 +139,9 @@ func increaseQuotaData(quotaData *QuotaData) {
 			"token_used": gorm.Expr("token_used + ?", quotaData.TokenUsed),
 		}).Error
 	if err != nil {
-		common.SysLog(fmt.Sprintf("increaseQuotaData error: %s", err))
+		common.SysLog(fmt.Sprintf("increaseQuotaDataTx error: %s", err))
 	}
+	return err
 }
 
 func GetQuotaDataByUsername(username string, startTime int64, endTime int64) (quotaData []*QuotaData, err error) {

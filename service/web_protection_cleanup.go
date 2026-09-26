@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
 )
 
 // webProtectionCleanupInterval 自动清理周期：过期封禁与超期日志（保留 7 天）。
@@ -43,6 +44,8 @@ func StartWebProtectionMaintenanceLoop() {
 			if err := RunWebProtectionMaintenance(); err != nil {
 				common.SysError("web protection maintenance error: " + err.Error())
 			}
+			// 周期清理渠道轮询锁缓存，防止 long-run 增删渠道时内存无限增长。
+			model.CleanupChannelPollingLocks()
 		}
 	}()
 }

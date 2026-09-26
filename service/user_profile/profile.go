@@ -150,6 +150,10 @@ func loadFromProcessCache(userID int) ([]byte, bool) {
 	}
 	entry, ok := value.(*cachedProfile)
 	if !ok || time.Now().After(entry.expiresAt) {
+		// 读路径自愈：惰性删除过期条目，避免 sync.Map 随 userID 无限增长。
+		if ok {
+			profileCache.CompareAndDelete(userID, value)
+		}
 		return nil, false
 	}
 	return entry.raw, true

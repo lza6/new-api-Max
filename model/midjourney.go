@@ -202,12 +202,14 @@ func (midjourney *Midjourney) UpdateWithStatus(fromStatus string) (bool, error) 
 func MjBulkUpdate(mjIds []string, params map[string]any) error {
 	return DB.Model(&Midjourney{}).
 		Where("mj_id in (?)", mjIds).
+		Where("status NOT IN ?", []string{"FAILURE", "SUCCESS"}).
 		Updates(params).Error
 }
 
 func MjBulkUpdateByTaskIds(taskIDs []int, params map[string]any) error {
 	return DB.Model(&Midjourney{}).
 		Where("id in (?)", taskIDs).
+		Where("status NOT IN ?", []string{"FAILURE", "SUCCESS"}).
 		Updates(params).Error
 }
 

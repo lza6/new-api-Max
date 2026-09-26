@@ -191,3 +191,42 @@ func TestLogQuotaDataSplitsRowsByUseGroupTokenChannelAndNode(t *testing.T) {
 	require.Equal(t, "default", rows[1].UseGroup)
 	require.Equal(t, 25, rows[1].Quota)
 }
+
+// TestSaveQuotaDataCacheIdempotentAccumulation T6：同 key 多次落库必须幂等累计，
+// 不得重复计数（多实例竞态修复：事务 + 行锁内 First→increase/Create）。
+func TestSaveQuotaDataCacheIdempotentAccumulation(t *testing.T) {
+	truncateTables(t)
+	CacheQuotaDataLock.Lock()
+	CacheQuotaData = make(map[string]*QuotaData)
+	CacheQuotaDataLock.Unlock()
+
+	// 同一 key 累积 6 次（跨两次 SaveQuotaDataCache 落库，模拟多次 flush + 多实例重放）。
+	base := QuotaDataLogParams{
+		UserID: 7, Username: "carol", ModelName: "gpt-b", CreatedAt: 3661,
+		UseGroup: "vip", TokenID: 33, ChannelID: 3, NodeName: "node-c",
+	}
+	LogQuotaData(baseWithQuota(base, 10, 5))
+	LogQuotaData(baseWithQuota(base, 20, 8))
+	LogQuotaData(baseWithQuota(base, 30, 13))
+	SaveQuotaDataCache() // 落库 count=3 quota=60 token=26
+
+	// 第二次 flush：同 key 再来 3 次 → 总量应累计到 6/120/52，而不是拆成多行重复计数。
+	LogQuotaData(baseWithQuota(base, 10, 5))
+	LogQuotaData(baseWithQuota(base, 20, 8))
+	LogQuotaData(baseWithQuota(base, 30, 13))
+	SaveQuotaDataCache()
+
+	var rows []QuotaData
+	require.NoError(t, DB.Where("user_id = ? AND username = ? AND model_name = ? AND created_at = ?",
+		7, "carol", "gpt-b", int64(3600)).Find(&rows).Error)
+	require.Len(t, rows, 1, "同一 key 必须只有一行，不能因并发/重复 flush 拆成多行")
+	require.Equal(t, 6, rows[0].Count)
+	require.Equal(t, 120, rows[0].Quota)
+	require.Equal(t, 52, rows[0].TokenUsed)
+}
+
+func baseWithQuota(base QuotaDataLogParams, quota, token int) QuotaDataLogParams {
+	base.Quota = quota
+	base.TokenUsed = token
+	return base
+}

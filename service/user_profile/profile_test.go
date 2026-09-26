@@ -200,3 +200,28 @@ func TestProfileModelShareMatchesRawLogs(t *testing.T) {
 	require.Equal(t, int64(80), aCount)
 	require.Equal(t, int64(20), bCount)
 }
+
+// TestProfileCacheExpiredEntrySelfHeals T6：过期条目在下次读取时被惰性删除，
+// 防止 sync.Map 随 userID 无限增长。
+func TestProfileCacheExpiredEntrySelfHeals(t *testing.T) {
+	setupLOGDB(t)
+	now := time.Now().Unix()
+	userID := 10
+	seedLogRow(t, userID, model.LogTypeConsume, "model-d", 1, 100, 10, now-60)
+
+	// 手工放入一条已过期条目（模拟 TTL 到期后没有被读取过）。
+	profileCache.Store(userID, &cachedProfile{expiresAt: time.Now().Add(-time.Minute), raw: []byte("stale")})
+
+	// 读路径应自愈：命中过期 → CompareAndDelete → 返回 miss → 触发完整重建。
+	raw, ok := loadFromProcessCache(userID)
+	require.False(t, ok, "过期条目必须被视为 miss")
+	require.Nil(t, raw)
+	_, stillThere := profileCache.Load(userID)
+	require.False(t, stillThere, "过期条目必须在读取后从缓存中删除")
+
+	// 重建后缓存恢复有效。
+	_, err := GetUserProfile(userID)
+	require.NoError(t, err)
+	_, ok = loadFromProcessCache(userID)
+	require.True(t, ok, "重建后的条目必须可命中")
+}
