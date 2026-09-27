@@ -222,3 +222,10 @@
   3. common/utils.go:155-158 字节大小格式化展示（非计费）。
 - **防御确认**：计费/额度转换全部走 common.QuotaFromFloat*/QuotaRound*/QuotaFromDecimal*（+ *Checked 变体）；倍率 map 经 AddOtherRatio 守卫。
 - **防重复跑**：新增计费路径时按 t4-billing-quota-safety.md §4 锚点自查；本记录为全仓基线。
+
+## 记录 0014 · §4.1.1 热路径缓存：订阅档位正缓存（2026-09-28，v1.3.47）
+- **审计结论**：用户/token/渠道/计费/定价（GetPricing 1min+InvalidatePricingCache）均已有缓存，热路径无直接 DB 读；唯一真·缺口=限流中间件对"有 active 订阅"用户每请求一次 `GetAllActiveUserSubscriptions`。
+- **落地**：`model/subscription_tier_cache.go` 进程内正缓存（TTL=env `SUBSCRIPTION_ACTIVE_CACHE_SECONDS` 默认 10s，0=关）+ 中间件缓存优先 + model 内订阅变更双向失效；计费路径不缓存。
+- **验证**：`go test ./model/ -run TestSubscriptionActiveCache` 5 用例 PASS（命中/未命中/失效/禁用/过期/并发）；middleware/service/model 订阅回归全 ok。
+- **E2E**：rpm=1 授权用户第 2 次中继 429；作废订阅后 TTL 窗口内不再 429（即时失效）。证据 `计划书/e2e-evidence/v1.3.47-subscription-tier-cache.json`。
+- **防重复跑**：后续"热路径缓存"类改动先核对本记录与 user_cache/token_cache/channel_cache/pricing.go 既有缓存，勿重复造轮子。

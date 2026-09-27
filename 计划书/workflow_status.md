@@ -881,3 +881,12 @@
 - 主线程补 N1（unconfirmed×2 接入 notifyTaskSettled）+ N2（G5 错码/故障测试）commit 396079a8b → 复验 PASS。
 - 收敛标准：无 P0/P1 阻塞；P1-3 全覆盖；N2 测试锁定；N3（P3 增强）落档不阻塞。
 - 最终判定由独立线程确认（ALL RESOLVED / 否）。
+## 九十七、v2.4.1.1 热路径缓存：订阅档位正缓存（v1.3.47，2026-09-28）
+
+- **研究（evidence-first，纠偏原任务卡前提）**：审计确认用户/渠道/计费/定价均已有缓存（user_cache Redis+栅栏、token_cache Redis、channel 快照、billing_setting 内存、GetPricing 1min+InvalidatePricingCache）；中继热路径**零直接 DB 调用**。原"给用户设置/定价快照加缓存"前提不成立，**不重复造轮子**。
+- **真·缺口**：`middleware/subscription-rate-limit.go` 对"有 active 订阅"用户每请求一次 `GetAllActiveUserSubscriptions`（无订阅用户已有 15s 负缓存）。
+- **落地**：`model/subscription_tier_cache.go`（进程内正缓存，TTL=env `SUBSCRIPTION_ACTIVE_CACHE_SECONDS` 默认 10s、0=关回退基线）；中间件缓存优先、摘要算档位（语义不变）；model 内订阅变更（创建/作废/删除/重置/到期降级/ExpireDueSubscriptions）双向失效；**计费路径不缓存**（NewBillingSession/PreConsume 保持 DB 权威）。
+- **验证**：model 缓存测试 5 用例 PASS（命中/未命中/失效/禁用/过期/并发）；middleware/service/model 订阅回归全 ok；`go build ./...` exit 0。
+- **E2E **：rpm=1 授权 → 第 2 次中继 429「订阅请求速率已达上限」；作废订阅后 TTL 窗口内不再 429（即时失效）。证据 `计划书/e2e-evidence/v1.3.47-subscription-tier-cache.json`。
+- **DB 削减口径**：订阅用户每请求 1 次 DB → 每 TTL(10s) 1 次 + 变更即时失效（软限数据，秒级滞后可接受）。
+- **交付**：VERSION v1.3.47；commit + push main + tag（沙箱内 Release 仍需 Actions 触发）。

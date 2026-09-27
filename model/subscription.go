@@ -487,6 +487,7 @@ func downgradeUserGroupForSubscriptionTx(tx *gorm.DB, sub *UserSubscription, now
 	if tx == nil || sub == nil {
 		return "", errors.New("invalid downgrade args")
 	}
+	InvalidateActiveSubscriptionCache(sub.UserId)
 	downgradeGroup := strings.TrimSpace(sub.DowngradeGroup)
 	upgradeGroup := strings.TrimSpace(sub.UpgradeGroup)
 	// Nothing to do if neither an explicit downgrade target nor an upgrade snapshot exists.
@@ -537,6 +538,7 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 	if userId <= 0 {
 		return nil, errors.New("invalid user id")
 	}
+	InvalidateActiveSubscriptionCache(userId)
 	nowUnix := getDBTimestampTx(tx)
 	now := time.Unix(nowUnix, 0)
 
@@ -1041,6 +1043,7 @@ func AdminInvalidateUserSubscription(userSubscriptionId int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	InvalidateActiveSubscriptionCache(userId)
 	if cacheGroup != "" && userId > 0 {
 		refreshSubscriptionUserGroupCache(userId, "admin subscription update")
 	}
@@ -1082,6 +1085,7 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	InvalidateActiveSubscriptionCache(userId)
 	if cacheGroup != "" && userId > 0 {
 		refreshSubscriptionUserGroupCache(userId, "admin subscription deletion")
 	}
@@ -1095,6 +1099,7 @@ func resetUserSubscriptionTx(tx *gorm.DB, sub *UserSubscription, plan *Subscript
 	if tx == nil || sub == nil || plan == nil {
 		return errors.New("invalid reset args")
 	}
+	InvalidateActiveSubscriptionCache(sub.UserId)
 	sub.AmountUsed = 0
 	if advanceResetTime {
 		nextReset := calcNextResetTime(time.Unix(now, 0), plan, sub.EndTime)
@@ -1244,6 +1249,7 @@ func ExpireDueSubscriptions(limit int) (int, error) {
 	for userId := range userIds {
 		cacheGroup := ""
 		err := DB.Transaction(func(tx *gorm.DB) error {
+			InvalidateActiveSubscriptionCache(userId)
 			res := tx.Model(&UserSubscription{}).
 				Where("user_id = ? AND status = ? AND end_time > 0 AND end_time <= ?", userId, "active", now).
 				Updates(map[string]any{

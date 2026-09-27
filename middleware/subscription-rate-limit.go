@@ -59,6 +59,10 @@ func releaseSubscriptionConcurrency(userId int) {
 
 // resolveSubscriptionTier 返回用户当前生效的订阅档位（覆盖优先，0=不限）。
 // 无 active 订阅时 hasSub=false。
+//
+// §4.1.1：订阅用户档位正向缓存（model.GetCachedActiveSubscriptions，短 TTL +
+// 订阅变更失效）命中时直接由缓存摘要计算档位，避免每请求一次 DB 查询；
+// 未命中才走全部 DB 查询并存回。计费路径不读本缓存（保持 DB 权威）。
 func resolveSubscriptionTier(userId int) (concurrencyLimit, rpmLimit int, hasSub bool) {
 	if userId <= 0 {
 		return 0, 0, false
@@ -70,11 +74,24 @@ func resolveSubscriptionTier(userId int) (concurrencyLimit, rpmLimit int, hasSub
 	if model.DB == nil {
 		return 0, 0, false
 	}
+	if tiers, found := model.GetCachedActiveSubscriptions(userId); found {
+		return resolveFromSubscriptionSummaries(tiers)
+	}
 	subs, err := model.GetAllActiveUserSubscriptions(userId)
 	if err != nil || len(subs) == 0 {
 		if err == nil {
 			service.CacheNoSubscription(userId)
 		}
+		return 0, 0, false
+	}
+	model.StoreCachedActiveSubscriptions(userId, subs)
+	return resolveFromSubscriptionSummaries(subs)
+}
+
+// resolveFromSubscriptionSummaries 从 active 订阅摘要计算档位（与既有语义一致：
+// 取 end_time 最新的首条订阅；套餐本身有缓存 GetSubscriptionPlanById）。
+func resolveFromSubscriptionSummaries(subs []model.SubscriptionSummary) (concurrencyLimit, rpmLimit int, hasSub bool) {
+	if len(subs) == 0 {
 		return 0, 0, false
 	}
 	sub := subs[0].Subscription

@@ -1,0 +1,109 @@
+package model
+
+import (
+	"os"
+	"strconv"
+	"sync"
+	"time"
+)
+
+// 订阅档位正向缓存（§4.1.1 热路径缓存 · 真实缺口定位）。
+//
+// 现状证据：limit 中间件 subscription-rate-limit.go 的 resolveSubscriptionTier 对
+// 「存在 active 订阅」的用户**每个请求**执行一次 GetAllActiveUserSubscriptions DB 查询
+// （无订阅用户已有 service 负缓存 15s 兜底）。该查询有复合索引但仍是每请求一次 DB 往返。
+//
+// 设计（只缓存纯软限数据，不碰计费）：
+//   - 仅缓存「active 订阅摘要」，供限流中间件计算并发/RPM 档位（EffectiveTier）。
+//   - 计费路径（NewBillingSession 的 HasActiveUserSubscription / AllowWalletOverflow、
+//     PreConsumeUserSubscription）**不读本缓存**，保持 DB 权威。
+//   - 短 TTL（默认 10s）+ 订阅变更写后失效（创建/过期/重置/降级/删除），把过期窗口压到
+//     秒级——对限流档位是软约束，秒级滞后可接受。
+//   - 开关：env SUBSCRIPTION_ACTIVE_CACHE_SECONDS，默认 10；0 = 关闭（行为与基线完全一致，
+//     每请求回 FallbackDB）。负缓存（service.CacheNoSubscription）不受影响。
+
+const subscriptionActiveCacheKeyPrefix = "sub_tier"
+const subscriptionActiveCacheDefaultTTL = 10 * time.Second
+
+// getSubscriptionActiveCacheTTL 返回 TTL；<=0（env 置 0）表示关闭缓存。
+func getSubscriptionActiveCacheTTL() time.Duration {
+	raw := os.Getenv("SUBSCRIPTION_ACTIVE_CACHE_SECONDS")
+	if raw == "" {
+		return subscriptionActiveCacheDefaultTTL
+	}
+	sec, err := strconv.Atoi(raw)
+	if err != nil || sec < 0 {
+		return subscriptionActiveCacheDefaultTTL
+	}
+	if sec == 0 {
+		return 0
+	}
+	return time.Duration(sec) * time.Second
+}
+
+// IsSubscriptionActiveCacheEnabled 缓存开关（TTL>0 且 Redis 可用？）。
+// 本缓存使用进程内 map（与 limit 中间件「进程内计数」口径一致，多实例各自缓存；
+// 失效窗口=TTL，接受与 no-subscription 负缓存相同的多实例局限）。
+func IsSubscriptionActiveCacheEnabled() bool {
+	return getSubscriptionActiveCacheTTL() > 0
+}
+
+type cachedActiveSubscriptions struct {
+	summaries []SubscriptionSummary
+	expiresAt time.Time
+}
+
+var activeSubCache = struct {
+	sync.Mutex
+	m map[int]cachedActiveSubscriptions
+}{m: make(map[int]cachedActiveSubscriptions)}
+
+// GetCachedActiveSubscriptions 返回缓存的 active 订阅摘要；未命中/过期/关闭返回 found=false。
+// 只会把订阅变更后的查询放回缓存——调用方（limit 中间件）若发现结果非空。
+func GetCachedActiveSubscriptions(userId int) ([]SubscriptionSummary, bool) {
+	if !IsSubscriptionActiveCacheEnabled() || userId <= 0 {
+		return nil, false
+	}
+	activeSubCache.Lock()
+	defer activeSubCache.Unlock()
+	entry, ok := activeSubCache.m[userId]
+	if !ok {
+		return nil, false
+	}
+	if time.Now().After(entry.expiresAt) {
+		delete(activeSubCache.m, userId)
+		return nil, false
+	}
+	return entry.summaries, true
+}
+
+// StoreCachedActiveSubscriptions 写入 active 订阅摘要缓存（TTL 由开关决定）。
+func StoreCachedActiveSubscriptions(userId int, summaries []SubscriptionSummary) {
+	if !IsSubscriptionActiveCacheEnabled() || userId <= 0 {
+		return
+	}
+	ttl := getSubscriptionActiveCacheTTL()
+	if ttl <= 0 {
+		return
+	}
+	activeSubCache.Lock()
+	defer activeSubCache.Unlock()
+	if len(activeSubCache.m) > 20000 {
+		clear(activeSubCache.m)
+	}
+	activeSubCache.m[userId] = cachedActiveSubscriptions{
+		summaries: append([]SubscriptionSummary(nil), summaries...),
+		expiresAt: time.Now().Add(ttl),
+	}
+}
+
+// InvalidateActiveSubscriptionCache 订阅变更（创建/过期/重置/降级/删除）时清除正向缓存。
+// 在 model 内的全部订阅变更函数调用，避免 model→service 循环依赖。
+func InvalidateActiveSubscriptionCache(userId int) {
+	if userId <= 0 {
+		return
+	}
+	activeSubCache.Lock()
+	defer activeSubCache.Unlock()
+	delete(activeSubCache.m, userId)
+}
