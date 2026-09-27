@@ -386,12 +386,6 @@ func updateBatchTasks(ctx context.Context, adaptor BatchTaskPollingAdaptor, chan
 			if task.Status == model.TaskStatusFailure && !billingSettled && task.Quota != 0 {
 				RefundTaskQuota(ctx, task, task.FailReason)
 			}
-			// T15-B：任务到达终态且结算完成 → 对外 webhook 通知（幂等键=任务ID+事件）。
-			NotifyWebhooks(ctx, operation_setting.WebhookEventTaskSettled, task.TaskID, map[string]any{
-				"task_id": task.TaskID,
-				"status":  task.Status,
-				"quota":   task.Quota,
-			})
 		}
 	}
 	return nil
@@ -700,7 +694,15 @@ func truncateBase64(s string) string {
 // 优先级：1. tiered snapshot → 2. adaptor 调整 → 3. token 重算。
 //
 // 表达式求值失败会保留预扣额度，因此也视为已接管，避免错误全退。
+//
+// 本函数是所有任务平台（批次/视频/其他）到达终态后的统一入口；T15-B 在此
+// 发出 task.settled webhook 通知，保证各任务路径都被覆盖（幂等键=任务ID+事件）。
 func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor, task *model.Task, taskResult *relaycommon.TaskInfo) bool {
+	NotifyWebhooks(ctx, operation_setting.WebhookEventTaskSettled, task.TaskID, map[string]any{
+		"task_id": task.TaskID,
+		"status":  task.Status,
+		"quota":   task.Quota,
+	})
 	if bc := task.PrivateData.BillingContext; bc != nil && bc.TieredSnapshot != nil {
 		// 用量表达式结算只适用于成功任务；失败任务由调用方全额退款。
 		if task.Status == model.TaskStatusFailure {

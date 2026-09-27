@@ -42,8 +42,14 @@ func verificationRedisAvailable() bool {
 	return RedisEnabled && RDB != nil
 }
 
+// verificationCodeTTL 返回 Redis 验证码过期时间。钳制最小 1 分钟：
+// go-redis 中 expiration=0 表示「不设过期」，若有效期被误设为 0 会导致验证码永不过期。
 func verificationCodeTTL() time.Duration {
-	return time.Duration(VerificationValidMinutes) * time.Minute
+	minutes := VerificationValidMinutes
+	if minutes <= 0 {
+		minutes = 1
+	}
+	return time.Duration(minutes) * time.Minute
 }
 
 func GenerateVerificationCode(length int) string {

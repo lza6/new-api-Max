@@ -6738,6 +6738,8 @@
     "URL and secret are required when webhook is enabled": "URL and secret are required when webhook is enabled",
     "Webhook": "Webhook",
     "Webhook Notifications": "Webhook Notifications",
-    "Webhook settings saved": "Webhook settings saved"
+    "Webhook settings saved": "Webhook settings saved",
+    "Verification cancelled. Please try again.": "Verification cancelled. Please try again.",
+    "You can copy up to 100 API keys at once": "You can copy up to 100 API keys at once"
   }
 }

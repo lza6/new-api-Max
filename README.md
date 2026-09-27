@@ -56,11 +56,20 @@
 ### 统计与模型广场
 - 模型卡片：今日/近 30 天调用与成功数；模型效果测试（含测试日期时间）整合进卡片
 - 流量智能单位（B/KB/MB/GB/TB）、每日/模型带宽排行、站点权威统计（带宽/请求/Token）
+- 订阅站点统计（v1.3.46）：`GET /v1/stats/subscriptions` 公开只读聚合（档位/订阅/生效中/7 天到期/30 天新增），定价页展示
+
+### 安全与事件（v1.3.46）
+- API Key 明文查看 step-up：`POST /api/token/:id/key` 与 `/batch/keys` 需安全验证
+  （passkey/2FA/密码，一次性 proof 绑定 token 上下文）；keys 页/仪表盘 copy-curl/chat 链接均受保护
+- 邮箱防枚举：发送验证码接口统一响应，不泄露注册状态
+- 验证码存储：Redis 优先（TTL + 原子一次性消费）+ 内存兜底
+- 通用 Webhook 子系统：`/api/admin/webhook/settings` 配置（默认关），事件订阅
+  `epay.topup.success / epay.subscription.success / task.settled`，HMAC-SHA256 签名 + SSRF 防护
 
 ### 运维与本地化
 - 前端 zh / zh-TW 汉化；系统信息页 CPU/内存/状态真实上报
-- 部署/回滚/验收/E2E 复现：见 `计划书/OPERATIONS_SOP.md`、`计划书/requirements-traceability-matrix.md`、`计划书/workflow_status.md`
-- 常用改动请先读 `.agents/skills/project-delivery/SKILL.md`（项目工作流技能）
+- 部署/回滚/验收/E2E 复现：见 `计划书/ops/deployment-sop.md`、`计划书/workflow_status.md`、`计划书/audit/final-audit-v1.3.46.md`
+- 常用改动请先读 `.claude/skills/new-api-add-feature/SKILL.md`（项目可复用开发工作流技能）
 
 ## 📝 Project Description
 

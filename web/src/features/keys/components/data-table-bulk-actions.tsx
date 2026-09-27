@@ -51,9 +51,15 @@ export function DataTableBulkActions<TData>({
   const handleBatchCopy = useCallback(async () => {
     if (selectedRows.length === 0) {return}
 
+    const ids = selectedRows.map((row) => (row.original as ApiKey).id)
+    if (ids.length > 100) {
+      // 后端批量 key 接口上限 100；超出直接提示，避免一次静默 400。
+      toast.error(t('You can copy up to 100 API keys at once'))
+      return
+    }
+
     setIsCopying(true)
     try {
-      const ids = selectedRows.map((row) => (row.original as ApiKey).id)
       const keysMap = await resolveRealKeysBatch(ids)
 
       const lines: string[] = []

@@ -6738,6 +6738,8 @@
     "URL and secret are required when webhook is enabled": "Cần URL và chuỗi bí mật khi bật webhook",
     "Webhook": "Webhook",
     "Webhook Notifications": "Thông báo Webhook",
-    "Webhook settings saved": "Đã lưu cài đặt webhook"
+    "Webhook settings saved": "Đã lưu cài đặt webhook",
+    "Verification cancelled. Please try again.": "Đã hủy xác minh. Vui lòng thử lại.",
+    "You can copy up to 100 API keys at once": "Bạn có thể sao chép tối đa 100 khóa API cùng lúc"
   }
 }

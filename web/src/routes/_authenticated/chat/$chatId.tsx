@@ -62,6 +62,7 @@ function ChatRouteComponent() {
     isPending,
     isError,
     error,
+    retry,
     verification,
   } = useActiveChatKey(Boolean(preset && requiresActiveKey))
 
@@ -136,6 +137,22 @@ function ChatRouteComponent() {
         <Alert variant='destructive' className='max-w-xl'>
           <AlertTitle>{t('Unable to open chat')}</AlertTitle>
           <AlertDescription>{message}</AlertDescription>
+          <div className='flex gap-2 pt-3'>
+            <Button
+              variant='outline'
+              onClick={() => {
+                retry()
+              }}
+            >
+              {t('Retry')}
+            </Button>
+            <Button
+              variant='ghost'
+              render={<Link to='/dashboard' />}
+            >
+              {t('Return to dashboard')}
+            </Button>
+          </div>
         </Alert>
       </div>
     )

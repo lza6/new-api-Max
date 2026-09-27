@@ -6738,6 +6738,8 @@
     "URL and secret are required when webhook is enabled": "Webhookを有効にするにはURLとシークレットが必要です",
     "Webhook": "Webhook",
     "Webhook Notifications": "Webhook 通知",
-    "Webhook settings saved": "Webhook設定を保存しました"
+    "Webhook settings saved": "Webhook設定を保存しました",
+    "Verification cancelled. Please try again.": "確認がキャンセルされました。もう一度お試しください。",
+    "You can copy up to 100 API keys at once": "一度にコピーできる APIキーは最大100個です"
   }
 }

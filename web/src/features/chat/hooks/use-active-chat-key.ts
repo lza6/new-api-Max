@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { t } from 'i18next'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 import { getApiKeys } from '@/features/keys/api'
 import { API_KEY_STATUS } from '@/features/keys/constants'
@@ -49,11 +49,15 @@ export async function getActiveChatTokenId(): Promise<number> {
  * Get the currently active chat key for chat links. The plaintext key is only
  * disclosed after a step-up security verification (G1/T8); consumers render
  * `<SecureVerificationDialog {...verification.dialogProps} />`.
+ *
+ * 取消/失败验证不会造成「加载中」死循环：一旦 reveal 未成功即标记 revealFailed，
+ * isPending 回到 false、isError 变为 true，消费方可调用 retry() 重新触发。
  */
 export function useActiveChatKey(enabled: boolean) {
   const userId = useAuthStore((state) => state.auth.user?.id)
   const disclosure = useTokenKeyDisclosure()
   const [revealedKey, setRevealedKey] = useState<string | null>(null)
+  const [revealFailed, setRevealFailed] = useState(false)
 
   const query = useQuery({
     queryKey: ['chat-active-key', userId],
@@ -65,22 +69,40 @@ export function useActiveChatKey(enabled: boolean) {
 
   const tokenId = query.data
 
+  const retry = useCallback(() => {
+    setRevealFailed(false)
+  }, [])
+
   useEffect(() => {
-    if (!enabled || !tokenId || revealedKey) {return}
+    if (!enabled || !tokenId || revealedKey || revealFailed) {return}
     let cancelled = false
     void disclosure.revealSingleKey(tokenId).then((key) => {
-      if (!cancelled && key) {setRevealedKey(key)}
+      if (cancelled) {return}
+      if (key) {
+        setRevealedKey(key)
+        setRevealFailed(false)
+      } else {
+        // 取消或失败：终止 pending，避免死循环；retry() 可重新拉起。
+        setRevealFailed(true)
+      }
     })
     return () => {
       cancelled = true
     }
-  }, [enabled, tokenId, revealedKey, disclosure])
+  }, [enabled, tokenId, revealedKey, revealFailed, disclosure])
+
+  const revealError = revealFailed
+    ? new Error(t('Verification cancelled. Please try again.'))
+    : null
 
   return {
     data: revealedKey ?? undefined,
-    isPending: query.isPending || (enabled && Boolean(tokenId) && !revealedKey),
-    isError: query.isError || query.error !== null,
-    error: query.error,
+    isPending:
+      query.isPending ||
+      (enabled && Boolean(tokenId) && !revealedKey && !revealFailed),
+    isError: query.isError || query.error !== null || revealError !== null,
+    error: revealError ?? query.error,
+    retry,
     verification: disclosure.verification,
   }
 }

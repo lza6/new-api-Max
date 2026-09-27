@@ -8,6 +8,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/config"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
@@ -67,6 +68,11 @@ func UpdateWebhookSettings(c *gin.Context) {
 			return
 		}
 		if !strings.HasPrefix(setting.URL, "https://") && !strings.HasPrefix(setting.URL, "http://") {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+		// 保存时即校验 SSRF（私网/环回/云元数据拒绝），避免「配置了但永不发送」的静默失败。
+		if err := service.ValidateSSRFProtectedFetchURL(setting.URL); err != nil {
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}

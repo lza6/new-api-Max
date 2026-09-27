@@ -6738,6 +6738,8 @@
     "URL and secret are required when webhook is enabled": "启用 Webhook 时必须填写地址与密钥",
     "Webhook": "Webhook",
     "Webhook Notifications": "Webhook 通知",
-    "Webhook settings saved": "Webhook 设置已保存"
+    "Webhook settings saved": "Webhook 设置已保存",
+    "Verification cancelled. Please try again.": "验证已取消，请重试。",
+    "You can copy up to 100 API keys at once": "一次最多复制 100 个 API Keys"
   }
 }

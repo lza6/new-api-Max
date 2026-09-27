@@ -6738,6 +6738,8 @@
     "URL and secret are required when webhook is enabled": "URL и секрет обязательны при включённом webhook",
     "Webhook": "Webhook",
     "Webhook Notifications": "Webhook-уведомления",
-    "Webhook settings saved": "Настройки webhook сохранены"
+    "Webhook settings saved": "Настройки webhook сохранены",
+    "Verification cancelled. Please try again.": "Проверка отменена. Попробуйте снова.",
+    "You can copy up to 100 API keys at once": "За раз можно скопировать не более 100 ключей API"
   }
 }
