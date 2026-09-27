@@ -96,3 +96,47 @@ func TestVerificationRedisPath(t *testing.T) {
 	assert.Greater(t, ttl, time.Duration(0))
 	DeleteKey(key, EmailVerificationPurpose)
 }
+
+// TestVerificationRedisMismatchDoesNotConsume 覆盖 P1-2/N2：Redis 命中但码错
+// （Lua 返回 mismatch）时必须返回 false 且不得消费（防双重消费/误判），
+// 正确码随后仍能一次性消费。
+func TestVerificationRedisMismatchDoesNotConsume(t *testing.T) {
+	client := redisTestClient(t)
+	prevEnabled, prevRDB := RedisEnabled, RDB
+	RedisEnabled, RDB = true, client
+	defer func() {
+		RedisEnabled, RDB = prevEnabled, prevRDB
+	}()
+
+	key := "redis-mismatch-" + GenerateVerificationCode(6) + "@example.com"
+	RegisterVerificationCodeWithKey(key, "246810", EmailVerificationPurpose)
+
+	// 错误码：Redis 中命中但值不匹配 → false，且不消费。
+	assert.False(t, VerifyCodeWithKeyConsume(key, "000000", EmailVerificationPurpose))
+	// 正确码仍可用（mismatch 未消费）→ 一次性消费成功 → 重放失败。
+	assert.True(t, VerifyCodeWithKeyConsume(key, "246810", EmailVerificationPurpose))
+	assert.False(t, VerifyCodeWithKeyConsume(key, "246810", EmailVerificationPurpose))
+	DeleteKey(key, EmailVerificationPurpose)
+}
+
+// TestVerificationRedisDownFallsBackToMemory 覆盖 P1-2/N2：Redis 故障（SET/GET/Lua
+// 全部失败）时注册落入内存，校验/消费回读内存兜底且仍保持一次性语义。
+func TestVerificationRedisDownFallsBackToMemory(t *testing.T) {
+	dead, err := redis.ParseURL("redis://127.0.0.1:1/1") // 无服务监听 → 连接立即拒绝
+	require.NoError(t, err)
+	client := redis.NewClient(dead)
+	prevEnabled, prevRDB := RedisEnabled, RDB
+	RedisEnabled, RDB = true, client
+	defer func() {
+		RedisEnabled, RDB = prevEnabled, prevRDB
+		_ = client.Close()
+	}()
+
+	key := "redis-down-" + GenerateVerificationCode(6) + "@example.com"
+	RegisterVerificationCodeWithKey(key, "135790", EmailVerificationPurpose) // SET 失败 → 落内存
+
+	assert.True(t, VerifyCodeWithKey(key, "135790", EmailVerificationPurpose))       // GET 失败 → 双读内存
+	assert.True(t, VerifyCodeWithKeyConsume(key, "135790", EmailVerificationPurpose)) // Lua 失败 → 内存消费
+	assert.False(t, VerifyCodeWithKeyConsume(key, "135790", EmailVerificationPurpose)) // 一次性
+	assert.False(t, VerifyCodeWithKey(key, "135790", EmailVerificationPurpose))        // 已消费
+}

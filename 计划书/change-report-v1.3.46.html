@@ -107,8 +107,26 @@ web vitest（新特性域）    → keys 59 + webhook 2 + chat hook 2 … 全绿
   </ul>
 </div>
 
+<h2>6. 独立审查结论（循环 · 主线程修复后）</h2>
+<div class="card">
+  <p>独立审查代理（六维度：需求完整性/逻辑正确性/边界/代码质量/测试覆盖/实际运行结果）产出修复清单：
+  <b>P0 无 · P1×3 · P2×5 · P3×8 · REJECTED×1</b>。主线程逐项修复后复验：</p>
+  <table>
+    <tr><th>关键项</th><th>处置</th><th>结果</th></tr>
+    <tr><td>typecheck 门禁回归（测试 mock 缺字段）</td><td>补全 AuthUser mock</td><td><span class="badge b-ok">RESOLVED</span> typecheck exit 0</td></tr>
+    <tr><td>G5 内存兜底失效（Redis 故障读不到内存码）</td><td>Verify/Consume 双读内存兜底；码错不回退</td><td><span class="badge b-ok">RESOLVED</span> 双路径测试 PASS</td></tr>
+    <tr><td>task.settled 在结算前发出/失败任务失真</td><td>移除 settle 入口调用；三处结算+退款后发送</td><td><span class="badge b-ok">RESOLVED</span></td></tr>
+    <tr><td>批量 key 中间件超限返回 500</td><td>前置校验 1..100/去重/排序→400 + 错误映射</td><td><span class="badge b-ok">RESOLVED</span></td></tr>
+    <tr><td>webhook 配置保存失败内存脏残留</td><td>两阶段提交（副本组装→校验→提交→持久化，失败回滚）</td><td><span class="badge b-ok">RESOLVED</span></td></tr>
+    <tr><td>用户级 SendWebhookNotify 被破坏性覆盖</td><td>恢复基线实现到 user_webhook.go；全局事件 webhook 独立</td><td><span class="badge b-ok">RESOLVED</span></td></tr>
+    <tr><td>G1 越权（用户披露他人 key）</td><td>归属校验严格 + 测试覆盖</td><td><span class="badge b-ok">REJECTED</span>（无此问题）</td></tr>
+    <tr><td>P3：注释/回退告警/聚合口径/单飞/缓存观案</td><td>落档 final-audit-v1.3.46.md</td><td><span class="badge b-warn">TRACKED</span></td></tr>
+  </table>
+  <p style="margin-top:.6rem">完整修复清单与复验命令见 <code>计划书/audit/final-audit-v1.3.46.md</code>。</p>
+</div>
+
 <div class="quiz">
-<h2>6. 📝 变更测验（你必须通过）</h2>
+<h2>7. 📝 变更测验（你必须通过）</h2>
 <p style="color:var(--mut)">每题单选，提交后即时判分。目标 100%——不过请回头重读本报告相关小节。</p>
 
 <div class="q" data-a="1">

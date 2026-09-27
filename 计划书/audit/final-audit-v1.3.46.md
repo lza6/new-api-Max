@@ -82,6 +82,11 @@
 | P3-8 | 公开统计端点无 DisableCache/短缓存 | P3 | 记录为性能观察项（COUNT 聚合轻量，低流量页可接受） | - |
 | REJECTED | G1 越权（用户披露他人 key） | - | 归属校验严格（GetTokenByIds 按 user_id），测试覆盖 | ✅ 维持 REJECTED |
 
+### 复验新增问题处置（第三轮）
+- **N1（P2）**：unconfirmed 解析路径（`task_unconfirmed_resolution.go:150/:165`）结算后未接 `notifyTaskSettled` → ✅ 已补两处（success 分支结算后、failure 分支结算+退款后），与视频分支同构；构建+定向测试 PASS。
+- **N2（P3，测试缺口）**：新增 `TestVerificationRedisMismatchDoesNotConsume`（Lua mismatch 不消费、正确码随后一次性消费）与 `TestVerificationRedisDownFallsBackToMemory`（Redis 故障 SET/GET/Lua 全失败 → 落内存 + 双读兜底 + 一次性）→ ✅ 全 PASS。
+- **N3（P3）**：G4 时序侧信道、统一响应 UX、T15-A 口径、单飞、去重 cap、公开统计缓存 —— 保持后续增强建议，不占本次交付。
+
 ### 口径说明（P3-5 落档）
 - `total_plans` = 全部档位计数（含禁用）；如需「仅启用」口径，运营侧按 `enabled` 过滤可后续加参数。
 - `new_last_30d` = 近 30 天创建的全部订阅（含后续 cancelled/expired）；语义为「新增趋势」而非「有效新增」。

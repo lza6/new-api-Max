@@ -148,6 +148,7 @@ func resolveWithUpstreamID(ctx context.Context, adaptor TaskPollingAdaptor, task
 		// 结算语义与 updateVideoSingleTask 一致：成功任务在无法差额结算时
 		// 保留预扣额度作为最终扣费；只有失败任务才补做全额退款。
 		settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
+		notifyTaskSettled(ctx, task)
 		return string(UnconfirmedResolvedSuccess)
 	case status == model.TaskStatusFailure:
 		won, _ := task.UpdateWithStatus(model.TaskStatusUnconfirmed)
@@ -166,6 +167,7 @@ func resolveWithUpstreamID(ctx context.Context, adaptor TaskPollingAdaptor, task
 		if !billingSettled && task.Quota != 0 {
 			RefundTaskQuota(ctx, task, task.FailReason)
 		}
+		notifyTaskSettled(ctx, task)
 		return string(UnconfirmedResolvedFailure)
 	default:
 		return ""
