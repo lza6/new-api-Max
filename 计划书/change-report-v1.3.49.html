@@ -76,7 +76,8 @@ E2E（Ollama 渠道 → mock 上游 → 真实中继 ×2）：
 <h2>5. 纪律与边界</h2>
 <div class="card"><ul>
   <li><b>后续禁裸建 <code>&amp;http.Client{}</code></b>：渠道/网关受控 URL 用 <code>common.NewOutboundClient</code>；用户可控 URL 走 SSRF 客户端。</li>
-  <li><span class="badge b-ok">发行版</span> main + tag v1.3.49 已推；Release 产物需在 Actions 触发 <code>release.yml</code>（沙箱无法访问 GitHub API）。</li>
+  <li><span class="badge b-ok">发行版</span> main + tag v1.3.51 已推；Release 产物需在 Actions 触发 <code>release.yml</code>（沙箱无法访问 GitHub API）。</li>
+  <li><span class="badge b-ok">独立审查（六维度）已收敛</span> 三轮：① P1-1 TLS init 时序缺陷（包 var 先于 init 读 false → <code>TLS_INSECURE_SKIP_VERIFY</code> 对渠道失效）→ builder 直读 env 修复（v1.3.50）；② P2 残留（.env 注入时序）→ 惰性 RoundTripper（真实 Transport 首个外呼才构建）闭合（v1.3.51）；③ 复验 <b>ALL RESOLVED</b>。</li>
 </ul></div>
 
 <div class="quiz">
