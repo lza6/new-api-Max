@@ -235,3 +235,8 @@
 - **落地**：common/outbound.go 共享调优 Transport（PerHost=32/Total=100）+ NewOutboundClient；7 处适配器改包级客户端，Timeout 语义不变。
 - **验证**：TestOutboundSharedTransport（指针同一=同池）+ relay 包回归 ok。
 - **防重复跑**：后续新增外呼点——若 URL 由渠道/网关配置控制（非用户可控），用 `common.NewOutboundClient(timeout)` 复用共享池；用户可控 URL 一律 SSRF 客户端；不再新建 `&http.Client{}` 裸 client。
+
+## 记录 0016 · §4.1.2 审查 P1-1 修复：共享 Transport TLS env 时序（2026-09-28，v1.3.50）
+- **缺陷**：包级 var 初始化先于 main/InitEnv；ollama 适配器包级 client var 初始化在程序加载即触发共享 Transport 构建 → 读 TLSInsecureSkipVerify=false → TLS_INSECURE_SKIP_VERIFY=true 在渠道路径失效（synk.Once 惰性修复同样无效，once 触发点过早）。
+- **修复**：builder 直读 env（GetEnvOrDefaultBool，os.Getenv 时序无关）；测试 t.Setenv+直接调 builder。
+- **防重复**：任何「启动期依赖 env 的共享对象」不得用包级 var/init 顺序或 sync.Once；一律在构建函数内直读 env。

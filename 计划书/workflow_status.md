@@ -904,3 +904,9 @@
 - **验证**：TestOutboundSharedTransport（指针同一=同池 + 调优下界）；relay ollama/ali/kilwa 回归 ok；go build/vet exit 0。
 - **同批收尾 §4.1.1 审查**：P2-1 注释 / P2-2 档位表驱动测试 / P2-3 档位覆盖失效 controller 测试 / P3 小修（只读注记、user_id 前置、容量注释、空摘要早退）。
 - **交付**：VERSION v1.3.49；commit 3dc97f27e + push main；tag v1.3.49（Release 仍待 Actions 触发）。
+
+## 九十九、v1.3.50 — §4.1.2 独立审查 P1-1/P1-2/P3-2 修复
+- 独立审查（六维度）①§4.1.2 CONFIRMED ②发现 **P1-1 init 时序缺陷**：共享 Transport 原按包级 var 构建，早于 main/InitEnv 读 TLSInsecureSkipVerify=false → `TLS_INSECURE_SKIP_VERIFY=true` 在 ollama/ali/kilwa 路径静默失效（DefaultTransport/relay 路径却 honor，混合行为）；我的初版 sync.Once 惰性修复**无效**（ollama 适配器包级 client var 初始化在程序加载即触发 once）。
+- **正确修复**：`buildOutboundTransport` 直读 `GetEnvOrDefaultBool("TLS_INSECURE_SKIP_VERIFY", false)`（os.Getenv 时序无关）+ 恢复随包 var 构建；测试改 `t.Setenv`+直接调 builder（确定性，不依赖 init 顺序）。
+- P3-2：controller TestMain AutoMigrate 补 `model.AuditLog`（档位失效测试审计噪声消除，审计写入真实覆盖）。
+- 验证：go build/vet exit 0；common/middleware/controller/model/ollama/ali/kilwa 定向全 PASS；main+tag v1.3.50 已推。
