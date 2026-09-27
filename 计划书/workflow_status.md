@@ -890,3 +890,9 @@
 - **E2E **：rpm=1 授权 → 第 2 次中继 429「订阅请求速率已达上限」；作废订阅后 TTL 窗口内不再 429（即时失效）。证据 `计划书/e2e-evidence/v1.3.47-subscription-tier-cache.json`。
 - **DB 削减口径**：订阅用户每请求 1 次 DB → 每 TTL(10s) 1 次 + 变更即时失效（软限数据，秒级滞后可接受）。
 - **交付**：VERSION v1.3.47；commit + push main + tag（沙箱内 Release 仍需 Actions 触发）。
+
+### v1.3.48 审计补位（订阅缓存）
+- GAP-A：`AdminSetUserSubscriptionTier`（PATCH 档位覆盖 Rpm/ConcurrencyOverride）补缓存失效（update 后取 UserId → InvalidateActiveSubscriptionCache），保持"变更即时失效"。
+- GAP-C：订阅缓存容量淘汰原为整表 `clear(20000)` → 高频全抖；改为达上限先清过期、仍达上限随机删至一半（严格有界 + 保留热点）；补容量/过期淘汰测试。
+- GAP-D：README 环境变量节登记 `SUBSCRIPTION_ACTIVE_CACHE_SECONDS`（默认 10、0=关）。
+- 验证：model 缓存测试 6 用例 PASS（含 cap 淘汰/过期清理）；controller/middleware 回归 ok；go build exit 0。commit 5b582b1ee；tag v1.3.48。

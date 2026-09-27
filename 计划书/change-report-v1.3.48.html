@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>new-api v1.3.47/48 变更报告 · 订阅档位热路径缓存</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --ink:#e6e8eb; --mut:#8b93a1; --acc:#4f8cff; --ok:#2eb872; --warn:#e8a33d; --bad:#e05b5b; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); font:15px/1.7 "Segoe UI",system-ui,sans-serif; margin:0; padding:2rem 1rem; }
+  .wrap { max-width:900px; margin:0 auto; }
+  h1 { font-size:1.8rem; margin:.2rem 0 1.2rem; }
+  h2 { font-size:1.25rem; margin:2rem 0 .7rem; border-bottom:2px solid #262c38; padding-bottom:.4rem; }
+  h3 { font-size:1.02rem; margin:1.3rem 0 .5rem; color:var(--acc); }
+  p, li { color:#d4d8de; }
+  .meta { color:var(--mut); font-size:.85rem; margin-bottom:1.6rem; }
+  table { border-collapse:collapse; width:100%; margin:1rem 0; }
+  th,td { border:1px solid #262c38; padding:.45rem .7rem; text-align:left; vertical-align:top; font-size:.88rem; }
+  th { background:#1c212b; color:var(--mut); font-weight:600; }
+  code { background:#232936; padding:1px 6px; border-radius:4px; font-size:.82em; color:#a8c8ff; }
+  pre { background:#10141b; border:1px solid #262c38; padding:.8rem; overflow:auto; border-radius:8px; font-size:.8rem; }
+  .card { background:var(--card); border:1px solid #262c38; border-radius:12px; padding:1rem 1.2rem; margin:1rem 0; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.74rem; font-weight:600; }
+  .b-ok { background:#123b2a; color:var(--ok); } .b-warn { background:#3d2f12; color:var(--warn); }
+  .quiz { margin-top:2.4rem; }
+  .q { background:var(--card); border:1px solid #262c38; border-radius:12px; padding:.9rem 1.1rem; margin:1rem 0; }
+  .q label { display:block; margin:.3rem 0; cursor:pointer; }
+  .q input { margin-right:.5rem; }
+  .q .fb { font-size:.84rem; margin-top:.3rem; display:none; }
+  .ok .fb, .bad .fb { display:block; }
+  .ok { border-color:var(--ok); } .bad { border-color:var(--bad); }
+  button { background:var(--acc); color:#fff; border:0; padding:.5rem 1.3rem; border-radius:8px; font-size:.95rem; cursor:pointer; margin-top:.5rem; }
+  .foot { color:var(--mut); font-size:.78rem; margin-top:2.4rem; border-top:1px solid #262c38; padding-top:1rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🧾 new-api v1.3.47/48 变更报告 — 订阅档位热路径缓存（§4.1.1）</h1>
+<div class="meta">commit <code>c1b9e53df</code> + <code>5b582b1ee</code> · main · 2026-09-28 · 里程碑：把 v2.x 高可用路线第一个性能卡真实落地</div>
+
+<h2>1. 上下文（Context）——解决什么</h2>
+<div class="card">
+  <p>指南 §4.1.1「热路径缓存」原任务卡假设「用户设置/定价快照每请求多次读库，需加缓存」。**审计（证据优先）推翻该前提**：用户（Redis+AuthVersion 栅栏）、token（Redis）、渠道（运行时快照）、计费（内存）、定价（1min 缓存 + 变更失效）均已有缓存，中继热路径零直接 DB 调用——**不重复造轮子**。</p>
+  <p>**真·缺口**：限流中间件对「有 active 订阅」用户，每个中继请求执行一次 <code>GetAllActiveUserSubscriptions</code> DB 查询（无订阅用户已有 15s 负缓存）。订阅用户通常是 API 高频调用方 → 每请求一次 DB 往返是真实热点。</p>
+</div>
+
+<h2>2. 直觉 / 动机（Why）——设计取舍</h2>
+<div class="card">
+  <ul>
+    <li><b>只缓存软限，绝不缓存计费</b>：缓存对象 = 「active 订阅摘要」用于限流档位（EffectiveTier：并发/RPM）。<code>NewBillingSession</code> 的 <code>HasActiveUserSubscription</code>/<code>AllowWalletOverflow</code>、<code>PreConsumeUserSubscription</code> 保持 DB 权威——避免任何记账/回退方向的秒级偏差。</li>
+    <li><b>变更写后失效 &gt; 只靠 TTL</b>：在订阅创建/作废/删除/重置/到期降级/过期 6 处失效（model 内，无 model→service 环）；v1.3.48 补上「档位覆盖 PATCH」失效。秒级滞后对软限可接受，但失效让它几乎为 0。</li>
+    <li><b>开关可回滚</b>：env <code>SUBSCRIPTION_ACTIVE_CACHE_SECONDS</code>，默认 10s、0=关闭（逐位回退基线）。</li>
+    <li><b>容量有界</b>：上限 20000 条目，达上限先清过期、仍达上限随机删至一半（保留热点，非整表清空）。</li>
+    <li><b>多实例口径</b>：进程内缓存，与既有 no-subscription 负缓存、RPM 计数同口径（已文档注明）。</li>
+  </ul>
+</div>
+
+<h2>3. 做了什么（What）</h2>
+<table>
+  <tr><th>文件</th><th>变更</th></tr>
+  <tr><td><code>model/subscription_tier_cache.go</code>（新增）</td><td>进程内正缓存：<code>GetCachedActiveSubscriptions</code>/<code>StoreCachedActiveSubscriptions</code>/<code>InvalidateActiveSubscriptionCache</code>；TTL env 化；容量淘汰（过期优先 + 随机删半）；开关 0=关</td></tr>
+  <tr><td><code>middleware/subscription-rate-limit.go</code></td><td><code>resolveSubscriptionTier</code> 缓存优先 → 未命中查库存回；<code>resolveFromSubscriptionSummaries</code> 保持既有 subs[0] 语义</td></tr>
+  <tr><td><code>model/subscription.go</code></td><td>6 处订阅变更失效接线（创建/作废/删除/重置/降级/ExpireDueSubscriptions）</td></tr>
+  <tr><td><code>controller/subscription.go</code>（v1.3.48）</td><td><code>AdminSetUserSubscriptionTier</code>（档位覆盖）失效</td></tr>
+  <tr><td><code>model/subscription_tier_cache_test.go</code>（新增）</td><td>6 用例：启用/禁用/命中/未命中/失效/过期(1.1s)/并发(50)/容量淘汰与过期清理</td></tr>
+  <tr><td>README / 指南 / perf-ledger / workflow_status</td><td>env 登记、§4.1.1 回填真实结论、记录 0014、九十七节</td></tr>
+</table>
+
+<h2>4. 验证（Evidence）</h2>
+<div class="card">
+  <pre>
+go build ./...                       → exit 0
+go test ./model/ -run TestSubscriptionActiveCache → 6/6 PASS（含 1.1s 过期、50 goroutine 并发、cap 淘汰）
+go test ./controller/ ./middleware/（订阅相关）     → ok
+E2E（本地网关 18201, SUBSCRIPTION_ACTIVE_CACHE_SECONDS=10）：
+  rpm=1 套餐授权 root → 第 2 次中继 429「订阅请求速率已达上限」
+  作废订阅后（TTL 窗口内）→ 不再 429（缓存即时失效）
+  </pre>
+  <p>证据：<code>计划书/e2e-evidence/v1.3.47-subscription-tier-cache.json</code>；perf-ledger 0014。</p>
+  <p><span class="badge b-warn">口径</span> 订阅用户 DB 往返：每请求 1 次 → 每 TTL(10s) 1 次 + 变更即时失效（软限数据，秒级滞后可接受）。</p>
+</div>
+
+<h2>5. 已知边界 / 独立审查</h2>
+<div class="card">
+  <ul>
+    <li><span class="badge b-warn">多实例</span> 缓存为进程内；多实例各自缓存（与 RPM/负缓存同口径），失效窗口=TTL。横向规模化可升级 Redis 共享。</li>
+    <li><span class="badge b-warn">审查</span> 独立审查线程（六维度）进行中：需求完整性/逻辑正确性/边界/代码质量/测试覆盖/实际运行结果 → 其修复清单到后按循环修复复验。</li>
+    <li><span class="badge b-ok">发行版</span> main + tag v1.3.48 已推；Release 产物需 Actions 触发 <code>release.yml</code>（沙箱无法访问 GitHub API）。</li>
+  </ul>
+</div>
+
+<div class="quiz">
+<h2>6. 📝 变更测验（你必须通过）</h2>
+
+<div class="q" data-a="1">
+  <p><b>Q1.</b> 本批"热路径缓存"最终缓存了什么？</p>
+  <label><input type="radio" name="q1" value="1"> 订阅用户「active 订阅摘要」，供限流中间件算并发/RPM 档位（软限）</label>
+  <label><input type="radio" name="q1" value="0"> 用户设置与定价快照（加新缓存）</label>
+  <label><input type="radio" name="q1" value="0"> 计费预扣结果</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q2.</b> 研究阶段的关键结论是什么？</p>
+  <label><input type="radio" name="q2" value="1"> 用户/token/渠道/计费/定价均已有缓存；原任务卡前提不成立，真缺口是订阅档位每请求 DB 读</label>
+  <label><input type="radio" name="q2" value="0"> 全部热路径都没缓存，需要全部新建</label>
+  <label><input type="radio" name="q2" value="0"> 无需缓存，性能已最优</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q3.</b> 计费路径（NewBillingSession / PreConsumeUserSubscription）为什么保持 DB 权威？</p>
+  <label><input type="radio" name="q3" value="1"> 避免记账/钱包回退方向的秒级偏差（计费安全不变量）；只缓存纯软限档位</label>
+  <label><input type="radio" name="q3" value="0"> 计费路径已经很快，不需要缓存</label>
+  <label><input type="radio" name="q3" value="0"> 缓存实现太复杂，没时间做</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q4.</b> 缓存失效覆盖了哪些变更？（单选最佳）</p>
+  <label><input type="radio" name="q4" value="1"> 订阅创建/作废/删除/重置/到期降级/过期 + 档位覆盖 PATCH（v1.3.48）</label>
+  <label><input type="radio" name="q4" value="0"> 仅到期过期</label>
+  <label><input type="radio" name="q4" value="0"> 仅创建</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q5.</b> 缓存开关与容量策略是？</p>
+  <label><input type="radio" name="q5" value="1"> env <code>SUBSCRIPTION_ACTIVE_CACHE_SECONDS</code>（默认 10、0=关回退基线）；上限 20000 条目，达上限先清过期、仍超随机删至一半</label>
+  <label><input type="radio" name="q5" value="0"> 永久开启且无限容量</label>
+  <label><input type="radio" name="q5" value="0"> 无开关，容量超了整表清空</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q6.</b> E2E 验证了哪些行为？</p>
+  <label><input type="radio" name="q6" value="1"> rpm=1 授权用户第 2 次中继 429（缓存档位生效）；作废订阅后 TTL 窗口内不再 429（即时失效）</label>
+  <label><input type="radio" name="q6" value="0"> 只验证了构建通过</label>
+  <label><input type="radio" name="q6" value="0"> 只验证了单测</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q7.</b> 本批"DB 削减"的真实口径？</p>
+  <label><input type="radio" name="q7" value="1"> 订阅用户从每请求 1 次 DB → 每 TTL(10s) 1 次 + 变更即时失效；无订阅用户早已有 15s 负缓存</label>
+  <label><input type="radio" name="q7" value="0"> 所有用户每请求都省了一次 DB</label>
+  <label><input type="radio" name="q7" value="0"> 没有省任何 DB 查询</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q8.</b> v1.3.48 审计补位修了什么？（多选视为单选：选"两项都对"）</p>
+  <label><input type="radio" name="q8" value="1"> 档位覆盖 PATCH 补缓存失效 + 容量淘汰改为"先清过期、随机删半"（不整表清空）</label>
+  <label><input type="radio" name="q8" value="0"> 新增了 Redis 分布式缓存</label>
+  <label><input type="radio" name="q8" value="0"> 回退了整个缓存功能</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q9.</b> 为什么没给"用户设置/定价快照"加新缓存？</p>
+  <label><input type="radio" name="q9" value="1"> 审计证明它们已有缓存（user_cache/token_cache/pricing 1min+失效）——不重复造轮子</label>
+  <label><input type="radio" name="q9" value="0"> 忘了做</label>
+  <label><input type="radio" name="q9" value="0"> 没时间</label>
+  <div class="fb"></div>
+</div>
+
+<div class="q" data-a="1">
+  <p><b>Q10.</b> 交付状态？</p>
+  <label><input type="radio" name="q10" value="1"> main + tag v1.3.48 已推；Release 产物需在 Actions 触发 release.yml（沙箱限制）</label>
+  <label><input type="radio" name="q10" value="0"> 只提交未推送</label>
+  <label><input type="radio" name="q10" value="0"> Release 已自动创建</label>
+  <div class="fb"></div>
+</div>
+
+<button onclick="grade()">提交测验</button>
+<div class="score" id="score"></div>
+</div>
+
+<div class="foot">生成：2026-09-28 · 数据源：本会话真实命令输出与代码证据 · 说明：测验为理解确认工具，答案均可从上文核对。</div>
+</div>
+
+<script>
+function grade() {
+  const qs = document.querySelectorAll('.q');
+  let ok = 0;
+  qs.forEach((q, i) => {
+    const sel = q.querySelector('input[name="q'+(i+1)+'"]:checked');
+    const fb = q.querySelector('.fb');
+    q.classList.remove('ok','bad');
+    if (sel && sel.value === q.dataset.a) { ok++; q.classList.add('ok'); fb.textContent = '✅ 正确。'; }
+    else {
+      q.classList.add('bad');
+      fb.textContent = sel ? '❌ 答错，请核对上文对应小节。' : '⚠️ 未作答。';
+    }
+  });
+  const pct = Math.round(ok/qs.length*100);
+  document.getElementById('score').textContent = '得分：'+ok+'/'+qs.length+'（'+pct+'%）' + (pct===100 ? ' — 🎉 满分，理解确认通过！' : ' — 未达标，请重读本报告后重试。');
+}
+</script>
+</body>
+</html>
