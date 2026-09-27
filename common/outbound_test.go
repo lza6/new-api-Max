@@ -27,3 +27,17 @@ func TestOutboundSharedTransport(t *testing.T) {
 	assert.GreaterOrEqual(t, c.MaxIdleConnsPerHost, 8)
 	assert.GreaterOrEqual(t, c.MaxIdleConns, 32)
 }
+
+// TestOutboundTransportHonorsTLSEnv 锁定 §4.1.2 P1-1 修复：builder 直接读取
+// TLS_INSECURE_SKIP_VERIFY 环境变量（os.Getenv 时序无关），不受包级 var/init 顺序
+// 影响。测试用 t.Setenv + 直接调 builder，确定性覆盖 true/false 两分支。
+func TestOutboundTransportHonorsTLSEnv(t *testing.T) {
+	t.Setenv("TLS_INSECURE_SKIP_VERIFY", "true")
+	tr := buildOutboundTransport()
+	require.NotNil(t, tr.TLSClientConfig)
+	assert.Same(t, InsecureTLSConfig, tr.TLSClientConfig)
+
+	t.Setenv("TLS_INSECURE_SKIP_VERIFY", "false")
+	tr2 := buildOutboundTransport()
+	assert.Nil(t, tr2.TLSClientConfig, "未开启 TLS_INSECURE_SKIP_VERIFY 时必须保持默认校验")
+}

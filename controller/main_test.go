@@ -50,7 +50,7 @@ func TestMain(m *testing.M) {
 		&model.CustomOAuthProvider{}, &model.UserOAuthBinding{}, &model.PerfMetric{},
 		&model.SystemInstance{}, &model.SystemTask{}, &model.SystemTaskLock{},
 		&model.CasbinRule{}, &model.AuthzRole{}, &model.BannedIP{},
-		&model.WebRequestLog{}, &model.EventDelivery{},
+		&model.WebRequestLog{}, &model.EventDelivery{}, &model.AuditLog{},
 	); err != nil {
 		panic("failed to migrate controller test db: " + err.Error())
 	}
