@@ -896,3 +896,11 @@
 - GAP-C：订阅缓存容量淘汰原为整表 `clear(20000)` → 高频全抖；改为达上限先清过期、仍达上限随机删至一半（严格有界 + 保留热点）；补容量/过期淘汰测试。
 - GAP-D：README 环境变量节登记 `SUBSCRIPTION_ACTIVE_CACHE_SECONDS`（默认 10、0=关）。
 - 验证：model 缓存测试 6 用例 PASS（含 cap 淘汰/过期清理）；controller/middleware 回归 ok；go build exit 0。commit 5b582b1ee；tag v1.3.48。
+
+## 九十八、v2.4.1.2 连接池/HTTP 复用收敛（v1.3.49，2026-09-28）
+
+- **研究（evidence-first）**：全仓 `&http.Client{}` 逐点分级——relay/middleware 热路径无直接 DB（§4.1.1 已证）；webhook/通知走 SSRF 客户端（复用）；`model_sync/ratio_sync` 自建 SSRF 拨号 transport（低频，不合并）；**真缺口**=中继渠道适配器 ollama×5/ali/kilwa 每请求新建 client，走 http.DefaultTransport（MaxIdleConnsPerHost=2，高并发同上游 keep-alive 复用不足）。
+- **落地**：`common/outbound.go` 共享调优 Transport（MaxIdleConnsPerHost=32、MaxIdleConns=100、TLS 随 TLSInsecureSkipVerify）+ `NewOutboundClient(timeout)`；ollama(5)/ali(1)/kilwa(1) 改包级客户端复用共享池，保留各自 Timeout（30min/1h/120s/不限时）。
+- **验证**：TestOutboundSharedTransport（指针同一=同池 + 调优下界）；relay ollama/ali/kilwa 回归 ok；go build/vet exit 0。
+- **同批收尾 §4.1.1 审查**：P2-1 注释 / P2-2 档位表驱动测试 / P2-3 档位覆盖失效 controller 测试 / P3 小修（只读注记、user_id 前置、容量注释、空摘要早退）。
+- **交付**：VERSION v1.3.49；commit 3dc97f27e + push main；tag v1.3.49（Release 仍待 Actions 触发）。

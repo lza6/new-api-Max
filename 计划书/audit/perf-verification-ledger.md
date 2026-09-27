@@ -229,3 +229,9 @@
 - **验证**：`go test ./model/ -run TestSubscriptionActiveCache` 5 用例 PASS（命中/未命中/失效/禁用/过期/并发）；middleware/service/model 订阅回归全 ok。
 - **E2E**：rpm=1 授权用户第 2 次中继 429；作废订阅后 TTL 窗口内不再 429（即时失效）。证据 `计划书/e2e-evidence/v1.3.47-subscription-tier-cache.json`。
 - **防重复跑**：后续"热路径缓存"类改动先核对本记录与 user_cache/token_cache/channel_cache/pricing.go 既有缓存，勿重复造轮子。
+
+## 记录 0015 · §4.1.2 连接池/HTTP 复用收敛（2026-09-28，v1.3.49）
+- **结论**：渠道适配器 ollama/ali/kilwa 每请求新建 `&http.Client{}`（走 DefaultTransport，MaxIdleConnsPerHost=2）；连接池在 Transport，client 是配置壳。
+- **落地**：common/outbound.go 共享调优 Transport（PerHost=32/Total=100）+ NewOutboundClient；7 处适配器改包级客户端，Timeout 语义不变。
+- **验证**：TestOutboundSharedTransport（指针同一=同池）+ relay 包回归 ok。
+- **防重复跑**：后续新增外呼点——若 URL 由渠道/网关配置控制（非用户可控），用 `common.NewOutboundClient(timeout)` 复用共享池；用户可控 URL 一律 SSRF 客户端；不再新建 `&http.Client{}` 裸 client。

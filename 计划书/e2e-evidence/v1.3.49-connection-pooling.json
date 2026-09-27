@@ -1,0 +1,16 @@
+{
+  "batch": "v1.3.49",
+  "date": "2026-09-28",
+  "title": "§4.1.2 连接池/HTTP 复用收敛 E2E 验收",
+  "research_finding": "渠道适配器 ollama/ali/kilwa 每请求新建 http.Client（走 DefaultTransport，MaxIdleConnsPerHost=2）；连接池在 Transport；webhook/通知已走 SSRF 客户端；model_sync/ratio_sync 自建 SSRF 拨号 transport（低频不合并）。",
+  "implementation": "common/outbound.go 共享调优 Transport（PerHost=32/Total=100，TLS 随 TLSInsecureSkipVerify）+ NewOutboundClient(timeout)；ollama(5)/ali(1)/kilwa(1) 改包级客户端复用共享池，Timeout 语义不变。",
+  "env": "PORT=18302 SQL_DSN=local SQLITE_PATH=/tmp/v1349.db SSRF_GUARD_DISABLED=true（仅测试环境，perf-ledger 口径）",
+  "results": [
+    {"check": "go build/vet", "actual": "exit 0", "pass": true},
+    {"check": "TestOutboundSharedTransport（指针同一=同池 + 调优下界）", "actual": "PASS", "pass": true},
+    {"check": "E2E: 建 Ollama 渠道→mock 上游→真实中继 /v1/chat/completions 第1次", "actual": "200 返回 mock 内容（hello from mock ollama upstream）", "pass": true},
+    {"check": "E2E: 第2次（验证共享连接池路径稳定）", "actual": "200 返回 mock 内容", "pass": true},
+    {"check": "回归: relay ollama/ali/kilwa + common 定向测试", "actual": "全 ok", "pass": true}
+  ],
+  "note": "SSRF_GUARD_DISABLED=true 仅本测试环境用于回环 mock 上游；生产安全不变（SSRF 守卫默认开启，拒绝私网）。共享池由 TestOutboundSharedTransport 构造性证明。"
+}
