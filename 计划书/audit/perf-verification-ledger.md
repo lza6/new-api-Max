@@ -240,3 +240,8 @@
 - **缺陷**：包级 var 初始化先于 main/InitEnv；ollama 适配器包级 client var 初始化在程序加载即触发共享 Transport 构建 → 读 TLSInsecureSkipVerify=false → TLS_INSECURE_SKIP_VERIFY=true 在渠道路径失效（synk.Once 惰性修复同样无效，once 触发点过早）。
 - **修复**：builder 直读 env（GetEnvOrDefaultBool，os.Getenv 时序无关）；测试 t.Setenv+直接调 builder。
 - **防重复**：任何「启动期依赖 env 的共享对象」不得用包级 var/init 顺序或 sync.Once；一律在构建函数内直读 env。
+
+## 记录 0017 · §4.1.2 惰性共享 Transport 闭合 .env 时序（2026-09-28，v1.3.51）
+- 闭合方式：真实 Transport 首个外呼才构建（lazy RoundTripper + sync.Once），TLS_INSECURE_SKIP_VERIFY 无论 .env/进程 env 均正确读取；连接池共享/并发安全不变。
+- 验证：common 3 用例 + ollama 中继 E2E（惰性路径）真实返回。
+- 防重复：启动期依赖 env 的共享对象 → 惰性构建到首个实际使用点；勿用包 var 顺序/sync.Once 早触发。

@@ -910,3 +910,8 @@
 - **正确修复**：`buildOutboundTransport` 直读 `GetEnvOrDefaultBool("TLS_INSECURE_SKIP_VERIFY", false)`（os.Getenv 时序无关）+ 恢复随包 var 构建；测试改 `t.Setenv`+直接调 builder（确定性，不依赖 init 顺序）。
 - P3-2：controller TestMain AutoMigrate 补 `model.AuditLog`（档位失效测试审计噪声消除，审计写入真实覆盖）。
 - 验证：go build/vet exit 0；common/middleware/controller/model/ollama/ali/kilwa 定向全 PASS；main+tag v1.3.50 已推。
+
+## 一〇〇、v1.3.51 — §4.1.2 审查残留闭合：共享 Transport 惰性构建（.env 时序）
+- 审查 ALL RESOLVED + P2 残留：包 var init 早于 godotenv.Load(".env") → 仅 .env 注入的 TLS_INSECURE_SKIP_VERIFY 不被共享 Transport 读到。
+- **彻底闭合**：lazyOutboundTransport（RoundTripper + sync.Once）真实 Transport 首个外呼才构建（晚于 env 就绪）；GetOutboundTransportBuilt() 测试用。E2E 经惰性 Transport 中继返回内容。
+- 验证：common 3 用例 PASS（同池/惰性幂等/TLS env）；go build exit 0；main+tag v1.3.51 已推。
