@@ -873,3 +873,10 @@
 
 ### 交付
 - commit/push main + tag v1.3.46 + Release（见 git log / gh release）。
+
+### 独立审查循环（终局闭环，3 轮收敛）
+- 独立 Critic（六维度只读 + 实际运行）第一轮：P0 无 / P1×3 / P2×5 / P3×8 / REJECTED×1。
+- 主线程修复 commit c86633bf5 → 复验：8 RESOLVED / 1 CONDITIONAL（P1-3 留 N1 缺口）。
+- 主线程补 N1（unconfirmed×2 接入 notifyTaskSettled）+ N2（G5 错码/故障测试）commit 396079a8b → 复验 PASS。
+- 收敛标准：无 P0/P1 阻塞；P1-3 全覆盖；N2 测试锁定；N3（P3 增强）落档不阻塞。
+- 最终判定由独立线程确认（ALL RESOLVED / 否）。

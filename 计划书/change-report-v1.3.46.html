@@ -120,6 +120,8 @@ web vitest（新特性域）    → keys 59 + webhook 2 + chat hook 2 … 全绿
     <tr><td>webhook 配置保存失败内存脏残留</td><td>两阶段提交（副本组装→校验→提交→持久化，失败回滚）</td><td><span class="badge b-ok">RESOLVED</span></td></tr>
     <tr><td>用户级 SendWebhookNotify 被破坏性覆盖</td><td>恢复基线实现到 user_webhook.go；全局事件 webhook 独立</td><td><span class="badge b-ok">RESOLVED</span></td></tr>
     <tr><td>G1 越权（用户披露他人 key）</td><td>归属校验严格 + 测试覆盖</td><td><span class="badge b-ok">REJECTED</span>（无此问题）</td></tr>
+    <tr><td>N1（复验新增）：unconfirmed 解析路径漏发 task.settled</td><td>success/failure 两分支结算+退款后补 notifyTaskSettled</td><td><span class="badge b-ok">RESOLVED</span> 五处结算调用点全覆盖</td></tr>
+    <tr><td>N2（复验新增）：G5 错码/故障分支无测试锁定</td><td>新增 mismatch-不消费 + Redis 故障回退内存两条测试</td><td><span class="badge b-ok">RESOLVED</span> 4/4 PASS</td></tr>
     <tr><td>P3：注释/回退告警/聚合口径/单飞/缓存观案</td><td>落档 final-audit-v1.3.46.md</td><td><span class="badge b-warn">TRACKED</span></td></tr>
   </table>
   <p style="margin-top:.6rem">完整修复清单与复验命令见 <code>计划书/audit/final-audit-v1.3.46.md</code>。</p>
