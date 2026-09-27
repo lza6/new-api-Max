@@ -116,3 +116,41 @@ func TestSubscriptionActiveCacheConcurrentAccess(t *testing.T) {
 	_, found := GetCachedActiveSubscriptions(64080)
 	assert.True(t, found)
 }
+
+func TestSubscriptionActiveCacheCapEvictsExpiredNotAll(t *testing.T) {
+	t.Setenv("SUBSCRIPTION_ACTIVE_CACHE_SECONDS", "60") // 长 TTL，制造大量存活条目
+	resetActiveSubCache()
+
+	// ① 灌满 cap+1 → 触发容量淘汰：不整表清空（保留部分热点），且不超过上限。
+	for i := 0; i < subscriptionActiveCacheMaxEntries+1; i++ {
+		StoreCachedActiveSubscriptions(70000+i, sampleSummaries())
+	}
+	activeSubCache.Lock()
+	size := len(activeSubCache.m)
+	activeSubCache.Unlock()
+	assert.LessOrEqual(t, size, subscriptionActiveCacheMaxEntries)
+	assert.Greater(t, size, 0)
+
+	// ② 把残留条目全部标为过期。
+	activeSubCache.Lock()
+	for k, e := range activeSubCache.m {
+		activeSubCache.m[k] = cachedActiveSubscriptions{summaries: e.summaries, expiresAt: time.Now().Add(-time.Second)}
+	}
+	activeSubCache.Unlock()
+
+	// ③ 再次灌满触发容量淘汰：过期条目应被清走，新条目可读。
+	for i := 0; i < subscriptionActiveCacheMaxEntries+1; i++ {
+		StoreCachedActiveSubscriptions(80000+i, sampleSummaries())
+	}
+	activeSubCache.Lock()
+	expiredRemaining := 0
+	for _, e := range activeSubCache.m {
+		if time.Now().After(e.expiresAt) {
+			expiredRemaining++
+		}
+	}
+	size2 := len(activeSubCache.m)
+	activeSubCache.Unlock()
+	assert.Zero(t, expiredRemaining, "过期条目应在容量淘汰时被清走")
+	assert.LessOrEqual(t, size2, subscriptionActiveCacheMaxEntries)
+}

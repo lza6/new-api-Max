@@ -24,6 +24,9 @@ import (
 
 const subscriptionActiveCacheKeyPrefix = "sub_tier"
 const subscriptionActiveCacheDefaultTTL = 10 * time.Second
+// subscriptionActiveCacheMaxEntries 缓存条目上限；超过时先淘汰过期项，
+// 仍超限则随机删除至上限一半（避免整表清空导致高频用户全部缓存抖动）。
+const subscriptionActiveCacheMaxEntries = 20000
 
 // getSubscriptionActiveCacheTTL 返回 TTL；<=0（env 置 0）表示关闭缓存。
 func getSubscriptionActiveCacheTTL() time.Duration {
@@ -88,8 +91,24 @@ func StoreCachedActiveSubscriptions(userId int, summaries []SubscriptionSummary)
 	}
 	activeSubCache.Lock()
 	defer activeSubCache.Unlock()
-	if len(activeSubCache.m) > 20000 {
-		clear(activeSubCache.m)
+	// 达到上限前先淘汰（>= 保证缓存严格不超过上限），先清过期项，仍超限随机删至一半。
+	if len(activeSubCache.m) >= subscriptionActiveCacheMaxEntries {
+		now := time.Now()
+		for k, e := range activeSubCache.m {
+			if now.After(e.expiresAt) {
+				delete(activeSubCache.m, k)
+			}
+		}
+		// 仍达上限（低频长 TTL 存活条目多）时随机删至上限一半：退化到部分直查 DB，
+		// 但保留半数热点，避免整表清空造成高频用户全部缓存抖动。
+		if len(activeSubCache.m) >= subscriptionActiveCacheMaxEntries {
+			for k := range activeSubCache.m {
+				delete(activeSubCache.m, k)
+				if len(activeSubCache.m) <= subscriptionActiveCacheMaxEntries/2 {
+					break
+				}
+			}
+		}
 	}
 	activeSubCache.m[userId] = cachedActiveSubscriptions{
 		summaries: append([]SubscriptionSummary(nil), summaries...),

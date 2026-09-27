@@ -637,6 +637,12 @@ func AdminSetUserSubscriptionTier(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	// 档位覆盖变更影响订阅限流档位（缓存摘要中的 EffectiveTier）：立即失效
+	// 正向订阅缓存，避免覆盖到 TTL 过期前才生效（软限数据，秒级可接受但保持即时）。
+	var sub model.UserSubscription
+	if err := model.DB.Select("user_id").Where("id = ?", subId).First(&sub).Error; err == nil {
+		model.InvalidateActiveSubscriptionCache(sub.UserId)
+	}
 	recordManageAudit(c, "subscription.tier_override", map[string]any{
 		"subscription_id":      subId,
 		"rpm_override":         req.RpmOverride,

@@ -344,6 +344,7 @@ docker run --name new-api -d --restart always \
 | `CRYPTO_SECRET` | HMAC secret for cache keys; nodes sharing Redis must use the same effective value | Defaults to `SESSION_SECRET` |
 | `SQL_DSN` | Database connection string | - |
 | `REDIS_CONN_STRING` | Redis connection string | - |
+| `SUBSCRIPTION_ACTIVE_CACHE_SECONDS` | 订阅档位正缓存 TTL（秒）：限流中间件对「有 active 订阅」用户每 TTL 才查询一次 DB，订阅变更即时失效；`0` = 关闭（逐位回退基线，每请求直查 DB）。多实例为进程内缓存，与 RPM 并发计数同口径 | `10` |
 | `RELAY_IDLE_CONN_TIMEOUT` | Idle keep-alive timeout for relay HTTP clients, seconds. Defaults to Go standard library behavior; set `0` to disable | `90` |
 | `RELAY_RESPONSE_HEADER_TIMEOUT` | How long the relay waits for upstream **response headers**, seconds; set `0` to disable. Only bounds the header wait -- streaming after the headers arrive is unaffected. Note that non-streaming upstreams usually send headers only once generation finishes, so leave headroom | `1800` |
 | `STREAMING_TIMEOUT` | Streaming timeout (seconds) | `300` |
