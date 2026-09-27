@@ -1,0 +1,42 @@
+{
+  "base": "http://127.0.0.1:18101",
+  "total": 7,
+  "passed": 6,
+  "results": [
+    {
+      "name": "setup 根管理员",
+      "ok": false,
+      "detail": "{\"message\":\"系统已经初始化完成\",\"success\":false}"
+    },
+    {
+      "name": "pricing 渲染订阅统计卡",
+      "ok": true,
+      "detail": "statsCard=1"
+    },
+    {
+      "name": "登录跳离 /sign-in",
+      "ok": true,
+      "detail": "http://127.0.0.1:18101/dashboard/overview"
+    },
+    {
+      "name": "创建测试 token",
+      "ok": true,
+      "detail": "id=1"
+    },
+    {
+      "name": "点击掩码 key → step-up 弹窗",
+      "ok": true,
+      "detail": "dialog=1"
+    },
+    {
+      "name": "密码验证 → key 披露",
+      "ok": true,
+      "detail": "unlocked=1"
+    },
+    {
+      "name": "webhook 设置页渲染",
+      "ok": true,
+      "detail": "title=1 urlInput=1"
+    }
+  ]
+}

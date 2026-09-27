@@ -101,7 +101,7 @@ web vitest（新特性域）    → keys 59 + webhook 2 + chat hook 2 … 全绿
 <div class="card">
   <ul>
     <li><span class="badge b-warn">发行版</span> main + tag v1.3.46 已推送；GitHub Release 创建受沙箱限制（无 gh/PAT，api.github.com 网络不可达）——需在 Actions UI 触发 <code>release.yml</code>（workflow_dispatch）或手工建 Release。</li>
-    <li><span class="badge b-warn">浏览器截图</span> 本批新增 UI（webhook 设置页、统计卡、验证弹窗路径）未补真实浏览器截图（既有 v1.3.40 截图覆盖 a11y/断点），标「待验证」。</li>
+    <li><span class="badge b-ok">浏览器 E2E</span> 已用系统 Chrome + playwright-core 真实跑通并截图：pricing 订阅统计卡、登录、keys step-up 弹窗（点击→密码验证→key 披露）、webhook 设置页——6/7 PASS（setup 因库内已有 root 跳过，非缺陷）。证据：<code>计划书/e2e-evidence/browser-e2e-v1.3.46/</code>（4 截图 + results.json）。</li>
     <li><span class="badge b-warn">a11y 扫描</span> 新页面未接 axe 用例，列为后续项。</li>
     <li><span class="badge b-ok">外部受限</span> 付费/真实上游 API 调用未发起（遵记账纪律），用契约/单测覆盖。</li>
   </ul>

@@ -868,8 +868,9 @@
 
 ### 验证
 - go build/vet PASS；新增测试全绿；controller 全量失败集与干净基线完全一致（既有顺序/环境依赖项：TestAuditDatabaseMatrix/TestSessionLimit/TestKling/TestResetPassword 全量序/TestSecurityAccountDeletion，均与本次改动无关，单独跑通过）。
-- web typecheck + vitest（keys 59 + webhook 2 + 关联 132）绿；i18n 7 语言 missing=0。
-- 证据：e2e-evidence/v1.3.46-t8-g1-token-key-stepup.json、v1.3.46-t15-a-subscription-stats.json、v1.3.46-t15-b-webhook.json。
+- web typecheck + vitest（keys 59 + webhook 2 + chat hook 2 + 关联 132）绿；i18n 7 语言 missing=0。
+- **真实浏览器 E2E（系统 Chrome + playwright-core）**：pricing 订阅统计卡、登录、keys step-up（点击→密码验证→key 披露）、webhook 设置页——6/7 PASS（setup 因库内已有 root 跳过）；证据：计划书/e2e-evidence/browser-e2e-v1.3.46/（4 截图 + results.json）。
+- 证据：e2e-evidence/v1.3.46-t8-g1-token-key-stepup.json、v1.3.46-t15-ab-webhook-subscription-stats.json。
 
 ### 交付
 - commit/push main + tag v1.3.46 + Release（见 git log / gh release）。

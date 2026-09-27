@@ -15,7 +15,7 @@
 | R5 | T15-A：订阅站点统计 | model/subscription_stats.go、controller/site_stats.go、/v1/stats/subscriptions、pricing 卡 | ✅ 已闭环 | TestSiteSubscriptionStatsAggregates PASS + 本地网关 E2E 200 | 无 |
 | R6 | T15-B：通用 webhook 子系统 | operation_setting/webhook_setting.go、service/webhook.go、epay/task 接线、/webhook 设置页 | ✅ 已闭环 | service/webhook_test.go PASS + E2E 401/403 门禁 | task.settled 覆盖全任务路径已上移（本批） |
 | R7 | T15-C：/v1/pricing 公开定价 | controller/pricing.go（既有 B5-4） | ✅ 复核确认 | E2E 200 | 无 |
-| R8 | 真实 E2E 测验/验收/审计 | e2e-evidence/v1.3.46-*.json | ✅ 已闭环 | 本地网关二进制打点全过 | 浏览器级截图未做（见 R23） |
+| R8 | 真实 E2E 测验/验收/审计 | e2e-evidence/v1.3.46-*.json + browser-e2e-v1.3.46/ | ✅ 已闭环（HTTP + 真实浏览器） | 本地网关二进制打点全过 + 浏览器 6/7（setup 因库内已有 root 跳过） | 无 |
 | R9 | 提交推送 main + tag + 发行版 | commit 7d6d2888、tag v1.3.46 | ✅ 提交/推送/tag 完成；⚠️ Release 创建受沙箱限制 | git ls-remote 确认远端 | 需在 Actions UI 触发 release.yml 或手工建 Release |
 | R10 | 独立审查线程循环（六维度） | 本批主线程 + 独立 Critic 子代理 | 🔄 进行中 | 见修复清单轮次 | 等待 Critic 报告 → 修复 → 复验 |
 | R11 | HTML 变更报告 + 底部测验 | 待产出 | ⏳ 未开始 | - | 全部修复后生成 |
