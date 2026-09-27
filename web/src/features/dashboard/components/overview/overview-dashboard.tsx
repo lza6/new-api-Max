@@ -48,7 +48,9 @@ import {
 } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
-import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
+import { SecureVerificationDialog } from '@/features/auth/secure-verification'
+import { getApiKeys } from '@/features/keys/api'
+import { useTokenKeyDisclosure } from '@/features/keys/hooks/use-token-key-disclosure'
 import type { ApiKey } from '@/features/keys/types'
 import { useCopyToClipboard } from '@/hooks/use-copy-to-clipboard'
 import { getUserModels } from '@/lib/api'
@@ -286,6 +288,9 @@ function RequestPreview(props: {
   const shouldReduceMotion = useReducedMotion()
   const [isCopying, setIsCopying] = useState(false)
   const { copyToClipboard } = useCopyToClipboard({ notify: false })
+  // G1/T8: copying the ready-to-run curl discloses the plaintext API key,
+  // so it requires a step-up security verification.
+  const disclosure = useTokenKeyDisclosure()
   const previewCurl = buildCurlCommand({
     endpoint: props.example.endpoint,
     apiKey: props.example.displayKey,
@@ -297,10 +302,11 @@ function RequestPreview(props: {
 
     setIsCopying(true)
     try {
-      const result = await fetchTokenKey(props.example.keyId)
-      const key = result.success && result.data?.key ? result.data.key : ''
+      const fullKey = await disclosure.revealSingleKey(props.example.keyId)
+      const key = fullKey ? fullKey.replace(/^sk-/, '') : ''
       if (!key) {
-        handleServerError(result, t('Failed to copy to clipboard'))
+        // Verification was cancelled or failed (the disclosure hook already
+        // surfaced the error), so there is nothing to copy.
         return
       }
 
@@ -323,12 +329,13 @@ function RequestPreview(props: {
   }
 
   return (
-    <motion.div
-      initial={shouldReduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
-      animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
-      transition={MOTION_TRANSITION.slow}
-      className='bg-background/75 relative overflow-hidden rounded-2xl border p-3 shadow-sm backdrop-blur'
-    >
+    <>
+      <motion.div
+        initial={shouldReduceMotion ? false : { opacity: 0, y: 10, scale: 0.98 }}
+        animate={shouldReduceMotion ? undefined : { opacity: 1, y: 0, scale: 1 }}
+        transition={MOTION_TRANSITION.slow}
+        className='bg-background/75 relative overflow-hidden rounded-2xl border p-3 shadow-sm backdrop-blur'
+      >
       {!shouldReduceMotion && (
         <motion.div
           className='via-foreground/30 pointer-events-none absolute inset-x-0 top-0 h-px bg-linear-to-r from-transparent to-transparent'
@@ -416,7 +423,9 @@ function RequestPreview(props: {
           )
         })}
       </div>
-    </motion.div>
+      </motion.div>
+      <SecureVerificationDialog {...disclosure.verification.dialogProps} />
+    </>
   )
 }
 

@@ -42,10 +42,19 @@
 - 本轮（2026-09-25~26）：T1 热路径（v1.3.29）+ T2-1 参数化（v1.3.30）+ T2-2 概览卡（v1.3.31）+ 终局闭环审计（P3 前端加固 + P2 latencyFactor NaN/combo min_score）。全部真实验证 + 推送 + Release。
 
 ## 待办（下轮）
-- T2-1 健康分策略参数化（窗口/权重/阈值进 operation_setting）
-- T2-2 前端健康分聚合概览卡（均值/最差渠道/近期可用率）
-- T3 策略维度补全（UA/路径/地域/白名单）
-- T5 多实例全局 trace（可选增强）
-- T14 旧产物清理（用户确认清单后）
-- H3 线上部署验收、H4 回滚演练更新（需授权）
+- H3 线上部署验收、H4 回滚演练更新（需授权；见 deployment-sop.md）
+
+## v1.3.46 批（docs/ 全量闭环，2026-09-27）
+
+| 任务 | 状态 | 证据 |
+|---|---|---|
+| T8-G1 API Key step-up | ✅ token.key.read scope + 单/批量中间件 + 前端 4 处披露路径全走验证弹窗 | service/auth_token_test.go、controller/security_enrollment_test.go、web keys/hooks 测试、e2e-evidence/v1.3.46-t8-g1-token-key-stepup.json |
+| T8-G4 邮箱枚举 | ✅ SendEmailVerification 统一响应 | TestSendEmailVerificationAntiEnumeration PASS |
+| T8-G5 验证码存储 | ✅ Redis 优先 + 内存兜底 | common/verification_test.go（真实 Redis） |
+| T15-A 订阅站点统计 | ✅ /v1/stats/subscriptions + 定价页统计卡 + specs/001 补全 | TestSiteSubscriptionStatsAggregates PASS、e2e-evidence/v1.3.46-t15-a-subscription-stats.json |
+| T15-B 通用 webhook | ✅ webhook 配置 + 签名通知 + 事件接线 + SendWebhookNotify 补全 + 设置页 | service/webhook_test.go、webhook-settings.test.tsx |
+| T15-C /v1/pricing | ✅ 复核既有 B5-4 已实现 | controller/pricing.go |
+| docs 回填 | ✅ t8/t15 闭环状态 + workflow_status 九十六 + README 索引修正 | 计划书/ |
+
+> 说明：controller 全量测试存在一组与干净基线一致的既有失败（TestAuditDatabaseMatrix/TestSessionLimit/TestKling/TestResetPassword 全量序/TestSecurityAccountDeletion），均与本批改动无关（单独跑通过），未宣称修复。
 

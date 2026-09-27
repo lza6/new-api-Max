@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import { useActiveChatKey } from '@/features/chat/hooks/use-active-chat-key'
 import { useChatPresets } from '@/features/chat/hooks/use-chat-presets'
 import {
@@ -61,6 +62,7 @@ function ChatRouteComponent() {
     isPending,
     isError,
     error,
+    verification,
   } = useActiveChatKey(Boolean(preset && requiresActiveKey))
 
   const iframeSrc = useMemo(() => {
@@ -119,6 +121,7 @@ function ChatRouteComponent() {
         <p className='text-muted-foreground text-sm'>
           {t('Preparing your chat link…')}
         </p>
+        <SecureVerificationDialog {...verification.dialogProps} />
       </div>
     )
   }
@@ -166,6 +169,7 @@ function ChatRouteComponent() {
         allow='camera; microphone'
         title={`Chat preset: ${preset.name}`}
       />
+      <SecureVerificationDialog {...verification.dialogProps} />
     </>
   )
 }

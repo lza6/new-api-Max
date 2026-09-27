@@ -32,3 +32,7 @@
 - ✅ 基线刷新：bundle-size.md 记录 0004（v1.3.41 实测 Total 59,408.8 kB / index 4,419.7 kB）。
 - ✅ 性能预算回归测试：web/src/lib/__tests__/bundle-budget.test.ts，index<5MB / 总<70MB / 最大 chunk<8MB，3/3 绿。
 - ⚪ 入口进一步瘦身：记录 0002/0003 结论「重依赖全异步 + 路由级 autoCodeSplitting 已最优，拆共享层收益低风险高，不推荐」。
+
+
+- ✅ E3 组件复用收敛（v1.3.45）：keys/redemption-codes 删除弹窗 → 共享 ConfirmDialog；pricing empty-state → 薄封装共享 EmptyState；死代码 settings-card.tsx 删除；6 类「确认非重复」已留档。详见 bundle-size.md 记录 0005。
+- ✅ E2 懒加载复核（v1.3.45）：真实 build stats 确认 codemirror/recharts/visactor/shiki/mermaid/zustand 全 async-only，index 入口 4.32MB 无重依赖残留，维持「不推荐再拆」结论。

@@ -1,0 +1,42 @@
+{
+  "batch": "v1.3.46",
+  "date": "2026-09-27",
+  "title": "T8-G1 API Key 明文查看 step-up 全链路 HTTP 验收",
+  "binary": "go build -ldflags '-s -w' . （本地 /tmp/newapi-gw.exe，go1.26.1）",
+  "env": "PORT=18100 SQL_DSN=local SQLITE_PATH=/tmp/newapi-e2e.db SESSION_SECRET=e2e-session-secret-x（无 Redis）",
+  "scenario": "注册 e2euser1 → 登录（Bearer access_token）→ 创建 token#1 → 未带安全证明访问 token key 端点 / 密码验证获取 proof 后访问",
+  "results": [
+    {
+      "check": "POST /api/token/1/key 无 X-Security-Proof",
+      "expect": "403 SECURITY_PROOF_REQUIRED",
+      "actual": "403 -> {\"code\":\"SECURITY_PROOF_REQUIRED\",\"message\":\"需要安全验证\",\"success\":false}",
+      "pass": true
+    },
+    {
+      "check": "POST /api/token/batch/keys {\"ids\":[1]} 无 X-Security-Proof",
+      "expect": "403 SECURITY_PROOF_REQUIRED",
+      "actual": "403 -> {\"code\":\"SECURITY_PROOF_REQUIRED\",...}",
+      "pass": true
+    },
+    {
+      "check": "GET /api/verify/methods?scope=token.key.read（本用户仅有密码）",
+      "expect": "methods=[password available]",
+      "actual": "{\"data\":{\"scope\":\"token.key.read\",\"methods\":[{\"method\":\"password\",\"available\":true}],...}",
+      "pass": true
+    },
+    {
+      "check": "POST /api/verify {method:password, scope:token.key.read, context:{token_id:1}, password:...}",
+      "expect": "签发 proof_token",
+      "actual": "proof 签发成功（len=583）",
+      "pass": true
+    },
+    {
+      "check": "POST /api/token/1/key 携带 X-Security-Proof",
+      "expect": "200 返回明文 key",
+      "actual": "200 -> {\"data\":{\"key\":\"kPybuamH3HxbKh4jEiwxW4Tb50VLu6t4YZgE1of7dTuGJvrY\"},...}",
+      "pass": true
+    }
+  ],
+  "note": "proof 为一次性且上下文哈希绑定 {token_id}，跨 token / 重放拒绝由 service/auth_token_test.go 与 controller/security_enrollment_test.go 单元级锁定。",
+  "evidence_units": ["service/auth_token_test.go TestTokenKeyReadProof*", "controller/security_enrollment_test.go TestSecurityEnrollmentOperationContext", "web/src/features/keys/hooks/__tests__/token-key-disclosure.test.tsx"]
+}

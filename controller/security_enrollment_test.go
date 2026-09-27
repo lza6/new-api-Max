@@ -549,6 +549,13 @@ func TestSecurityEnrollmentOperationContext(t *testing.T) {
 		{"negative channel", "channel.key.read", `{"channel_id":-1}`, service.ErrVerificationContextInvalid},
 		{"overflow channel", "channel.key.read", `{"channel_id":18446744073709551615}`, service.ErrVerificationContextInvalid},
 		{"extra field", "channel.key.read", `{"channel_id":123,"extra":true}`, service.ErrVerificationContextInvalid},
+		{"token single", "token.key.read", `{"token_id":7}`, nil},
+		{"token missing", "token.key.read", ``, service.ErrVerificationContextInvalid},
+		{"token zero", "token.key.read", `{"token_id":0}`, service.ErrVerificationContextInvalid},
+		{"token batch", "token.key.read", `{"token_ids":[1,2,3]}`, nil},
+		{"token batch empty", "token.key.read", `{"token_ids":[]}`, service.ErrVerificationContextInvalid},
+		{"token batch duplicate", "token.key.read", `{"token_ids":[1,1]}`, service.ErrVerificationContextInvalid},
+		{"token mixed fields", "token.key.read", `{"token_id":1,"token_ids":[1]}`, service.ErrVerificationContextInvalid},
 		{"null context", "passkey.register", `null`, service.ErrVerificationContextInvalid},
 		{"array context", "passkey.register", `[]`, service.ErrVerificationContextInvalid},
 		{"empty enrollment", "passkey.register", `{}`, nil},
@@ -1513,10 +1520,13 @@ func TestSecurityEnrollmentNeverTrustsSessionForFirstFactor(t *testing.T) {
 				_, err := model.RevokeAllUserSessions(user.Id, "test")
 				require.NoError(t, err)
 			}
-			for _, scope := range []string{"2fa.setup", "passkey.register", "passkey.delete", "channel.key.read"} {
+			for _, scope := range []string{"2fa.setup", "passkey.register", "passkey.delete", "channel.key.read", "token.key.read"} {
 				context := json.RawMessage(nil)
-				if scope == "channel.key.read" {
+				switch scope {
+				case "channel.key.read":
 					context = json.RawMessage(`{"channel_id":1}`)
+				case "token.key.read":
+					context = json.RawMessage(`{"token_id":1}`)
 				}
 				_, err := service.VerifySecurityInput(identity, service.VerificationInput{Method: "session", Scope: scope, Context: context})
 				assert.Error(t, err, scope)

@@ -838,3 +838,38 @@
 ### 验证
 - go build/vet PASS；go test ./service/ ./middleware/（audit/security/web-protection/task-progress 组）PASS。
 - 证据：计划书/e2e-evidence/v1.3.44-docs-closure-incident.json
+
+## 九十五、T9-E3 组件复用收敛（v1.3.45，2026-09-27）
+
+- **收敛**：keys/redemption-codes 删除弹窗 → 共享 ConfirmDialog（2 处）；pricing empty-state → 薄封装共享 EmptyState（1 处）；死代码 settings-card.tsx 删除（0 引用）。
+- **E2 复核**：真实 build stats 确认重依赖全 async-only，index 4.32MB 无残留，维持「不推荐再拆」。
+- **非重复留档**：6 类（BulkActions 包装/徽章映射/re-export/意图不同/能力缺口/内联错误）避免误扫。
+- **验证**：typecheck+build PASS；vitest 29 文件 329 测试绿；knip 无新增死码；bundle-budget 3/3 绿。
+- 证据：计划书/e2e-evidence/v1.3.45-t9-e3-reuse-convergence.json；bundle-size.md 记录 0005。
+
+## 九十六、docs/ 全量闭环批：T8-G1/G4/G5 + T15-A/B/C（v1.3.46，2026-09-27）
+
+> 本批目标：把《计划书/docs/》此前标注「Gap / 立项未实施」的剩余开放项全部真实落地闭环，
+> 附真实 E2E 证据、审计与交付（commit/push/tag/release）。
+
+### T8 安全剩余 Gap 闭环（docs/t8-security-asvs-deepdive.md 已回填）
+| 项 | 落地 | 证据 |
+|---|---|---|
+| G1 API Key 明文查看无 step-up | 新增 `token.key.read` scope（单条/批量两种严格上下文）；`POST /api/token/:id/key` 与 `/batch/keys` 挂安全验证中间件；前端 keys 页/仪表盘 copy-curl/chat 链接/chat preset 4 处披露路径全走 step-up 对话框；OWASP 重认证要求 | service/auth_token_test.go + controller/security_enrollment_test.go + web keys/hooks 测试 + e2e-evidence/v1.3.46-t8-g1-token-key-stepup.json |
+| G4 邮箱枚举 | `SendEmailVerification` 已注册/未注册返回完全一致响应；已注册不落码不发信；发送失败仅日志 | TestSendEmailVerificationAntiEnumeration PASS |
+| G5 验证码内存存储 | Redis 优先（TTL + Lua 原子消费）+ 内存兜底 | TestVerificationMemoryPath/RedisPath PASS（真实 Redis 6379） |
+
+### T15 未来方向立项落地（docs/t15-roadmap-brainstorm.md 已回填）
+| 方向 | 落地 | 证据 |
+|---|---|---|
+| A 订阅站点统计 | specs/001 补真实 spec+plan；`GET /v1/stats/subscriptions` 公开只读聚合（无明细泄露）；定价页只读统计卡 + i18n | TestSiteSubscriptionStatsAggregates PASS + web 卡片 |
+| B 通用 webhook 子系统 | operation_setting `webhook` 配置（默认关）+ `service/webhook.go`（HMAC 签名 + SSRF 防护 + 幂等 + 异步重试）+ 接线 epay.topup/subscription/task.settled + 补上既有未定义的 `SendWebhookNotify` + 管理员设置页 `/webhook` + 导航 + i18n | TestSendWebhookNotify*/TestNotifyWebhooks* PASS + webhook-settings.test.tsx 2/2 |
+| C /v1/pricing 公开定价 | 复核确认 B5-4 已实现（`GET /v1/pricing` 无鉴权+限流），无需新增 | controller/pricing.go |
+
+### 验证
+- go build/vet PASS；新增测试全绿；controller 全量失败集与干净基线完全一致（既有顺序/环境依赖项：TestAuditDatabaseMatrix/TestSessionLimit/TestKling/TestResetPassword 全量序/TestSecurityAccountDeletion，均与本次改动无关，单独跑通过）。
+- web typecheck + vitest（keys 59 + webhook 2 + 关联 132）绿；i18n 7 语言 missing=0。
+- 证据：e2e-evidence/v1.3.46-t8-g1-token-key-stepup.json、v1.3.46-t15-a-subscription-stats.json、v1.3.46-t15-b-webhook.json。
+
+### 交付
+- commit/push main + tag v1.3.46 + Release（见 git log / gh release）。

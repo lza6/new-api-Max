@@ -21,6 +21,7 @@ const (
 	VerificationMethodOAuth              = "oauth"
 	VerificationMethodSession            = "session"
 	VerificationScopeChannelKeyRead      = "channel.key.read"
+	VerificationScopeTokenKeyRead        = "token.key.read"
 	VerificationScopePasskeyRegister     = "passkey.register"
 	VerificationScopePasskeyDelete       = "passkey.delete"
 	VerificationScopeTwoFASetup          = "2fa.setup"
@@ -56,6 +57,17 @@ type ChannelKeyReadContext struct {
 	ChannelID int `json:"channel_id"`
 }
 
+// TokenKeyReadContext 绑定单条 API Key 披露的目标 token（用户仅可披露自己的 key）。
+type TokenKeyReadContext struct {
+	TokenID int `json:"token_id"`
+}
+
+// TokenKeysBatchReadContext 绑定批量 API Key 披露的 id 集合，保证 proof 不能
+// 被重放到不同的 id 集合上。
+type TokenKeysBatchReadContext struct {
+	TokenIDs []int `json:"token_ids"`
+}
+
 type AccountBindingContext struct {
 	Provider string `json:"provider"`
 	Email    string `json:"email,omitempty"`
@@ -88,6 +100,34 @@ func BindVerificationOperation(operation VerificationOperation) (VerificationBin
 			return VerificationBinding{}, ErrVerificationContextInvalid
 		}
 		normalized = context
+	case VerificationScopeTokenKeyRead:
+		// 同一 scope 两种严格上下文形态：单条 {token_id} 或批量 {token_ids}。
+		// 批量 id 要求：1..100 个、均 > 0、去重、排序 —— 保证上下文哈希稳定。
+		if _, hasSingle := fields["token_id"]; hasSingle {
+			var context TokenKeyReadContext
+			if len(fields) != 1 || common.Unmarshal(fields["token_id"], &context.TokenID) != nil || context.TokenID <= 0 {
+				return VerificationBinding{}, ErrVerificationContextInvalid
+			}
+			normalized = context
+		} else {
+			var context TokenKeysBatchReadContext
+			if len(fields) != 1 || common.Unmarshal(fields["token_ids"], &context.TokenIDs) != nil ||
+				len(context.TokenIDs) == 0 || len(context.TokenIDs) > 100 {
+				return VerificationBinding{}, ErrVerificationContextInvalid
+			}
+			seen := make(map[int]struct{}, len(context.TokenIDs))
+			for _, id := range context.TokenIDs {
+				if id <= 0 {
+					return VerificationBinding{}, ErrVerificationContextInvalid
+				}
+				if _, dup := seen[id]; dup {
+					return VerificationBinding{}, ErrVerificationContextInvalid
+				}
+				seen[id] = struct{}{}
+			}
+			sort.Ints(context.TokenIDs)
+			normalized = context
+		}
 	case VerificationScopeAccountBind:
 		var context AccountBindingContext
 		if common.Unmarshal(operation.Context, &context) != nil {
@@ -179,6 +219,16 @@ func securityVerificationPolicy(scope string, state model.UserVerificationState)
 	}
 	switch scope {
 	case VerificationScopeChannelKeyRead, VerificationScopePasskeyDelete, VerificationScopeLogin:
+	case VerificationScopeTokenKeyRead:
+		// API Key 披露面向所有已登录用户：有 2FA/passkey 时优先，
+		// 否则回退密码（或 OAuth）。不沿用 channel 的 root-only 语义。
+		if len(methods) == 0 {
+			if state.HasPassword {
+				methods = []string{VerificationMethodPassword}
+			} else {
+				methods = []string{VerificationMethodOAuth}
+			}
+		}
 	case VerificationScopeTwoFADisable, VerificationScopeTwoFABackupCodes:
 		if !state.HasTwoFA {
 			return nil, model.ErrTwoFANotEnabled

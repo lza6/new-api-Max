@@ -36,6 +36,7 @@ import {
   User,
   Users,
   Wallet,
+  Webhook,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -173,6 +174,12 @@ export function useSidebarData(): SidebarData {
             title: t('Web Protection'),
             url: '/web-protection',
             icon: ShieldCheck,
+            requiredRole: ROLE.SUPER_ADMIN,
+          },
+          {
+            title: t('Webhook'),
+            url: '/webhook',
+            icon: Webhook,
             requiredRole: ROLE.SUPER_ADMIN,
           },
           {

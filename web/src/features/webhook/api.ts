@@ -16,36 +16,34 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { memo } from 'react'
+import { api } from '@/lib/api'
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from '@/components/ui/card'
-
-type SettingsCardProps = {
-  title: string
-  description?: string
-  children: React.ReactNode
-  className?: string
+export interface WebhookSettings {
+  enabled: boolean
+  url: string
+  secret: string
+  events: string[]
 }
 
-export const SettingsCard = memo(function SettingsCard({
-  title,
-  description,
-  children,
-  className,
-}: SettingsCardProps) {
-  return (
-    <Card className={className}>
-      <CardHeader>
-        <CardTitle>{title}</CardTitle>
-        {description && <CardDescription>{description}</CardDescription>}
-      </CardHeader>
-      <CardContent>{children}</CardContent>
-    </Card>
-  )
-})
+export const WEBHOOK_EVENT_OPTIONS = [
+  {
+    value: 'epay.topup.success',
+    label: 'Recharge (topup) success',
+  },
+  {
+    value: 'epay.subscription.success',
+    label: 'Subscription success',
+  },
+  {
+    value: 'task.settled',
+    label: 'Task settled',
+  },
+] as const
+
+export function getWebhookSettings(): Promise<WebhookSettings> {
+  return api.get('/api/admin/webhook/settings').then((r) => r.data.data)
+}
+
+export function updateWebhookSettings(patch: Partial<WebhookSettings>) {
+  return api.put('/api/admin/webhook/settings', patch)
+}

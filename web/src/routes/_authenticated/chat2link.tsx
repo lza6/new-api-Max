@@ -22,6 +22,7 @@ import { useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import { useActiveChatKey } from '@/features/chat/hooks/use-active-chat-key'
 import { useChatPresets } from '@/features/chat/hooks/use-chat-presets'
 import { resolveChatUrl } from '@/features/chat/lib/chat-links'
@@ -41,7 +42,7 @@ function Chat2LinkPage() {
     [chatPresets]
   )
 
-  const { data: activeKey, error: keyError } = useActiveChatKey(
+  const { data: activeKey, error: keyError, verification } = useActiveChatKey(
     Boolean(firstWebPreset)
   )
 
@@ -90,6 +91,7 @@ function Chat2LinkPage() {
       <p className='text-muted-foreground text-sm'>
         {t('Redirecting to chat page...')}
       </p>
+      <SecureVerificationDialog {...verification.dialogProps} />
     </div>
   )
 }

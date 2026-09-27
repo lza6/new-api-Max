@@ -160,3 +160,74 @@ func TestSecurityProofBindsIdentityAndOperation(t *testing.T) {
 	_, err = ConsumeOperationProof(expired, identity, operation)
 	assert.ErrorIs(t, err, ErrAuthTokenExpired)
 }
+
+func TestTokenKeyReadProofBindsExactContext(t *testing.T) {
+	setupAuthSessionTestDB(t)
+	useTestSessionSecret(t)
+	identity := AuthIdentity{UserID: 42, SessionID: "session-1", UserAuthVersion: 3, SessionVersion: 2}
+
+	single, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeTokenKeyRead, Context: []byte(`{"token_id":42}`)})
+	require.NoError(t, err)
+	proof, _, err := IssueSecurityProof(identity, "password", single)
+	require.NoError(t, err)
+
+	// 相同 token 上下文可验证；不同 token 上下文必须拒绝（防重放）。
+	claims, err := verifySecurityProof(proof, identity, single)
+	require.NoError(t, err)
+	assert.Equal(t, "password", claims.Method)
+
+	otherToken, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeTokenKeyRead, Context: []byte(`{"token_id":43}`)})
+	require.NoError(t, err)
+	_, err = verifySecurityProof(proof, identity, otherToken)
+	assert.ErrorIs(t, err, ErrProofContext)
+
+	// 批量上下文与单条上下文互不通用。
+	batch, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeTokenKeyRead, Context: []byte(`{"token_ids":[42,43]}`)})
+	require.NoError(t, err)
+	_, err = verifySecurityProof(proof, identity, batch)
+	assert.ErrorIs(t, err, ErrProofContext)
+
+	// 批量 id 排序归一：不同顺序必须绑定同一上下文哈希。
+	batchOrderA, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeTokenKeyRead, Context: []byte(`{"token_ids":[3,1,2]}`)})
+	require.NoError(t, err)
+	batchOrderB, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeTokenKeyRead, Context: []byte(`{"token_ids":[2,1,3]}`)})
+	require.NoError(t, err)
+	assert.Equal(t, batchOrderA.ContextHash, batchOrderB.ContextHash)
+
+	batchProof, _, err := IssueSecurityProof(identity, "password", batchOrderA)
+	require.NoError(t, err)
+	_, err = verifySecurityProof(batchProof, identity, batchOrderB)
+	require.NoError(t, err)
+}
+
+func TestTokenKeyReadProofRejectsInvalidContext(t *testing.T) {
+	useTestSessionSecret(t)
+	overLimit := make([]int, 101)
+	for i := range overLimit {
+		overLimit[i] = i + 1
+	}
+	overLimitRaw, err := common.Marshal(map[string]any{"token_ids": overLimit})
+	require.NoError(t, err)
+	cases := []struct {
+		name    string
+		context string
+	}{
+		{"single missing", `{}`},
+		{"single zero", `{"token_id":0}`},
+		{"single negative", `{"token_id":-1}`},
+		{"single extra field", `{"token_id":1,"token_ids":[1]}`},
+		{"batch empty", `{"token_ids":[]}`},
+		{"batch zero id", `{"token_ids":[0]}`},
+		{"batch negative id", `{"token_ids":[-1]}`},
+		{"batch duplicate", `{"token_ids":[1,1]}`},
+		{"batch over limit", string(overLimitRaw)},
+		{"malformed", `{"token_ids":123}`},
+		{"non object", `[1,2]`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := BindVerificationOperation(VerificationOperation{Scope: VerificationScopeTokenKeyRead, Context: []byte(tc.context)})
+			assert.ErrorIs(t, err, ErrVerificationContextInvalid)
+		})
+	}
+}

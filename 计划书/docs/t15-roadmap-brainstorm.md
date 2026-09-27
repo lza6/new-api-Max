@@ -36,6 +36,8 @@
 - 前端：`cd web && bun run typecheck && bunx vitest run src/features/subscriptions src/features/task-plugins`。
 - 浏览器/E2E：STAGING 真实截图入 `计划书/e2e-evidence/`；线上验收需授权。
 
-## 立项状态（2026-09-27，v1.3.44 回填）
-- ⚪ 三方向均为立项参考，未实施：A 订阅站点统计（specs/001 待办）、B 通用 webhook（需用户优先级）、C /v1/pricing 公开定价（需授权）。
+## 立项状态（2026-09-27，v1.3.46 回填）
+- ✅ **A 订阅站点统计（v1.3.46 已实施）**：specs/001 已补真实 spec+plan；`GET /v1/stats/subscriptions` 公开只读聚合（档位总数/订阅总数/生效中/7 天内到期/30 天内新增/按档位）；定价页展示只读统计卡；controller 单测覆盖聚合口径 + 无明细泄露。证据：e2e-evidence/v1.3.46-t15-a-subscription-stats.json。
+- ✅ **B 通用 webhook 子系统（v1.3.46 已实施）**：`operation_setting` webhook 配置（enabled/url/secret/events，默认关）+ `service/webhook.go`（HMAC-SHA256 签名 + SSRF 防护 + 幂等去重窗口 + 异步重试）+ 接线 epay.topup.success / epay.subscription.success / task.settled 事件 + 补上此前未定义的 `SendWebhookNotify`（用户级 webhook 通知）；管理员设置页 `/webhook` + 导航 + i18n；测试：service/webhook_test.go（签名/SSRF/幂等/订阅解析）。
+- ✅ **C /v1/pricing 公开定价（既有，复核确认）**：B5-4 已实现 `GET /v1/pricing`（无鉴权 + 限流），无需新增。
 - 纪律：新能力复用 common.*/quota_math/billingexpr/operation_setting/i18n；先 dry-run + 灰度开关；涉外呼走 URL 白名单防 SSRF。

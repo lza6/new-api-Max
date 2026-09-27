@@ -7,6 +7,7 @@ import (
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
 // P2-2 支付 webhook 事件归一：易支付充值回调 → 事件总线 → 处理器做账本更新。
@@ -107,10 +108,13 @@ func DispatchEpaySubscriptionEvent(ctx context.Context, tradeNo, verifyInfoJSON,
 	}
 	err := paymentEventBus.Publish(ctx, ev)
 	if err == nil {
+		// T15-B：事件处理完成后对外通知（幂等去重窗口兜底）。
+		NotifyWebhooks(ctx, operation_setting.WebhookEventEpaySubscriptionSuccess, tradeNo, ev.Payload)
 		return false, nil
 	}
 	if errors.Is(err, ErrEventBusDup) {
 		if state, ok := paymentEventBus.State(ev.ID); ok && state == EventStateSuccess {
+			NotifyWebhooks(ctx, operation_setting.WebhookEventEpaySubscriptionSuccess, tradeNo, ev.Payload)
 			return true, nil
 		}
 		// 已投递但非成功：账本级幂等兜底（CompleteSubscriptionOrder 状态校验）。
@@ -133,10 +137,13 @@ func DispatchEpayTopupEvent(ctx context.Context, tradeNo, actualPaymentMethod, c
 	}
 	err := paymentEventBus.Publish(ctx, ev)
 	if err == nil {
+		// T15-B：充值事件处理完成后对外通知（幂等去重窗口兜底）。
+		NotifyWebhooks(ctx, operation_setting.WebhookEventEpayTopupSuccess, tradeNo, ev.Payload)
 		return false, nil
 	}
 	if errors.Is(err, ErrEventBusDup) {
 		if state, ok := paymentEventBus.State(ev.ID); ok && state == EventStateSuccess {
+			NotifyWebhooks(ctx, operation_setting.WebhookEventEpayTopupSuccess, tradeNo, ev.Payload)
 			return true, nil
 		}
 		// 已投递但非成功：账本级幂等兜底（行锁 + 状态校验）。

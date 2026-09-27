@@ -224,20 +224,21 @@ func SendEmailVerification(c *gin.Context) {
 		return
 	}
 
-	if model.IsEmailAlreadyTaken(email) {
-		common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
-		return
-	}
-	code := common.GenerateVerificationCode(6)
-	common.RegisterVerificationCodeWithKey(email, code, common.EmailVerificationPurpose)
-	subject := fmt.Sprintf("%s邮箱验证邮件", common.SystemName)
-	content := fmt.Sprintf("<p>您好，你正在进行%s邮箱验证。</p>"+
-		"<p>您的验证码为: <strong>%s</strong></p>"+
-		"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, common.VerificationValidMinutes)
-	err = common.SendEmail(subject, email, content)
-	if err != nil {
-		common.ApiError(c, err)
-		return
+	// G4（防枚举）：无论邮箱是否已注册，都返回完全一致的统一成功响应。
+	// 已注册邮箱不生成、不落库、不发送验证码；未注册邮箱照常发送。
+	// 响应体不包含任何区分信息，杜绝通过该接口探测已注册邮箱。
+	if !model.IsEmailAlreadyTaken(email) {
+		code := common.GenerateVerificationCode(6)
+		common.RegisterVerificationCodeWithKey(email, code, common.EmailVerificationPurpose)
+		subject := fmt.Sprintf("%s邮箱验证邮件", common.SystemName)
+		content := fmt.Sprintf("<p>您好，你正在进行%s邮箱验证。</p>"+
+			"<p>您的验证码为: <strong>%s</strong></p>"+
+			"<p>验证码 %d 分钟内有效，如果不是本人操作，请忽略。</p>", common.SystemName, code, common.VerificationValidMinutes)
+		err = common.SendEmail(subject, email, content)
+		if err != nil {
+			// 发送失败不向客户端暴露（避免响应差异泄露邮箱状态），只记录日志。
+			logger.LogError(c.Request.Context(), fmt.Sprintf("failed to send email verification to %s: %s", email, err.Error()))
+		}
 	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

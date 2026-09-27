@@ -20,6 +20,7 @@ import (
 	"github.com/lza6/new-api-Max/pkg/billingexpr"
 	"github.com/lza6/new-api-Max/relay/channel/task/taskcommon"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
@@ -385,6 +386,12 @@ func updateBatchTasks(ctx context.Context, adaptor BatchTaskPollingAdaptor, chan
 			if task.Status == model.TaskStatusFailure && !billingSettled && task.Quota != 0 {
 				RefundTaskQuota(ctx, task, task.FailReason)
 			}
+			// T15-B：任务到达终态且结算完成 → 对外 webhook 通知（幂等键=任务ID+事件）。
+			NotifyWebhooks(ctx, operation_setting.WebhookEventTaskSettled, task.TaskID, map[string]any{
+				"task_id": task.TaskID,
+				"status":  task.Status,
+				"quota":   task.Quota,
+			})
 		}
 	}
 	return nil

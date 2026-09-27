@@ -1,0 +1,79 @@
+=== RUN   TestDBConformanceAutoMigrateIdempotent
+=== RUN   TestDBConformanceAutoMigrateIdempotent/sqlite
+[SYS] 2026/09/25 - 07:48:03 | SQL_DSN not set, using SQLite as database 
+=== RUN   TestDBConformanceAutoMigrateIdempotent/mysql
+[SYS] 2026/09/25 - 07:48:15 | using MySQL as database 
+=== RUN   TestDBConformanceAutoMigrateIdempotent/postgres
+[SYS] 2026/09/25 - 07:48:32 | using PostgreSQL as database 
+--- PASS: TestDBConformanceAutoMigrateIdempotent (63.01s)
+    --- PASS: TestDBConformanceAutoMigrateIdempotent/sqlite (11.94s)
+    --- PASS: TestDBConformanceAutoMigrateIdempotent/mysql (16.88s)
+    --- PASS: TestDBConformanceAutoMigrateIdempotent/postgres (34.20s)
+=== RUN   TestDBConformanceLogsIndexes
+=== RUN   TestDBConformanceLogsIndexes/sqlite
+[SYS] 2026/09/25 - 07:49:06 | SQL_DSN not set, using SQLite as database 
+=== RUN   TestDBConformanceLogsIndexes/mysql
+[SYS] 2026/09/25 - 07:49:07 | using MySQL as database 
+=== RUN   TestDBConformanceLogsIndexes/postgres
+[SYS] 2026/09/25 - 07:49:07 | using PostgreSQL as database 
+--- PASS: TestDBConformanceLogsIndexes (2.31s)
+    --- PASS: TestDBConformanceLogsIndexes/sqlite (0.41s)
+    --- PASS: TestDBConformanceLogsIndexes/mysql (0.27s)
+    --- PASS: TestDBConformanceLogsIndexes/postgres (1.63s)
+=== RUN   TestDBConformanceEventDeliveryDedup
+=== RUN   TestDBConformanceEventDeliveryDedup/sqlite
+[SYS] 2026/09/25 - 07:49:09 | SQL_DSN not set, using SQLite as database 
+=== RUN   TestDBConformanceEventDeliveryDedup/mysql
+[SYS] 2026/09/25 - 07:49:09 | using MySQL as database 
+=== RUN   TestDBConformanceEventDeliveryDedup/postgres
+[SYS] 2026/09/25 - 07:49:09 | using PostgreSQL as database 
+--- PASS: TestDBConformanceEventDeliveryDedup (1.37s)
+    --- PASS: TestDBConformanceEventDeliveryDedup/sqlite (0.22s)
+    --- PASS: TestDBConformanceEventDeliveryDedup/mysql (0.15s)
+    --- PASS: TestDBConformanceEventDeliveryDedup/postgres (0.99s)
+=== RUN   TestDBConformanceReservedColumns
+=== RUN   TestDBConformanceReservedColumns/sqlite
+[SYS] 2026/09/25 - 07:49:10 | SQL_DSN not set, using SQLite as database 
+=== RUN   TestDBConformanceReservedColumns/mysql
+[SYS] 2026/09/25 - 07:49:10 | using MySQL as database 
+=== RUN   TestDBConformanceReservedColumns/postgres
+[SYS] 2026/09/25 - 07:49:10 | using PostgreSQL as database 
+--- PASS: TestDBConformanceReservedColumns (1.04s)
+    --- PASS: TestDBConformanceReservedColumns/sqlite (0.10s)
+    --- PASS: TestDBConformanceReservedColumns/mysql (0.23s)
+    --- PASS: TestDBConformanceReservedColumns/postgres (0.71s)
+=== RUN   TestDBConformanceJsonRoundTrip
+=== RUN   TestDBConformanceJsonRoundTrip/sqlite
+[SYS] 2026/09/25 - 07:49:11 | SQL_DSN not set, using SQLite as database 
+=== RUN   TestDBConformanceJsonRoundTrip/mysql
+[SYS] 2026/09/25 - 07:49:11 | using MySQL as database 
+=== RUN   TestDBConformanceJsonRoundTrip/postgres
+[SYS] 2026/09/25 - 07:49:11 | using PostgreSQL as database 
+--- PASS: TestDBConformanceJsonRoundTrip (0.94s)
+    --- PASS: TestDBConformanceJsonRoundTrip/sqlite (0.08s)
+    --- PASS: TestDBConformanceJsonRoundTrip/mysql (0.18s)
+    --- PASS: TestDBConformanceJsonRoundTrip/postgres (0.68s)
+=== RUN   TestDBConformanceLockForUpdate
+=== RUN   TestDBConformanceLockForUpdate/sqlite
+[SYS] 2026/09/25 - 07:49:12 | SQL_DSN not set, using SQLite as database 
+=== RUN   TestDBConformanceLockForUpdate/mysql
+[SYS] 2026/09/25 - 07:49:12 | using MySQL as database 
+=== RUN   TestDBConformanceLockForUpdate/postgres
+[SYS] 2026/09/25 - 07:49:12 | using PostgreSQL as database 
+--- PASS: TestDBConformanceLockForUpdate (0.88s)
+    --- PASS: TestDBConformanceLockForUpdate/sqlite (0.07s)
+    --- PASS: TestDBConformanceLockForUpdate/mysql (0.16s)
+    --- PASS: TestDBConformanceLockForUpdate/postgres (0.65s)
+=== RUN   TestDBConformanceUsingDatabaseBranches
+=== RUN   TestDBConformanceUsingDatabaseBranches/sqlite
+[SYS] 2026/09/25 - 07:49:13 | SQL_DSN not set, using SQLite as database 
+=== RUN   TestDBConformanceUsingDatabaseBranches/mysql
+[SYS] 2026/09/25 - 07:49:13 | using MySQL as database 
+=== RUN   TestDBConformanceUsingDatabaseBranches/postgres
+[SYS] 2026/09/25 - 07:49:13 | using PostgreSQL as database 
+--- PASS: TestDBConformanceUsingDatabaseBranches (0.49s)
+    --- PASS: TestDBConformanceUsingDatabaseBranches/sqlite (0.02s)
+    --- PASS: TestDBConformanceUsingDatabaseBranches/mysql (0.01s)
+    --- PASS: TestDBConformanceUsingDatabaseBranches/postgres (0.46s)
+PASS
+ok  	github.com/lza6/new-api-Max/model	76.309s

@@ -22,6 +22,8 @@ func SetRelayRouter(router *gin.Engine) {
 	pricingV1Router.Use(middleware.CriticalRateLimit())
 	{
 		pricingV1Router.GET("/pricing", controller.GetV1Pricing)
+		// T15-A: 公开只读站点订阅运营统计（聚合计数，无用户明细）。
+		pricingV1Router.GET("/stats/subscriptions", controller.GetSiteSubscriptionStats)
 	}
 
 	modelsRouter := router.Group("/v1/models")

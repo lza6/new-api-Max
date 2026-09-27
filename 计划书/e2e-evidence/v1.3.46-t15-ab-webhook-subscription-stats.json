@@ -1,0 +1,35 @@
+{
+  "batch": "v1.3.46",
+  "date": "2026-09-27",
+  "title": "T15-A 订阅站点统计 + T15-B 通用 webhook 本地网关 HTTP 验收",
+  "binary": "go build -ldflags '-s -w' . （本地，go1.26.1）",
+  "env": "PORT=18100 SQL_DSN=local SQLITE_PATH=/tmp/newapi-e2e.db（空库；无 Redis）",
+  "results": [
+    {
+      "check": "GET /v1/stats/subscriptions（公开、空库）",
+      "expect": "200 返回正确 JSON 结构（聚合计数 + by_plan）",
+      "actual": "200 -> {\"data\":{\"total_plans\":0,\"total_subscriptions\":0,\"active_subscriptions\":0,\"expiring_soon_7d\":0,\"new_last_30d\":0,\"by_plan\":[]},\"success\":true}",
+      "pass": true
+    },
+    {
+      "check": "GET /v1/pricing（公开复核既有实现）",
+      "expect": "200 定价快照",
+      "actual": "200 -> {\"auto_groups\":[\"default\"],\"data\":[],\"group_ratio\":{\"default\":1,\"vip\":1},...}",
+      "pass": true
+    },
+    {
+      "check": "GET /api/admin/webhook/settings 未登录",
+      "expect": "401",
+      "actual": "401",
+      "pass": true
+    },
+    {
+      "check": "GET /api/admin/webhook/settings 普通用户登录",
+      "expect": "403 AUTH_INSUFFICIENT_PRIVILEGE（管理端门禁）",
+      "actual": "403 -> {\"code\":\"AUTH_INSUFFICIENT_PRIVILEGE\",...}",
+      "pass": true
+    }
+  ],
+  "note": "T15-A 聚合口径（档位数/订阅数/生效中/7天到期/30天新增/按档位）由 controller/site_stats_test.go TestSiteSubscriptionStatsAggregates 以真实种子数据单元级锁定；此处验证真实二进制上行链路与权限模型。T15-B 事件签名/SSRF/幂等由 service/webhook_test.go 锁定；webhook 配置为 operation_setting JSON（无 schema 变更）。",
+  "evidence_units": ["controller/site_stats_test.go", "service/webhook_test.go", "web/src/features/webhook/webhook-settings.test.tsx"]
+}

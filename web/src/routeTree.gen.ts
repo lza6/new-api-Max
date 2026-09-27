@@ -60,6 +60,7 @@ import { Route as AuthenticatedUsageLogsAuditRouteImport } from './routes/_authe
 import { Route as AuthenticatedUsersIndexRouteImport } from './routes/_authenticated/users/index'
 import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenticated/wallet/index'
 import { Route as AuthenticatedWebProtectionIndexRouteImport } from './routes/_authenticated/web-protection/index'
+import { Route as AuthenticatedWebhookIndexRouteImport } from './routes/_authenticated/webhook/index'
 import { Route as PricingModelIdIndexRouteImport } from './routes/pricing/$modelId/index'
 import { Route as AuthenticatedSystemSettingsAuthIndexRouteImport } from './routes/_authenticated/system-settings/auth/index'
 import { Route as AuthenticatedSystemSettingsAuthSectionRouteImport } from './routes/_authenticated/system-settings/auth/$section'
@@ -350,6 +351,12 @@ const AuthenticatedWebProtectionIndexRoute =
     path: '/web-protection/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedWebhookIndexRoute =
+  AuthenticatedWebhookIndexRouteImport.update({
+    id: '/webhook/',
+    path: '/webhook/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const PricingModelIdIndexRoute = PricingModelIdIndexRouteImport.update({
   id: '/pricing/$modelId/',
   path: '/pricing/$modelId/',
@@ -490,6 +497,7 @@ export interface FileRoutesByFullPath {
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/wallet/': typeof AuthenticatedWalletIndexRoute
   '/web-protection/': typeof AuthenticatedWebProtectionIndexRoute
+  '/webhook/': typeof AuthenticatedWebhookIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -555,6 +563,7 @@ export interface FileRoutesByTo {
   '/users': typeof AuthenticatedUsersIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
   '/web-protection': typeof AuthenticatedWebProtectionIndexRoute
+  '/webhook': typeof AuthenticatedWebhookIndexRoute
   '/pricing/$modelId': typeof PricingModelIdIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -624,6 +633,7 @@ export interface FileRoutesById {
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
   '/_authenticated/web-protection/': typeof AuthenticatedWebProtectionIndexRoute
+  '/_authenticated/webhook/': typeof AuthenticatedWebhookIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
   '/_authenticated/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/_authenticated/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
@@ -692,6 +702,7 @@ export interface FileRouteTypes {
     | '/users/'
     | '/wallet/'
     | '/web-protection/'
+    | '/webhook/'
     | '/pricing/$modelId/'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
@@ -757,6 +768,7 @@ export interface FileRouteTypes {
     | '/users'
     | '/wallet'
     | '/web-protection'
+    | '/webhook'
     | '/pricing/$modelId'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
@@ -825,6 +837,7 @@ export interface FileRouteTypes {
     | '/_authenticated/users/'
     | '/_authenticated/wallet/'
     | '/_authenticated/web-protection/'
+    | '/_authenticated/webhook/'
     | '/pricing/$modelId/'
     | '/_authenticated/system-settings/auth/$section'
     | '/_authenticated/system-settings/billing/$section'
@@ -1223,6 +1236,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedWebProtectionIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/webhook/': {
+      id: '/_authenticated/webhook/'
+      path: '/webhook'
+      fullPath: '/webhook/'
+      preLoaderRoute: typeof AuthenticatedWebhookIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/pricing/$modelId/': {
       id: '/pricing/$modelId/'
       path: '/pricing/$modelId'
@@ -1439,6 +1459,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
   AuthenticatedWebProtectionIndexRoute: typeof AuthenticatedWebProtectionIndexRoute
+  AuthenticatedWebhookIndexRoute: typeof AuthenticatedWebhookIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
@@ -1468,6 +1489,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,
   AuthenticatedWebProtectionIndexRoute: AuthenticatedWebProtectionIndexRoute,
+  AuthenticatedWebhookIndexRoute: AuthenticatedWebhookIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =

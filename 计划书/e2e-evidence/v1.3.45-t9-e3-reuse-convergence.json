@@ -1,0 +1,65 @@
+{
+  "meta": {
+    "title": "T9-E3 component reuse convergence (v1.3.45)",
+    "version": "v1.3.45",
+    "date": "2026-09-27T06:45:00+08:00",
+    "repo": "github.com/lza6/new-api-Max",
+    "branch": "main",
+    "base": "952ff57fc"
+  },
+  "converged": [
+    {
+      "file": "web/src/features/keys/components/api-keys-delete-dialog.tsx",
+      "target": "web/src/components/confirm-dialog.tsx",
+      "refs": 1,
+      "risk": "low"
+    },
+    {
+      "file": "web/src/features/redemption-codes/components/redemptions-delete-dialog.tsx",
+      "target": "web/src/components/confirm-dialog.tsx",
+      "refs": 1,
+      "risk": "low"
+    },
+    {
+      "file": "web/src/features/pricing/components/empty-state.tsx",
+      "target": "web/src/components/empty-state.tsx (thin wrapper)",
+      "refs": 1,
+      "risk": "low-mid, visual 320->300px/bordered differs, accepted"
+    }
+  ],
+  "dead_code_removed": "web/src/features/system-settings/components/settings-card.tsx (0 refs)",
+  "kept_as_candidates": [
+    "playground-empty-state (min-h)",
+    "channel-editor-loading-state (domain text)",
+    "redemptions-mobile-list (official mobile slot)",
+    "pricing loading-skeleton (auto-skeleton fidelity)",
+    "wallet payment-confirm dialogs (rich content)"
+  ],
+  "verified_not_duplicates": [
+    "BulkActions wrappers x4",
+    "StatusBadge/ProviderBadge domain maps",
+    "api-key-timestamp-cell re-export",
+    "pricing search-bar (intent diff)",
+    "usage-logs date range picker (capability gap)",
+    "message-error inline alert vs error-state"
+  ],
+  "lazy_loading_recheck": {
+    "index_chunk": "4.32 MB (4,421,571 B)",
+    "heavy_deps": {
+      "codemirror": "async-only",
+      "recharts": "async-only",
+      "visactor": "async-only",
+      "shiki": "async-only",
+      "mermaid": "async-only",
+      "zustand": "async-only"
+    },
+    "conclusion": "already optimal; no further split recommended"
+  },
+  "verification": [
+    "bun run typecheck PASS",
+    "bunx vitest run keys/redemption-codes/pricing/system-settings: 29 files 329 tests PASS",
+    "bun run build PASS (Total 59,410.0 kB, consistent with 0004)",
+    "bunx knip: no new dead code from convergence",
+    "bunx vitest run bundle-budget.test.ts: 3/3 PASS"
+  ]
+}

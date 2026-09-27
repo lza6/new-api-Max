@@ -18,16 +18,19 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { useQuery } from '@tanstack/react-query'
 import { t } from 'i18next'
+import { useEffect, useState } from 'react'
 
-import { fetchTokenKey, getApiKeys } from '@/features/keys/api'
+import { getApiKeys } from '@/features/keys/api'
 import { API_KEY_STATUS } from '@/features/keys/constants'
-import {
-  requireServerSuccess,
-  createServerError,
-} from '@/lib/server-error-message'
+import { useTokenKeyDisclosure } from '@/features/keys/hooks/use-token-key-disclosure'
+import { createServerError } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
-export async function fetchActiveChatKey() {
+/**
+ * G1/T8: locate the user's first enabled API key. It returns only the token id;
+ * the plaintext key itself is disclosed through step-up verification.
+ */
+export async function getActiveChatTokenId(): Promise<number> {
   const result = await getApiKeys({ p: 1, size: 50 })
   if (!result.success) {
     throw createServerError(result, t('Failed to load API keys'))
@@ -39,25 +42,45 @@ export async function fetchActiveChatKey() {
     throw new Error('No enabled API keys found. Create or enable one first.')
   }
 
-  const keyResult = await fetchTokenKey(active.id)
-  if (!keyResult.success || !keyResult.data?.key) {
-    throw createServerError(keyResult, t('Failed to load API keys'))
-  }
-
-  return `sk-${keyResult.data.key}`
+  return active.id
 }
 
 /**
- * Get the currently active API key for chat links
+ * Get the currently active chat key for chat links. The plaintext key is only
+ * disclosed after a step-up security verification (G1/T8); consumers render
+ * `<SecureVerificationDialog {...verification.dialogProps} />`.
  */
 export function useActiveChatKey(enabled: boolean) {
   const userId = useAuthStore((state) => state.auth.user?.id)
+  const disclosure = useTokenKeyDisclosure()
+  const [revealedKey, setRevealedKey] = useState<string | null>(null)
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['chat-active-key', userId],
-    queryFn: async () => requireServerSuccess(await fetchActiveChatKey()),
+    queryFn: getActiveChatTokenId,
     enabled: enabled && Boolean(userId),
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   })
+
+  const tokenId = query.data
+
+  useEffect(() => {
+    if (!enabled || !tokenId || revealedKey) {return}
+    let cancelled = false
+    void disclosure.revealSingleKey(tokenId).then((key) => {
+      if (!cancelled && key) {setRevealedKey(key)}
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [enabled, tokenId, revealedKey, disclosure])
+
+  return {
+    data: revealedKey ?? undefined,
+    isPending: query.isPending || (enabled && Boolean(tokenId) && !revealedKey),
+    isError: query.isError || query.error !== null,
+    error: query.error,
+    verification: disclosure.verification,
+  }
 }

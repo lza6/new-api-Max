@@ -17,14 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import React, { useState, useCallback, useRef, useEffect } from 'react'
-import { useTranslation } from 'react-i18next'
 
+import { SecureVerificationDialog } from '@/features/auth/secure-verification'
 import useDialogState from '@/hooks/use-dialog'
-import { handleServerError } from '@/lib/handle-server-error'
 
-import { fetchTokenKey, fetchTokenKeysBatch } from '../api'
-import { ERROR_MESSAGES } from '../constants'
 import type { ApiKey, ApiKeysDialogType } from '../types'
+import { useTokenKeyDisclosure } from '../hooks/use-token-key-disclosure'
 
 type ApiKeysContextType = {
   open: ApiKeysDialogType | null
@@ -46,7 +44,6 @@ type ApiKeysContextType = {
 const ApiKeysContext = React.createContext<ApiKeysContextType | null>(null)
 
 export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
-  const { t } = useTranslation()
   const [open, setOpen] = useDialogState<ApiKeysDialogType>(null)
   const [currentRow, setCurrentRow] = useState<ApiKey | null>(null)
   const [refreshTrigger, setRefreshTrigger] = useState(0)
@@ -58,6 +55,10 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
 
   const [copiedKeyId, setCopiedKeyId] = useState<number | null>(null)
   const copiedTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+
+  // G1/T8: 明文 API Key 披露必须经过 step-up 安全验证（passkey/2FA/密码）。
+  const { revealSingleKey, revealKeysBatch, verification } =
+    useTokenKeyDisclosure()
 
   useEffect(() => {
     return () => clearTimeout(copiedTimerRef.current)
@@ -81,17 +82,11 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
       const request = (async () => {
         setLoadingKeys((prev) => ({ ...prev, [id]: true }))
         try {
-          const res = await fetchTokenKey(id)
-          if (res.success && res.data?.key) {
-            const fullKey = `sk-${res.data.key}`
+          const fullKey = await revealSingleKey(id)
+          if (fullKey) {
             setResolvedKeys((prev) => ({ ...prev, [id]: fullKey }))
-            return fullKey
           }
-          handleServerError(res, t(ERROR_MESSAGES.UNEXPECTED))
-          return null
-        } catch (error) {
-          handleServerError(error, t(ERROR_MESSAGES.UNEXPECTED))
-          return null
+          return fullKey
         } finally {
           delete pendingRequests.current[id]
           setLoadingKeys((prev) => {
@@ -105,7 +100,7 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
       pendingRequests.current[id] = request
       return request
     },
-    [resolvedKeys, t]
+    [resolvedKeys, revealSingleKey]
   )
 
   const resolveRealKeysBatch = useCallback(
@@ -122,25 +117,16 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
       }
 
       try {
-        const res = await fetchTokenKeysBatch(uncachedIds)
-        if (res.success && res.data?.keys) {
-          const newKeys: Record<number, string> = {}
-          for (const [idStr, key] of Object.entries(res.data.keys)) {
-            newKeys[Number(idStr)] = `sk-${key}`
-          }
+        const newKeys = await revealKeysBatch(uncachedIds)
+        if (Object.keys(newKeys).length > 0) {
           setResolvedKeys((prev) => ({ ...prev, ...newKeys }))
-
-          const result: Record<number, string> = { ...newKeys }
-          for (const id of ids) {
-            if (resolvedKeys[id]) {result[id] = resolvedKeys[id]}
-          }
-          return result
         }
-        handleServerError(res, t(ERROR_MESSAGES.UNEXPECTED))
-        return {}
-      } catch (error) {
-        handleServerError(error, t(ERROR_MESSAGES.UNEXPECTED))
-        return {}
+
+        const result: Record<number, string> = { ...newKeys }
+        for (const id of ids) {
+          if (resolvedKeys[id]) {result[id] = resolvedKeys[id]}
+        }
+        return result
       } finally {
         for (const id of uncachedIds) {
           setLoadingKeys((prev) => {
@@ -151,7 +137,7 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
         }
       }
     },
-    [resolvedKeys, t]
+    [resolvedKeys, revealKeysBatch]
   )
 
   return (
@@ -174,6 +160,7 @@ export function ApiKeysProvider({ children }: { children: React.ReactNode }) {
       }}
     >
       {children}
+      <SecureVerificationDialog {...verification.dialogProps} />
     </ApiKeysContext>
   )
 }

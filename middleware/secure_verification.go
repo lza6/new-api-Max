@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,6 +29,60 @@ func SecureVerificationRequired() gin.HandlerFunc {
 			return
 		}
 		if RequireSecurityProof(c, service.VerificationOperation{Scope: service.VerificationScopeChannelKeyRead, Context: context}) == nil {
+			return
+		}
+		c.Set("secure_verified", true)
+		c.Next()
+	}
+}
+
+// SecureTokenKeyVerificationRequired protects single API key disclosure
+// (POST /api/token/:id/key). The proof binds to the exact token id.
+func SecureTokenKeyVerificationRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		tokenID, err := strconv.Atoi(c.Param("id"))
+		if err != nil || tokenID <= 0 {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
+			return
+		}
+		context, err := common.Marshal(service.TokenKeyReadContext{TokenID: tokenID})
+		if err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		if RequireSecurityProof(c, service.VerificationOperation{Scope: service.VerificationScopeTokenKeyRead, Context: context}) == nil {
+			return
+		}
+		c.Set("secure_verified", true)
+		c.Next()
+	}
+}
+
+// SecureTokenKeysBatchVerificationRequired protects batch API key disclosure
+// (POST /api/token/batch/keys). The proof binds to the exact sorted id set, so
+// a proof cannot be replayed against a different set. The body is restored
+// before calling next so the controller can bind it again.
+func SecureTokenKeysBatchVerificationRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		raw, err := c.GetRawData()
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
+			return
+		}
+		var body struct {
+			Ids []int `json:"ids"`
+		}
+		if common.Unmarshal(raw, &body) != nil || len(body.Ids) == 0 {
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
+			return
+		}
+		c.Request.Body = io.NopCloser(bytes.NewReader(raw))
+		context, err := common.Marshal(service.TokenKeysBatchReadContext{TokenIDs: body.Ids})
+		if err != nil {
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+		if RequireSecurityProof(c, service.VerificationOperation{Scope: service.VerificationScopeTokenKeyRead, Context: context}) == nil {
 			return
 		}
 		c.Set("secure_verified", true)

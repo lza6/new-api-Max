@@ -306,6 +306,19 @@ function KeysPage() {
 async function renderKeysPage(status = 1, overrides: Partial<ApiKey> = {}) {
   let currentKey = { ...key, status, ...overrides }
   vi.mocked(api.get).mockImplementation(async (url) => {
+    if (url.startsWith('/api/verify/methods')) {
+      return {
+        data: {
+          success: true,
+          data: {
+            scope: 'token.key.read',
+            methods: [{ method: '2fa', available: true }],
+            oauth_providers: [],
+            password_encryption_enabled: false,
+          },
+        },
+      }
+    }
     if (url.startsWith('/api/token/')) {
       return {
         data: { success: true, data: { items: [currentKey], total: 1 } },
@@ -313,8 +326,24 @@ async function renderKeysPage(status = 1, overrides: Partial<ApiKey> = {}) {
     }
     return { data: { success: true, data: { default: { ratio: 1 } } } }
   })
-  const post = vi.spyOn(api, 'post').mockResolvedValue({
-    data: { success: true, data: { key: 'fake-key-for-test-only' } },
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/verify') {
+      return {
+        data: {
+          success: true,
+          data: {
+            proof_token: 'token-key-proof',
+            method: '2fa',
+            scope: 'token.key.read',
+            expires_at: Math.floor(Date.now() / 1000) + 60,
+          },
+        },
+      }
+    }
+    if (url === '/api/token/7/key') {
+      return { data: { success: true, data: { key: 'fake-key-for-test-only' } } }
+    }
+    return { data: { success: true, data: {} } }
   })
   const put = vi.spyOn(api, 'put').mockImplementation(async (_url, data) => {
     const update = data as { id: number; status: number }
@@ -421,20 +450,45 @@ it('keeps expired status when the server refuses reactivation', async () => {
 })
 
 it.each([true, false])(
-  'fetches a full key only on explicit copy and honors permission success=%s',
+  'fetches a full key only after step-up verification and honors permission success=%s',
   async (success) => {
     const user = userEvent.setup()
     const { post } = await renderKeysPage()
-    post.mockResolvedValue(
-      success
+    post.mockImplementation(async (url) => {
+      if (url === '/api/verify') {
+        return {
+          data: {
+            success: true,
+            data: {
+              proof_token: 'token-key-proof',
+              method: '2fa',
+              scope: 'token.key.read',
+              expires_at: Math.floor(Date.now() / 1000) + 60,
+            },
+          },
+        }
+      }
+      return success
         ? { data: { success: true, data: { key: 'fake-key-for-test-only' } } }
         : { data: { success: false, message: 'Verification required' } }
-    )
+    })
     const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
     await user.click(screen.getByRole('button', { name: 'Open menu' }))
     expect(post).not.toHaveBeenCalled()
     await user.click(screen.getByRole('menuitem', { name: 'Copy Key' }))
-    await waitFor(() => expect(post).toHaveBeenCalledWith('/api/token/7/key'))
+    // G1/T8: plaintext key disclosure now requires a step-up security dialog.
+    await user.type(
+      await screen.findByLabelText('Authenticator code or backup code'),
+      '123456'
+    )
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    await waitFor(() =>
+      expect(post).toHaveBeenCalledWith(
+        '/api/token/7/key',
+        undefined,
+        expect.anything()
+      )
+    )
     if (success) {
       await waitFor(() =>
         expect(copy).toHaveBeenCalledWith('sk-fake-key-for-test-only')
@@ -443,7 +497,8 @@ it.each([true, false])(
       await screen.findByText('Verification required')
       expect(copy).not.toHaveBeenCalled()
     }
-  }
+  },
+  40_000
 )
 
 it('keeps full mobile information without group or quota section headings', async () => {

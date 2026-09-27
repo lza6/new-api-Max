@@ -15,6 +15,7 @@ import (
 func SetRouter(router *gin.Engine, assets WebAssets) {
 	SetApiRouter(router)
 	SetWebProtectionRouter(router)
+	SetWebhookRouter(router)
 	SetDashboardRouter(router)
 	SetRelayRouter(router)
 	SetTaskPluginProtocolRouter(router)

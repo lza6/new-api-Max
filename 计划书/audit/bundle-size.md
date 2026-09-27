@@ -77,3 +77,18 @@ Top 10 chunk（原始/gzip）：
   断言入口 index chunk（原始）< 5 MB、总 JS < 70 MB、gzip 总 < 25 MB（CI 可跑，阈值留余量防 flaky）。
 - **结论**：首屏 JS ≈ 1.25 MB gzip 为稳定基线；拆共享层收益低风险高，维持「不推荐进一步瘦身」。
 - **防重复跑**：改动入口/共享层/重依赖后再跑 build 对比本记录。
+
+
+
+## 记录 0005 · T9-E3 组件复用收敛（2026-09-27，v1.3.45）
+- **范围**：web/src/components 业务共享组件 vs 31 features 本地实现盘点（explorer 只读审计）。
+- **确认非重复**（避免误收敛）：channels/keys/models/users 的 BulkActions 包装、StatusBadge/ProviderBadge 领域映射、api-key-timestamp-cell re-export、pricing search-bar（意图不同）、usage-logs 双日期选择器（能力缺口）。共 6 类。
+- **已收敛（明确重复、低风险、各 1 引用）**：
+  1. keys/api-keys-delete-dialog.tsx → 共享 ConfirmDialog（删除 AlertDialog 手写结构）。
+  2. redemption-codes/redemptions-delete-dialog.tsx → 共享 ConfirmDialog。
+  3. pricing/empty-state.tsx → 薄封装共享 EmptyState（保留领域文案/清空动作，委托 icon/title/description/action props）。
+- **死代码清理**：system-settings/components/settings-card.tsx（0 引用，字段子集，删除）。
+- **保留收敛候选（uncertain/需视觉确认，不动）**：playground empty-state（min-h 差异）、channel-editor-loading-state（领域文案+auto-skeleton 未采用）、redemptions-mobile-list（官方 mobile 槽扩展点）、pricing loading-skeleton（auto-skeleton 保真度）、wallet 支付确认对话框（富内容）。
+- **验证**：typecheck PASS；vitest keys/redemption-codes/pricing/system-settings 29 文件 329 测试全绿；build PASS（Total 59,410.0 kB 与 0004 基线一致）；bunx knip 无新增死代码（存量未使用类型属已知）。
+- **性能预算**：bundle-budget.test.ts 3/3 绿（index<5MB / 总<70MB / 最大 chunk<8MB）。
+- **防重复跑**：下次收敛前先读本记录「确认非重复」清单，避免误扫。

@@ -87,3 +87,34 @@ func TestResetPasswordRejectsInvalidToken(t *testing.T) {
 	assert.False(t, payload.Success)
 	assert.NotContains(t, response.Body.String(), "original-password-456")
 }
+
+// TestSendEmailVerificationAntiEnumeration 覆盖 G4：发送邮箱验证码接口对已注册与
+// 未注册邮箱必须返回完全一致的统一成功响应（不泄露注册状态），且已注册邮箱不生成验证码。
+func TestSendEmailVerificationAntiEnumeration(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	registeredEmail := "g4-registered@example.com"
+	password, err := common.HashAccountPassword("password-123")
+	require.NoError(t, err)
+	require.NoError(t, model.DB.Create(&model.User{
+		Username: "g4-user", Email: registeredEmail, Password: password,
+		Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AffCode: "g4a",
+	}).Error)
+
+	sendFor := func(email string) *httptest.ResponseRecorder {
+		response := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(response)
+		c.Request = httptest.NewRequest(http.MethodGet, "/api/verification?email="+email, nil)
+		SendEmailVerification(c)
+		return response
+	}
+
+	registered := sendFor(registeredEmail)
+	unregistered := sendFor("g4-unregistered@example.com")
+	require.Equal(t, http.StatusOK, registered.Code)
+	require.Equal(t, http.StatusOK, unregistered.Code)
+	// 两个响应体必须完全一致 —— 接口不可区分邮箱是否已注册。
+	assert.Equal(t, registered.Body.String(), unregistered.Body.String())
+
+	// 已注册邮箱不得生成/落库验证码：任意码都校验失败。
+	assert.False(t, common.VerifyCodeWithKey(registeredEmail, "123456", common.EmailVerificationPurpose))
+}

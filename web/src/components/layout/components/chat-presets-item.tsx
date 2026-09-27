@@ -41,8 +41,10 @@ import {
   SidebarMenuSubItem,
   useSidebar,
 } from '@/components/ui/sidebar'
-import { fetchActiveChatKey } from '@/features/chat/hooks/use-active-chat-key'
+import { SecureVerificationDialog } from '@/features/auth/secure-verification'
+import { getActiveChatTokenId } from '@/features/chat/hooks/use-active-chat-key'
 import { useChatPresets } from '@/features/chat/hooks/use-chat-presets'
+import { useTokenKeyDisclosure } from '@/features/keys/hooks/use-token-key-disclosure'
 import {
   chatLinkRequiresApiKey,
   resolveChatUrl,
@@ -165,6 +167,9 @@ export function ChatPresetsItem({ item }: { item: NavChatPresets }) {
   const href = useLocation({ select: (location) => location.href })
   const [loadingPresetId, setLoadingPresetId] = useState<string | null>(null)
   const loadingPresetIdRef = useRef<string | null>(null)
+  // G1/T8: opening a chat link with the user's key discloses the plaintext key,
+  // so it requires a step-up security verification.
+  const disclosure = useTokenKeyDisclosure()
 
   const visiblePresets = useMemo(
     () => chatPresets.filter((preset) => preset.type !== 'fluent'),
@@ -187,7 +192,8 @@ export function ChatPresetsItem({ item }: { item: NavChatPresets }) {
         loadingPresetIdRef.current = preset.id
         setLoadingPresetId(preset.id)
         try {
-          activeKey = await fetchActiveChatKey()
+          const tokenId = await getActiveChatTokenId()
+          activeKey = (await disclosure.revealSingleKey(tokenId)) ?? undefined
         } catch (error) {
           const message =
             error instanceof Error
@@ -232,60 +238,68 @@ export function ChatPresetsItem({ item }: { item: NavChatPresets }) {
   // Collapsed state on non-mobile - render dropdown menu
   if (state === 'collapsed' && !isMobile) {
     return (
-      <SidebarMenuItem>
-        <DropdownMenu>
-          <DropdownMenuTrigger
-            render={<SidebarMenuButton tooltip={item.title} />}
-          >
-            {item.icon && <item.icon className='h-4 w-4 shrink-0' />}
-            <span className='min-w-0 flex-1 truncate'>{item.title}</span>
-            <ChevronRight className='ms-auto h-4 w-4 shrink-0 opacity-70' />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align='start'>
-            {visiblePresets.map((preset) => (
-              <DropdownPresetItem
-                key={preset.id}
-                preset={preset}
-                loading={loadingPresetId === preset.id}
-                onOpen={handleOpenExternal}
-              />
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </SidebarMenuItem>
+      <>
+        <SidebarMenuItem>
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              render={<SidebarMenuButton tooltip={item.title} />}
+            >
+              {item.icon && <item.icon className='h-4 w-4 shrink-0' />}
+              <span className='min-w-0 flex-1 truncate'>{item.title}</span>
+              <ChevronRight className='ms-auto h-4 w-4 shrink-0 opacity-70' />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align='start'>
+              {visiblePresets.map((preset) => (
+                <DropdownPresetItem
+                  key={preset.id}
+                  preset={preset}
+                  loading={loadingPresetId === preset.id}
+                  onOpen={handleOpenExternal}
+                />
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </SidebarMenuItem>
+        <SecureVerificationDialog
+          {...disclosure.verification.dialogProps}
+        />
+      </>
     )
   }
 
   // Expanded state - render collapsible menu
   return (
-    <Collapsible
-      defaultOpen={normalizedHref.startsWith('/chat')}
-      className='group/collapsible'
-      render={<SidebarMenuItem />}
-    >
-      <CollapsibleTrigger
-        className='group/collapsible-trigger'
-        render={<SidebarMenuButton />}
+    <>
+      <Collapsible
+        defaultOpen={normalizedHref.startsWith('/chat')}
+        className='group/collapsible'
+        render={<SidebarMenuItem />}
       >
-        {item.icon && <item.icon className='shrink-0' />}
-        <span className='min-w-0 flex-1 truncate'>{item.title}</span>
-        <ChevronRight className='ms-auto size-4 shrink-0 transition-transform duration-200 group-data-[panel-open]/collapsible-trigger:rotate-90' />
-      </CollapsibleTrigger>
-      <CollapsibleContent className='CollapsibleContent'>
-        <SidebarMenuSub>
-          {visiblePresets.map((preset) => (
-            <ChatMenuItem
-              key={preset.id}
-              preset={preset}
-              active={normalizedHref === `/chat/${preset.id}`}
-              loading={loadingPresetId === preset.id}
-              onOpen={handleOpenExternal}
-              onNavigate={() => setOpenMobile(false)}
-              preload={isMobile ? false : undefined}
-            />
-          ))}
-        </SidebarMenuSub>
-      </CollapsibleContent>
-    </Collapsible>
+        <CollapsibleTrigger
+          className='group/collapsible-trigger'
+          render={<SidebarMenuButton />}
+        >
+          {item.icon && <item.icon className='shrink-0' />}
+          <span className='min-w-0 flex-1 truncate'>{item.title}</span>
+          <ChevronRight className='ms-auto size-4 shrink-0 transition-transform duration-200 group-data-[panel-open]/collapsible-trigger:rotate-90' />
+        </CollapsibleTrigger>
+        <CollapsibleContent className='CollapsibleContent'>
+          <SidebarMenuSub>
+            {visiblePresets.map((preset) => (
+              <ChatMenuItem
+                key={preset.id}
+                preset={preset}
+                active={normalizedHref === `/chat/${preset.id}`}
+                loading={loadingPresetId === preset.id}
+                onOpen={handleOpenExternal}
+                onNavigate={() => setOpenMobile(false)}
+                preload={isMobile ? false : undefined}
+              />
+            ))}
+          </SidebarMenuSub>
+        </CollapsibleContent>
+      </Collapsible>
+      <SecureVerificationDialog {...disclosure.verification.dialogProps} />
+    </>
   )
 }

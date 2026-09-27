@@ -104,7 +104,12 @@ func NotifyUser(userId int, userEmail string, userSetting dto.UserSetting, data 
 
 		// 获取 webhook secret
 		webhookSecret := userSetting.WebhookSecret
-		return SendWebhookNotify(webhookURLStr, webhookSecret, data)
+		body, err := common.Marshal(data)
+		if err != nil {
+			common.SysLog(fmt.Sprintf("failed to marshal webhook notify for user %d: %s", userId, err.Error()))
+			return err
+		}
+		return SendWebhookNotify(webhookURLStr, webhookSecret, body)
 	case dto.NotifyTypeBark:
 		barkURL := userSetting.BarkUrl
 		if barkURL == "" {
