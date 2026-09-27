@@ -3,6 +3,7 @@ package common
 import (
 	"net"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -15,15 +16,33 @@ import (
 // 本文件提供单一共享调优 Transport + 带超时的 client 工厂：
 //   - 所有外呼共享同一连接池（更高 MaxIdleConnsPerHost），消除连接抖动；
 //   - 各调用方仍可指定自己的 Timeout（如 ollama 大模型 30min/60min），行为不变；
-//   - 保持流式不透传缓冲、直连；TLS 校验随 TLS_INSECURE_SKIP_VERIFY 与中继口径一致。
+//   - TLS 校验随 TLS_INSECURE_SKIP_VERIFY 与中继口径一致；
 //   - 非 SSRF 路径专用：URL 由网关/渠道配置控制；任意用户可控 URL 走 SSRF 客户端。
 //
-// 构造时机（P1-1 修复）：本 Transport 由渠道适配器的**包级 client var 初始化**触发构建，
-// 先于 main()/InitEnv()，因此不能依赖包内 `TLSInsecureSkipVerify` 变量（其在 init.go 的
-// init() 里才从 env 赋值）——builder 直接读取 env（os.Getenv 时序无关），保证与
-// service/http_client.go 的 newRelayHTTPTransport（运行期构建）最终口径一致。
+// 构造时机（P1-1 修复）：渠道适配器的**包级 client var 初始化**在程序加载即会触发
+// `GetOutboundTransport()`——早于 main() 的 godotenv.Load 与 InitEnv，因此不能依赖
+// 包内 `TLSInsecureSkipVerify` 变量或包 var 顺序（都会在 .env 加载前读到 false）。
+// 修复采用「惰性 RoundTripper」：真实 Transport 在**首个外呼（RoundTrip）**时才构建，
+// 此时 .env/进程 env 均已就绪；os.Getenv 时序无关地正确读取 TLS_INSECURE_SKIP_VERIFY。
+// 连接池共享、并发安全（sync.Once）、TLS 行为与 service/http_client.go 运行期构建最终一致。
 
-var sharedOutboundTransport = buildOutboundTransport()
+// lazyOutboundTransport 延迟构建真实 Transport 的 RoundTripper（首个 RoundTrip 时构建）。
+type lazyOutboundTransport struct {
+	once sync.Once
+	tr   *http.Transport
+}
+
+func (l *lazyOutboundTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	l.once.Do(func() { l.tr = buildOutboundTransport() })
+	return l.tr.RoundTrip(req)
+}
+
+func (l *lazyOutboundTransport) ensureBuilt() *http.Transport {
+	l.once.Do(func() { l.tr = buildOutboundTransport() })
+	return l.tr
+}
+
+var sharedOutbound = &lazyOutboundTransport{}
 
 func buildOutboundTransport() *http.Transport {
 	transport := &http.Transport{
@@ -39,16 +58,21 @@ func buildOutboundTransport() *http.Transport {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: time.Second,
 	}
-	// 直读 env：无论本包/调用方何时初始化，均正确反映 TLS_INSECURE_SKIP_VERIFY。
+	// 直读 env：无论何时构建（首个外呼，晚于 .env/进程 env 就绪），均正确反映开关。
 	if GetEnvOrDefaultBool("TLS_INSECURE_SKIP_VERIFY", false) {
 		transport.TLSClientConfig = InsecureTLSConfig
 	}
 	return transport
 }
 
-// GetOutboundTransport 返回共享出站连接池 Transport（只读，勿修改字段）。
-func GetOutboundTransport() *http.Transport {
-	return sharedOutboundTransport
+// GetOutboundTransport 返回共享出站连接池（惰性构建的 RoundTripper，只读勿改写）。
+func GetOutboundTransport() http.RoundTripper {
+	return sharedOutbound
+}
+
+// GetOutboundTransportBuilt 强制构建并返回真实 Transport（测试/观测用）。
+func GetOutboundTransportBuilt() *http.Transport {
+	return sharedOutbound.ensureBuilt()
 }
 
 // NewOutboundClient 返回使用共享连接池 + 指定超时的出站 client。
