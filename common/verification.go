@@ -101,15 +101,15 @@ func VerifyCodeWithKey(key string, code string, purpose string) bool {
 	rk := purpose + key
 	if verificationRedisAvailable() {
 		val, found, err := redisVerificationGet(rk)
+		if err == nil && found {
+			// Redis TTL 已实现过期；仅比对码值。
+			return code == val
+		}
+		// Redis 未命中或故障：回读内存兜底（可能是故障窗口内写入内存的码）。
+		// 注意：不在此处写回 Redis，避免与注册侧的单源策略产生不一致。
 		if err != nil {
-			SysError("verification: redis get failed: " + err.Error())
-			return false
+			SysError("verification: redis get failed, falling back to memory: " + err.Error())
 		}
-		if !found {
-			return false
-		}
-		// Redis TTL 已实现过期；仅比对码值。
-		return code == val
 	}
 	verificationMutex.Lock()
 	defer verificationMutex.Unlock()
@@ -125,18 +125,28 @@ func VerifyCodeWithKey(key string, code string, purpose string) bool {
 // T8：防止验证码在有效窗口内被重放用于多次注册/绑定。校验成功后立即删除，
 // 与重置路径"成功后 DeleteKey"语义对齐。Redis 路径用 Lua 保证
 // 「匹配才删除」的原子性，避免多实例并发消费竞态。
+// Redis 未命中/故障时回读内存兜底；Redis 返回「码错」则不回退（防双重消费）。
 func VerifyCodeWithKeyConsume(key string, code string, purpose string) bool {
 	rk := purpose + key
 	if verificationRedisAvailable() {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
 		res, err := RDB.Eval(ctx, verificationRedisLua, []string{verificationRedisPrefix + rk}, code).Result()
-		if err != nil {
-			SysError("verification: redis consume failed: " + err.Error())
-			return false
+		cancel()
+		if err == nil {
+			if s, ok := res.(string); ok {
+				if s == "ok" {
+					return true
+				}
+				if s == "mismatch" {
+					// Redis 中码存在但值不匹配：不回退内存（避免对内存中的同键
+					// 孤儿条目产生双重消费/误判）。
+					return false
+				}
+			}
+			// "" → Redis 未命中：回读内存兜底（故障窗口内写入的码）。
+		} else {
+			SysError("verification: redis consume failed, falling back to memory: " + err.Error())
 		}
-		s, ok := res.(string)
-		return ok && s == "ok"
 	}
 	verificationMutex.Lock()
 	defer verificationMutex.Unlock()

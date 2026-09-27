@@ -30,7 +30,7 @@ func hmacHex(secret string, body []byte) string {
 	return hex.EncodeToString(mac.Sum(nil))
 }
 
-func TestSendWebhookNotifySignsAndPosts(t *testing.T) {
+func TestSendSignedEventWebhookSignsAndPosts(t *testing.T) {
 	disableSSRFProtection(t)
 	received := make(chan []byte, 1)
 	var signature string
@@ -43,7 +43,7 @@ func TestSendWebhookNotifySignsAndPosts(t *testing.T) {
 	defer srv.Close()
 
 	body := []byte(`{"event_type":"epay.topup.success","event_id":"T1"}`)
-	require.NoError(t, SendWebhookNotify(srv.URL, "webhook-secret-abc", body))
+	require.NoError(t, SendSignedEventWebhook(srv.URL, "webhook-secret-abc", body))
 	select {
 	case got := <-received:
 		assert.Equal(t, body, got)
@@ -53,19 +53,19 @@ func TestSendWebhookNotifySignsAndPosts(t *testing.T) {
 	assert.Equal(t, "sha256="+hmacHex("webhook-secret-abc", body), signature)
 }
 
-func TestSendWebhookNotifyRejectsPrivateURLUnderSSRF(t *testing.T) {
+func TestSendSignedEventWebhookRejectsPrivateURLUnderSSRF(t *testing.T) {
 	configureSSRFTestFetchSetting(t)
-	err := SendWebhookNotify("http://127.0.0.1:1/notify", "secret", []byte(`{}`))
+	err := SendSignedEventWebhook("http://127.0.0.1:1/notify", "secret", []byte(`{}`))
 	require.Error(t, err)
 }
 
-func TestSendWebhookNotifyFailsOnNon2xx(t *testing.T) {
+func TestSendSignedEventWebhookFailsOnNon2xx(t *testing.T) {
 	disableSSRFProtection(t)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
-	err := SendWebhookNotify(srv.URL, "secret", []byte(`{}`))
+	err := SendSignedEventWebhook(srv.URL, "secret", []byte(`{}`))
 	require.Error(t, err)
 }
 

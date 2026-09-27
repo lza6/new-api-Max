@@ -18,8 +18,9 @@ func GetWebhookSettings(c *gin.Context) {
 	common.ApiSuccess(c, operation_setting.GetWebhookSetting())
 }
 
-// UpdateWebhookSettings 更新全局 Webhook 配置并热生效+持久化。
-// URL 必须为 https（SSRF 防护在发送时二次校验）；events 为订阅事件白名单。
+// UpdateWebhookSettings 更新全局 Webhook 配置。
+// 两阶段提交：先在副本上组装+校验，全部通过后再写入运行时配置并持久化；
+// 任一失败（校验/UURL/SSRF/持久化）均回滚，运行时行为不受被拒配置影响。
 func UpdateWebhookSettings(c *gin.Context) {
 	var input map[string]any
 	if err := common.DecodeJson(c.Request.Body, &input); err != nil {
@@ -47,37 +48,41 @@ func UpdateWebhookSettings(c *gin.Context) {
 			return
 		}
 	}
-	target := config.GlobalConfig.Get("webhook")
-	if target == nil {
+
+	// ① 在深拷贝上组装。
+	prev := operation_setting.SnapshotWebhookSetting()
+	next := prev
+	if err := config.UpdateConfigFromMap(&next, configMap); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
-	if err := config.UpdateConfigFromMap(target, configMap); err != nil {
-		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
-		return
-	}
-	if err := common.Validate.Struct(target); err != nil {
+	if err := common.Validate.Struct(&next); err != nil {
 		common.ApiErrorI18n(c, i18n.MsgInvalidInput)
 		return
 	}
-	// 启用时必须配置有效 http(s) URL + secret；否则拒绝保存（fail fast）。
-	setting := operation_setting.GetWebhookSetting()
-	if setting.Enabled {
-		if setting.URL == "" || setting.Secret == "" {
+
+	// ② 启用时必须配置有效 http(s) URL + secret；并对 URL 做 SSRF fail-fast。
+	if next.Enabled {
+		if next.URL == "" || next.Secret == "" {
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}
-		if !strings.HasPrefix(setting.URL, "https://") && !strings.HasPrefix(setting.URL, "http://") {
+		if !strings.HasPrefix(next.URL, "https://") && !strings.HasPrefix(next.URL, "http://") {
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}
-		// 保存时即校验 SSRF（私网/环回/云元数据拒绝），避免「配置了但永不发送」的静默失败。
-		if err := service.ValidateSSRFProtectedFetchURL(setting.URL); err != nil {
+		if err := service.ValidateSSRFProtectedFetchURL(next.URL); err != nil {
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}
 	}
+
+	// ③ 提交运行时配置。
+	operation_setting.ReplaceWebhookSetting(next)
+
+	// ④ 持久化；失败回滚运行时配置。
 	if err := saveWebhookConfig(); err != nil {
+		operation_setting.ReplaceWebhookSetting(prev)
 		common.ApiError(c, err)
 		return
 	}

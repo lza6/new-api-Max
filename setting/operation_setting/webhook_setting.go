@@ -11,7 +11,8 @@ import (
 type WebhookSetting struct {
 	// Enabled 总开关（默认关，以避免未配置时产生任何外呼）。
 	Enabled bool `json:"enabled"`
-	// URL 接收回调的 HTTPS 地址（SSRF 防护：仅 https，且拒绝私网/环回/云元数据段）。
+	// URL 接收回调的地址。允许 http/https（https 强烈推荐）；SSRF 防护拒绝
+	// 私网/环回/云元数据段（保存与发送时双重校验）。
 	URL string `json:"url"`
 	// Secret 用于 HMAC-SHA256 签名，请求头 X-New-API-Webhook-Signature: sha256=<hex>。
 	Secret string `json:"secret"`
@@ -36,6 +37,20 @@ func init() {
 
 func GetWebhookSetting() *WebhookSetting {
 	return &webhookSetting
+}
+
+// SnapshotWebhookSetting 返回当前配置的深拷贝，用于「副本组装→校验→提交」，
+// 避免控制层校验失败时污染运行时配置。
+func SnapshotWebhookSetting() WebhookSetting {
+	s := webhookSetting
+	s.Events = append([]string(nil), webhookSetting.Events...)
+	return s
+}
+
+// ReplaceWebhookSetting 用已校验的副本原子替换运行时配置（Events 深拷贝）。
+func ReplaceWebhookSetting(s WebhookSetting) {
+	s.Events = append([]string(nil), s.Events...)
+	webhookSetting = s
 }
 
 // IsWebhookEventSubscribed 事件类型是否在订阅白名单内（空白条目丢弃）。

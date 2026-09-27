@@ -38,10 +38,11 @@ var webhookDedup = struct {
 	m  map[string]time.Time
 }{m: make(map[string]time.Time)}
 
-// SendWebhookNotify 向用户配置的 webhook URL 发送签名 POST。
-// 响应体作为 body 发送，签名覆盖 body 全量字节；失败返回 error（由调用方决定重试/记录）。
-// 任意用户可控 URL 必须走 SSRF 校验（ValidateSSRFProtectedFetchURL）。
-func SendWebhookNotify(webhookURL string, webhookSecret string, body []byte) error {
+// SendSignedEventWebhook 向全局配置的 webhook URL 发送签名 POST（事件信封）。
+// 负载为事件信封（event_type/event_id/payload/timestamp），签名头
+// X-New-API-Webhook-Signature: sha256=<hex>，走 SSRF 校验直连。
+// 与用户级通知 SendWebhookNotify（user_webhook.go，legacy 契约）相互独立。
+func SendSignedEventWebhook(webhookURL string, webhookSecret string, body []byte) error {
 	if webhookURL == "" {
 		return errors.New("webhook url is empty")
 	}
@@ -59,6 +60,9 @@ func SendWebhookNotify(webhookURL string, webhookSecret string, body []byte) err
 	req.Header.Set(WebhookSignatureHeader, "sha256="+sig)
 	client := GetSSRFProtectedHTTPClient()
 	if client == nil {
+		// ssrfProtectedHTTPClient 由 InitHttpClient 启动时注入；除非初始化失败否则非 nil。
+		// 该回退路径没有拨号级 SSRF 校验，触发时应告警（仍保留 URL 预校验）。
+		common.SysError("webhook: GetSSRFProtectedHTTPClient() returned nil; falling back to plain client (SSRF dial-guard bypass pending)")
 		client = &http.Client{Timeout: webhookTimeout}
 	}
 	resp, err := client.Do(req)
@@ -114,6 +118,8 @@ func validateWebhookURL(raw string) error {
 }
 
 // acquireWebhookDedup 去重窗口内同一 (eventType, eventID) 只允许一次通知。
+// 注意：该去重为进程内语义（单实例）。多实例部署下同一事件可能跨实例重复
+// 通知；如需跨实例幂等，应引入 Redis/DB 级投递去重（当前文档已注明局限）。
 func acquireWebhookDedup(key string) bool {
 	webhookDedup.mu.Lock()
 	defer webhookDedup.mu.Unlock()
@@ -145,7 +151,7 @@ func dispatchWebhook(rawURL, secret, eventType, eventID string, payload any) {
 		return
 	}
 	for attempt := 1; attempt <= webhookMaxRetry; attempt++ {
-		err := SendWebhookNotify(rawURL, secret, body)
+		err := SendSignedEventWebhook(rawURL, secret, body)
 		if err == nil {
 			return
 		}

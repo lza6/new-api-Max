@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -62,6 +63,10 @@ func SecureTokenKeyVerificationRequired() gin.HandlerFunc {
 // (POST /api/token/batch/keys). The proof binds to the exact sorted id set, so
 // a proof cannot be replayed against a different set. The body is restored
 // before calling next so the controller can bind it again.
+//
+// P2-1/P2-5：这里前置校验 1..100 个、均 >0、去重、排序后再生成上下文，
+// 与 service.BindVerificationOperation 的规范化语义完全一致，超限/重复等
+// 非法输入直接返回 400（而不是让 bind 阶段落到 500）。
 func SecureTokenKeysBatchVerificationRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		raw, err := c.GetRawData()
@@ -72,10 +77,23 @@ func SecureTokenKeysBatchVerificationRequired() gin.HandlerFunc {
 		var body struct {
 			Ids []int `json:"ids"`
 		}
-		if common.Unmarshal(raw, &body) != nil || len(body.Ids) == 0 {
+		if common.Unmarshal(raw, &body) != nil || len(body.Ids) == 0 || len(body.Ids) > 100 {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
 			return
 		}
+		seen := make(map[int]struct{}, len(body.Ids))
+		for _, id := range body.Ids {
+			if id <= 0 {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
+				return
+			}
+			if _, dup := seen[id]; dup {
+				c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
+				return
+			}
+			seen[id] = struct{}{}
+		}
+		sort.Ints(body.Ids)
 		c.Request.Body = io.NopCloser(bytes.NewReader(raw))
 		context, err := common.Marshal(service.TokenKeysBatchReadContext{TokenIDs: body.Ids})
 		if err != nil {
@@ -110,6 +128,8 @@ func RequireSecurityProof(c *gin.Context, operation service.VerificationOperatio
 			securityProofError(c, "SECURITY_PROOF_EXPIRED", "安全验证已过期")
 		case errors.Is(err, service.ErrProofScope):
 			securityProofError(c, "SECURITY_PROOF_SCOPE_MISMATCH", "安全验证范围不匹配")
+		case errors.Is(err, service.ErrVerificationContextInvalid):
+			securityProofError(c, "SECURITY_CONTEXT_INVALID", service.ErrVerificationContextInvalid.Error())
 		case errors.Is(err, service.ErrVerificationUnavailable):
 			securityProofError(c, "SECURITY_METHOD_UNAVAILABLE", service.ErrVerificationUnavailable.Error())
 		case errors.Is(err, service.ErrProofMethod):

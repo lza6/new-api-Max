@@ -54,7 +54,12 @@ function makeWrapper() {
 }
 
 beforeEach(() => {
-  useAuthStore.setState({ auth: { user: { id: 1 } } })
+  useAuthStore.setState((state) => ({
+    auth: {
+      ...state.auth,
+      user: { id: 1, username: 'e2e-user', role: 0 },
+    },
+  }))
   mocks.revealSingleKey.mockReset()
 })
 

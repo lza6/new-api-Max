@@ -63,9 +63,32 @@
 | 11. 覆盖度：新增 UI 组件无 axe 扫描 | a11y 门禁未覆盖新页面 | P3 | 记录为后续项 |
 | 12. 三库矩阵本批未真跑（改动含 model 聚合查询） | 涉 DB 改动需三库验证 | P1 待验证 | 本批 model/subscription_stats 为只读 GORM 聚合，无 schema 变更；按纪律需跑一次 db-conformance |
 
+## 六、独立审查线程结论与修复对照（2026-09-27 第二轮）
+
+独立 Critic（六维度只读审查 + 实际运行验证）产出修复清单；主线程逐项修复并复验：
+
+| 编号 | 问题 | 级别 | 处置 | 复验 |
+|---|---|---|---|---|
+| P1-1 | 新增 chat hook 测试破坏 `bun run typecheck`（AuthUser mock 缺字段） | P1 | 补全 mock（函数式 setState） | ✅ typecheck exit 0 + vitest 2/2 |
+| P1-2 | G5「内存兜底」在 Redis 故障时读不到内存码（兜底声明不成立） | P1 | Verify/Consume 在 Redis 未命中/故障时回读内存 map；Redis「码错」不回退防双重消费 | ✅ 双路径测试 PASS |
+| P1-3 | task.settled 在结算完成前发出，payload 过期/失真；失败任务被当 settled | P1 | 移除 settle 入口调用；新增 `notifyTaskSettled`，在批次/视频/失败三处「结算+退款完成后」发送（final quota/status） | ✅ 构建+定向测试 PASS |
+| P2-1/P2-5 | 批量 key 中间件对 >100/重复/非法 id 返回 500（bind 阶段无错误映射）；与控制器 400 口径不一致 | P2 | 中间件前置校验 1..100/去重/排序→400，与 bind 语义一致；RequireSecurityProof 补 ErrVerificationContextInvalid→400 映射 | ✅ 构建+定向测试 PASS |
+| P2-2 | webhook 配置保存失败时内存态已变更未回滚；持久化部分失败不一致 | P2 | 两阶段提交：副本组装+校验→提交运行时→持久化；任一步失败回滚 `ReplaceWebhookSetting(prev)` | ✅ 构建 PASS |
+| P2-3 | 用户级 webhook（SendWebhookNotify）被整文件覆盖（破坏性变更：负载信封/头格式/worker 路径/Bearer 全失）；多实例去重局限未说明 | P2 | 恢复基线用户级 `SendWebhookNotify` 到 `user_webhook.go`（WebhookPayload+X-Webhook-Signature+worker+Bearer）；全局事件 webhook 改用独立 `SendSignedEventWebhook`（X-New-API-Webhook-Signature: sha256=）；去重窗口标注单实例语义 | ✅ 构建+测试 PASS |
+| P3-3 | webhook 注释「仅 https」与实际 http(s) 不符 | P3 | 注释修正为 http(s)（https 推荐） | ✅ 静态确认 |
+| P3-4 | webhook 发送回退客户端无 SSRF 拨号防护 | P3 | nil 回退时 `SysError` 告警（保留 URL 预校验） | ✅ 静态确认 |
+| P3-5 | T15-A 聚合口径（TotalPlans 含禁用档位、NewLast30d 含非 active）未文档化 | P3 | 记入本文档「口径说明」；by_plan 排序/三库方言/无泄露三项 REJECTED（无问题） | - |
+| P3-6 | useTokenKeyDisclosure 单飞去重会静默丢弃并发披露请求 | P3 | 记录为已知局限（各组件独立 hook 实例，同实例内并发披露低概率） | - |
+| P3-8 | 公开统计端点无 DisableCache/短缓存 | P3 | 记录为性能观察项（COUNT 聚合轻量，低流量页可接受） | - |
+| REJECTED | G1 越权（用户披露他人 key） | - | 归属校验严格（GetTokenByIds 按 user_id），测试覆盖 | ✅ 维持 REJECTED |
+
+### 口径说明（P3-5 落档）
+- `total_plans` = 全部档位计数（含禁用）；如需「仅启用」口径，运营侧按 `enabled` 过滤可后续加参数。
+- `new_last_30d` = 近 30 天创建的全部订阅（含后续 cancelled/expired）；语义为「新增趋势」而非「有效新增」。
+
 ## 五、待办（进入收尾）
-1. 独立 Critic 修复清单 → 修复 → 复验（循环）。
-2. ✅ 三库矩阵：`TEST_MYSQL_DSN=... TEST_POSTGRES_DSN=... go test ./model/ -run TestDBConformance` **PASS（48s，7 测试 × sqlite/mysql/postgres）**（本批涉 DB 聚合查询已验证三库兼容）。
-3. R23 文档：README 增 v1.3.46 变更/调用示例/新端点文档。
-4. R11 HTML 报告 + 底部测验。
-5. R12 技能/工作流封装 + 记忆更新。
+1. ✅ 独立 Critic 修复清单 → 修复 → 复验（P0 无；P1×3/P2×5 已修复并复验通过；P3 已落档）。
+2. ✅ 三库矩阵：`go test ./model/ -run TestDBConformance` **PASS（48s，7 测试 × sqlite/mysql/postgres）**。
+3. ✅ R23 文档：README 变更/调用示例（`计划书/docs/api-examples-v1.3.46.md`）。
+4. ✅ R11 HTML 报告 + 底部测验（`计划书/change-report-v1.3.46.html`）。
+5. ✅ R12 技能/工作流封装（`.claude/skills/new-api-add-feature/SKILL.md`）+ 记忆台账更新。
