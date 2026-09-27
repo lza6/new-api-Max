@@ -21,6 +21,9 @@ import (
 	"github.com/samber/lo"
 )
 
+// §4.1.2：包级出站客户端，复用共享调优连接池；保持既有无超时语义。
+var aliUpdateTaskClient = common.NewOutboundClient(0)
+
 func oaiImage2AliImageRequest(info *relaycommon.RelayInfo, request dto.ImageRequest, isSync bool) (*AliImageRequest, error) {
 	var imageRequest AliImageRequest
 	imageRequest.Model = request.Model
@@ -204,7 +207,7 @@ func updateTask(info *relaycommon.RelayInfo, taskID string) (*AliResponse, error
 
 	req.Header.Set("Authorization", "Bearer "+info.ApiKey)
 
-	client := &http.Client{}
+	client := aliUpdateTaskClient
 	resp, err := client.Do(req)
 	if err != nil {
 		common.SysLog("updateTask client.Do err: " + err.Error())

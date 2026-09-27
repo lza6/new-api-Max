@@ -629,6 +629,13 @@ func AdminSetUserSubscriptionTier(c *gin.Context) {
 		common.ApiErrorMsg(c, "档位不能为负数")
 		return
 	}
+	// 先取 user_id（用于失效与校验），再 UPDATE——若 UPDATE 失败则无需失效，
+	// 取 user_id 失败直接 404，避免"改档位后缓存滞留至 TTL"。
+	var sub model.UserSubscription
+	if err := model.DB.Select("id", "user_id").Where("id = ?", subId).First(&sub).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
 	if err := model.DB.Model(&model.UserSubscription{}).Where("id = ?", subId).Updates(map[string]any{
 		"rpm_override":         req.RpmOverride,
 		"concurrency_override": req.ConcurrencyOverride,
@@ -639,10 +646,7 @@ func AdminSetUserSubscriptionTier(c *gin.Context) {
 	}
 	// 档位覆盖变更影响订阅限流档位（缓存摘要中的 EffectiveTier）：立即失效
 	// 正向订阅缓存，避免覆盖到 TTL 过期前才生效（软限数据，秒级可接受但保持即时）。
-	var sub model.UserSubscription
-	if err := model.DB.Select("user_id").Where("id = ?", subId).First(&sub).Error; err == nil {
-		model.InvalidateActiveSubscriptionCache(sub.UserId)
-	}
+	model.InvalidateActiveSubscriptionCache(sub.UserId)
 	recordManageAudit(c, "subscription.tier_override", map[string]any{
 		"subscription_id":      subId,
 		"rpm_override":         req.RpmOverride,

@@ -62,7 +62,7 @@ var activeSubCache = struct {
 }{m: make(map[int]cachedActiveSubscriptions)}
 
 // GetCachedActiveSubscriptions 返回缓存的 active 订阅摘要；未命中/过期/关闭返回 found=false。
-// 只会把订阅变更后的查询放回缓存——调用方（limit 中间件）若发现结果非空。
+// 返回的切片为内部副本的只读视图，调用方不应修改其元素（避免污染缓存）。
 func GetCachedActiveSubscriptions(userId int) ([]SubscriptionSummary, bool) {
 	if !IsSubscriptionActiveCacheEnabled() || userId <= 0 {
 		return nil, false
@@ -81,8 +81,9 @@ func GetCachedActiveSubscriptions(userId int) ([]SubscriptionSummary, bool) {
 }
 
 // StoreCachedActiveSubscriptions 写入 active 订阅摘要缓存（TTL 由开关决定）。
+// 空摘要不入缓存（与"无订阅→负缓存"分工明确，避免 found-but-empty 跳过负缓存路径）。
 func StoreCachedActiveSubscriptions(userId int, summaries []SubscriptionSummary) {
-	if !IsSubscriptionActiveCacheEnabled() || userId <= 0 {
+	if !IsSubscriptionActiveCacheEnabled() || userId <= 0 || len(summaries) == 0 {
 		return
 	}
 	ttl := getSubscriptionActiveCacheTTL()
@@ -99,8 +100,8 @@ func StoreCachedActiveSubscriptions(userId int, summaries []SubscriptionSummary)
 				delete(activeSubCache.m, k)
 			}
 		}
-		// 仍达上限（低频长 TTL 存活条目多）时随机删至上限一半：退化到部分直查 DB，
-		// 但保留半数热点，避免整表清空造成高频用户全部缓存抖动。
+		// 仍达上限（低频长 TTL 存活条目多）时随机删至上限一半：部分条目退化到直查 DB，
+		// 但避免整表清空造成高频用户全部缓存抖动（非 LRU，仅容量兜底）。
 		if len(activeSubCache.m) >= subscriptionActiveCacheMaxEntries {
 			for k := range activeSubCache.m {
 				delete(activeSubCache.m, k)

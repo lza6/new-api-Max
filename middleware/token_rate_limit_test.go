@@ -4,7 +4,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
+	"github.com/lza6/new-api-Max/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestAllowTokenQBS(t *testing.T) {
@@ -88,4 +92,57 @@ func TestUserRateLimitConcurrencyStore(t *testing.T) {
 	releaseUserRateLimitConcurrency(401)
 	releaseUserRateLimitConcurrency(401)
 	releaseUserRateLimitConcurrency(401)
+}
+
+// TestResolveFromSubscriptionSummaries 锁定 §4.1.2 抽取函数（缓存命中路径）的档位语义：
+// 覆盖优先、subs[0] 取最新、空/无 sub/套餐未命中 均安全返回。
+func TestResolveFromSubscriptionSummaries(t *testing.T) {
+	// 内存 DB：供套餐缓存未命中时回退查询（覆盖 plan-miss 分支，不 panic）。
+	previousDB := model.DB
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&model.SubscriptionPlan{}))
+	model.DB = db
+	t.Cleanup(func() {
+		model.DB = previousDB
+		model.InvalidateSubscriptionPlanCache(1)
+	})
+
+	// 套餐直接落内存 DB：GetSubscriptionPlanById 缓存未命中时回退 DB（无缓存 API 依赖）。
+	plan := model.SubscriptionPlan{
+		Title: "plan-a", ConcurrencyLimit: 3, RpmLimit: 50,
+		DurationUnit: "month", DurationValue: 1, Enabled: true,
+	}
+	require.NoError(t, model.DB.Create(&plan).Error)
+	planID := plan.Id
+
+	newSub := func(rpmOv, conOv int) model.SubscriptionSummary {
+		return model.SubscriptionSummary{
+			Subscription: &model.UserSubscription{Id: 11, UserId: 63011, PlanId: planID, Status: "active", RpmOverride: rpmOv, ConcurrencyOverride: conOv},
+		}
+	}
+
+	cases := []struct {
+		name   string
+		subs   []model.SubscriptionSummary
+		expC   int
+		expR   int
+		expHas bool
+	}{
+		{"empty list", nil, 0, 0, false},
+		{"nil subscription", []model.SubscriptionSummary{{Subscription: nil}}, 0, 0, false},
+		{"plan limits no override", []model.SubscriptionSummary{newSub(0, 0)}, 3, 50, true},
+		{"rpm override wins", []model.SubscriptionSummary{newSub(120, 0)}, 3, 120, true},
+		{"concurrency override wins", []model.SubscriptionSummary{newSub(0, 9)}, 9, 50, true},
+		{"both override", []model.SubscriptionSummary{newSub(120, 9)}, 9, 120, true},
+		{"plan not found -> safe 0", []model.SubscriptionSummary{{Subscription: &model.UserSubscription{Id: 12, UserId: 63012, PlanId: 99999, Status: "active"}}}, 0, 0, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c, r, has := resolveFromSubscriptionSummaries(tc.subs)
+			assert.Equal(t, tc.expC, c)
+			assert.Equal(t, tc.expR, r)
+			assert.Equal(t, tc.expHas, has)
+		})
+	}
 }

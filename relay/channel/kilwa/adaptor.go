@@ -49,6 +49,9 @@ const (
 	kilwaTimeout    = 120 * time.Second
 )
 
+// §4.1.2：包级出站客户端，复用共享调优连接池（保持 120s 超时语义）。
+var kilwaHTTPClient = common.NewOutboundClient(kilwaTimeout)
+
 // kilwaUpstreamPath 按真实模型名选择上游端点：Claude 系列走 /kilwa-claude，
 // 其余（Grok 4.3 及未知模型）走 /kilwa-grok。
 func kilwaUpstreamPath(modelName string) string {
@@ -179,7 +182,7 @@ func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, request
 	if err != nil {
 		return nil, err
 	}
-	client := &http.Client{Timeout: kilwaTimeout}
+	client := kilwaHTTPClient
 	upstreamResp, err := client.Do(req)
 	if err != nil {
 		return nil, err

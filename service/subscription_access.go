@@ -12,7 +12,9 @@ import (
 // 无订阅负缓存：非订阅用户（relay 热路径的常见情形）短时间跳过 DB 订阅查询，
 // 避免每请求 2 次主库读（限流档位解析 + 模型矩阵校验各一次）。
 // TTL 15s：购买/到期最迟 15s 内生效，对限流档位语义可接受且已注明。
-// 订阅用户不缓存（人数少，保持矩阵/档位实时正确）。
+// 订阅用户走 model 正向缓存（model/subscription_tier_cache.go，TTL=env
+// SUBSCRIPTION_ACTIVE_CACHE_SECONDS 默认 10s，订阅变更即时失效）——本负缓存
+// 只负责"无订阅"用户的短路，明确两者分工。
 const noSubscriptionCacheTTL = 15 * time.Second
 
 var noSubscriptionCache = struct {

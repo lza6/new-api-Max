@@ -3,6 +3,8 @@ package controller
 import (
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -78,4 +80,37 @@ func TestSiteSubscriptionStatsAggregates(t *testing.T) {
 	// 响应不泄露任何用户 ID / 订单 / 时间细节。
 	assert.NotContains(t, response.Body.String(), "user_id")
 	assert.NotContains(t, response.Body.String(), "start_time")
+}
+// TestAdminSetUserSubscriptionTierInvalidatesCache 锁定 v1.3.48 审计补位（GAP-A）：
+// 管理端修改订阅档位覆盖（Rpm/ConcurrencyOverride）必须立即失效正向订阅缓存，
+// 使新档位即时生效，而不是等 TTL 过期。
+func TestAdminSetUserSubscriptionTierInvalidatesCache(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	// 造用户 + 套餐 + 订阅（创建路径会失效缓存，随后重新预置以模拟热路径已缓存）。
+	password, err := common.HashAccountPassword("original-password-123")
+	require.NoError(t, err)
+	user := model.User{Username: "tier-cache-user", Email: "tier-cache@example.com", Password: password, Role: common.RoleCommonUser, Status: common.UserStatusEnabled, Group: "default", AffCode: "tc1"}
+	require.NoError(t, model.DB.Create(&user).Error)
+	plan := model.SubscriptionPlan{Title: "tier-cache-plan", PriceAmount: 1, Currency: "USD", DurationUnit: "month", DurationValue: 1, Enabled: true, ConcurrencyLimit: 2, RpmLimit: 10, TotalAmount: 100000, QuotaResetPeriod: "month"}
+	require.NoError(t, model.DB.Create(&plan).Error)
+	sub, err := model.CreateUserSubscriptionFromPlanTx(model.DB, user.Id, &plan, "test")
+	require.NoError(t, err)
+
+	model.StoreCachedActiveSubscriptions(user.Id, []model.SubscriptionSummary{{Subscription: sub}})
+	_, found := model.GetCachedActiveSubscriptions(user.Id)
+	require.True(t, found, "热路径应已缓存该用户订阅")
+
+	body := `{"rpm_override":100,"concurrency_override":5}`
+	response := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(response)
+	c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(sub.Id)}}
+	c.Request = httptest.NewRequest(http.MethodPatch, "/api/subscription/admin/user_subscriptions/"+strconv.Itoa(sub.Id)+"/tier", strings.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+	AdminSetUserSubscriptionTier(c)
+
+	require.Equal(t, http.StatusOK, response.Code)
+	_, found = model.GetCachedActiveSubscriptions(user.Id)
+	assert.False(t, found, "档位覆盖后正向订阅缓存应已失效")
+	model.InvalidateActiveSubscriptionCache(user.Id)
 }
