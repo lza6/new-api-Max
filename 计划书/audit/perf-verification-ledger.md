@@ -271,3 +271,10 @@
 - **§4.2.4 a11y**：新增 3 个 vitest-axe 用例（webhook 设置页 / keys step-up 弹窗 / 订阅统计卡），axe 0 违规，无需改生产组件；断点截图 375/768/1280 × 3 页全部渲染 + 无横向溢出（18/18）。
 - **§4.2.5 性能预算**：`web/scripts/knip-gate.mjs` 基线对比门禁（--update 建基线；新 dead code → exit 1；存量 626 key 不清零）；bundle-budget.test.ts 递归扫 async/ + code-split 断言（5/5 绿）；ci.yml frontend job 接入。
 - **防重复**：① 前端 axe 单测本机可跑（单文件 38s，非噪声），勿再按旧的"vitest worker 崩溃"规避；② 本地 E2E 服务用 `PORT=3000 SQLITE_PATH=one-api.db?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_txlock=immediate go run main.go`，前端内嵌产物 API base 默认 localhost:3000（起其他端口需镜像 VITE_REACT_APP_SERVER_URL）；③ knip 改动后跑 `node scripts/knip-gate.mjs` 验证无新增，改文件若引入未用导出会红灯。
+
+## 记录 0022 · §4.3 v4.x SaaS 商业化（2026-09-29，v1.3.57）
+- **§4.3.1 定价透明**：额度预警多档（common.QuotaWarnThresholds=[1000,500,100]，env QUOTA_WARN_THRESHOLDS）；QuotaWarnThresholdsDefault 标记区分注册注入 80% 与显式设置；套餐对比页 /pricing/plans + 定价页余额 Banner。
+- **§4.3.2 留存续费**：到期前 N 天提醒（ReminderDaysNotified + MasterNode 周期任务，env SUBSCRIPTION_EXPIRY_REMIND_DAYS=3）；续费顺延重置提醒计数；一键续费复用余额支付。
+- **§4.3.3 P3**：落档建议仅文档，不实现（护栏）。
+- **验证**：后端 service/model 全量测试绿 + quota_warn 7 用例 + 到期提醒 4 用例；前端 typecheck/oxlint/i18n 无漂移；E2E 13/13 三断点截图；独立审查 2 轮收敛（P1-1/P1-2 修复）。
+- **防重复**：① 本机 E2E 起服务需 kill 占用 3000 的旧进程再 go run（go:embed 编译快照，改前端必须重启 Go 服务）；② compliance 端点 POST /api/option/payment_compliance 需 dashboard session Bearer（用 login 返回 access_token 即可，非 sk-token）；③ 套餐 API 路径：公开 GET /api/subscription/plans（挂 UserAuth）、admin POST /api/subscription/admin/plans、绑定 POST /api/subscription/admin/bind、续费复用 POST /api/subscription/balance/pay。
