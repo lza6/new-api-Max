@@ -24,6 +24,7 @@ import (
 
 const subscriptionActiveCacheKeyPrefix = "sub_tier"
 const subscriptionActiveCacheDefaultTTL = 10 * time.Second
+
 // subscriptionActiveCacheMaxEntries 缓存条目上限；超过时先淘汰过期项，
 // 仍超限则随机删除至上限一半（避免整表清空导致高频用户全部缓存抖动）。
 const subscriptionActiveCacheMaxEntries = 20000

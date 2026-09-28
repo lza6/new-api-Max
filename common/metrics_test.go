@@ -36,7 +36,7 @@ func TestMetricsCounterAndLabels(t *testing.T) {
 func TestMetricsHistogram(t *testing.T) {
 	resetMetrics()
 	MetricsObserve("http_request_duration_seconds", 0.05) // bucket[0] (<0.1)
-	MetricsObserve("http_request_duration_seconds", 0.3)  // bucket[1] (<0.25 -> index2? 0.3 -> bucket 0.5 le -> idx2)
+	MetricsObserve("http_request_duration_seconds", 0.3)  // 0.05 落入 le=0.1；0.3 落入 le=0.5（累计含 0.05）
 	MetricsObserve("http_request_duration_seconds", 30.0) // +Inf bucket (last)
 
 	out := RenderPrometheusMetrics()

@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
@@ -171,7 +173,13 @@ func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gi
 // §4.1.5：公开只读聚合端点（/v1/pricing、/v1/stats/subscriptions）不应用
 // CriticalRateLimit（20/20min 为敏感写端点设计，会 429 真实访客）；只读数据
 // 已由数据层/响应层短缓存兜底，宽松 IP 限流足以防滥用。
+// 逃生口：env PUBLIC_READ_RATE_LIMIT_ENABLE=false 可完全关闭（公开只读无鉴权，
+// 若需不限流部署）。注意该限流经 Redis 限流器（Redis 不可用时按既有全局模式
+// fail-closed 500）；如需无 Redis 依赖，置 false。
 func PublicReadRateLimit() func(c *gin.Context) {
+	if strings.EqualFold(os.Getenv("PUBLIC_READ_RATE_LIMIT_ENABLE"), "false") {
+		return func(c *gin.Context) { c.Next() }
+	}
 	return rateLimitFactory(60, 60, "PR")
 }
 

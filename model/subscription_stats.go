@@ -15,8 +15,8 @@ import (
 // 各自独立（TTL 秒级一致，公开聚合可接受）；过期自动刷新。
 var statsCache = struct {
 	sync.Mutex
-	value    *SiteSubscriptionStats
-	expires  time.Time
+	value   *SiteSubscriptionStats
+	expires time.Time
 }{}
 
 func subscriptionStatsCacheTTL() time.Duration {
@@ -47,7 +47,13 @@ func GetSiteSubscriptionStatsCached() (*SiteSubscriptionStats, error) {
 		return nil, err
 	}
 	if ttl > 0 {
+		// 写锁内双检：计算期间其他 goroutine 已填充新快照时，丢弃本次结果（避免覆盖，
+		// 减少 TTL 边界的重复聚合）。
 		statsCache.Lock()
+		if statsCache.value != nil && time.Now().Before(statsCache.expires) {
+			statsCache.Unlock()
+			return statsCache.value, nil
+		}
 		statsCache.value = stats
 		statsCache.expires = time.Now().Add(ttl)
 		statsCache.Unlock()
