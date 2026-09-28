@@ -265,3 +265,9 @@
 ## 记录 0020 · §4.1.3-4.1.6 审查收尾（2026-09-28，v1.3.53）
 - stats 缓存写锁内双检（并发 miss 收敛）；PublicReadRateLimit 逃生开关；gofmt 清零。
 - 既有 gofmt -l 基线债务（verification_test.go / channel.go / shadow_price.go 等）与本批无关，未动；后续可在独立批次清理。
+
+## 记录 0021 · §4.2.3/4.2.4/4.2.5 前端批次（2026-09-28，v1.3.56）
+- **§4.2.3 设计系统**：theme.css 新增语义阴影 tokens（--shadow-card/raised/drawer/popover/overlay，:root+dark 双套 oklch+inset 高光）；五个 pricing 组件 token 化 + hover/focus-visible/active 三态补齐。typecheck/lint/build 绿；产物 CSS 实证 utility 生成。
+- **§4.2.4 a11y**：新增 3 个 vitest-axe 用例（webhook 设置页 / keys step-up 弹窗 / 订阅统计卡），axe 0 违规，无需改生产组件；断点截图 375/768/1280 × 3 页全部渲染 + 无横向溢出（18/18）。
+- **§4.2.5 性能预算**：`web/scripts/knip-gate.mjs` 基线对比门禁（--update 建基线；新 dead code → exit 1；存量 626 key 不清零）；bundle-budget.test.ts 递归扫 async/ + code-split 断言（5/5 绿）；ci.yml frontend job 接入。
+- **防重复**：① 前端 axe 单测本机可跑（单文件 38s，非噪声），勿再按旧的"vitest worker 崩溃"规避；② 本地 E2E 服务用 `PORT=3000 SQLITE_PATH=one-api.db?_pragma=busy_timeout(30000)&_pragma=journal_mode(WAL)&_txlock=immediate go run main.go`，前端内嵌产物 API base 默认 localhost:3000（起其他端口需镜像 VITE_REACT_APP_SERVER_URL）；③ knip 改动后跑 `node scripts/knip-gate.mjs` 验证无新增，改文件若引入未用导出会红灯。

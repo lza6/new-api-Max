@@ -70,7 +70,7 @@ export function SiteSubscriptionStatsCard() {
 
   return (
     <div className='mx-auto mb-6 w-full max-w-2xl'>
-      <div className='bg-background/60 flex flex-wrap items-start justify-between gap-4 rounded-2xl border px-4 py-3 shadow-sm'>
+      <div className='bg-background/60 flex flex-wrap items-start justify-between gap-4 rounded-2xl border px-4 py-3 shadow-card'>
         <div className='flex flex-wrap gap-6'>
           <StatItem
             label={t('Active subscriptions')}

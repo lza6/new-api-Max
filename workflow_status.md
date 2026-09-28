@@ -515,3 +515,50 @@
 - 终局闭环审计结论（见下节 / 由审计子代理补充）
 - T14 旧产物清理（用户确认清单后）
 - H3 线上部署验收、H4 回滚演练（需授权）
+
+---
+
+# 2026-09-28 追加段：批次 004 — UI 设计系统 / a11y 与移动端 / 性能预算回归
+
+> 对应 .specify/specs/004（Spec-Kit 规范化条目）+ 指南 §4.2.3 / §4.2.4 / §4.2.5
+> 不覆盖上述记录，独立追加段。
+
+## Task Contract
+- §4.2.3：卡片/抽屉/表格视觉层级 token 化（语义阴影层新增，颜色/圆角已全）；hover/focus/active 覆盖；深浅双主题一致（不默认全暗）。验收对照 rules/web/design-quality.md。
+- §4.2.4：webhook 设置页 / keys step-up / 订阅统计卡补 vitest-axe 用例；新页面 375/768/1280 截图入 e2e-evidence。
+- §4.2.5：bundle-budget 扩展 code-splitting 复核；knip 死码门禁入 CI（基线对比，只防新增不清零存量）。
+
+## 已确认事实基线（2026-09-28）
+- vitest 单文件 axe 测试可跑通（38s 绿，非旧环境噪声）。
+- knip 6.27.0 无 --since；存量问题 600+（files 67 / deps 6 / devDeps 3 / exports 390 / types 155 / dup 1）；用 knip-gate 基线对比门禁。
+- theme.css 颜色/圆角 tokens 完整，缺语义阴影层；theme-presets.css 9 预设勿动结构。
+- 定版工具链：bun 1.4 / vitest 4.1 / knip 6.27 / oxlint。
+
+## Task Graph
+| ID | Owner | Goal | Status |
+|----|----|----|----|
+| A-1..A-7 | Builder A (§4.2.3) | theme.css 阴影 tokens + pricing 组件 token 化/交互态 | RUNNING |
+| B-1..B-5 | Builder B (§4.2.4) | 3 个 vitest-axe 用例 + 生产组件修复 | RUNNING |
+| C-1..C-5 | Builder C (§4.2.5) | knip-gate 门禁 + budget 扩展 + ci.yml + 懒加载复核 | RUNNING |
+| M-1 主控 | 主协调 | 375/768/1280 断点截图 e2e-evidence | PENDING（依赖 B） |
+| 审查线程 | 独立 Critic | 六维审查（需求/逻辑/边界/质量/测试/运行证据）| PENDING |
+| 交付 | 主协调 | typecheck/lint/vitest → commit → push → tag v1.3.56 → HTML 报告+测验 | PENDING |
+| 生产部署 | 用户授权 | 按部署纪律：用户明确要求才执行 | 不自动 |
+
+## 验收标准
+- [ ] 3 个 axe 用例本地实跑 0 违规（含修复生产组件）
+- [ ] knip-gate 探针正反例实测通过（+探针→exit1 / 删探针→exit0）
+- [ ] bundle-budget 绿；typecheck/lint 绿
+- [ ] 3 断点截图落盘
+- [ ] 独立审查 3 轮收敛
+- [ ] commit + push + tag v1.3.56 + HTML 报告/测验
+
+## 关键文件（改动目标）
+- web/src/styles/theme.css（shadow tokens）
+- web/src/features/pricing/components/{model-card,pricing-table,site-subscription-stats-card,search-bar,model-details}.tsx
+- web/src/features/webhook/__tests__/a11y-webhook-settings.test.tsx（新）
+- web/src/features/keys/components/__tests__/a11y-keys-stepup.test.tsx（新）
+- web/src/features/pricing/components/__tests__/a11y-stats-card.test.tsx（新）
+- web/scripts/knip-gate.mjs + knip-baseline.json（新）
+- web/src/lib/__tests__/bundle-budget.test.ts
+- .github/workflows/ci.yml

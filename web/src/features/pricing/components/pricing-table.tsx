@@ -103,8 +103,19 @@ export function PricingTable(props: PricingTableProps) {
           <DataTableRow
             key={row.id}
             row={row}
-            className='hover:bg-muted/30 cursor-pointer transition-colors'
+            aria-label={`${row.original.model_name} · ${t('Details')}`}
+            className='hover:bg-muted/30 cursor-pointer transition-colors focus-visible:ring-ring/40 focus-visible:ring-inset focus-visible:ring-2 active:bg-muted/40'
             onClick={() => handleRowClick(row.original)}
+            tabIndex={0}
+            onKeyDown={(event) => {
+              // 行级键盘激活遵循「Enter 或 Space」惯例；用 target 守卫避免
+              // 未来行内子元素（如复制按钮）的按键被行处理器劫持。
+              if (event.target !== event.currentTarget) {return}
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                handleRowClick(row.original)
+              }
+            }}
           />
         )}
       />

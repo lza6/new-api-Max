@@ -107,6 +107,12 @@ jobs:
       - name: Typecheck
         run: bun run typecheck
 
+      # §4.2.5 knip dead-code gate: fail only on NEW dead code (baseline diff
+      # via scripts/knip-gate.mjs). The legacy 600+ backlog is intentionally
+      # out of scope, so it never blocks CI.
+      - name: Knip dead-code gate (no new dead code)
+        run: node scripts/knip-gate.mjs
+
       - name: Test
         run: bun run test
   db-conformance:

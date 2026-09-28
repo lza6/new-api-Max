@@ -1410,7 +1410,7 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
         <TabsContent value='overview' className='space-y-6 outline-none'>
           <OverviewSummaryGrid model={props.model} />
 
-          <section className='bg-card/60 space-y-5 rounded-xl border p-4 shadow-sm'>
+          <section className='bg-card/60 space-y-5 rounded-xl border p-4 shadow-card'>
             <SectionTitle>{t('Pricing')}</SectionTitle>
             {showBasePrices && (
               <PriceSection
@@ -1480,7 +1480,7 @@ export function ModelDetailsDrawer(props: ModelDetailsDrawerProps) {
       <SheetContent
         side='right'
         className={sideDrawerContentClassName(
-          'sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl'
+          'shadow-drawer sm:max-w-2xl lg:max-w-3xl xl:max-w-4xl 2xl:max-w-5xl'
         )}
       >
         <SheetHeader className='sr-only'>

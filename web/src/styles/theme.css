@@ -91,6 +91,15 @@ For commercial licensing, please contact support@quantumnous.com
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+
+  /* Semantic elevation shadows, mapped to the `shadow-*` utilities.
+   * Runtime values live in `--elevation-*` (异名间接，与 `--color-*` 一致) so the
+   * mapping declaration is not a self-referential cycle. */
+  --shadow-card: var(--elevation-card);
+  --shadow-raised: var(--elevation-raised);
+  --shadow-drawer: var(--elevation-drawer);
+  --shadow-popover: var(--elevation-popover);
+  --shadow-overlay: var(--elevation-overlay);
 }
 
 :root {
@@ -176,6 +185,16 @@ For commercial licensing, please contact support@quantumnous.com
     var(--foreground) 16%,
     var(--background)
   );
+  /* Semantic elevation shadows. `card` is the resting state, `raised` is the
+   * hover state of interactive cards, and drawer/popover/overlay describe
+   * progressively higher floating layers above the canvas.
+   * Runtime names are `--elevation-*` (mirrored by `--shadow-*` in the
+   * `@theme inline` block) to avoid a self-referential token cycle. */
+  --elevation-card: 0 1px 2px oklch(0 0 0 / 0.05), 0 1px 1px oklch(0 0 0 / 0.04);
+  --elevation-raised: 0 4px 8px oklch(0 0 0 / 0.08), 0 2px 4px oklch(0 0 0 / 0.05);
+  --elevation-drawer: -8px 0 24px oklch(0 0 0 / 0.12), 0 4px 12px oklch(0 0 0 / 0.06);
+  --elevation-popover: 0 4px 16px oklch(0 0 0 / 0.12), 0 2px 6px oklch(0 0 0 / 0.06);
+  --elevation-overlay: 0 8px 32px oklch(0 0 0 / 0.18), 0 4px 12px oklch(0 0 0 / 0.08);
 }
 
 .dark {
@@ -244,4 +263,15 @@ For commercial licensing, please contact support@quantumnous.com
     var(--foreground) 24%,
     var(--background)
   );
+  /* Black shadows would vanish on the dark canvas, so the dark set raises
+   * opacity and adds a faint inner top highlight to keep edges and elevation
+   * legible next to the border. Runtime names are `--elevation-*` (see :root). */
+  --elevation-card: 0 1px 2px oklch(0 0 0 / 0.5), 0 1px 1px oklch(0 0 0 / 0.4),
+    inset 0 1px 0 oklch(1 0 0 / 0.03);
+  --elevation-raised: 0 4px 8px oklch(0 0 0 / 0.65), 0 2px 4px oklch(0 0 0 / 0.55),
+    inset 0 1px 0 oklch(1 0 0 / 0.04);
+  --elevation-drawer: -8px 0 24px oklch(0 0 0 / 0.7), 0 4px 12px oklch(0 0 0 / 0.6);
+  --elevation-popover: 0 4px 16px oklch(0 0 0 / 0.65), 0 2px 6px oklch(0 0 0 / 0.55),
+    inset 0 1px 0 oklch(1 0 0 / 0.04);
+  --elevation-overlay: 0 8px 32px oklch(0 0 0 / 0.75), 0 4px 12px oklch(0 0 0 / 0.65);
 }
