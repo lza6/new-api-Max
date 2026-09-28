@@ -6740,6 +6740,7 @@
     "Webhook Notifications": "Thông báo Webhook",
     "Webhook settings saved": "Đã lưu cài đặt webhook",
     "Verification cancelled. Please try again.": "Đã hủy xác minh. Vui lòng thử lại.",
-    "You can copy up to 100 API keys at once": "Bạn có thể sao chép tối đa 100 khóa API cùng lúc"
+    "You can copy up to 100 API keys at once": "Bạn có thể sao chép tối đa 100 khóa API cùng lúc",
+    "Failed to load pricing. Please try again.": "Không thể tải bảng giá. Vui lòng thử lại."
   }
 }

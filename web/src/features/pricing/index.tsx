@@ -19,8 +19,10 @@ For commercial licensing, please contact support@quantumnous.com
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { Button } from '@/components/ui/button'
 import { PublicLayout } from '@/components/layout'
 import { PageTransition } from '@/components/page-transition'
+import { getFriendlyErrorMessage } from '@/lib/server-error-message'
 
 import {
   LoadingSkeleton,
@@ -51,6 +53,8 @@ export function Pricing() {
     endpointMap,
     autoGroups,
     isLoading,
+    error: pricingError,
+    refetch,
     priceRate,
     usdExchangeRate,
   } = usePricingData()
@@ -154,6 +158,23 @@ export function Pricing() {
       <PublicLayout showMainContainer={false}>
         <div className='mx-auto w-full max-w-[1800px] px-3 pt-16 pb-8 sm:px-6 sm:pt-20 sm:pb-10 xl:px-8'>
           <LoadingSkeleton viewMode={viewMode} />
+        </div>
+      </PublicLayout>
+    )
+  }
+
+  // §4.2.1：查询失败不再伪装成「无模型」空态——给人话错误 + 重试，避免假功能。
+  if (pricingError) {
+    return (
+      <PublicLayout showMainContainer={false}>
+        <div className='flex h-full min-h-[60vh] flex-col items-center justify-center gap-4 px-4'>
+          <p className='text-muted-foreground max-w-md text-center text-sm'>
+            {getFriendlyErrorMessage(pricingError) ??
+              t('Failed to load pricing. Please try again.')}
+          </p>
+          <Button variant='outline' onClick={() => void refetch()}>
+            {t('Retry')}
+          </Button>
         </div>
       </PublicLayout>
     )

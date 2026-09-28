@@ -52,3 +52,8 @@
 | 29 | users | 用户 CRUD/批量/绑定/限速 | √ DataTable isLoading+Processing... | √ toast.success x8 | √ handleServerError x15 | √ emptyTitle No Users Found | `users-table.tsx:209-211`、`data-table-bulk-actions.tsx:146-198,290-324`、`user-quota-dialog.tsx:88-97`、`users-delete-dialog.tsx:43-50`、`users-mutate-drawer.tsx:192-218` | - | - |
 | 30 | wallet | 充值/转账/兑换/补单/订阅 | √ Skeleton+loadingKey | √ toast.success(Redirecting/Transfer/Redemption/Order completed) | √ handleServerError x8 | × 计划列表空时隐藏区无空态文案 | `hooks/use-payment.ts:130-153`、`hooks/use-redemption.ts:38-68`、`hooks/use-affiliate.ts:54-80`、`hooks/use-billing-history.ts`、`recharge-form-card.tsx:148-191`、`subscription-plans-card.tsx:143-195,246-256` | 支付失败无 retry 按钮；affiliate 空载直接无内容 | P2 |
 | 31 | web-protection | 封禁/解封+保存 | √ setSaving/setIsLoading | √ toast.success x4 | √ handleServerError | × 封禁列表 rows.length===0 无 EmptyState | `web-protection-page.tsx:185-186,274,338-368` | 空列表无文案 | P2 |
+
+## §4.2.1 补位（2026-09-28，v1.3.54）
+- **P1-16 pricing 查询失败假空态 → 已修**：`usePricingData` 已暴露 error/refetch，页面改用之——失败渲染人话错误 + 重试按钮（`web/src/features/pricing/index.tsx` 错误分支），不再伪装「无模型」空列表；i18n 7 语言 + vitest（`pricing-error-state.test.tsx`，本环境 vitest worker 崩溃待 CI 跑）。
+- **E2E 按钮反馈实证（browser-e2e-v1.3.54-interaction，8/10 PASS）**：登录（提交中禁用+跳转）、keys 表格行操作菜单、keys 复制→step-up 弹窗、keys 删除→二次确认弹窗、dashboard 复制→step-up 弹窗、pricing 渲染+统计卡、webhook 保存→toast。
+- 未纳入 PASS 的 2 项为 E2E 选择器/状态累积基建问题（toggle toast 检测、webhook Save 偶发选择器），非产品缺口（既有 ledger 已列代码级反馈证据）。

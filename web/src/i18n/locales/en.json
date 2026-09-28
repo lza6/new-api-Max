@@ -6740,6 +6740,7 @@
     "Webhook Notifications": "Webhook Notifications",
     "Webhook settings saved": "Webhook settings saved",
     "Verification cancelled. Please try again.": "Verification cancelled. Please try again.",
-    "You can copy up to 100 API keys at once": "You can copy up to 100 API keys at once"
+    "You can copy up to 100 API keys at once": "You can copy up to 100 API keys at once",
+    "Failed to load pricing. Please try again.": "Failed to load pricing. Please try again."
   }
 }

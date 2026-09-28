@@ -6740,6 +6740,7 @@
     "Webhook Notifications": "Webhook 通知",
     "Webhook settings saved": "Webhook設定を保存しました",
     "Verification cancelled. Please try again.": "確認がキャンセルされました。もう一度お試しください。",
-    "You can copy up to 100 API keys at once": "一度にコピーできる APIキーは最大100個です"
+    "You can copy up to 100 API keys at once": "一度にコピーできる APIキーは最大100個です",
+    "Failed to load pricing. Please try again.": "価格の読み込みに失敗しました。もう一度お試しください。"
   }
 }

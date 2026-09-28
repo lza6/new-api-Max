@@ -1,0 +1,57 @@
+{
+  "base": "http://127.0.0.1:18601",
+  "total": 10,
+  "passed": 8,
+  "results": [
+    {
+      "name": "setup",
+      "ok": true,
+      "detail": "系统已经初始化完成"
+    },
+    {
+      "name": "登录按钮：提交中禁用 + 成功后跳转",
+      "ok": true,
+      "detail": "redirect=http://127.0.0.1:18601/dashboard/overview"
+    },
+    {
+      "name": "keys 表格：有可操作行",
+      "ok": true,
+      "detail": "rows=6"
+    },
+    {
+      "name": "keys 行操作：菜单打开",
+      "ok": true,
+      "detail": "menu=1"
+    },
+    {
+      "name": "keys 复制：触发 step-up 弹窗",
+      "ok": true,
+      "detail": "stepup=1"
+    },
+    {
+      "name": "keys 状态切换：有 toast 反馈",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "keys 删除：出现二次确认弹窗",
+      "ok": true,
+      "detail": "confirm=1"
+    },
+    {
+      "name": "dashboard 复制：触发 step-up 弹窗",
+      "ok": true,
+      "detail": "stepup=1"
+    },
+    {
+      "name": "pricing：页面渲染 + 订阅统计卡",
+      "ok": true,
+      "detail": "stats=1"
+    },
+    {
+      "name": "webhook 保存：有 toast 反馈",
+      "ok": false,
+      "detail": "未找到 Save 按钮"
+    }
+  ]
+}

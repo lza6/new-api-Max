@@ -6740,6 +6740,7 @@
     "Webhook Notifications": "Webhook 通知",
     "Webhook settings saved": "Webhook 設定已儲存",
     "Verification cancelled. Please try again.": "驗證已取消，請重試。",
-    "You can copy up to 100 API keys at once": "一次最多複製 100 個 API Keys"
+    "You can copy up to 100 API keys at once": "一次最多複製 100 個 API Keys",
+    "Failed to load pricing. Please try again.": "載入定價失敗，請重試。"
   }
 }
