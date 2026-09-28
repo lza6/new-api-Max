@@ -277,6 +277,10 @@ type UserSubscription struct {
 	EndTime   int64  `json:"end_time" gorm:"bigint;index;index:idx_user_sub_active,priority:3"`
 	Status    string `json:"status" gorm:"type:varchar(32);index;index:idx_user_sub_active,priority:2"` // active/expired/cancelled
 
+	// 到期提醒已通知的提前天数（0 = 未提醒）。扫描任务命中后置为 N，
+	// 防止每个 tick 重复发送到期提醒。
+	ReminderDaysNotified int `json:"reminder_days_notified" gorm:"type:int;default:0"`
+
 	Source string `json:"source" gorm:"type:varchar(32);default:'order'"` // order/admin
 
 	LastResetTime int64 `json:"last_reset_time" gorm:"type:bigint;default:0"`
@@ -561,6 +565,9 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		updates := map[string]any{
 			"end_time":   extendedEnd,
 			"updated_at": common.GetTimestamp(),
+			// 续费顺延后重置到期提醒计数：下个周期临近到期可再次提醒
+			// （不重置则「被提醒→续费→下周期」留存闭环在首次续费后断裂，审查 P1-2）。
+			"reminder_days_notified": 0,
 		}
 		if plan.TotalAmount > 0 {
 			updates["amount_total"] = gorm.Expr("amount_total + ?", plan.TotalAmount)
@@ -1320,6 +1327,53 @@ func ExpireDueSubscriptions(limit int) (int, error) {
 		}
 	}
 	return expiredCount, nil
+}
+
+// DueExpiryReminderWindowEnd returns the end timestamp of the "expire soon"
+// reminder window: now + notifyDays * 86400 seconds.
+func DueExpiryReminderWindowEnd(now int64, notifyDays int) int64 {
+	if notifyDays <= 0 {
+		return now
+	}
+	return now + int64(notifyDays)*24*3600
+}
+
+// GetDueExpiryReminderSubscriptions returns active subscriptions that expire within
+// notifyDays days from now and have not been reminded for that window yet
+// (reminder_days_notified < notifyDays). Ordered by end_time so the most urgent
+// ones are processed first within a batch.
+func GetDueExpiryReminderSubscriptions(limit int, notifyDays int) ([]UserSubscription, error) {
+	if limit <= 0 {
+		limit = 300
+	}
+	if notifyDays <= 0 {
+		return nil, nil
+	}
+	now := GetDBTimestamp()
+	windowEnd := DueExpiryReminderWindowEnd(now, notifyDays)
+	var subs []UserSubscription
+	err := DB.Where("status = ? AND end_time > ? AND end_time <= ? AND reminder_days_notified < ?",
+		"active", now, windowEnd, notifyDays).
+		Order("end_time asc, id asc").
+		Limit(limit).
+		Find(&subs).Error
+	if err != nil {
+		return nil, err
+	}
+	return subs, nil
+}
+
+// MarkSubscriptionReminderNotified records that subscription id was reminded for
+// the given notifyDays window, preventing duplicate reminders on every tick.
+// The reminder_days_notified < notifyDays guard makes the update idempotent even
+// if two scanners race on the same subscription.
+func MarkSubscriptionReminderNotified(id int, notifyDays int) error {
+	if id <= 0 || notifyDays <= 0 {
+		return nil
+	}
+	return DB.Model(&UserSubscription{}).
+		Where("id = ? AND reminder_days_notified < ?", id, notifyDays).
+		Update("reminder_days_notified", notifyDays).Error
 }
 
 // SubscriptionPreConsumeRecord stores idempotent pre-consume operations per request.

@@ -6741,6 +6741,25 @@
     "Webhook Notifications": "Webhook-уведомления",
     "Webhook settings saved": "Настройки webhook сохранены",
     "Verification cancelled. Please try again.": "Проверка отменена. Попробуйте снова.",
-    "You can copy up to 100 API keys at once": "За раз можно скопировать не более 100 ключей API"
+    "You can copy up to 100 API keys at once": "За раз можно скопировать не более 100 ключей API",
+    "Back to Pricing": "Назад к ценам",
+    "Buy in Wallet": "Купить в кошельке",
+    "Choose a plan that fits your usage. Your subscription applies immediately after purchase.": "Выберите план под ваш сценарий использования — подписка активируется сразу после покупки.",
+    "Compare subscription plans by price, quota, concurrency, RPM and validity period.": "Сравните планы по цене, квоте, параллелизму, RPM и сроку действия.",
+    "Failed to load subscription plans. Please try again.": "Не удалось загрузить планы. Попробуйте ещё раз.",
+    "No subscription plans are currently available.": "Сейчас нет доступных планов подписки.",
+    "Not subscribed": "Не подписан",
+    "Plan Comparison": "Сравнение планов",
+    "Remaining Balance": "Остаток на балансе",
+    "Renew Now": "Продлить сейчас",
+    "Resubscribe": "Переподписаться",
+    "Sign in to view subscription plans, check your balances and renew with one click.": "Войдите, чтобы просмотреть планы, проверить баланс и продлить подписку в один клик.",
+    "Subscribe": "Подписаться",
+    "Subscription plan comparison": "Сравнение планов подписки",
+    "Subscription renewed successfully": "Подписка успешно продлена",
+    "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "Подписка автоматически завершается по истечении срока. Автопродления и списаний нет. Вы можете продлить её вручную на этой странице в любой момент.",
+    "This plan does not support balance renewal. Manage it from your wallet.": "Этот план не поддерживает продление за счёт баланса. Управляйте им в кошельке.",
+    "Top up balance": "Пополнить баланс",
+    "{{count}} plans on sale": "В продаже планов: {{count}}"
   }
 }

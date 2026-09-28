@@ -562,3 +562,62 @@
 - web/scripts/knip-gate.mjs + knip-baseline.json（新）
 - web/src/lib/__tests__/bundle-budget.test.ts
 - .github/workflows/ci.yml
+
+# 2026-09-28 批次 004 交付收尾（追加）
+
+## 独立审查收敛
+- Critic（a16b51df60c0360bf）六维审查 → REQUEST CHANGES：P1-1（bundle-budget `index!` lint error 击穿 CI）、P1-2（截图证据曾为 FAIL 产物，主控重跑 18/18 闭环）、P2-1（阴影同名自环 → 改名 --elevation-*）、P2-2（可聚焦行键盘语义 → aria-label+Space+target 守卫）、P2-3（code-split 断言过弱 → async/ 下限 path.dirname 跨平台）。
+- 全部修复并复验：typecheck 0 / oxlint 0 / axe 3/3 / bundle-budget 5/5 / knip-gate exit 0 + 探针正反例 / 生产构建 EXIT 0（预算内）。
+
+## 交付
+- main → c91f9b590（feat + docs 两 commit），tag v1.3.56 前移至含 HTML 报告。
+- HTML 变更报告：计划书/change-report-v1.3.56.html（含 8 题测验）。
+- Spec-Kit：.specify/specs/004-ui-design-system-a11y-perf（spec/plan/tasks 审查修复记录）。
+- 验证台账记录 0021 已追加（防重复要点：本地 E2E 服务启动命令、axe 单测可跑、knip 门禁用法）。
+- 生产部署：按纪律未自动执行，等用户授权（deploy.sh 就绪）。
+- 遗留 .codex/ 为非本批工作区脚本目录，未提交。
+- P3 记录：axe happy-path 补充、逐路由懒加载证据，非阻塞。
+
+---
+
+# 2026-09-28 批次 005：§4.3 v4.x SaaS 商业化与增长
+
+> 对应 .specify/specs/005-saas-commercial-grow + 指南 §4.3.1/§4.3.2/§4.3.3
+
+## Task Contract
+- §4.3.1 P1 定价透明：额度预警「阈值档+渠道」升级、钱包/订阅余额关键页展示、套餐对比页。
+- §4.3.2 P2 留存续费：到期前 N 天提醒（复用 NotifyUser）、续费一键、退订/自动续费合规文案（产品拍板边界）。
+- §4.3.3 P3：落档建议（报表导出/邀请分销/增长看板），护栏一次一个方向，不实现。
+
+## Task Graph
+| ID | Owner | Goal | Status |
+|----|----|----|----|
+| A-1..A-6 | Builder A | quota 阈值档升级（默认[1000,500,100]，env 可配）+ relaykit/dto 字段 + 6 单测 | DONE (6/6) |
+| C-1..C-5 | Builder C | 到期前 N 天提醒（ReminderDaysNotified 字段+扫描任务）+ 续费路径复用确认 + 4 单测 | DONE (4/4) |
+| B-1..B-7 | Builder B | 套餐对比页 / 定价页余额 / 续费一键 / 合规文案 / i18n 7 语言 | DONE (E2E 13/13) |
+| B-8 | 主控 | plans-compare-table 6/6 本机绿；plan-comparison 5 用例修复 No QueryClient，整页本机 worker OOM（环境噪声，4 池模式均卡死）待 CI | CONDITIONAL |
+| M-1 | 主控 | P3 落档 docs/v4x-b2b-growth-p3-suggestion.md | DONE |
+| E2E | 主控 | 三断点截图 13/13 PASS（前置+对比页+续费+余额+无溢出）| DONE |
+| 审查 | 独立 Critic | 六维审查 | RUNNING |
+| 交付 | 主控 | commit/push/tag v1.3.57 + HTML 报告 | PENDING |
+
+## 关键事实/坑（供下次）
+- **旧进程嵌入旧 dist 的坑**：`go run main.go` 后若前端源码有变必须重启 Go 服务（go:embed 编译快照）；本次 `/pricing/plans` 显示 "Model not found" 是旧 dist 所致，kill 占用端口进程（taskkill PID）重启后 13/13。
+- compliance 端点 `POST /api/option/payment_compliance` 需 dashboard session Bearer（API token 是被拒的）——用 login 返回的 access_token 作 Bearer 可过（login access_token 也是 dashboard 型）。
+- 套餐 API：公开 `GET /api/subscription/plans`（**非公开**，挂 UserAuth 需登录）；admin `POST /api/subscription/admin/plans`；绑定 `POST /api/subscription/admin/bind`。
+- 续费 = 复用 `SubscriptionRequestBalancePay` 顺延 end_time，无新端点（护栏：不做自动续费闭环）。
+
+## 待办
+- 独立审查收敛 → commit/push/tag v1.3.57 → HTML 报告+测验 → 台账 0022。
+- 生产部署按纪律待用户授权。
+
+## 批次 005 审查收敛记录（2026-09-29 补）
+- Critic 第 1 轮（a041aa74c5ff3826e）REQUEST CHANGES：P1-1（多档对新用户不可达，因注册注入 80% 被当显式）、P1-2（续费不重置 reminder_days_notified 导致留存闭环断裂）、P2-1（QuotaRemindThreshold 死配置）、P2-2（plan-comparison 本机 OOM）、P2-3（钱包/订阅共享台账）。
+- 主控修复：
+  - P1-1：`dto.UserSetting.QuotaWarnThresholdsDefault` 标记 + 注册注入置 true + quota.go gating `usingExplicitQuotaWarn`；显式更新全量构造（无残留）读码确认。
+  - P1-2：续费 updates map 加 `reminder_days_notified:0` + 回归测试（置 3 → 续费 → 断 0）PASS。
+  - P2-1：README 补 QUOTA_REMIND_THRESHOLD 弃用说明。
+  - P2-2/P2-3：如实 CONDITIONAL + 文档已记。
+  - P2 补测：`TestUsingExplicitQuotaWarn` 表驱动（4 场景）PASS（审查建议）。
+- Critic 第 2 轮（a50510c9d105e85c6）CONDITIONAL APPROVE：P1-1/P1-2 全路径核对无遗漏、回归全绿、gofmt 干净；仅剩 P2（gating 单测——本批已补）+ 前端 plan-comparison 本机 OOM（维持 CONDITIONAL 标注，E2E 13/13 兜底）。
+- 结论：无未解决 P0/P1；前端整页测试环境受限已诚实披露。

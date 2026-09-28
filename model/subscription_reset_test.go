@@ -293,4 +293,18 @@ func TestCreateUserSubscriptionRenewsActiveByExtendingEndTime(t *testing.T) {
 	require.Equal(t, firstEnd+86400, sub.EndTime)
 	require.NoError(t, DB.Model(&UserSubscription{}).Where("user_id = ?", 70001).Count(&count).Error)
 	require.Equal(t, int64(1), count)
+
+	// P1-2 回归（审查批次 005）：续费顺延必须重置到期提醒计数，
+	// 否则「被提醒→一键续费→下周期」留存闭环在首次续费后断裂，
+	// 订阅生命周期内再也收不到到期提醒。
+	require.NoError(t, DB.Model(&UserSubscription{}).Where("user_id = ?", 70001).
+		Update("reminder_days_notified", 3).Error)
+	require.NoError(t, DB.Transaction(func(tx *gorm.DB) error {
+		s, err := CreateUserSubscriptionFromPlanTx(tx, 70001, plan, PaymentMethodBalance)
+		sub = s
+		return err
+	}))
+	var afterRenew UserSubscription
+	require.NoError(t, DB.Where("user_id = ?", 70001).First(&afterRenew).Error)
+	require.Equal(t, 0, afterRenew.ReminderDaysNotified, "续费顺延后到期提醒计数必须重置为 0")
 }

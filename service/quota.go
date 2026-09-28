@@ -3,7 +3,9 @@ package service
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -477,57 +479,147 @@ func postConsumeQuotaWithResult(relayInfo *relaycommon.RelayInfo, quota int, pre
 	return result, nil
 }
 
+// quotaWarnUpdateLocks 串行化同一用户的 UserSetting 读-改-写：多个并发额度预警
+// goroutine 若同时基于同一旧快照写回 QuotaWarnedLevels，会重复触发同一档位。
+// 分片锁内存有界、无需清理；用户侧主动修改设置走同样的 UpdateUserSetting，与
+// billing_session 的既有读写模式保持一致。
+var quotaWarnUpdateLocks [256]sync.Mutex
+
+func lockQuotaWarnUpdate(userId int) func() {
+	mu := &quotaWarnUpdateLocks[uint(userId)%uint(len(quotaWarnUpdateLocks))]
+	mu.Lock()
+	return mu.Unlock
+}
+
+// decideQuotaWarn 判定当前剩余额度需要提醒的档位（纯函数，便于单测）。
+// explicitThreshold != 0：用户显式单档，最高优先级，不记录档位（防重复交给
+// CheckNotificationLimit），保持存量行为。否则按 thresholds 多档：remaining 低于
+// 某档且该档未在 alreadyWarned 记录过 → 触发；已记录档位在 remaining 回升到该档
+// 以上后剔除（充值/额度增长后下次再降到该档可再次提醒）。
+// 返回 (本次需提醒的档位, 更新后应持久化的已记录档位)；thresholds 需为从大到小。
+func decideQuotaWarn(remaining int64, explicitThreshold float64, thresholds []int, alreadyWarned []int) (toNotify []int, newWarned []int) {
+	if explicitThreshold != 0 {
+		if remaining < int64(int(explicitThreshold)) {
+			return []int{int(explicitThreshold)}, alreadyWarned
+		}
+		return nil, alreadyWarned
+	}
+
+	// 先剔除已回升到该档以上的记录，实现充值后降档重置。
+	for _, warned := range alreadyWarned {
+		if remaining < int64(warned) {
+			newWarned = append(newWarned, warned)
+		}
+	}
+	// thresholds 已按从大到小排序，toNotify 保持该触发顺序。
+	for _, tier := range thresholds {
+		if remaining >= int64(tier) {
+			continue
+		}
+		if !slices.Contains(newWarned, tier) {
+			toNotify = append(toNotify, tier)
+			newWarned = append(newWarned, tier)
+		}
+	}
+	return toNotify, newWarned
+}
+
+// usingExplicitQuotaWarn 判定用户额度预警是否走「显式单档」最高优先级路径。
+// 仅当阈值非零且非注册注入默认（QuotaWarnThresholdsDefault=false）时为显式；
+// 注册注入的默认 80% 阈值（B6-3）标记为 default=true，走多档默认（P1-1 审查修复）。
+func usingExplicitQuotaWarn(userSetting dto.UserSetting) bool {
+	return userSetting.QuotaWarningThreshold != 0 && !userSetting.QuotaWarnThresholdsDefault
+}
+
+// refreshQuotaWarnLevels 在并发安全的读-改-写下读取并持久化用户已触发档位，
+// 返回本次需提醒的档位。仅当档位集合实际变化时才写回 setting JSON 列，避免
+// 每个完成请求无谓写库。
+func refreshQuotaWarnLevels(relayInfo *relaycommon.RelayInfo, remaining int64) []int {
+	unlock := lockQuotaWarnUpdate(relayInfo.UserId)
+	defer unlock()
+
+	currentSetting, err := model.GetUserSetting(relayInfo.UserId, false)
+	if err != nil {
+		common.SysError(fmt.Sprintf("failed to load user setting for quota warn levels: %s", err.Error()))
+		currentSetting = relayInfo.UserSetting
+	}
+	toNotify, newWarned := decideQuotaWarn(remaining, 0, common.QuotaWarnThresholds, currentSetting.QuotaWarnedLevels)
+	if !slices.Equal(newWarned, currentSetting.QuotaWarnedLevels) {
+		updated := currentSetting
+		updated.QuotaWarnedLevels = newWarned
+		if err := model.UpdateUserSetting(relayInfo.UserId, updated); err != nil {
+			common.SysError(fmt.Sprintf("failed to persist quota warn levels for user %d: %s", relayInfo.UserId, err.Error()))
+		}
+	}
+	return toNotify
+}
+
+// buildQuotaWarnNotify 根据通知渠道构建额度预警消息（Email/Webhook 支持 HTML，
+// Bark/Gotify 使用简短纯文本）。
+func buildQuotaWarnNotify(userSetting dto.UserSetting, prompt string, displayQuota int) dto.Notify {
+	topUpLink := PaymentReturnURL("/wallet")
+	notifyType := userSetting.NotifyType
+	if notifyType == "" {
+		notifyType = dto.NotifyTypeEmail
+	}
+	var content string
+	var values []any
+	switch notifyType {
+	case dto.NotifyTypeBark:
+		content = "{{value}}，剩余额度：{{value}}，请及时充值"
+		values = []any{prompt, logger.FormatQuota(displayQuota)}
+	case dto.NotifyTypeGotify:
+		content = "{{value}}，当前剩余额度为 {{value}}，请及时充值。"
+		values = []any{prompt, logger.FormatQuota(displayQuota)}
+	default:
+		content = "{{value}}，当前剩余额度为 {{value}}，为了不影响您的使用，请及时充值。<br/>充值链接：<a href='{{value}}'>{{value}}</a>"
+		values = []any{prompt, logger.FormatQuota(displayQuota), topUpLink, topUpLink}
+	}
+	return dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values)
+}
+
+// sendQuotaWarnNotify 按用户通知渠道发送额度预警，失败仅记日志，不影响计费主链路。
+func sendQuotaWarnNotify(relayInfo *relaycommon.RelayInfo, userSetting dto.UserSetting, prompt string, displayQuota int) {
+	notify := buildQuotaWarnNotify(userSetting, prompt, displayQuota)
+	if err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, userSetting, notify); err != nil {
+		common.SysError(fmt.Sprintf("failed to send quota notify to user %d: %s", relayInfo.UserId, err.Error()))
+	}
+}
+
 func checkAndSendQuotaNotify(relayInfo *relaycommon.RelayInfo, quota int, preConsumedQuota int) {
 	gopool.Go(func() {
+		if relayInfo == nil || relayInfo.UserId == 0 {
+			return
+		}
 		userSetting := relayInfo.UserSetting
-		threshold := common.QuotaRemindThreshold
-		if userSetting.QuotaWarningThreshold != 0 {
-			threshold = int(userSetting.QuotaWarningThreshold)
-		}
+		consumeQuota := int64(quota) + int64(preConsumedQuota)
+		remaining := int64(relayInfo.UserQuota) - consumeQuota
 
-		//noMoreQuota := userCache.Quota-(quota+preConsumedQuota) <= 0
-		quotaTooLow := false
-		consumeQuota := quota + preConsumedQuota
-		if relayInfo.UserQuota-consumeQuota < threshold {
-			quotaTooLow = true
-		}
-		if quotaTooLow {
+		// 用户显式单档：最高优先级，保持存量行为（不记录档位，防重复交给限频）。
+		// QuotaWarnThresholdsDefault=true 表示阈值是注册注入的默认值（B6-3 的 80%），
+		// 非"用户显式设置"——这类用户走多档默认，避免多档对主流用户不可达（审查 P1-1）。
+		if usingExplicitQuotaWarn(userSetting) {
+			toNotify, _ := decideQuotaWarn(remaining, userSetting.QuotaWarningThreshold, nil, nil)
+			if len(toNotify) == 0 {
+				return
+			}
 			prompt := "您的额度即将用尽"
-			topUpLink := PaymentReturnURL("/wallet")
+			sendQuotaWarnNotify(relayInfo, userSetting, prompt, relayInfo.UserQuota)
+			return
+		}
 
-			// 根据通知方式生成不同的内容格式
-			var content string
-			var values []any
-
-			notifyType := userSetting.NotifyType
-			if notifyType == "" {
-				notifyType = dto.NotifyTypeEmail
-			}
-
-			if notifyType == dto.NotifyTypeBark {
-				// Bark推送使用简短文本，不支持HTML
-				content = "{{value}}，剩余额度：{{value}}，请及时充值"
-				values = []any{prompt, logger.FormatQuota(relayInfo.UserQuota)}
-			} else if notifyType == dto.NotifyTypeGotify {
-				content = "{{value}}，当前剩余额度为 {{value}}，请及时充值。"
-				values = []any{prompt, logger.FormatQuota(relayInfo.UserQuota)}
-			} else {
-				// 默认内容格式，适用于Email和Webhook（支持HTML）
-				content = "{{value}}，当前剩余额度为 {{value}}，为了不影响您的使用，请及时充值。<br/>充值链接：<a href='{{value}}'>{{value}}</a>"
-				values = []any{prompt, logger.FormatQuota(relayInfo.UserQuota), topUpLink, topUpLink}
-			}
-
-			err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values))
-			if err != nil {
-				common.SysError(fmt.Sprintf("failed to send quota notify to user %d: %s", relayInfo.UserId, err.Error()))
-			}
+		// 多档分级提醒：每个新触发的档位提醒一次；充值/额度增长后档位重置可再提醒。
+		toNotify := refreshQuotaWarnLevels(relayInfo, remaining)
+		for _, tier := range toNotify {
+			prompt := fmt.Sprintf("您的额度即将用尽（剩余额度低于 %s）", logger.FormatQuota(tier))
+			sendQuotaWarnNotify(relayInfo, userSetting, prompt, relayInfo.UserQuota)
 		}
 	})
 }
 
 func checkAndSendSubscriptionQuotaNotify(relayInfo *relaycommon.RelayInfo) {
 	gopool.Go(func() {
-		if relayInfo == nil {
+		if relayInfo == nil || relayInfo.UserId == 0 {
 			return
 		}
 		if relayInfo.SubscriptionId == 0 || relayInfo.SubscriptionAmountTotal <= 0 {
@@ -535,40 +627,26 @@ func checkAndSendSubscriptionQuotaNotify(relayInfo *relaycommon.RelayInfo) {
 		}
 
 		userSetting := relayInfo.UserSetting
-		threshold := common.QuotaRemindThreshold
-		if userSetting.QuotaWarningThreshold != 0 {
-			threshold = int(userSetting.QuotaWarningThreshold)
-		}
-
 		usedAfter := relayInfo.SubscriptionAmountUsedAfterPreConsume + relayInfo.SubscriptionPostDelta
 		remaining := relayInfo.SubscriptionAmountTotal - usedAfter
-		if remaining >= int64(threshold) {
+
+		// 用户显式单档：最高优先级，保持存量行为（不记录档位，防重复交给限频）。
+		// QuotaWarnThresholdsDefault=true 表示默认注入阈值（走多档），见钱包路径注释（审查 P1-1）。
+		if usingExplicitQuotaWarn(userSetting) {
+			toNotify, _ := decideQuotaWarn(remaining, userSetting.QuotaWarningThreshold, nil, nil)
+			if len(toNotify) == 0 {
+				return
+			}
+			prompt := "您的订阅额度即将用尽"
+			sendQuotaWarnNotify(relayInfo, userSetting, prompt, int(remaining))
 			return
 		}
 
-		prompt := "您的订阅额度即将用尽"
-		topUpLink := PaymentReturnURL("/wallet")
-
-		var content string
-		var values []any
-		notifyType := userSetting.NotifyType
-		if notifyType == "" {
-			notifyType = dto.NotifyTypeEmail
-		}
-
-		if notifyType == dto.NotifyTypeBark {
-			content = "{{value}}，剩余额度：{{value}}，请及时充值"
-			values = []any{prompt, logger.FormatQuota(int(remaining))}
-		} else if notifyType == dto.NotifyTypeGotify {
-			content = "{{value}}，当前剩余额度为 {{value}}，请及时充值。"
-			values = []any{prompt, logger.FormatQuota(int(remaining))}
-		} else {
-			content = "{{value}}，当前剩余额度为 {{value}}，为了不影响您的使用，请及时充值。<br/>充值链接：<a href='{{value}}'>{{value}}</a>"
-			values = []any{prompt, logger.FormatQuota(int(remaining)), topUpLink, topUpLink}
-		}
-
-		if err := NotifyUser(relayInfo.UserId, relayInfo.UserEmail, relayInfo.UserSetting, dto.NewNotify(dto.NotifyTypeQuotaExceed, prompt, content, values)); err != nil {
-			common.SysError(fmt.Sprintf("failed to send subscription quota notify to user %d: %s", relayInfo.UserId, err.Error()))
+		// 多档分级提醒：复用 refreshQuotaWarnLevels 的档位台账（与钱包额度同源）。
+		toNotify := refreshQuotaWarnLevels(relayInfo, remaining)
+		for _, tier := range toNotify {
+			prompt := fmt.Sprintf("您的订阅额度即将用尽（剩余额度低于 %s）", logger.FormatQuota(tier))
+			sendQuotaWarnNotify(relayInfo, userSetting, prompt, int(remaining))
 		}
 	})
 }

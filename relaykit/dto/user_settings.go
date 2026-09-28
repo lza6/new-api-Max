@@ -3,6 +3,8 @@ package dto
 type UserSetting struct {
 	NotifyType                       string  `json:"notify_type,omitempty"`                          // QuotaWarningType 额度预警类型
 	QuotaWarningThreshold            float64 `json:"quota_warning_threshold,omitempty"`              // QuotaWarningThreshold 额度预警阈值
+	QuotaWarnedLevels                []int   `json:"quota_warned_levels,omitempty"`                  // QuotaWarnedLevels 已触发额度预警档位记录（内部台账，非用户可配置）
+	QuotaWarnThresholdsDefault       bool    `json:"quota_warn_thresholds_default,omitempty"`        // 是否注册注入的默认 80% 阈值（true=默认走多档；false=用户显式设置，单档最高优先级）
 	WebhookUrl                       string  `json:"webhook_url,omitempty"`                          // WebhookUrl webhook地址
 	WebhookSecret                    string  `json:"webhook_secret,omitempty"`                       // WebhookSecret webhook密钥
 	NotificationEmail                string  `json:"notification_email,omitempty"`                   // NotificationEmail 通知邮箱地址

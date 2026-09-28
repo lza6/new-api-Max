@@ -711,8 +711,11 @@ func (user *User) Insert(inviterId int) error {
 				defaultSetting := dto.UserSetting{}
 				// B6-3 新用户默认开启成本告警：阈值设为 80% 告警档
 				// （QuotaForNewUser 的 80%），存量用户零值保持现状不受影响。
+				// QuotaWarnThresholdsDefault=true 标记该阈值是注册注入的默认值：
+				// 决策层据此走「多档默认」（P1 §4.3.1），而非误判为用户显式单档。
 				if common.QuotaForNewUser > 0 {
 					defaultSetting.QuotaWarningThreshold = float64(common.QuotaForNewUser) * 0.8
+					defaultSetting.QuotaWarnThresholdsDefault = true
 				}
 				// 这里暂时不设置SidebarModules，因为需要在用户创建后根据角色设置
 				user.SetSetting(defaultSetting)

@@ -6741,6 +6741,25 @@
     "Webhook Notifications": "Webhook 通知",
     "Webhook settings saved": "Webhook設定を保存しました",
     "Verification cancelled. Please try again.": "確認がキャンセルされました。もう一度お試しください。",
-    "You can copy up to 100 API keys at once": "一度にコピーできる APIキーは最大100個です"
+    "You can copy up to 100 API keys at once": "一度にコピーできる APIキーは最大100個です",
+    "Back to Pricing": "価格表に戻る",
+    "Buy in Wallet": "ウォレットで購入",
+    "Choose a plan that fits your usage. Your subscription applies immediately after purchase.": "用途に合ったプランを選択してください。購入後、サブスクリプションはすぐに有効になります。",
+    "Compare subscription plans by price, quota, concurrency, RPM and validity period.": "価格・クォータ・同時接続数・RPM・有効期間でプランを比較できます。",
+    "Failed to load subscription plans. Please try again.": "プランの読み込みに失敗しました。もう一度お試しください。",
+    "No subscription plans are currently available.": "現在利用可能なサブスクリプションプランはありません。",
+    "Not subscribed": "未購読",
+    "Plan Comparison": "プラン比較",
+    "Remaining Balance": "残り残高",
+    "Renew Now": "今すぐ更新",
+    "Resubscribe": "再購読",
+    "Sign in to view subscription plans, check your balances and renew with one click.": "ログインするとプランの閲覧、残高の確認、ワンクリックでの更新ができます。",
+    "Subscribe": "購読する",
+    "Subscription plan comparison": "サブスクリプションプラン比較",
+    "Subscription renewed successfully": "サブスクリプションを更新しました",
+    "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "サブスクリプションは期限切れで自動的に停止します。自動更新や請求はありません。このページからいつでも手動で更新できます。",
+    "This plan does not support balance renewal. Manage it from your wallet.": "このプランは残高での更新に対応していません。ウォレットで管理してください。",
+    "Top up balance": "残高をチャージ",
+    "{{count}} plans on sale": "販売中プラン: {{count}} 件"
   }
 }

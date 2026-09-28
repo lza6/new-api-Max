@@ -62,6 +62,7 @@ import { Route as AuthenticatedWalletIndexRouteImport } from './routes/_authenti
 import { Route as AuthenticatedWebProtectionIndexRouteImport } from './routes/_authenticated/web-protection/index'
 import { Route as AuthenticatedWebhookIndexRouteImport } from './routes/_authenticated/webhook/index'
 import { Route as PricingModelIdIndexRouteImport } from './routes/pricing/$modelId/index'
+import { Route as PricingPlansIndexRouteImport } from './routes/pricing/plans/index'
 import { Route as AuthenticatedSystemSettingsAuthIndexRouteImport } from './routes/_authenticated/system-settings/auth/index'
 import { Route as AuthenticatedSystemSettingsAuthSectionRouteImport } from './routes/_authenticated/system-settings/auth/$section'
 import { Route as AuthenticatedSystemSettingsBillingIndexRouteImport } from './routes/_authenticated/system-settings/billing/index'
@@ -362,6 +363,11 @@ const PricingModelIdIndexRoute = PricingModelIdIndexRouteImport.update({
   path: '/pricing/$modelId/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PricingPlansIndexRoute = PricingPlansIndexRouteImport.update({
+  id: '/pricing/plans/',
+  path: '/pricing/plans/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedSystemSettingsAuthIndexRoute =
   AuthenticatedSystemSettingsAuthIndexRouteImport.update({
     id: '/auth/',
@@ -499,6 +505,7 @@ export interface FileRoutesByFullPath {
   '/web-protection/': typeof AuthenticatedWebProtectionIndexRoute
   '/webhook/': typeof AuthenticatedWebhookIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
+  '/pricing/plans/': typeof PricingPlansIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
   '/system-settings/content/$section': typeof AuthenticatedSystemSettingsContentSectionRoute
@@ -565,6 +572,7 @@ export interface FileRoutesByTo {
   '/web-protection': typeof AuthenticatedWebProtectionIndexRoute
   '/webhook': typeof AuthenticatedWebhookIndexRoute
   '/pricing/$modelId': typeof PricingModelIdIndexRoute
+  '/pricing/plans': typeof PricingPlansIndexRoute
   '/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
   '/system-settings/content/$section': typeof AuthenticatedSystemSettingsContentSectionRoute
@@ -635,6 +643,7 @@ export interface FileRoutesById {
   '/_authenticated/web-protection/': typeof AuthenticatedWebProtectionIndexRoute
   '/_authenticated/webhook/': typeof AuthenticatedWebhookIndexRoute
   '/pricing/$modelId/': typeof PricingModelIdIndexRoute
+  '/pricing/plans/': typeof PricingPlansIndexRoute
   '/_authenticated/system-settings/auth/$section': typeof AuthenticatedSystemSettingsAuthSectionRoute
   '/_authenticated/system-settings/billing/$section': typeof AuthenticatedSystemSettingsBillingSectionRoute
   '/_authenticated/system-settings/content/$section': typeof AuthenticatedSystemSettingsContentSectionRoute
@@ -704,6 +713,7 @@ export interface FileRouteTypes {
     | '/web-protection/'
     | '/webhook/'
     | '/pricing/$modelId/'
+    | '/pricing/plans/'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
     | '/system-settings/content/$section'
@@ -770,6 +780,7 @@ export interface FileRouteTypes {
     | '/web-protection'
     | '/webhook'
     | '/pricing/$modelId'
+    | '/pricing/plans'
     | '/system-settings/auth/$section'
     | '/system-settings/billing/$section'
     | '/system-settings/content/$section'
@@ -839,6 +850,7 @@ export interface FileRouteTypes {
     | '/_authenticated/web-protection/'
     | '/_authenticated/webhook/'
     | '/pricing/$modelId/'
+    | '/pricing/plans/'
     | '/_authenticated/system-settings/auth/$section'
     | '/_authenticated/system-settings/billing/$section'
     | '/_authenticated/system-settings/content/$section'
@@ -875,6 +887,7 @@ export interface RootRouteChildren {
   RankingsIndexRoute: typeof RankingsIndexRoute
   SetupIndexRoute: typeof SetupIndexRoute
   PricingModelIdIndexRoute: typeof PricingModelIdIndexRoute
+  PricingPlansIndexRoute: typeof PricingPlansIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -1250,6 +1263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PricingModelIdIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/pricing/plans/': {
+      id: '/pricing/plans/'
+      path: '/pricing/plans'
+      fullPath: '/pricing/plans/'
+      preLoaderRoute: typeof PricingPlansIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/system-settings/auth/': {
       id: '/_authenticated/system-settings/auth/'
       path: '/auth'
@@ -1515,6 +1535,7 @@ const rootRouteChildren: RootRouteChildren = {
   RankingsIndexRoute: RankingsIndexRoute,
   SetupIndexRoute: SetupIndexRoute,
   PricingModelIdIndexRoute: PricingModelIdIndexRoute,
+  PricingPlansIndexRoute: PricingPlansIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

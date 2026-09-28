@@ -127,6 +127,14 @@ func InitEnv() {
 	LogFlushIntervalMs = GetEnvOrDefault("LOG_FLUSH_INTERVAL", 1000)
 	LogFlushBatch = GetEnvOrDefault("LOG_FLUSH_BATCH", 500)
 
+	// 额度预警多档位：QUOTA_WARN_THRESHOLDS="1000,500,100" 逗号分隔覆盖默认档位，
+	// 解析失败或全空时保持默认，不影响启动。
+	if raw := os.Getenv("QUOTA_WARN_THRESHOLDS"); raw != "" {
+		if parsed, err := ParseQuotaWarnThresholds(raw); err == nil && len(parsed) > 0 {
+			QuotaWarnThresholds = parsed
+		}
+	}
+
 	// Initialize string variables with GetEnvOrDefaultString
 	GeminiSafetySetting = GetEnvOrDefaultString("GEMINI_SAFETY_SETTING", "BLOCK_NONE")
 	CohereSafetySetting = GetEnvOrDefaultString("COHERE_SAFETY_SETTING", "NONE")

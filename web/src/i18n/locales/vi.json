@@ -6741,6 +6741,25 @@
     "Webhook Notifications": "Thông báo Webhook",
     "Webhook settings saved": "Đã lưu cài đặt webhook",
     "Verification cancelled. Please try again.": "Đã hủy xác minh. Vui lòng thử lại.",
-    "You can copy up to 100 API keys at once": "Bạn có thể sao chép tối đa 100 khóa API cùng lúc"
+    "You can copy up to 100 API keys at once": "Bạn có thể sao chép tối đa 100 khóa API cùng lúc",
+    "Back to Pricing": "Quay lại trang giá",
+    "Buy in Wallet": "Mua trong ví",
+    "Choose a plan that fits your usage. Your subscription applies immediately after purchase.": "Chọn gói phù hợp với nhu cầu của bạn. Gói đăng ký có hiệu lực ngay sau khi mua.",
+    "Compare subscription plans by price, quota, concurrency, RPM and validity period.": "So sánh các gói theo giá, hạn mức, đồng thời, RPM và thời hạn hiệu lực.",
+    "Failed to load subscription plans. Please try again.": "Không tải được danh sách gói. Vui lòng thử lại.",
+    "No subscription plans are currently available.": "Hiện không có gói đăng ký nào khả dụng.",
+    "Not subscribed": "Chưa đăng ký",
+    "Plan Comparison": "So sánh gói",
+    "Remaining Balance": "Số dư còn lại",
+    "Renew Now": "Gia hạn ngay",
+    "Resubscribe": "Đăng ký lại",
+    "Sign in to view subscription plans, check your balances and renew with one click.": "Đăng nhập để xem các gói, kiểm tra số dư và gia hạn chỉ với một cú nhấp.",
+    "Subscribe": "Đăng ký",
+    "Subscription plan comparison": "So sánh gói đăng ký",
+    "Subscription renewed successfully": "Đã gia hạn gói đăng ký thành công",
+    "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "Gói đăng ký tự động dừng khi hết hạn. Không có gia hạn hoặc tính phí tự động. Bạn có thể gia hạn thủ công từ trang này bất cứ lúc nào.",
+    "This plan does not support balance renewal. Manage it from your wallet.": "Gói này không hỗ trợ gia hạn bằng số dư. Vui lòng quản lý trong ví của bạn.",
+    "Top up balance": "Nạp số dư",
+    "{{count}} plans on sale": "{{count}} gói đang bán"
   }
 }

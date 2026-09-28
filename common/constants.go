@@ -2,8 +2,9 @@ package common
 
 import (
 	"crypto/tls"
-	//"os"
-	//"strconv"
+	"slices"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -135,6 +136,7 @@ var ChannelDisableThreshold = 5.0
 var AutomaticDisableChannelEnabled = false
 var AutomaticEnableChannelEnabled = false
 var QuotaRemindThreshold = 1000
+var QuotaWarnThresholds = []int{1000, 500, 100}
 var PreConsumedQuota = 500
 
 var RetryTimes = 0
@@ -285,3 +287,25 @@ const (
 	TopUpStatusFailed  = "failed"
 	TopUpStatusExpired = "expired"
 )
+
+// ParseQuotaWarnThresholds 解析逗号分隔的额度预警档位（如 "1000,500,100"）。
+// 结果去重并按从大到小排序，保证多档按最高档优先触发；非法或全空输入返回错误，
+// 由调用方回退到默认档位 QuotaWarnThresholds。
+func ParseQuotaWarnThresholds(raw string) ([]int, error) {
+	var thresholds []int
+	for v := range strings.SplitSeq(raw, ",") {
+		v = strings.TrimSpace(v)
+		if v == "" {
+			continue
+		}
+		n, err := strconv.Atoi(v)
+		if err != nil {
+			return nil, err
+		}
+		if n > 0 && !slices.Contains(thresholds, n) {
+			thresholds = append(thresholds, n)
+		}
+	}
+	slices.SortFunc(thresholds, func(a, b int) int { return b - a })
+	return thresholds, nil
+}

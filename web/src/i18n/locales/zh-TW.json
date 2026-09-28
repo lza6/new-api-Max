@@ -6741,6 +6741,25 @@
     "Webhook Notifications": "Webhook 通知",
     "Webhook settings saved": "Webhook 設定已儲存",
     "Verification cancelled. Please try again.": "驗證已取消，請重試。",
-    "You can copy up to 100 API keys at once": "一次最多複製 100 個 API Keys"
+    "You can copy up to 100 API keys at once": "一次最多複製 100 個 API Keys",
+    "Back to Pricing": "返回定價頁",
+    "Buy in Wallet": "在錢包購買",
+    "Choose a plan that fits your usage. Your subscription applies immediately after purchase.": "選擇適合您使用場景的套餐，購買後訂閱立即生效。",
+    "Compare subscription plans by price, quota, concurrency, RPM and validity period.": "按價格、額度、並發、RPM 與有效期對比套餐。",
+    "Failed to load subscription plans. Please try again.": "套餐載入失敗，請重試。",
+    "No subscription plans are currently available.": "目前暫無可購買的套餐。",
+    "Not subscribed": "未訂閱",
+    "Plan Comparison": "套餐對比",
+    "Remaining Balance": "剩餘額度",
+    "Renew Now": "立即續費",
+    "Resubscribe": "重新訂閱",
+    "Sign in to view subscription plans, check your balances and renew with one click.": "登入後即可查看套餐對比、剩餘額度並一鍵續費。",
+    "Subscribe": "訂閱",
+    "Subscription plan comparison": "套餐對比表",
+    "Subscription renewed successfully": "訂閱續費成功",
+    "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "訂閱到期後會自動停止，不會自動扣費。您可隨時在本頁手動續費。",
+    "This plan does not support balance renewal. Manage it from your wallet.": "該套餐不支援餘額續費，請在錢包中管理。",
+    "Top up balance": "儲值餘額",
+    "{{count}} plans on sale": "在售套餐 {{count}} 個"
   }
 }

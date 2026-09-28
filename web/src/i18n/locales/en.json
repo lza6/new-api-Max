@@ -6741,6 +6741,25 @@
     "Webhook Notifications": "Webhook Notifications",
     "Webhook settings saved": "Webhook settings saved",
     "Verification cancelled. Please try again.": "Verification cancelled. Please try again.",
-    "You can copy up to 100 API keys at once": "You can copy up to 100 API keys at once"
+    "You can copy up to 100 API keys at once": "You can copy up to 100 API keys at once",
+    "Back to Pricing": "Back to Pricing",
+    "Buy in Wallet": "Buy in Wallet",
+    "Choose a plan that fits your usage. Your subscription applies immediately after purchase.": "Choose a plan that fits your usage. Your subscription applies immediately after purchase.",
+    "Compare subscription plans by price, quota, concurrency, RPM and validity period.": "Compare subscription plans by price, quota, concurrency, RPM and validity period.",
+    "Failed to load subscription plans. Please try again.": "Failed to load subscription plans. Please try again.",
+    "No subscription plans are currently available.": "No subscription plans are currently available.",
+    "Not subscribed": "Not subscribed",
+    "Plan Comparison": "Plan Comparison",
+    "Remaining Balance": "Remaining Balance",
+    "Renew Now": "Renew Now",
+    "Resubscribe": "Resubscribe",
+    "Sign in to view subscription plans, check your balances and renew with one click.": "Sign in to view subscription plans, check your balances and renew with one click.",
+    "Subscribe": "Subscribe",
+    "Subscription plan comparison": "Subscription plan comparison",
+    "Subscription renewed successfully": "Subscription renewed successfully",
+    "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.",
+    "This plan does not support balance renewal. Manage it from your wallet.": "This plan does not support balance renewal. Manage it from your wallet.",
+    "Top up balance": "Top up balance",
+    "{{count}} plans on sale": "{{count}} plans on sale"
   }
 }

@@ -348,6 +348,8 @@ docker run --name new-api -d --restart always \
 | `SUBSCRIPTION_STATS_CACHE_SECONDS` | 公开订阅统计端点（`/v1/stats/subscriptions`）短缓存 TTL（秒）；`0` = 关闭实时聚合。公开只读端点已用宽松 `PublicReadRateLimit`（60/min/IP） | `30` |
 | `METRICS_ENABLED` | 是否开放 Prometheus 文本格式 `/metrics` 端点（默认关；含请求量/延迟直方图、限流命中、自动封禁、事件总线投递计数） | `false` |
 | `SLOW_REQUEST_THRESHOLD_MS` | 慢请求采样阈值（毫秒）：超过则输出 `[SLOW] request-id=...` 日志，供按 request-id 聚合慢链路；`0` = 全部采样 | `3000` |
+| `QUOTA_WARN_THRESHOLDS` | 额度预警多档位（逗号分隔，从大到小）：用户**未显式设置** `QuotaWarningThreshold`（注册注入的默认 80% 视为未显式设置）时按此多档分级提醒；解析失败或全空时回退默认档位 | `1000,500,100` |
+| `QUOTA_REMIND_THRESHOLD`（旧） | **已弃用**：旧单阈值由多档 `QUOTA_WARN_THRESHOLDS` 取代，预警路径不再读取此值；保留仅为系统设置 UI 兼容显示，新部署无需配置 | `1000` |
 | `RELAY_IDLE_CONN_TIMEOUT` | Idle keep-alive timeout for relay HTTP clients, seconds. Defaults to Go standard library behavior; set `0` to disable | `90` |
 | `RELAY_RESPONSE_HEADER_TIMEOUT` | How long the relay waits for upstream **response headers**, seconds; set `0` to disable. Only bounds the header wait -- streaming after the headers arrive is unaffected. Note that non-streaming upstreams usually send headers only once generation finishes, so leave headroom | `1800` |
 | `STREAMING_TIMEOUT` | Streaming timeout (seconds) | `300` |

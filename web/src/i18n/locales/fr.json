@@ -6741,6 +6741,25 @@
     "Webhook Notifications": "Notifications Webhook",
     "Webhook settings saved": "Réglages Webhook enregistrés",
     "Verification cancelled. Please try again.": "Vérification annulée. Veuillez réessayer.",
-    "You can copy up to 100 API keys at once": "Vous pouvez copier jusqu'à 100 clés API à la fois"
+    "You can copy up to 100 API keys at once": "Vous pouvez copier jusqu'à 100 clés API à la fois",
+    "Back to Pricing": "Retour aux tarifs",
+    "Buy in Wallet": "Acheter dans le portefeuille",
+    "Choose a plan that fits your usage. Your subscription applies immediately after purchase.": "Choisissez un plan adapté à votre usage. Votre abonnement s'applique immédiatement après l'achat.",
+    "Compare subscription plans by price, quota, concurrency, RPM and validity period.": "Comparez les plans par prix, quota, concurrence, RPM et durée de validité.",
+    "Failed to load subscription plans. Please try again.": "Échec du chargement des plans. Veuillez réessayer.",
+    "No subscription plans are currently available.": "Aucun plan d'abonnement n'est actuellement disponible.",
+    "Not subscribed": "Non abonné",
+    "Plan Comparison": "Comparaison des plans",
+    "Remaining Balance": "Solde restant",
+    "Renew Now": "Renouveler maintenant",
+    "Resubscribe": "Se réabonner",
+    "Sign in to view subscription plans, check your balances and renew with one click.": "Connectez-vous pour consulter les plans, vérifier vos soldes et renouveler en un clic.",
+    "Subscribe": "S'abonner",
+    "Subscription plan comparison": "Comparaison des plans d'abonnement",
+    "Subscription renewed successfully": "Abonnement renouvelé avec succès",
+    "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "Les abonnements s'arrêtent automatiquement à l'expiration. Aucun renouvellement ni prélèvement automatique. Vous pouvez renouveler manuellement depuis cette page à tout moment.",
+    "This plan does not support balance renewal. Manage it from your wallet.": "Ce plan ne prend pas en charge le renouvellement par solde. Gérez-le depuis votre portefeuille.",
+    "Top up balance": "Recharger le solde",
+    "{{count}} plans on sale": "{{count}} plans en vente"
   }
 }
