@@ -261,3 +261,7 @@
 - **指标**：common/metrics.go（请求量/延迟直方图/限流命中/封禁/事件总线）；/metrics 端点 env 门控（默认关）；慢链路 [SLOW] request-id 采样日志（env 阈值）。E2E：/metrics 文本 + [SLOW] 真实触发。
 - **公开端点**：stats 30s 短缓存（env）；公开只读限流 CriticalRateLimit→PublicReadRateLimit（E2E 25 连打全 200，旧 20/20min 第 21 次必 429）。
 - **防重复**：指标只在 logger/限流/封禁/事件总线 4 个挂钩点；新增计费/外呼路径如需指标，复用 common.MetricsInc/Observe，勿另建注册表。
+
+## 记录 0020 · §4.1.3-4.1.6 审查收尾（2026-09-28，v1.3.53）
+- stats 缓存写锁内双检（并发 miss 收敛）；PublicReadRateLimit 逃生开关；gofmt 清零。
+- 既有 gofmt -l 基线债务（verification_test.go / channel.go / shadow_price.go 等）与本批无关，未动；后续可在独立批次清理。

@@ -923,3 +923,7 @@
 - **§4.1.5 公开端点短缓存与限流**：`/v1/stats/subscriptions` 加 30s 短缓存（env SUBSCRIPTION_STATS_CACHE_SECONDS，0=关）；公开只读 `/v1/pricing`+`/v1/stats/subscriptions` 限流由 CriticalRateLimit(20/20min) 换 **PublicReadRateLimit(60/min/IP)**——E2E 25 连打全 200（旧限流第 21 次必 429，修复真实访客被误限）。/v1/pricing 底层 GetPricing 已有 1min 数据层缓存，不再叠加响应缓存。
 - **§4.1.6 HA 路线图（记录，非本轮）**：LB（Caddy 多后端已有 blue-green）、Redis Cache-Aside（§4.1.1 已部分）、CDN（web/dist 需授权）、DB 读写分离/分片（大改专批）、**消息队列明确不做**（内存 event bus+持久化投递满足，除非横向规模证实）、熔断（结合健康分路由）、健康检查（HEALTHCHECK 已有）。决策：多实例 webhook 幂等需 Redis/DB 去重（现状进程内窗口已注明）；event bus 不上 MQ。
 - 交付：VERSION v1.3.52；commit+push main；tag v1.3.52（Release 待 Actions 触发）。
+
+## 一〇二、v1.3.53 — §4.1.3-4.1.6 审查收尾
+- 独立审查 CONDITIONAL PASS（无 P0/P1）：P2-1 gofmt（本批清零）；P3-1 stats 缓存写锁内双检；P3-2 PublicReadRateLimit 逃生开关 PUBLIC_READ_RATE_LIMIT_ENABLE=false（注明 Redis 依赖）；P3-5 非法 env 回退测试；P3-6 注释修正。
+- 验证：go build/vet exit 0；model/common/middleware/controller 定向全 PASS；gofmt 本批文件清零（基线存量 -l 项属既有债务）。commit 197383765；tag v1.3.53。
