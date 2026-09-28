@@ -139,6 +139,8 @@ func memoryRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark s
 // without a TTL pass the full window duration as a conservative upper bound.
 // B6-2：统一携带机器可读 error.type=rate_limited 供前端人话映射。
 func writeRateLimited(c *gin.Context, retryAfterSeconds int64) {
+	// §4.1.4 指标：限流命中计数。
+	common.MetricsInc("rate_limit_hits_total", map[string]string{"type": "http_429"}, 1)
 	if retryAfterSeconds > 0 {
 		c.Header("Retry-After", strconv.FormatInt(retryAfterSeconds, 10))
 	}
@@ -163,6 +165,14 @@ func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gi
 	return func(c *gin.Context) {
 		memoryRateLimiter(c, maxRequestNum, duration, mark)
 	}
+}
+
+// PublicReadRateLimit 公开只读端点专用限流（60 次/分钟/IP，宽松）。
+// §4.1.5：公开只读聚合端点（/v1/pricing、/v1/stats/subscriptions）不应用
+// CriticalRateLimit（20/20min 为敏感写端点设计，会 429 真实访客）；只读数据
+// 已由数据层/响应层短缓存兜底，宽松 IP 限流足以防滥用。
+func PublicReadRateLimit() func(c *gin.Context) {
+	return rateLimitFactory(60, 60, "PR")
 }
 
 func GlobalWebRateLimit() func(c *gin.Context) {

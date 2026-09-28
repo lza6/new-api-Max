@@ -1,10 +1,59 @@
 package model
 
 import (
+	"os"
 	"sort"
+	"strconv"
+	"sync"
+	"time"
 
 	"github.com/lza6/new-api-Max/common"
 )
+
+// §4.1.5：站点订阅统计响应短缓存（公开只读端点，默认 30s；env
+// SUBSCRIPTION_STATS_CACHE_SECONDS=0 可关闭回退实时聚合）。进程内缓存，多实例
+// 各自独立（TTL 秒级一致，公开聚合可接受）；过期自动刷新。
+var statsCache = struct {
+	sync.Mutex
+	value    *SiteSubscriptionStats
+	expires  time.Time
+}{}
+
+func subscriptionStatsCacheTTL() time.Duration {
+	raw := os.Getenv("SUBSCRIPTION_STATS_CACHE_SECONDS")
+	if raw == "" {
+		return 30 * time.Second
+	}
+	sec, err := strconv.Atoi(raw)
+	if err != nil || sec < 0 {
+		return 30 * time.Second
+	}
+	return time.Duration(sec) * time.Second
+}
+
+// GetSiteSubscriptionStatsCached 返回订阅统计（短缓存命中直接用，未命中实时聚合）。
+func GetSiteSubscriptionStatsCached() (*SiteSubscriptionStats, error) {
+	ttl := subscriptionStatsCacheTTL()
+	if ttl > 0 {
+		statsCache.Lock()
+		if statsCache.value != nil && time.Now().Before(statsCache.expires) {
+			statsCache.Unlock()
+			return statsCache.value, nil
+		}
+		statsCache.Unlock()
+	}
+	stats, err := GetSiteSubscriptionStats()
+	if err != nil {
+		return nil, err
+	}
+	if ttl > 0 {
+		statsCache.Lock()
+		statsCache.value = stats
+		statsCache.expires = time.Now().Add(ttl)
+		statsCache.Unlock()
+	}
+	return stats, nil
+}
 
 // T15-A 站点订阅统计（只读聚合，不暴露任何用户/订单明细，仅运营透明度数据）。
 // 复用既有 subscription_plans / user_subscriptions 表，无 schema 变更、无新表。

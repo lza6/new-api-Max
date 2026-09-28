@@ -240,6 +240,8 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 			b.DeliveredCount++
 			b.LastDispatchMs = time.Since(started).Milliseconds()
 			b.mu.Unlock()
+			// §4.1.4 指标：投递结果计数。
+			common.MetricsInc("event_bus_deliveries_total", map[string]string{"state": "success"}, 1)
 			return nil
 		}
 
@@ -260,6 +262,8 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 			b.DeadCount++
 			b.LastDispatchMs = time.Since(started).Milliseconds()
 			b.mu.Unlock()
+			// §4.1.4 指标：投递死信计数。
+			common.MetricsInc("event_bus_deliveries_total", map[string]string{"state": "dead"}, 1)
 			return err
 		}
 		delay := b.baseDelay * time.Duration(1<<min(next.attempts, 5))
@@ -276,6 +280,8 @@ func (b *EventBus) dispatch(ctx context.Context, ev Event) error {
 		b.RetryCount++
 		b.LastDispatchMs = time.Since(started).Milliseconds()
 		b.mu.Unlock()
+		// §4.1.4 指标：投递失败（待重试）计数。
+		common.MetricsInc("event_bus_deliveries_total", map[string]string{"state": "failed"}, 1)
 
 		common.SysError(fmt.Sprintf("event_bus: event %s type=%s attempt=%d failed: %v; retry in %s", ev.ID, ev.Type, next.attempts, err, delay))
 		select {

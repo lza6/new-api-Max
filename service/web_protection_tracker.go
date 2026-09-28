@@ -298,6 +298,8 @@ func TrackWebRequestBegin(c *gin.Context) bool {
 		t.mu.Unlock()
 		if shouldBan {
 			minutes := operation_setting.GetAutoBanMinutes()
+			// §4.1.4 指标：自动封禁计数。
+			common.MetricsInc("web_protection_bans_total", map[string]string{"reason": "auto:web_rate_limit"}, 1)
 			if err := model.BanIP(ip, "auto:web_rate_limit", "auto", minutes); err != nil {
 				logger.LogError(c.Request.Context(), fmt.Sprintf("auto ban ip %s failed: %v", ip, err))
 			}

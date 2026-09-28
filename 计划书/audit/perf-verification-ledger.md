@@ -245,3 +245,19 @@
 - 闭合方式：真实 Transport 首个外呼才构建（lazy RoundTripper + sync.Once），TLS_INSECURE_SKIP_VERIFY 无论 .env/进程 env 均正确读取；连接池共享/并发安全不变。
 - 验证：common 3 用例 + ollama 中继 E2E（惰性路径）真实返回。
 - 防重复：启动期依赖 env 的共享对象 → 惰性构建到首个实际使用点；勿用包 var 顺序/sync.Once 早触发。
+
+## 记录 0018 · §4.1.3 慢查询 EXPLAIN 复核（2026-09-28，v1.3.51 批 · PG16+MySQL9 实机）
+- **方法**：对热点表真实查询在 PG(newapi_conformance_test)+MySQL 同库跑 EXPLAIN。
+- **结果（均走索引，type≠ALL/Seq Scan）**：
+  - logs 分页（user_id+type+created_at 范围+DESC）→ PG `idx_log_user_type_created`（Index Scan Backward）、MySQL `ref idx_log_user_type_created Using index`。
+  - tokens 分页（user_id）→ PG `idx_tokens_user_id`、MySQL `idx_tokens_user_id`。
+  - active 订阅（user_id+status+end_time）→ PG `idx_user_sub_active`、MySQL `idx_user_sub_active`。
+  - task_events 按时间 → PG `idx_task_events_created_at`（窄范围 Index Scan）、MySQL 同。
+- **周期任务**：ResetDueSubscriptions（next_reset_time+status）走 `idx_user_subscriptions_status`（周期批量可接受，P3 注记不加新索引）。
+- **结论**：无缺失复合索引；无需 schema/索引改动（S7 已覆盖）；三库 conformance 保持通过。
+- **防重复**：新增热点查询上线前按本清单核对索引；改 model/GORM 依赖重跑三库矩阵。
+
+## 记录 0019 · §4.1.4/4.1.5 指标与公开端点缓存（2026-09-28，v1.3.52）
+- **指标**：common/metrics.go（请求量/延迟直方图/限流命中/封禁/事件总线）；/metrics 端点 env 门控（默认关）；慢链路 [SLOW] request-id 采样日志（env 阈值）。E2E：/metrics 文本 + [SLOW] 真实触发。
+- **公开端点**：stats 30s 短缓存（env）；公开只读限流 CriticalRateLimit→PublicReadRateLimit（E2E 25 连打全 200，旧 20/20min 第 21 次必 429）。
+- **防重复**：指标只在 logger/限流/封禁/事件总线 4 个挂钩点；新增计费/外呼路径如需指标，复用 common.MetricsInc/Observe，勿另建注册表。

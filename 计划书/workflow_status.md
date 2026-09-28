@@ -915,3 +915,11 @@
 - 审查 ALL RESOLVED + P2 残留：包 var init 早于 godotenv.Load(".env") → 仅 .env 注入的 TLS_INSECURE_SKIP_VERIFY 不被共享 Transport 读到。
 - **彻底闭合**：lazyOutboundTransport（RoundTripper + sync.Once）真实 Transport 首个外呼才构建（晚于 env 就绪）；GetOutboundTransportBuilt() 测试用。E2E 经惰性 Transport 中继返回内容。
 - 验证：common 3 用例 PASS（同池/惰性幂等/TLS env）；go build exit 0；main+tag v1.3.51 已推。
+
+## 一〇一、v2.4.1.3-4.1.6 性能批（v1.3.52，2026-09-28）
+
+- **§4.1.3 慢查询猎杀**：PG+MySQL 实机 EXPLAIN 复核热点查询（logs 分页/tokens 分页/active 订阅/task_events 按时间）**全部走复合索引**（idx_log_user_type_created / idx_tokens_user_id / idx_user_sub_active / idx_task_events_created_at）；无缺失索引，无需 schema 改动（台账 0018）。周期订阅重置任务走 status 索引（P3 注记）。
+- **§4.1.4 可观测性深化**：common/metrics.go 轻量 Prometheus 文本指标（请求量/延迟直方图/限流命中/自动封禁/事件总线投递）+ `/metrics`（env METRICS_ENABLED=true 开放）；logger 中间件采样输出 `[SLOW] request-id=...` 慢链路（env SLOW_REQUEST_THRESHOLD_MS）；日志脱敏复核通过（OAuth/审计去敏已在位）。E2E：/metrics 文本 + [SLOW] 真实触发。
+- **§4.1.5 公开端点短缓存与限流**：`/v1/stats/subscriptions` 加 30s 短缓存（env SUBSCRIPTION_STATS_CACHE_SECONDS，0=关）；公开只读 `/v1/pricing`+`/v1/stats/subscriptions` 限流由 CriticalRateLimit(20/20min) 换 **PublicReadRateLimit(60/min/IP)**——E2E 25 连打全 200（旧限流第 21 次必 429，修复真实访客被误限）。/v1/pricing 底层 GetPricing 已有 1min 数据层缓存，不再叠加响应缓存。
+- **§4.1.6 HA 路线图（记录，非本轮）**：LB（Caddy 多后端已有 blue-green）、Redis Cache-Aside（§4.1.1 已部分）、CDN（web/dist 需授权）、DB 读写分离/分片（大改专批）、**消息队列明确不做**（内存 event bus+持久化投递满足，除非横向规模证实）、熔断（结合健康分路由）、健康检查（HEALTHCHECK 已有）。决策：多实例 webhook 幂等需 Redis/DB 去重（现状进程内窗口已注明）；event bus 不上 MQ。
+- 交付：VERSION v1.3.52；commit+push main；tag v1.3.52（Release 待 Actions 触发）。

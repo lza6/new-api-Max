@@ -345,6 +345,9 @@ docker run --name new-api -d --restart always \
 | `SQL_DSN` | Database connection string | - |
 | `REDIS_CONN_STRING` | Redis connection string | - |
 | `SUBSCRIPTION_ACTIVE_CACHE_SECONDS` | 订阅档位正缓存 TTL（秒）：限流中间件对「有 active 订阅」用户每 TTL 才查询一次 DB，订阅变更即时失效；`0` = 关闭（逐位回退基线，每请求直查 DB）。多实例为进程内缓存，与 RPM 并发计数同口径 | `10` |
+| `SUBSCRIPTION_STATS_CACHE_SECONDS` | 公开订阅统计端点（`/v1/stats/subscriptions`）短缓存 TTL（秒）；`0` = 关闭实时聚合。公开只读端点已用宽松 `PublicReadRateLimit`（60/min/IP） | `30` |
+| `METRICS_ENABLED` | 是否开放 Prometheus 文本格式 `/metrics` 端点（默认关；含请求量/延迟直方图、限流命中、自动封禁、事件总线投递计数） | `false` |
+| `SLOW_REQUEST_THRESHOLD_MS` | 慢请求采样阈值（毫秒）：超过则输出 `[SLOW] request-id=...` 日志，供按 request-id 聚合慢链路；`0` = 全部采样 | `3000` |
 | `RELAY_IDLE_CONN_TIMEOUT` | Idle keep-alive timeout for relay HTTP clients, seconds. Defaults to Go standard library behavior; set `0` to disable | `90` |
 | `RELAY_RESPONSE_HEADER_TIMEOUT` | How long the relay waits for upstream **response headers**, seconds; set `0` to disable. Only bounds the header wait -- streaming after the headers arrive is unaffected. Note that non-streaming upstreams usually send headers only once generation finishes, so leave headroom | `1800` |
 | `STREAMING_TIMEOUT` | Streaming timeout (seconds) | `300` |

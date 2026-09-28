@@ -13,6 +13,13 @@ import (
 )
 
 func SetRouter(router *gin.Engine, assets WebAssets) {
+	// §4.1.4：Prometheus 文本格式指标端点（env METRICS_ENABLED=true 开放，默认关）。
+	if strings.EqualFold(os.Getenv("METRICS_ENABLED"), "true") {
+		router.GET("/metrics", func(c *gin.Context) {
+			c.Header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+			c.String(http.StatusOK, common.RenderPrometheusMetrics())
+		})
+	}
 	SetApiRouter(router)
 	SetWebProtectionRouter(router)
 	SetWebhookRouter(router)

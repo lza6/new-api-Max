@@ -17,9 +17,11 @@ func SetRelayRouter(router *gin.Engine) {
 	router.Use(middleware.StatsMiddleware())
 	// https://platform.openai.com/docs/api-reference/introduction
 	// B5-4: 公开只读价目端点（无鉴权，仅轻量 IP 限流；/v1 前缀跳过 Web 防护）。
+	// §4.1.5：公开只读 GET 用宽松 PublicReadRateLimit（60/min/IP），不用敏感端点
+	// 的 CriticalRateLimit（20/20min 会 429 真实访客）；响应由数据/短缓存兜底。
 	pricingV1Router := router.Group("/v1")
 	pricingV1Router.Use(middleware.RouteTag("relay"))
-	pricingV1Router.Use(middleware.CriticalRateLimit())
+	pricingV1Router.Use(middleware.PublicReadRateLimit())
 	{
 		pricingV1Router.GET("/pricing", controller.GetV1Pricing)
 		// T15-A: 公开只读站点订阅运营统计（聚合计数，无用户明细）。
