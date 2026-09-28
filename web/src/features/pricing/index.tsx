@@ -164,7 +164,8 @@ export function Pricing() {
   }
 
   // §4.2.1：查询失败不再伪装成「无模型」空态——给人话错误 + 重试，避免假功能。
-  if (pricingError) {
+  // 仅当确无数据时整页错误态；已有陈旧数据时保留列表（后台/聚焦刷新失败不覆盖页面）。
+  if (pricingError && !models?.length) {
     return (
       <PublicLayout showMainContainer={false}>
         <div className='flex h-full min-h-[60vh] flex-col items-center justify-center gap-4 px-4'>

@@ -23,8 +23,6 @@ import { I18nextProvider } from 'react-i18next'
 import { afterEach, expect, it, vi } from 'vitest'
 
 import { Pricing } from '../index'
-import * as usePricingDataModule from '../hooks/use-pricing-data'
-import * as useStatusModule from '@/hooks/use-status'
 
 const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),

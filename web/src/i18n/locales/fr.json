@@ -3,6 +3,7 @@
     "360": "360",
     "1000": "1000",
     "10000": "10000",
+    "Failed to load pricing. Please try again.": "Échec du chargement des tarifs. Veuillez réessayer.",
     "_copy": "_copie",
     "，": ", ",
     ", and": ", et",
@@ -6740,7 +6741,6 @@
     "Webhook Notifications": "Notifications Webhook",
     "Webhook settings saved": "Réglages Webhook enregistrés",
     "Verification cancelled. Please try again.": "Vérification annulée. Veuillez réessayer.",
-    "You can copy up to 100 API keys at once": "Vous pouvez copier jusqu'à 100 clés API à la fois",
-    "Failed to load pricing. Please try again.": "Échec du chargement des tarifs. Veuillez réessayer."
+    "You can copy up to 100 API keys at once": "Vous pouvez copier jusqu'à 100 clés API à la fois"
   }
 }

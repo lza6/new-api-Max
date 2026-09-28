@@ -3,6 +3,7 @@
     "360": "360",
     "1000": "1000",
     "10000": "10000",
+    "Failed to load pricing. Please try again.": "Не удалось загрузить цены. Попробуйте снова.",
     "_copy": "_копировать",
     "，": ", ",
     ", and": ", и",
@@ -6740,7 +6741,6 @@
     "Webhook Notifications": "Webhook-уведомления",
     "Webhook settings saved": "Настройки webhook сохранены",
     "Verification cancelled. Please try again.": "Проверка отменена. Попробуйте снова.",
-    "You can copy up to 100 API keys at once": "За раз можно скопировать не более 100 ключей API",
-    "Failed to load pricing. Please try again.": "Не удалось загрузить цены. Попробуйте снова."
+    "You can copy up to 100 API keys at once": "За раз можно скопировать не более 100 ключей API"
   }
 }
