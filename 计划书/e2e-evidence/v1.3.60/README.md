@@ -56,3 +56,27 @@ POST /api/token/batch/keys (as other)  → 404 TOKEN_NOT_FOUND
 2. **内容可能永久不可见**（严重）：初版用 `initial={{opacity:0}} + whileInView`——
    若 IntersectionObserver 未触发（截图工具、旧浏览器、JS 延迟），内容**永不显示**。
    已改为 `initial={false} + animate`：**默认可见，动画仅作增强**。
+
+---
+
+## C-1 修复端到端验证（v1.3.61，真实浏览器）
+
+**背景**：独立审查发现 `readServerCode()` 先读 `error.code`，而 axios 对所有 4xx 设
+`error.code='ERR_BAD_REQUEST'` → `SECURITY_PROOF_REQUIRED` 永远读不到 →
+「站点强制验证时的回退弹窗」是**死代码**（且现有测试用伪造错误对象恰好绕过）。
+
+**验证方法**（真实服务 + 真实浏览器，非 mock）：
+1. 本地 v1.3.61 服务，登录后把 `token_setting.require_verification_to_read_own_key` 设为 **true**
+2. 直接调 API 确认服务端要求验证：`POST /api/token/2/key`（不带 proof）→
+   **403 + `{"code":"SECURITY_PROOF_REQUIRED"}`**
+3. Playwright 真实浏览器点击「掩码密钥」→ 断言验证弹窗出现
+
+**结果**：
+| 步骤 | 结果 |
+|---|---|
+| 服务端 403 SECURITY_PROOF_REQUIRED | ✅ |
+| **前端弹窗出现**（修复前不可能） | ✅ `c1-fallback-dialog.png`（「验证后查看 API Key」+ 密码框 + 取消/验证） |
+| 恢复默认（false）后不带 proof → 200 | ✅ |
+
+**踩坑记录**：首次 E2E 复现失败，原因是**改完前端忘记 `bun run build`**
+（`go:embed web/dist` 是编译期快照）—— 测的是旧 bundle。重建后一次通过。
