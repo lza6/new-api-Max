@@ -535,3 +535,32 @@ func TestPreviewKeyNeverLeaksFullKey(t *testing.T) {
 	// 短密钥原样返回（无可截断的前缀）
 	assert.Equal(t, "short", previewKey("short"))
 }
+
+// TestRunSingleKeyTestRejectsOutOfRangeIndex 越界 key 索引必须返回明确错误而非 panic。
+func TestRunSingleKeyTestRejectsOutOfRangeIndex(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	channel := &model.Channel{
+		Id: 8881, Name: "bounds", Type: constant.ChannelTypeOpenAI, Status: 1,
+		Key: "k1\nk2", Group: "default", Models: "gpt-4o-mini",
+	}
+	channel.ChannelInfo.IsMultiKey = true
+	channel.ChannelInfo.MultiKeySize = 2
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/channel/8881/key/test", nil)
+
+	// 越界索引：返回失败结果，不 panic。
+	result := runSingleKeyTest(c, channel, 99, "", "", false)
+	assert.False(t, result.Ok)
+	assert.Equal(t, 99, result.Index)
+	assert.NotEmpty(t, result.Message)
+}
+
+// TestPreviewKeyMasksShortAndLong 密钥预览的边界：短密钥原样、长密钥截断加省略号。
+func TestPreviewKeyMasksShortAndLong(t *testing.T) {
+	assert.Equal(t, "", previewKey(""))
+	assert.Equal(t, "abc", previewKey("abc"))
+	assert.Equal(t, "1234567890", previewKey("1234567890"))     // 恰好 10 位不截断
+	assert.Equal(t, "1234567890...", previewKey("12345678901")) // 11 位截断
+}
