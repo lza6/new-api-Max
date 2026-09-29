@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/shopspring/decimal"
+	"gorm.io/gorm"
 )
 
 type tokenAutoGroupsInput struct {
@@ -194,6 +196,17 @@ func GetTokenKey(c *gin.Context) {
 	}
 	token, err := model.GetTokenByIds(id, userId)
 	if err != nil {
+		// [fix-security] 越权与他人不存在统一按 404 返回：既避免用 200+错误文本
+		// 让调用方误判成功、也避免通过状态码枚举「该 id 是否存在」（防枚举）。
+		// 审计仍记录本次尝试（success=false），便于发现探测行为。
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"code":    "TOKEN_NOT_FOUND",
+				"message": i18n.T(c, i18n.MsgTokenNotExists),
+			})
+			return
+		}
 		common.ApiError(c, err)
 		return
 	}
@@ -544,7 +557,25 @@ func GetTokenKeysBatch(c *gin.Context) {
 	userId := c.GetInt("id")
 	tokens, err := model.GetTokenKeysByIds(tokenBatch.Ids, userId)
 	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"code":    "TOKEN_NOT_FOUND",
+				"message": i18n.T(c, i18n.MsgTokenNotExists),
+			})
+			return
+		}
 		common.ApiError(c, err)
+		return
+	}
+	// [fix-security] 一个都没拿到（全部不属于当前用户或不存在）时返回 404，
+	// 而不是 200 + 空 map —— 后者会让客户端以为「批量读取成功但无数据」。
+	if len(tokens) == 0 && len(tokenBatch.Ids) > 0 {
+		c.JSON(http.StatusNotFound, gin.H{
+			"success": false,
+			"code":    "TOKEN_NOT_FOUND",
+			"message": i18n.T(c, i18n.MsgTokenNotExists),
+		})
 		return
 	}
 	keysMap := make(map[int]string)

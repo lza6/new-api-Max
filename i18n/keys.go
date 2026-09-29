@@ -54,6 +54,7 @@ const (
 	MsgTokenExpired              = "token.expired"
 	MsgTokenExhausted            = "token.exhausted"
 	MsgTokenStatusUnavailable    = "token.status_unavailable"
+	MsgTokenNotExists            = "token.not_exists"
 	MsgTokenDbError              = "token.db_error"
 	MsgTokenAutoGroupsTooMany    = "token.auto_groups_too_many"
 	MsgTokenAutoGroupsDuplicate  = "token.auto_groups_duplicate"

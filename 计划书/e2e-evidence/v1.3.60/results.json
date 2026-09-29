@@ -1,0 +1,63 @@
+{
+  "ranAt": "2026-09-29T18:33:20.373Z",
+  "base": "http://127.0.0.1:3000",
+  "results": [
+    {
+      "name": "登录成功",
+      "ok": true,
+      "detail": "http://127.0.0.1:3000/sign-in"
+    },
+    {
+      "name": "备份分区可见",
+      "ok": true
+    },
+    {
+      "name": "导出按钮存在",
+      "ok": true
+    },
+    {
+      "name": "导入按钮存在",
+      "ok": true
+    },
+    {
+      "name": "防错提示可见（不删除不覆盖）",
+      "ok": true
+    },
+    {
+      "name": "导出下载成功且为有效 gzip",
+      "ok": true,
+      "detail": "1964 bytes"
+    },
+    {
+      "name": "密钥列表非空（避免假阳性）",
+      "ok": true,
+      "detail": "rows=2"
+    },
+    {
+      "name": "找到掩码密钥触发器",
+      "ok": true
+    },
+    {
+      "name": "找到掩码密钥触发器",
+      "ok": true
+    },
+    {
+      "name": "查看自己的密钥未弹二次验证",
+      "ok": true
+    },
+    {
+      "name": "完整密钥确实被揭示（正向证据：已解锁 toast）",
+      "ok": true
+    },
+    {
+      "name": "本地 API 健康",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "浏览器控制台无致命错误",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}
