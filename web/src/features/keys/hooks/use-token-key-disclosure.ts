@@ -54,15 +54,27 @@ function isProofRequiredError(error: unknown): boolean {
   )
 }
 
-/** 从各类错误形态里取出服务端 code 字段。 */
+/**
+ * 从各类错误形态里取出**服务端业务 code**。
+ *
+ * 注意：必须先读 `response.data.code`，不能先读顶层 `error.code` ——
+ * axios 对所有 4xx/5xx 都会把 `error.code` 设成 `ERR_BAD_REQUEST` /
+ * `ERR_BAD_RESPONSE` 这类传输层标识，业务 code 只存在于 `response.data.code`。
+ * 顺序写反会让 SECURITY_PROOF_* 永远读不到，回退弹验证的分支变成死代码。
+ */
 function readServerCode(error: unknown): string | null {
   if (!error || typeof error !== 'object') {return null}
   const record = error as Record<string, unknown>
-  const direct = record.code
-  if (typeof direct === 'string') {return direct}
+  // 1) 服务端业务 code（最可靠）
   const response = record.response as Record<string, unknown> | undefined
   const data = response?.data as Record<string, unknown> | undefined
-  return typeof data?.code === 'string' ? data.code : null
+  if (typeof data?.code === 'string' && data.code) {return data.code}
+  // 2) 顶层 code：仅当它不是 axios 的传输层前缀时才采用
+  const direct = record.code
+  if (typeof direct === 'string' && direct && !direct.startsWith('ERR_')) {
+    return direct
+  }
+  return null
 }
 
 export function useTokenKeyDisclosure() {

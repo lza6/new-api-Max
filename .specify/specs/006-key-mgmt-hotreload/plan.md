@@ -16,7 +16,9 @@
 ### AD-2 渠道 key 运维补「测试单个 key / 批量测试」
 - 新增 `POST /api/channel/:id/key/test`，body `{"key_index": N}`：用第 N 个 key 向该渠道发一次最小请求（复用 `channel-test.go` 的测试逻辑，指定 key index）。
 - 新增 `POST /api/channel/:id/keys/test`：并发批量测试全部 key，返回 `[{index, ok, latency_ms, error}]`。
-- 复用既有 `GetNextEnabledKey` 的 key 解析与 `processChannelError` 的健康分记录。
+- 复用既有 key 解析（`channel.GetKeys()`）与 `testChannelWithKey` 的上下文覆盖。
+- **实现说明（与初稿的差异）**：单/批量 key 测试**不改动渠道健康分**——测试是只读
+  诊断，不应把测试失败计入生产健康评分（否则误测会误伤渠道）。
 
 ### AD-3 查看渠道 key 去 step-up（管理端）
 `POST /api/channel/:id/key` 的 `SecureVerificationRequired` 改为可配置：

@@ -120,11 +120,14 @@ export function MultiKeyManageDialog({
   const [isTestingAll, setIsTestingAll] = useState(false)
   const [addKeysOpen, setAddKeysOpen] = useState(false)
 
-  // Reset and load data when dialog opens
+  // Reset and load data when dialog opens — 也必须清空测试结果，
+  // 否则切换到另一个渠道后会显示上一个渠道的 OK/FAIL 标记（误导）。
   useEffect(() => {
     if (open && currentRow) {
       setCurrentPage(1)
       setStatusFilter(null)
+      setTestResults({})
+      setTestingIndex(null)
       loadKeyStatus(1, pageSize, null)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -188,7 +191,7 @@ export function MultiKeyManageDialog({
           index: keyIndex,
           ok: Boolean(res.success),
           message: res.message || '',
-          time_ms: res.time ? Math.round(res.time * 1000) : 0,
+          time_ms: res.time_ms ?? 0,
           error_code: res.error_code,
           key_preview: '',
         },

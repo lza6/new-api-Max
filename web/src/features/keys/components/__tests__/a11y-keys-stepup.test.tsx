@@ -16,8 +16,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-// T7-C3 a11y：密钥查看的 step-up 安全验证弹窗必须通过 axe 扫描。
-// 用户路径：打开行操作菜单 → Copy Key → 触发 SecureVerificationDialog。
+// T7-C3 a11y：密钥查看路径的可访问性契约。
+//
+// v1.3.59 起默认不再要求 step-up（用户已登录，归属由后端 GetTokenByIds 保证），
+// 主契约改为：**Copy Key 后不弹验证弹窗、可访问性无违规**。
+// 站点强制验证（require_verification_to_read_own_key=true）时的回退弹窗分支，
+// 由 keys/hooks/__tests__/token-key-disclosure.test.tsx 的 axios-shape 用例覆盖。
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   createMemoryHistory,
@@ -26,7 +30,7 @@ import {
   createRouter,
   RouterProvider,
 } from '@tanstack/react-router'
-import { cleanup, render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { createInstance } from 'i18next'
 import { I18nextProvider } from 'react-i18next'
@@ -143,25 +147,21 @@ afterEach(() => {
     .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
 })
 
-it('step-up dialog for viewing an API key passes the axe scan', async () => {
+it('viewing an own API key requires no step-up and stays accessible', async () => {
   await renderKeysPage()
   const user = userEvent.setup()
   await user.click(screen.getByRole('button', { name: 'Open menu' }))
   await user.click(screen.getByRole('menuitem', { name: 'Copy Key' }))
 
-  const dialog = await screen.findByRole('dialog')
-  expect(
-    within(dialog).getByText('Verify to view API key')
-  ).toBeInTheDocument()
-  expect(
-    within(dialog).getByText(
-      'Confirm your identity before revealing this API key.'
-    )
-  ).toBeInTheDocument()
-  expect(
-    within(dialog).getByLabelText('Authenticator code or backup code')
-  ).toBeInTheDocument()
-
-  const results = await axe(dialog)
+  // v1.3.59 主契约：默认不弹验证弹窗
+  await waitFor(() =>
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  )
+  // 密钥行区域无 axe 违规（与原用例一致：只扫本功能相关的 DOM，
+  // 避免把页面其它既有组件的可访问性问题算作本用例失败）
+  const nameCell = await screen.findByText('production')
+  const row = nameCell.closest('tr')
+  expect(row).not.toBeNull()
+  const results = await axe(row as HTMLElement)
   expect(results.violations).toEqual([])
 })

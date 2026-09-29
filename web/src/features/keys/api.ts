@@ -109,7 +109,8 @@ export async function updateApiKeyStatus(
 }
 
 // Fetch the real (unmasked) key for a token by ID.
-// G1/T8: requires a step-up security proof (scope `token.key.read`).
+// proofToken 可选：站点默认不要求 step-up（自己的密钥）；仅当服务端
+// 返回 SECURITY_PROOF_* 时才由调用方补带 proof 重试（见 use-token-key-disclosure）。
 export async function fetchTokenKey(
   id: number,
   proofToken?: string

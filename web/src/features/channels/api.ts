@@ -705,7 +705,15 @@ export async function testChannelKey(
   channelId: number,
   keyIndex: number,
   params: { model?: string; endpoint_type?: string; stream?: boolean } = {}
-): Promise<{ success: boolean; message?: string; time?: number; error_code?: string }> {
+): Promise<{
+  success: boolean
+  message?: string
+  /** 端到端耗时（毫秒），与后端 keyTestResult.time_ms 对齐。 */
+  time_ms?: number
+  error_code?: string
+  key_preview?: string
+  index?: number
+}> {
   const query = new URLSearchParams({ key_index: String(keyIndex) })
   if (params.model) {query.set('model', params.model)}
   if (params.endpoint_type) {query.set('endpoint_type', params.endpoint_type)}

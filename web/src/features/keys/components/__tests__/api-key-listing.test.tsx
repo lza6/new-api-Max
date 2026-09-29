@@ -449,57 +449,46 @@ it('keeps expired status when the server refuses reactivation', async () => {
   expect(post).not.toHaveBeenCalled()
 })
 
-it.each([true, false])(
-  'fetches a full key only after step-up verification and honors permission success=%s',
-  async (success) => {
-    const user = userEvent.setup()
-    const { post } = await renderKeysPage()
-    post.mockImplementation(async (url) => {
-      if (url === '/api/verify') {
-        return {
-          data: {
-            success: true,
-            data: {
-              proof_token: 'token-key-proof',
-              method: '2fa',
-              scope: 'token.key.read',
-              expires_at: Math.floor(Date.now() / 1000) + 60,
-            },
-          },
-        }
-      }
-      return success
-        ? { data: { success: true, data: { key: 'fake-key-for-test-only' } } }
-        : { data: { success: false, message: 'Verification required' } }
-    })
-    const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
-    await user.click(screen.getByRole('button', { name: 'Open menu' }))
-    expect(post).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('menuitem', { name: 'Copy Key' }))
-    // G1/T8: plaintext key disclosure now requires a step-up security dialog.
-    await user.type(
-      await screen.findByLabelText('Authenticator code or backup code'),
-      '123456'
-    )
-    await user.click(screen.getByRole('button', { name: 'Verify' }))
-    await waitFor(() =>
-      expect(post).toHaveBeenCalledWith(
-        '/api/token/7/key',
-        undefined,
-        expect.anything()
-      )
-    )
-    if (success) {
-      await waitFor(() =>
-        expect(copy).toHaveBeenCalledWith('sk-fake-key-for-test-only')
-      )
-    } else {
-      await screen.findByText('Verification required')
-      expect(copy).not.toHaveBeenCalled()
+// v1.3.59 起默认不要求 step-up：Copy Key 直接揭示并复制。
+// 服务端仍要求验证时的回退路径由 hooks/__tests__/token-key-disclosure.test.tsx
+// 的 axios-shape 用例覆盖（那里模拟真实 axios 403 + ERR_BAD_REQUEST）。
+it('copies a full key without step-up by default (success=true)', async () => {
+  const user = userEvent.setup()
+  const { post } = await renderKeysPage()
+  post.mockImplementation(async (url) => {
+    if (url === '/api/token/7/key') {
+      return { data: { success: true, data: { key: 'fake-key-for-test-only' } } }
     }
-  },
-  40_000
-)
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+  await user.click(screen.getByRole('button', { name: 'Open menu' }))
+  expect(post).not.toHaveBeenCalled()
+  await user.click(screen.getByRole('menuitem', { name: 'Copy Key' }))
+  // 不弹验证弹窗
+  await waitFor(() =>
+    expect(screen.queryByLabelText('Authenticator code or backup code')).toBeNull()
+  )
+  await waitFor(() =>
+    expect(copy).toHaveBeenCalledWith('sk-fake-key-for-test-only')
+  )
+}, 40_000)
+
+it('surfaces the server error when key fetch fails (success=false)', async () => {
+  const user = userEvent.setup()
+  const { post } = await renderKeysPage()
+  post.mockImplementation(async (url) => {
+    if (url === '/api/token/7/key') {
+      return { data: { success: false, message: 'Verification required' } }
+    }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  const copy = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+  await user.click(screen.getByRole('button', { name: 'Open menu' }))
+  await user.click(screen.getByRole('menuitem', { name: 'Copy Key' }))
+  await screen.findByText('Verification required')
+  expect(copy).not.toHaveBeenCalled()
+}, 40_000)
 
 it('keeps full mobile information without group or quota section headings', async () => {
   const matchMedia = window.matchMedia

@@ -96,10 +96,21 @@ async function completeVerification() {
   await user.click(screen.getByRole('button', { name: 'Verify' }))
 }
 
-/** 构造一个「服务端要求二次验证」的 403 错误，模拟站点把开关设为 true。 */
+/**
+ * 构造一个**真实 axios 形状**的 403 错误：站点把开关设为 true 时服务端返回它。
+ *
+ * 关键：axios 对 4xx 会设 `error.code = 'ERR_BAD_REQUEST'`，业务 code 只存在于
+ * `response.data.code`。旧版测试用 `new Error()` 不带 `code`，恰好绕过了
+ * readServerCode 的顺序缺陷——所以这里必须显式带上 ERR_BAD_REQUEST 才能真实覆盖。
+ */
 function proofRequiredError() {
   return Object.assign(new Error('需要安全验证'), {
-    response: { status: 403, data: { code: 'SECURITY_PROOF_REQUIRED' } },
+    code: 'ERR_BAD_REQUEST', // ← axios 实际会设置这个值
+    isAxiosError: true,
+    response: {
+      status: 403,
+      data: { success: false, code: 'SECURITY_PROOF_REQUIRED', message: '需要安全验证' },
+    },
   })
 }
 
@@ -194,5 +205,41 @@ it('cancelling the fallback verification never reveals the key', async () => {
   await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
   await waitFor(() =>
     expect(screen.getByLabelText('Single key')).toHaveTextContent('Hidden')
+  )
+})
+
+// 回归（v1.3.60 审查 C-1）：axios 的 error.code 是 'ERR_BAD_REQUEST'，
+// 业务 code 只在 response.data.code。读取顺序写反会让回退弹验证的分支变死代码。
+it('detects proof-required from a real axios error shape (ERR_BAD_REQUEST)', async () => {
+  tokenVerification()
+  let attempts = 0
+  vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/verify') {
+      return {
+        data: {
+          success: true,
+          data: {
+            proof_token: 'token-key-proof',
+            method: '2fa',
+            scope: 'token.key.read',
+            expires_at: Math.floor(Date.now() / 1000) + 60,
+          },
+        },
+      }
+    }
+    if (url === '/api/token/7/key') {
+      attempts += 1
+      if (attempts === 1) {throw proofRequiredError()}
+      return { data: { success: true, data: { key: 'axios-shape-key' } } }
+    }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  render(<Harness />)
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal Single' }))
+  await completeVerification()
+  await waitFor(() =>
+    expect(screen.getByLabelText('Single key')).toHaveTextContent(
+      'sk-axios-shape-key'
+    )
   )
 })

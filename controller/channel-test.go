@@ -39,9 +39,6 @@ type testResult struct {
 	context     *gin.Context
 	localErr    error
 	newAPIError *types.NewAPIError
-	// keyIndex 是本次测试实际使用的多 key 索引（-1 表示非多 key 或未知）。
-	// 单 key/批量 key 测试接口用它回传「测的是哪个 key」。
-	keyIndex int
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) string {
@@ -1250,8 +1247,31 @@ func TestChannelKeys(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"success": false, "message": "该渠道没有可测试的密钥"})
 		return
 	}
+	// [防御] key 总数上限：add_keys 可无限追加，批量测试会逐个发起真实上游请求，
+	// 不设上限则一次点击就可能打出一大批外部请求（上游限流/成本风险）。
+	const maxKeysPerBatchTest = 200
+	if len(keys) > maxKeysPerBatchTest {
+		c.JSON(http.StatusOK, gin.H{
+			"success": false,
+			"message": fmt.Sprintf("密钥数量 %d 超过单次批量测试上限 %d，请先精简", len(keys), maxKeysPerBatchTest),
+		})
+		return
+	}
 	testModel := c.Query("model")
 	endpointType := c.Query("endpoint_type")
+
+	// [防御] 整批总超时：并发只限「同时在跑几个」，不限制总时长。若不设总超时，
+	// 慢上游（未配 relay_timeout_seconds 时客户端 Timeout=0）会让请求长期挂住，
+	// 占着 goroutine 与连接直到客户端断开。这里给整批一个上界，未完成的 key
+	// 标记为超时失败，保证 handler 一定会返回。
+	batchTimeout := time.Duration(2*maxKeysPerBatchTest) * time.Second
+	if v := c.Query("timeout_seconds"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 3600 {
+			batchTimeout = time.Duration(n) * time.Second
+		}
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), batchTimeout)
+	defer cancel()
 
 	// 并发度限制为 3，避免对上游造成突发压力（2C2G 网关 + 上游限流友好）。
 	const maxConcurrency = 3
@@ -1262,12 +1282,30 @@ func TestChannelKeys(c *gin.Context) {
 		waitGroup.Add(1)
 		go func(idx int) {
 			defer waitGroup.Done()
-			sem <- struct{}{}
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				results[idx] = keyTestResult{Index: idx, Ok: false, Message: "批量测试整体超时，未执行该密钥"}
+				return
+			}
 			defer func() { <-sem }()
-			results[idx] = runSingleKeyTest(c, channel, idx, testModel, endpointType, false)
+			if ctx.Err() != nil {
+				results[idx] = keyTestResult{Index: idx, Ok: false, Message: "批量测试整体超时，未执行该密钥"}
+				return
+			}
+			results[idx] = runSingleKeyTest(ctx, channel, idx, testModel, endpointType, false)
 		}(i)
 	}
-	waitGroup.Wait()
+
+	// 等待完成或总超时；超时后不再等剩余 goroutine（它们会因 ctx 取消而快速返回）。
+	done := make(chan struct{})
+	go func() { waitGroup.Wait(); close(done) }()
+	timedOut := false
+	select {
+	case <-done:
+	case <-ctx.Done():
+		timedOut = true
+	}
 
 	okCount := 0
 	for _, r := range results {
@@ -1275,15 +1313,21 @@ func TestChannelKeys(c *gin.Context) {
 			okCount++
 		}
 	}
+	payload := gin.H{
+		"total":      len(results),
+		"ok_count":   okCount,
+		"fail_count": len(results) - okCount,
+		"results":    results,
+	}
+	// 整批超时时明确告知调用方结果不完整，避免把「未执行」误读成「失败/通过」。
+	if timedOut {
+		payload["timed_out"] = true
+		payload["timeout_seconds"] = int(batchTimeout.Seconds())
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "",
-		"data": gin.H{
-			"total":      len(results),
-			"ok_count":   okCount,
-			"fail_count": len(results) - okCount,
-			"results":    results,
-		},
+		"data":    payload,
 	})
 }
 
@@ -1302,31 +1346,33 @@ func parseTestStream(c *gin.Context) bool {
 }
 
 // runSingleKeyTest 用第 keyIndex 个密钥对渠道发起一次最小测试请求。
-func runSingleKeyTest(c *gin.Context, channel *model.Channel, keyIndex int, testModel, endpointType string, isStream bool) keyTestResult {
+func runSingleKeyTest(ctx context.Context, channel *model.Channel, keyIndex int, testModel, endpointType string, isStream bool) keyTestResult {
 	preview := ""
 	if keys := channel.GetKeys(); keyIndex >= 0 && keyIndex < len(keys) {
 		preview = previewKey(keys[keyIndex])
 	}
-	testUserID, err := resolveChannelTestUserID(c)
+	testUserID, err := resolveChannelTestUserID(nil)
 	if err != nil {
 		return keyTestResult{Index: keyIndex, Ok: false, Message: err.Error(), Preview: preview}
 	}
-	requestCtx := context.Background()
-	if c.Request != nil {
-		requestCtx = c.Request.Context()
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	result := testChannelWithKey(requestCtx, channel, testUserID, testModel, endpointType, isStream, keyIndex)
+	started := time.Now()
+	result := testChannelWithKey(ctx, channel, testUserID, testModel, endpointType, isStream, keyIndex)
+	elapsedMs := time.Since(started).Milliseconds()
 	if result.localErr != nil {
-		return keyTestResult{Index: keyIndex, Ok: false, Message: result.localErr.Error(), Preview: preview}
+		return keyTestResult{Index: keyIndex, Ok: false, Message: result.localErr.Error(), TimeMs: elapsedMs, Preview: preview}
 	}
 	if result.newAPIError != nil {
 		return keyTestResult{
 			Index:     keyIndex,
 			Ok:        false,
 			Message:   result.newAPIError.Error(),
+			TimeMs:    elapsedMs,
 			ErrorCode: string(result.newAPIError.GetErrorCode()),
 			Preview:   preview,
 		}
 	}
-	return keyTestResult{Index: keyIndex, Ok: true, Message: "", Preview: preview}
+	return keyTestResult{Index: keyIndex, Ok: true, Message: "", TimeMs: elapsedMs, Preview: preview}
 }

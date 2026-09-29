@@ -118,12 +118,15 @@ export function ApiKeyCell({ apiKey }: { apiKey: ApiKey }) {
       <Tooltip>
         <TooltipTrigger
           render={
+            // 图标按钮必须有可访问名称：Tooltip 只是视觉提示，读屏与
+            // 自动化 a11y 扫描（axe button-name）读的是 aria-label。
             <Button
               variant='ghost'
               size='icon'
               className='size-7 shrink-0'
               onClick={handleCopy}
               disabled={isLoading}
+              aria-label={copyTooltip}
             />
           }
         >
