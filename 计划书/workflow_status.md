@@ -927,3 +927,28 @@
 ## 一〇二、v1.3.53 — §4.1.3-4.1.6 审查收尾
 - 独立审查 CONDITIONAL PASS（无 P0/P1）：P2-1 gofmt（本批清零）；P3-1 stats 缓存写锁内双检；P3-2 PublicReadRateLimit 逃生开关 PUBLIC_READ_RATE_LIMIT_ENABLE=false（注明 Redis 依赖）；P3-5 非法 env 回退测试；P3-6 注释修正。
 - 验证：go build/vet exit 0；model/common/middleware/controller 定向全 PASS；gofmt 本批文件清零（基线存量 -l 项属既有债务）。commit 197383765；tag v1.3.53。
+
+---
+
+## 九、Spec 006 密钥自主管理 · 渠道 Key 运维 · 零停机热更新（v1.3.59，2026-09-29）
+
+> 规范：`.specify/specs/006-key-mgmt-hotreload/`（spec.md / plan.md / tasks.md）
+
+| 节点 | 任务 | 状态 | 证据 |
+|---|---|---|---|
+| US-1 后端 | 用户查看自己密钥默认免 step-up（可配置开关） | ✅ DONE | `setting/operation_setting/token_setting.go` + `middleware/secure_verification.go` |
+| US-1 前端 | 先免 proof 请求，服务端要求时回退验证弹窗 | ✅ DONE | `web/src/features/keys/hooks/use-token-key-disclosure.ts` + `api.ts` |
+| US-1 测试 | 后端开关矩阵 + 前端 4 用例 | ✅ DONE | `middleware/secure_verification_test.go`（4 子用例）+ `token-key-disclosure.test.tsx`（4/4） |
+| US-2a 新增 key | `add_keys` action（追加/去重/拒绝空） | ✅ DONE | `controller/channel.go` + `TestManageMultiKeysAddKeys` |
+| US-2b key 状态 | 既有 `get_key_status`（有效/禁用/原因/时间） | ✅ 已有 | `controller/channel.go:1576` + 前端多 key 面板 |
+| US-2c 单 key 测试 | `POST /api/channel/:id/key/test?key_index=N` | ✅ DONE | `controller/channel-test.go:TestChannelKey` + `testChannelWithKey` |
+| US-2d 批量测试 | `POST /api/channel/:id/keys/test`（并发 3） | ✅ DONE | `controller/channel-test.go:TestChannelKeys` |
+| US-2e 免验证 | 查看渠道 key 默认免 step-up（可配置） | ✅ DONE | `SecureVerificationRequired` + `TestChannelKeyReadWithoutVerificationByDefault` |
+| US-2 UI | 行内测试按钮 + 一键全测 + 新增密钥弹窗 | ✅ DONE | `multi-key-table-row-actions.tsx` + `add-multi-keys-dialog.tsx` |
+| US-3 零停机 | 蓝绿交替端口发布脚本 | ✅ DONE（脚本 + dry-run 验证） | `/opt/new-api/deploy-zero-downtime.sh` |
+| 管理开关 | 系统设置→安全→Token 限制 增加两个验证开关 | ✅ DONE | `web/src/features/system-settings/request-limits/token-limit-section.tsx` |
+| 文案 | i18n 7 语言（密钥运维 14 + 安全开关 4） | ✅ DONE | `bun run i18n:sync` 无漂移，一致性测试 2/2 |
+
+**模型广场「机房部署」不显示**：排查结论 = 数据侧已正确（`/api/pricing` 返回 `enable_groups:["机房部署","default"]`，匿名 `usable_group` 含 `机房部署`，abilities `机房部署|deepseek-v4.1-flash|46|enabled=t`），前端 `filterByGroup` 按 `enable_groups.includes(group)` 过滤、`getAvailableGroups` 展示分组标签均正确 → 属数据修复前的旧状态/浏览器缓存，非代码缺陷。**未改动任何前端过滤代码。**
+
+**质量门**：`go build ./...` / `go vet ./...` exit 0；controller/middleware/common/setting 全绿；`bun run typecheck` exit 0；oxlint 改动文件无 error；vitest 12/12 + i18n 一致性 2/2。

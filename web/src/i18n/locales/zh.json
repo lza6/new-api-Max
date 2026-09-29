@@ -6769,6 +6769,23 @@
     "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch 等兼容 OpenAI 协议的客户端会从以下地址自动读取你的剩余余额。请使用 API 密钥鉴权。",
     "Copy address": "复制地址",
     "Use your API key as the Bearer token. The base URL used by every protocol is": "用你的 API 密钥作为 Bearer Token。所有协议共用的接入地址是",
-    "CC Switch intro": "可从控制台一键导入，也可手动填写接入地址与 API 密钥。余额显示读取下方列出的站点计费地址。"
+    "CC Switch intro": "可从控制台一键导入，也可手动填写接入地址与 API 密钥。余额显示读取下方列出的站点计费地址。",
+    "Add Keys": "新增密钥",
+    "Paste one API key per line. Duplicate keys are skipped automatically.": "每行粘贴一个 API 密钥，重复的密钥会自动跳过。",
+    "Add {{count}} Keys": "新增 {{count}} 个密钥",
+    "{{count}} key(s) will be added": "将新增 {{count}} 个密钥",
+    "Test All Keys": "一键测试全部密钥",
+    "Test this key": "测试此密钥",
+    "Key test passed": "密钥测试通过",
+    "Key test failed": "密钥测试失败",
+    "Key test done: {{ok}} ok / {{fail}} failed": "密钥测试完成：{{ok}} 个可用 / {{fail}} 个失败",
+    "Keys added": "密钥已新增",
+    "Failed to add keys": "新增密钥失败",
+    "OK": "OK",
+    "FAIL": "FAIL",
+    "Require verification to view own API key": "查看自己的 API 密钥需要二次验证",
+    "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "关闭（默认）时，已登录用户查看自己的密钥无需二次验证。开启可恢复二次验证。",
+    "Require verification to view channel keys": "查看渠道密钥需要二次验证",
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "关闭（默认）时，管理员查看与测试渠道密钥无需二次验证。开启可恢复二次验证。"
   }
 }

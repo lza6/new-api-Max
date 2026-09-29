@@ -466,3 +466,72 @@ func TestTestAllChannelsRejectsExistingActiveTask(t *testing.T) {
 	require.Contains(t, recorder.Body.String(), existing.TaskID)
 	require.Contains(t, recorder.Body.String(), "已有通道测试任务正在运行或等待中")
 }
+
+// performMultiKeyManage 构造 ManageMultiKeys 请求（root 管理员上下文）。
+func performMultiKeyManage(t *testing.T, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/channel/multi_key/manage", bytes.NewReader([]byte(body)))
+	c.Request.Header.Set("Content-Type", "application/json")
+	c.Set("id", 9999)
+	c.Set("role", common.RoleRootUser)
+	c.Set("username", "root-operator")
+	c.Set(common.RequestIdKey, "multi-key-test")
+	ManageMultiKeys(c)
+	return recorder
+}
+
+// TestManageMultiKeysAddKeys 验证 add_keys：追加不覆盖、去重、拒绝空输入。
+func TestManageMultiKeysAddKeys(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}))
+
+	channel := model.Channel{
+		Id: 7771, Name: "multi-add", Type: constant.ChannelTypeOpenAI, Status: 1,
+		Key: "k1\nk2", Group: "default", Models: "gpt-4o-mini",
+	}
+	channel.ChannelInfo.IsMultiKey = true
+	channel.ChannelInfo.MultiKeySize = 2
+	channel.ChannelInfo.MultiKeyMode = constant.MultiKeyModePolling
+	require.NoError(t, db.Create(&channel).Error)
+
+	// 追加 2 个新 key + 1 个重复
+	recorder := performMultiKeyManage(t, `{"channel_id":7771,"action":"add_keys","keys":["k3","k2","k4"]}`)
+	assert.Contains(t, recorder.Body.String(), `"success":true`, recorder.Body.String())
+	assert.Contains(t, recorder.Body.String(), `"added":2`, recorder.Body.String())
+
+	var updated model.Channel
+	require.NoError(t, db.First(&updated, 7771).Error)
+	assert.Equal(t, "k1\nk2\nk3\nk4", updated.Key, "既有 key 必须保留，新 key 追加在后")
+	assert.Equal(t, 4, updated.ChannelInfo.MultiKeySize)
+
+	// 全部重复 → 不写入
+	recorder = performMultiKeyManage(t, `{"channel_id":7771,"action":"add_keys","keys":["k1","k2"]}`)
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+	var still model.Channel
+	require.NoError(t, db.First(&still, 7771).Error)
+	assert.Equal(t, 4, still.ChannelInfo.MultiKeySize)
+
+	// 空输入 → 拒绝
+	recorder = performMultiKeyManage(t, `{"channel_id":7771,"action":"add_keys","keys":["  ",""]}`)
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+
+	// 非多 key 渠道 → 拒绝
+	single := model.Channel{Id: 7772, Name: "single", Type: constant.ChannelTypeOpenAI, Status: 1, Key: "only", Group: "default"}
+	require.NoError(t, db.Create(&single).Error)
+	recorder = performMultiKeyManage(t, `{"channel_id":7772,"action":"add_keys","keys":["x"]}`)
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+}
+
+// TestPreviewKeyNeverLeaksFullKey 密钥预览不得暴露完整密钥。
+func TestPreviewKeyNeverLeaksFullKey(t *testing.T) {
+	long := "sk-ljBkmVpVCeWgn4eoLp59aGMh5SD8B41Qad6uzGv4BzyGBBWt"
+	preview := previewKey(long)
+	assert.Equal(t, "sk-ljBkmVp...", preview)
+	assert.NotContains(t, preview, "B41Qad6uzGv4")
+
+	// 短密钥原样返回（无可截断的前缀）
+	assert.Equal(t, "short", previewKey("short"))
+}

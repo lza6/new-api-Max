@@ -361,10 +361,31 @@ export interface MultiKeyManageParams {
     | 'disable_all_keys'
     | 'delete_key'
     | 'delete_disabled_keys'
+    | 'add_keys'
   key_index?: number
   page?: number
   page_size?: number
   status?: number // 1=enabled, 2=manual_disabled, 3=auto_disabled
+  // add_keys：新增的多密钥列表（每个元素一个密钥）。
+  keys?: string[]
+}
+
+/** 单个密钥的测试结果。 */
+export interface KeyTestResult {
+  index: number
+  ok: boolean
+  message: string
+  time_ms: number
+  error_code?: string
+  key_preview: string
+}
+
+/** 批量测试全部密钥的结果。 */
+export interface KeysTestSummary {
+  total: number
+  ok_count: number
+  fail_count: number
+  results: KeyTestResult[]
 }
 
 export interface BatchDeleteParams {

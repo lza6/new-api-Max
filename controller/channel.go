@@ -1504,6 +1504,8 @@ type MultiKeyManageRequest struct {
 	Page      int    `json:"page,omitempty"`      // for get_key_status pagination
 	PageSize  int    `json:"page_size,omitempty"` // for get_key_status pagination
 	Status    *int   `json:"status,omitempty"`    // for get_key_status filtering: 1=enabled, 2=manual_disabled, 3=auto_disabled, nil=all
+	// Keys 用于 add_keys：新增到该渠道的多密钥列表（每行/每元素一个密钥）。
+	Keys []string `json:"keys,omitempty"`
 }
 
 // MultiKeyStatusResponse represents the response for key status query
@@ -1917,6 +1919,54 @@ func ManageMultiKeys(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"success": true,
 			"message": "密钥已删除",
+		})
+		return
+
+	case "add_keys":
+		if !channel.ChannelInfo.IsMultiKey {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": "该渠道不是多密钥模式"})
+			return
+		}
+		added := make([]string, 0, len(request.Keys))
+		for _, k := range request.Keys {
+			k = strings.TrimSpace(k)
+			if k != "" {
+				added = append(added, k)
+			}
+		}
+		if len(added) == 0 {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": "未提供要新增的密钥"})
+			return
+		}
+		existing := channel.GetKeys()
+		seen := make(map[string]struct{}, len(existing)+len(added))
+		for _, k := range existing {
+			seen[k] = struct{}{}
+		}
+		fresh := make([]string, 0, len(added))
+		for _, k := range added {
+			if _, dup := seen[k]; dup {
+				continue
+			}
+			seen[k] = struct{}{}
+			fresh = append(fresh, k)
+		}
+		if len(fresh) == 0 {
+			c.JSON(http.StatusOK, gin.H{"success": false, "message": "新增密钥均已存在（重复）"})
+			return
+		}
+		merged := append(append([]string{}, existing...), fresh...)
+		channel.Key = strings.Join(merged, "\n")
+		channel.ChannelInfo.MultiKeySize = len(merged)
+		if err := channel.Update(); err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		model.InitChannelCache()
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": fmt.Sprintf("已新增 %d 个密钥", len(fresh)),
+			"data":    gin.H{"added": len(fresh), "total": len(merged)},
 		})
 		return
 

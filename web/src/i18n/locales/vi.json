@@ -6769,6 +6769,23 @@
     "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch và các ứng dụng tương thích OpenAI khác tự động đọc số dư còn lại từ các địa chỉ dưới đây. Hãy xác thực bằng khóa API của bạn.",
     "Copy address": "Sao chép địa chỉ",
     "Use your API key as the Bearer token. The base URL used by every protocol is": "Dùng khóa API của bạn làm Bearer Token. Địa chỉ dùng chung cho mọi giao thức là",
-    "CC Switch intro": "Nhập một lần nhấp từ bảng điều khiển, hoặc tự cấu hình Base URL và khóa API. Hiển thị số dư dùng các địa chỉ tính phí bên dưới."
+    "CC Switch intro": "Nhập một lần nhấp từ bảng điều khiển, hoặc tự cấu hình Base URL và khóa API. Hiển thị số dư dùng các địa chỉ tính phí bên dưới.",
+    "Add Keys": "Thêm khóa",
+    "Paste one API key per line. Duplicate keys are skipped automatically.": "Dán mỗi dòng một khóa API. Khóa trùng sẽ tự động bị bỏ qua.",
+    "Add {{count}} Keys": "Thêm {{count}} khóa",
+    "{{count}} key(s) will be added": "Sẽ thêm {{count}} khóa",
+    "Test All Keys": "Kiểm tra tất cả khóa",
+    "Test this key": "Kiểm tra khóa này",
+    "Key test passed": "Kiểm tra khóa thành công",
+    "Key test failed": "Kiểm tra khóa thất bại",
+    "Key test done: {{ok}} ok / {{fail}} failed": "Kiểm tra xong: {{ok}} thành công / {{fail}} thất bại",
+    "Keys added": "Đã thêm khóa",
+    "Failed to add keys": "Thêm khóa thất bại",
+    "OK": "OK",
+    "FAIL": "FAIL",
+    "Require verification to view own API key": "Yêu cầu xác minh để xem khóa API của chính mình",
+    "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "Khi tắt (mặc định), người dùng đã đăng nhập xem khóa API của mình mà không cần xác minh lại. Bật để khôi phục xác minh nâng cao.",
+    "Require verification to view channel keys": "Yêu cầu xác minh để xem khóa kênh",
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Khi tắt (mặc định), quản trị viên xem và kiểm tra khóa kênh mà không cần xác minh lại. Bật để khôi phục xác minh nâng cao."
   }
 }

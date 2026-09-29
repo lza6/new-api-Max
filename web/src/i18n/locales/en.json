@@ -6769,6 +6769,23 @@
     "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.",
     "Copy address": "Copy address",
     "Use your API key as the Bearer token. The base URL used by every protocol is": "Use your API key as the Bearer token. The base URL used by every protocol is",
-    "CC Switch intro": "One-click import from the console, or configure Base URL and API key manually. The balance display uses the site billing endpoints listed below."
+    "CC Switch intro": "One-click import from the console, or configure Base URL and API key manually. The balance display uses the site billing endpoints listed below.",
+    "Add Keys": "Add Keys",
+    "Paste one API key per line. Duplicate keys are skipped automatically.": "Paste one API key per line. Duplicate keys are skipped automatically.",
+    "Add {{count}} Keys": "Add {{count}} Keys",
+    "{{count}} key(s) will be added": "{{count}} key(s) will be added",
+    "Test All Keys": "Test All Keys",
+    "Test this key": "Test this key",
+    "Key test passed": "Key test passed",
+    "Key test failed": "Key test failed",
+    "Key test done: {{ok}} ok / {{fail}} failed": "Key test done: {{ok}} ok / {{fail}} failed",
+    "Keys added": "Keys added",
+    "Failed to add keys": "Failed to add keys",
+    "OK": "OK",
+    "FAIL": "FAIL",
+    "Require verification to view own API key": "Require verification to view own API key",
+    "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.",
+    "Require verification to view channel keys": "Require verification to view channel keys",
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification."
   }
 }

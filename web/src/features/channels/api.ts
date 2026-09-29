@@ -35,6 +35,7 @@ import type {
   GetChannelResponse,
   GetChannelsParams,
   GetChannelsResponse,
+  KeysTestSummary,
   MultiKeyManageParams,
   MultiKeyStatusResponse,
   SearchChannelsParams,
@@ -676,5 +677,62 @@ export async function getPrefillGroups(
   data?: Array<{ id: number; name: string; items: string | string[] }>
 }> {
   const res = await api.get('/api/prefill_group', { params: { type } })
+  return res.data
+}
+
+// ============================================================================
+// Multi-Key Channel Operations (add / test)
+// ============================================================================
+
+/**
+ * Add keys to a multi-key channel (append; duplicates skipped server-side).
+ */
+export async function addMultiKeys(
+  channelId: number,
+  keys: string[]
+): Promise<{ success: boolean; message?: string }> {
+  return manageMultiKeys({
+    channel_id: channelId,
+    action: 'add_keys',
+    keys,
+  }) as Promise<{ success: boolean; message?: string }>
+}
+
+/**
+ * Test a single key of a multi-key channel (uses the key at key_index).
+ */
+export async function testChannelKey(
+  channelId: number,
+  keyIndex: number,
+  params: { model?: string; endpoint_type?: string; stream?: boolean } = {}
+): Promise<{ success: boolean; message?: string; time?: number; error_code?: string }> {
+  const query = new URLSearchParams({ key_index: String(keyIndex) })
+  if (params.model) {query.set('model', params.model)}
+  if (params.endpoint_type) {query.set('endpoint_type', params.endpoint_type)}
+  if (params.stream) {query.set('stream', 'true')}
+  const res = await api.post(
+    `/api/channel/${channelId}/key/test?${query.toString()}`,
+    undefined,
+    channelActionConfig()
+  )
+  return res.data
+}
+
+/**
+ * Test every key of a multi-key channel concurrently (server limits concurrency).
+ */
+export async function testChannelKeys(
+  channelId: number,
+  params: { model?: string; endpoint_type?: string } = {}
+): Promise<{ success: boolean; message?: string; data?: KeysTestSummary }> {
+  const query = new URLSearchParams()
+  if (params.model) {query.set('model', params.model)}
+  if (params.endpoint_type) {query.set('endpoint_type', params.endpoint_type)}
+  const suffix = query.toString() ? `?${query.toString()}` : ''
+  const res = await api.post(
+    `/api/channel/${channelId}/keys/test${suffix}`,
+    undefined,
+    channelActionConfig()
+  )
   return res.data
 }

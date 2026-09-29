@@ -6769,6 +6769,23 @@
     "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch и другие клиенты, совместимые с OpenAI, автоматически считывают ваш остаток по этим адресам. Используйте для авторизации свой API-ключ.",
     "Copy address": "Скопировать адрес",
     "Use your API key as the Bearer token. The base URL used by every protocol is": "Используйте свой API-ключ как Bearer Token. Базовый URL для всех протоколов:",
-    "CC Switch intro": "Импорт в один клик из консоли или ручная настройка базового URL и API-ключа. Для отображения баланса используются указанные ниже биллинговые адреса."
+    "CC Switch intro": "Импорт в один клик из консоли или ручная настройка базового URL и API-ключа. Для отображения баланса используются указанные ниже биллинговые адреса.",
+    "Add Keys": "Добавить ключи",
+    "Paste one API key per line. Duplicate keys are skipped automatically.": "Вставьте по одному API-ключу в строке. Дубликаты пропускаются автоматически.",
+    "Add {{count}} Keys": "Добавить {{count}} ключей",
+    "{{count}} key(s) will be added": "Будет добавлено ключей: {{count}}",
+    "Test All Keys": "Проверить все ключи",
+    "Test this key": "Проверить этот ключ",
+    "Key test passed": "Проверка ключа пройдена",
+    "Key test failed": "Проверка ключа не пройдена",
+    "Key test done: {{ok}} ok / {{fail}} failed": "Проверка завершена: {{ok}} успешно / {{fail}} с ошибкой",
+    "Keys added": "Ключи добавлены",
+    "Failed to add keys": "Не удалось добавить ключи",
+    "OK": "OK",
+    "FAIL": "FAIL",
+    "Require verification to view own API key": "Требовать проверку для просмотра своего ключа API",
+    "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "Выключено (по умолчанию): вошедшие пользователи видят свои ключи без повторной проверки. Включите, чтобы вернуть двухэтапную проверку.",
+    "Require verification to view channel keys": "Требовать проверку для просмотра ключей канала",
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Выключено (по умолчанию): администраторы видят и тестируют ключи канала без повторной проверки. Включите, чтобы вернуть двухэтапную проверку."
   }
 }

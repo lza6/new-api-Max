@@ -28,11 +28,43 @@ import { createServerError } from '@/lib/server-error-message'
 import { fetchTokenKey, fetchTokenKeysBatch } from '../api'
 
 /**
- * G1/T8: API key plaintext disclosure requires a step-up security proof.
- * Each reveal request first runs the shared secure-verification dialog
- * (passkey / 2FA / password), then calls the protected endpoint with the
- * single-use proof. A cancelled or failed verification yields no key.
+ * API key plaintext disclosure.
+ *
+ * 默认（站点配置 require_verification_to_read_own_key=false）用户查看**自己的**
+ * 密钥不再要求 step-up：用户已通过 session 登录，后端 GetTokenByIds(id, userId)
+ * 已保证归属，二次验证属重复校验，徒增操作步骤。
+ *
+ * 兼容策略：先不带 proof 直接请求；仅当服务端返回 SECURITY_PROOF_REQUIRED 类
+ * 错误时，才弹出共享验证弹窗并用一次性 proof 重试。这样无论站点开关如何配置
+ * （含管理员改为强制验证），前端都能正确工作，无需额外配置端点。
  */
+
+/** 服务端要求二次验证时返回的错误码前缀。 */
+function isProofRequiredError(error: unknown): boolean {
+  const message = readServerCode(error)
+  if (!message) {return false}
+  return (
+    message === 'SECURITY_PROOF_REQUIRED' ||
+    message === 'SECURITY_PROOF_EXPIRED' ||
+    message === 'SECURITY_PROOF_INVALID' ||
+    message === 'SECURITY_PROOF_CONSUMED' ||
+    message === 'SECURITY_PROOF_CONTEXT_MISMATCH' ||
+    message === 'SECURITY_PROOF_SCOPE_MISMATCH' ||
+    message === 'SECURITY_PROOF_METHOD_MISMATCH'
+  )
+}
+
+/** 从各类错误形态里取出服务端 code 字段。 */
+function readServerCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {return null}
+  const record = error as Record<string, unknown>
+  const direct = record.code
+  if (typeof direct === 'string') {return direct}
+  const response = record.response as Record<string, unknown> | undefined
+  const data = response?.data as Record<string, unknown> | undefined
+  return typeof data?.code === 'string' ? data.code : null
+}
+
 export function useTokenKeyDisclosure() {
   const { t } = useTranslation()
   const verification = useSecureVerification()
@@ -45,16 +77,24 @@ export function useTokenKeyDisclosure() {
       const current = new AbortController()
       operation.current = current
       try {
-        const proof = await requestVerification({
-          scope: 'token.key.read',
-          context: { token_id: tokenId },
-          title: t('Verify to view API key'),
-          description: t(
-            'Confirm your identity before revealing this API key.'
-          ),
-        })
-        if (!proof || operation.current !== current) {return null}
-        const res = await fetchTokenKey(tokenId, proof.proof_token)
+        let res: Awaited<ReturnType<typeof fetchTokenKey>>
+        try {
+          // 先不带 proof：站点默认不再要求二次验证。
+          res = await fetchTokenKey(tokenId)
+        } catch (error) {
+          if (!isProofRequiredError(error)) {throw error}
+          // 站点仍强制验证：弹出验证弹窗并重试一次。
+          const proof = await requestVerification({
+            scope: 'token.key.read',
+            context: { token_id: tokenId },
+            title: t('Verify to view API key'),
+            description: t(
+              'Confirm your identity before revealing this API key.'
+            ),
+          })
+          if (!proof || operation.current !== current) {return null}
+          res = await fetchTokenKey(tokenId, proof.proof_token)
+        }
         if (operation.current !== current) {return null}
         if (!res.success) {
           throw createServerError(res, t('Failed to fetch API key'))
@@ -84,16 +124,22 @@ export function useTokenKeyDisclosure() {
       const current = new AbortController()
       operation.current = current
       try {
-        const proof = await requestVerification({
-          scope: 'token.key.read',
-          context: { token_ids: tokenIds },
-          title: t('Verify to view API keys'),
-          description: t(
-            'Confirm your identity before revealing these API keys.'
-          ),
-        })
-        if (!proof || operation.current !== current) {return {}}
-        const res = await fetchTokenKeysBatch(tokenIds, proof.proof_token)
+        let res: Awaited<ReturnType<typeof fetchTokenKeysBatch>>
+        try {
+          res = await fetchTokenKeysBatch(tokenIds)
+        } catch (error) {
+          if (!isProofRequiredError(error)) {throw error}
+          const proof = await requestVerification({
+            scope: 'token.key.read',
+            context: { token_ids: tokenIds },
+            title: t('Verify to view API keys'),
+            description: t(
+              'Confirm your identity before revealing these API keys.'
+            ),
+          })
+          if (!proof || operation.current !== current) {return {}}
+          res = await fetchTokenKeysBatch(tokenIds, proof.proof_token)
+        }
         if (operation.current !== current) {return {}}
         if (!res.success) {
           throw createServerError(res, t('Failed to fetch API keys'))

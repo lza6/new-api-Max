@@ -13,15 +13,24 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 )
 
 // SecureVerificationRequired protects channel key disclosure. Other sensitive
 // operations validate their narrower proof scopes in their controller.
+//
+// 管理端 key 运维（查看/测试）默认不要求 step-up：已由 AdminAuth + RootAuth +
+// ChannelSensitiveWrite 权限把关，重复二次验证拖慢运维。管理员可通过
+// token_setting.require_verification_to_read_channel_key=true 恢复旧行为。
 func SecureVerificationRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		channelID, err := strconv.Atoi(c.Param("id"))
 		if err != nil || channelID <= 0 {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
+			return
+		}
+		if !operation_setting.IsChannelKeyReadVerificationRequired() {
+			c.Next()
 			return
 		}
 		context, err := common.Marshal(service.ChannelKeyReadContext{ChannelID: channelID})
@@ -37,13 +46,29 @@ func SecureVerificationRequired() gin.HandlerFunc {
 	}
 }
 
+// requireOwnTokenProofIfConfigured 判断读取「自己」的 token 密钥是否需要 step-up。
+// 返回 true 表示需要继续走验证；false 表示可直接放行。
+//
+// 安全边界：调用方必须已确认 token 归属当前 session 用户。此函数只放宽「自己
+// 的密钥」；越权读取仍由控制器层的 GetTokenByIds(id, userId) 拦截。
+func requireOwnTokenProofIfConfigured() bool {
+	return operation_setting.IsOwnKeyReadVerificationRequired()
+}
+
 // SecureTokenKeyVerificationRequired protects single API key disclosure
 // (POST /api/token/:id/key). The proof binds to the exact token id.
+//
+// 默认不要求 step-up（用户已通过 session 登录，归属由控制器校验）；管理员可
+// 通过 token_setting.require_verification_to_read_own_key=true 恢复旧行为。
 func SecureTokenKeyVerificationRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		tokenID, err := strconv.Atoi(c.Param("id"))
 		if err != nil || tokenID <= 0 {
 			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"success": false, "code": "SECURITY_CONTEXT_INVALID", "message": service.ErrVerificationContextInvalid.Error()})
+			return
+		}
+		if !requireOwnTokenProofIfConfigured() {
+			c.Next()
 			return
 		}
 		context, err := common.Marshal(service.TokenKeyReadContext{TokenID: tokenID})
@@ -95,6 +120,12 @@ func SecureTokenKeysBatchVerificationRequired() gin.HandlerFunc {
 		}
 		sort.Ints(body.Ids)
 		c.Request.Body = io.NopCloser(bytes.NewReader(raw))
+		// 默认不要求 step-up（归属由控制器 GetTokenKeysByIds(ids, userId) 校验）；
+		// 开关开启时恢复旧的批量证明语义，此时才需要生成绑定 id 集的上下文。
+		if !requireOwnTokenProofIfConfigured() {
+			c.Next()
+			return
+		}
 		context, err := common.Marshal(service.TokenKeysBatchReadContext{TokenIDs: body.Ids})
 		if err != nil {
 			c.AbortWithStatus(http.StatusInternalServerError)

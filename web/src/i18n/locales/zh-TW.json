@@ -6769,6 +6769,23 @@
     "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch 等相容 OpenAI 協定的客戶端會從以下位址自動讀取你的剩餘餘額。請使用 API 金鑰驗證。",
     "Copy address": "複製位址",
     "Use your API key as the Bearer token. The base URL used by every protocol is": "用你的 API 金鑰作為 Bearer Token。所有協定共用的接入位址是",
-    "CC Switch intro": "可從主控台一鍵匯入，也可手動填寫接入位址與 API 金鑰。餘額顯示讀取下方列出的站點計費位址。"
+    "CC Switch intro": "可從主控台一鍵匯入，也可手動填寫接入位址與 API 金鑰。餘額顯示讀取下方列出的站點計費位址。",
+    "Add Keys": "新增金鑰",
+    "Paste one API key per line. Duplicate keys are skipped automatically.": "每行貼上一個 API 金鑰，重複的金鑰會自動略過。",
+    "Add {{count}} Keys": "新增 {{count}} 個金鑰",
+    "{{count}} key(s) will be added": "將新增 {{count}} 個金鑰",
+    "Test All Keys": "一鍵測試全部金鑰",
+    "Test this key": "測試此金鑰",
+    "Key test passed": "金鑰測試通過",
+    "Key test failed": "金鑰測試失敗",
+    "Key test done: {{ok}} ok / {{fail}} failed": "金鑰測試完成：{{ok}} 個可用 / {{fail}} 個失敗",
+    "Keys added": "金鑰已新增",
+    "Failed to add keys": "新增金鑰失敗",
+    "OK": "OK",
+    "FAIL": "FAIL",
+    "Require verification to view own API key": "查看自己的 API 金鑰需要二次驗證",
+    "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "關閉（預設）時，已登入使用者查看自己的金鑰無需二次驗證。開啟可恢復二次驗證。",
+    "Require verification to view channel keys": "查看渠道金鑰需要二次驗證",
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "關閉（預設）時，管理員查看與測試渠道金鑰無需二次驗證。開啟可恢復二次驗證。"
   }
 }

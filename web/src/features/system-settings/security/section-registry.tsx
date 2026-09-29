@@ -134,6 +134,10 @@ const SECURITY_SECTIONS = [
         defaultValues={{
           'token_setting.max_user_tokens':
             settings['token_setting.max_user_tokens'],
+          'token_setting.require_verification_to_read_own_key':
+            settings['token_setting.require_verification_to_read_own_key'],
+          'token_setting.require_verification_to_read_channel_key':
+            settings['token_setting.require_verification_to_read_channel_key'],
         }}
       />
     ),

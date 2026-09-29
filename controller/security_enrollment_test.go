@@ -31,6 +31,7 @@ import (
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/oauth"
 	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/lza6/new-api-Max/setting/system_setting"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
@@ -38,6 +39,16 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
+
+// enableChannelKeyReadVerificationForTest 临时把渠道密钥读取验证开关设为 true，
+// 返回恢复函数。用于仍要验证 step-up 机制本身的用例。
+func enableChannelKeyReadVerificationForTest(t *testing.T) func() {
+	t.Helper()
+	setting := operation_setting.GetTokenSetting()
+	previous := setting.RequireVerificationToReadChannelKey
+	setting.RequireVerificationToReadChannelKey = true
+	return func() { setting.RequireVerificationToReadChannelKey = previous }
+}
 
 func setupSecurityEnrollmentTest(t *testing.T) (*model.User, service.AuthIdentity) {
 	t.Helper()
@@ -805,6 +816,11 @@ func TestSecurityEnrollmentPendingPasskeyRejectsChangedAuthorization(t *testing.
 }
 
 func TestSecurityEnrollmentPasskeyProofProtectsChannelKeyRead(t *testing.T) {
+	// 本用例验证 step-up 机制本身，需显式开启渠道密钥读取验证（默认已放宽为
+	// 不要求验证——见 TestChannelKeyReadWithoutVerificationByDefault）。
+	restore := enableChannelKeyReadVerificationForTest(t)
+	defer restore()
+
 	user, identity := setupSecurityEnrollmentTest(t)
 	require.NoError(t, model.DB.Model(user).Update("role", common.RoleRootUser).Error)
 	require.NoError(t, model.PublishUserAuthCache(user.Id))
@@ -1649,4 +1665,40 @@ func TestSecurityEnrollmentRejectsChangedFirstFactorPolicy(t *testing.T) {
 			})
 		}
 	}
+}
+
+// TestChannelKeyReadWithoutVerificationByDefault 生产回归（2026-09-29）：
+// 管理端查看渠道密钥默认不再要求 step-up —— 管理端已由 RootAuth +
+// ChannelSensitiveWrite 权限把关（生产反馈重复二次验证拖慢运维）。
+// 管理员可把 token_setting.require_verification_to_read_channel_key 设为 true
+// 恢复旧行为（由 TestSecurityEnrollmentPasskeyProofProtectsChannelKeyRead 覆盖）。
+func TestChannelKeyReadWithoutVerificationByDefault(t *testing.T) {
+	user, _ := setupSecurityEnrollmentTest(t)
+	require.NoError(t, model.DB.Model(user).Update("role", common.RoleRootUser).Error)
+	require.NoError(t, model.PublishUserAuthCache(user.Id))
+	require.NoError(t, model.DB.AutoMigrate(&model.Channel{}))
+	require.NoError(t, model.DB.Create(&model.Channel{
+		Id: 321, Name: "no-verify", Key: "secret-without-step-up", Type: 1, Status: 1,
+	}).Error)
+
+	setting := operation_setting.GetTokenSetting()
+	previous := setting.RequireVerificationToReadChannelKey
+	setting.RequireVerificationToReadChannelKey = false
+	t.Cleanup(func() { setting.RequireVerificationToReadChannelKey = previous })
+
+	bundle, err := service.CreateLoginSession(user.Id, "password", "127.0.0.1", "no-verify-test")
+	require.NoError(t, err)
+
+	router := gin.New()
+	router.POST("/api/channel/:id/key", middleware.RootAuth(), middleware.SecureVerificationRequired(), GetChannelKey)
+
+	// 无 X-Security-Proof 头，仅凭 root 会话即应拿到密钥。
+	request := httptest.NewRequest("POST", "/api/channel/321/key", nil)
+	request.Header.Set("Authorization", "Bearer "+bundle.AccessToken)
+	result := httptest.NewRecorder()
+	router.ServeHTTP(result, request)
+
+	require.Equal(t, http.StatusOK, result.Code, result.Body.String())
+	assert.Contains(t, result.Body.String(), "secret-without-step-up")
+	assert.NotContains(t, result.Body.String(), "SECURITY_PROOF_REQUIRED")
 }

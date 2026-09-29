@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2, RefreshCw, Trash2, Power, PowerOff } from 'lucide-react'
+import { Loader2, Plus, RefreshCw, Trash2, Power, PowerOff } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -52,6 +52,9 @@ import {
   enableAllMultiKeys,
   disableAllMultiKeys,
   deleteDisabledMultiKeys,
+  addMultiKeys,
+  testChannelKey,
+  testChannelKeys,
 } from '../../api'
 import { MULTI_KEY_FILTER_OPTIONS } from '../../constants'
 import {
@@ -61,10 +64,18 @@ import {
   getMultiKeyConfirmMessage,
   isDestructiveAction,
 } from '../../lib'
-import type { KeyStatus, MultiKeyConfirmAction } from '../../types'
+import type {
+  KeyStatus,
+  KeyTestResult,
+  MultiKeyConfirmAction,
+} from '../../types'
 import { useChannels } from '../channels-provider'
 import { StatisticsCard } from './multi-key-statistics-card'
-import { MultiKeyTableRowActions } from './multi-key-table-row-actions'
+import {
+  MultiKeyTableRowActions,
+  TestAllKeysButton,
+} from './multi-key-table-row-actions'
+import { AddMultiKeysDialog } from './add-multi-keys-dialog'
 
 type MultiKeyManageDialogProps = {
   open: boolean
@@ -101,6 +112,13 @@ export function MultiKeyManageDialog({
   const [confirmAction, setConfirmAction] =
     useState<MultiKeyConfirmAction | null>(null)
   const [isPerformingAction, setIsPerformingAction] = useState(false)
+  // 密钥测试状态：单 key 测试中集合 + 最近结果 + 批量测试中/汇总
+  const [testingIndex, setTestingIndex] = useState<number | null>(null)
+  const [testResults, setTestResults] = useState<Record<number, KeyTestResult>>(
+    {}
+  )
+  const [isTestingAll, setIsTestingAll] = useState(false)
+  const [addKeysOpen, setAddKeysOpen] = useState(false)
 
   // Reset and load data when dialog opens
   useEffect(() => {
@@ -157,6 +175,76 @@ export function MultiKeyManageDialog({
   const handlePageChange = (newPage: number) => {
     setCurrentPage(newPage)
     loadKeyStatus(newPage, pageSize)
+  }
+
+  const handleTestKey = async (keyIndex: number) => {
+    if (!currentRow) {return}
+    setTestingIndex(keyIndex)
+    try {
+      const res = await testChannelKey(currentRow.id, keyIndex)
+      setTestResults((prev) => ({
+        ...prev,
+        [keyIndex]: {
+          index: keyIndex,
+          ok: Boolean(res.success),
+          message: res.message || '',
+          time_ms: res.time ? Math.round(res.time * 1000) : 0,
+          error_code: res.error_code,
+          key_preview: '',
+        },
+      }))
+      if (res.success) {
+        toast.success(t('Key test passed'))
+      } else {
+        toast.error(res.message || t('Key test failed'))
+      }
+    } catch (error) {
+      handleServerError(error, t('Key test failed'))
+    } finally {
+      setTestingIndex(null)
+    }
+  }
+
+  const handleTestAllKeys = async () => {
+    if (!currentRow) {return}
+    setIsTestingAll(true)
+    try {
+      const res = await testChannelKeys(currentRow.id)
+      if (res.success && res.data) {
+        const map: Record<number, KeyTestResult> = {}
+        for (const r of res.data.results) {map[r.index] = r}
+        setTestResults(map)
+        toast.success(
+          t('Key test done: {{ok}} ok / {{fail}} failed', {
+            ok: res.data.ok_count,
+            fail: res.data.fail_count,
+          })
+        )
+      } else {
+        toast.error(res.message || t('Key test failed'))
+      }
+    } catch (error) {
+      handleServerError(error, t('Key test failed'))
+    } finally {
+      setIsTestingAll(false)
+    }
+  }
+
+  const handleAddKeys = async (keys: string[]) => {
+    if (!currentRow) {return}
+    try {
+      const res = await addMultiKeys(currentRow.id, keys)
+      if (res.success) {
+        toast.success(res.message || t('Keys added'))
+        setAddKeysOpen(false)
+        await loadKeyStatus(1, pageSize, statusFilter)
+        queryClient.invalidateQueries({ queryKey: channelsQueryKeys.lists() })
+      } else {
+        toast.error(res.message || t('Failed to add keys'))
+      }
+    } catch (error) {
+      handleServerError(error, t('Failed to add keys'))
+    }
   }
 
   const performAction = async () => {
@@ -312,7 +400,7 @@ export function MultiKeyManageDialog({
               </SelectContent>
             </Select>
 
-            <div className='flex items-center gap-2'>
+            <div className='flex flex-wrap items-center gap-2'>
               <Button
                 variant='outline'
                 size='sm'
@@ -320,6 +408,22 @@ export function MultiKeyManageDialog({
                 disabled={isLoading}
               >
                 <RefreshCw className='h-4 w-4' />
+              </Button>
+
+              <TestAllKeysButton
+                onTest={handleTestAllKeys}
+                testing={isTestingAll}
+                disabled={isLoading || total === 0}
+              />
+
+              <Button
+                variant='outline'
+                size='sm'
+                onClick={() => setAddKeysOpen(true)}
+                disabled={isLoading}
+              >
+                <Plus className='mr-2 h-4 w-4' />
+                {t('Add Keys')}
               </Button>
 
               {manualDisabledCount + autoDisabledCount > 0 && (
@@ -427,6 +531,9 @@ export function MultiKeyManageDialog({
                         status={key.status}
                         canDelete={canEditSensitive}
                         onAction={setConfirmAction}
+                        onTest={handleTestKey}
+                        testResult={testResults[key.index]}
+                        testing={testingIndex === key.index}
                       />
                     ),
                   },
@@ -466,6 +573,12 @@ export function MultiKeyManageDialog({
           )}
         </div>
       </Dialog>
+
+      <AddMultiKeysDialog
+        open={addKeysOpen}
+        onOpenChange={setAddKeysOpen}
+        onSubmit={handleAddKeys}
+      />
 
       {/* Confirmation Dialog */}
       <ConfirmDialog

@@ -398,6 +398,8 @@ export type SecuritySettings = {
   'fetch_setting.allowed_ports': number[]
   'fetch_setting.apply_ip_filter_for_domain': boolean
   'token_setting.max_user_tokens': number
+  'token_setting.require_verification_to_read_own_key': boolean
+  'token_setting.require_verification_to_read_channel_key': boolean
   // T6 全局并发桶（relay 设置块，relay.* 前缀）
   'relay.global_concurrency_enabled': boolean
   'relay.global_concurrency_limit': number

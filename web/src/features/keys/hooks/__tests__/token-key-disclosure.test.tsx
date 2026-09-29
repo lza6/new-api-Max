@@ -16,6 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+// 生产回归（2026-09-29）：用户查看**自己的**密钥默认不再要求 step-up。
+// 后端归属校验 GetTokenByIds(id, userId) 才是安全边界；用户已通过 session 登录，
+// 二次验证属重复校验（生产曾收到「复制密钥被要求验证」投诉）。
+// 兼容：站点若把 require_verification_to_read_own_key 设为 true，服务端返回
+// SECURITY_PROOF_* 时前端仍会弹出验证弹窗并重试一次。
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { useState } from 'react'
@@ -91,11 +96,68 @@ async function completeVerification() {
   await user.click(screen.getByRole('button', { name: 'Verify' }))
 }
 
-it('reveals a single API key only after a step-up proof', async () => {
+/** 构造一个「服务端要求二次验证」的 403 错误，模拟站点把开关设为 true。 */
+function proofRequiredError() {
+  return Object.assign(new Error('需要安全验证'), {
+    response: { status: 403, data: { code: 'SECURITY_PROOF_REQUIRED' } },
+  })
+}
+
+it('reveals a single own API key without any step-up verification (default)', async () => {
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/token/7/key') {
+      return {
+        data: { success: true, data: { key: 'fake-key-for-test-only' } },
+      }
+    }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  render(<Harness />)
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal Single' }))
+  await waitFor(() =>
+    expect(screen.getByLabelText('Single key')).toHaveTextContent(
+      'sk-fake-key-for-test-only'
+    )
+  )
+  // 不得调用 /api/verify（证明没有弹二次验证）
+  expect(post.mock.calls.map(([url]) => url)).toEqual(['/api/token/7/key'])
+  const [, , config] = post.mock.calls[0] as unknown as [
+    string,
+    unknown,
+    { headers?: Record<string, string> },
+  ]
+  expect(config?.headers?.['X-Security-Proof']).toBeUndefined()
+})
+
+it('reveals a batch of own API keys without step-up (default)', async () => {
+  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/token/batch/keys') {
+      return {
+        data: { success: true, data: { keys: { 7: 'fake-key-7', 8: 'fake-key-8' } } },
+      }
+    }
+    throw new Error(`Unexpected POST ${url}`)
+  })
+  render(<Harness />)
+  await userEvent.click(screen.getByRole('button', { name: 'Reveal Batch' }))
+  await waitFor(() =>
+    expect(screen.getByLabelText('Batch keys')).toHaveTextContent(
+      '7:sk-fake-key-7,8:sk-fake-key-8'
+    )
+  )
+  expect(post.mock.calls.map(([url]) => url)).toEqual([
+    '/api/token/batch/keys',
+  ])
+})
+
+it('falls back to step-up verification when the server still requires it', async () => {
   const proof = tokenVerification()
+  let keyAttempts = 0
   const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
     if (url === '/api/verify') {return Promise.resolve(proof)}
     if (url === '/api/token/7/key') {
+      keyAttempts += 1
+      if (keyAttempts === 1) {throw proofRequiredError()}
       return {
         data: { success: true, data: { key: 'fake-key-for-test-only' } },
       }
@@ -110,61 +172,27 @@ it('reveals a single API key only after a step-up proof', async () => {
       'sk-fake-key-for-test-only'
     )
   )
-  const [, , config] = post.mock.calls.find(
-    ([url]) => url === '/api/token/7/key'
-  ) as unknown as [string, unknown, { headers?: Record<string, string> }]
-  expect(config?.headers?.['X-Security-Proof']).toBe('token-key-proof')
-})
-
-it('reveals a batch of API keys only after a step-up proof bound to the id set', async () => {
-  const proof = tokenVerification()
-  const post = vi.spyOn(api, 'post').mockImplementation(async (url) => {
-    if (url === '/api/verify') {return Promise.resolve(proof)}
-    if (url === '/api/token/batch/keys') {
-      return {
-        data: {
-          success: true,
-          data: {
-            keys: { 7: 'fake-key-7', 8: 'fake-key-8' },
-          },
-        },
-      }
-    }
-    throw new Error(`Unexpected POST ${url}`)
-  })
-  render(<Harness />)
-  await userEvent.click(screen.getByRole('button', { name: 'Reveal Batch' }))
-  await completeVerification()
-  await waitFor(() =>
-    expect(screen.getByLabelText('Batch keys')).toHaveTextContent(
-      '7:sk-fake-key-7,8:sk-fake-key-8'
-    )
-  )
-  const call = post.mock.calls.find(([url]) => url === '/api/token/batch/keys')
-  expect(call).toBeDefined()
-  const [, body, config] = call as unknown as [
+  // 第二次带 proof 重试
+  const retry = post.mock.calls.filter(([url]) => url === '/api/token/7/key')[1]
+  const [, , config] = retry as unknown as [
     string,
-    { ids: number[] },
+    unknown,
     { headers?: Record<string, string> },
   ]
-  expect(body?.ids).toEqual([7, 8])
   expect(config?.headers?.['X-Security-Proof']).toBe('token-key-proof')
 })
 
-it('cancelling verification never calls the key endpoint', async () => {
+it('cancelling the fallback verification never reveals the key', async () => {
   tokenVerification()
-  const post = vi
-    .spyOn(api, 'post')
-    .mockImplementation(async (url) =>
-      url === '/api/verify'
-        ? { data: { success: true, data: {} } }
-        : Promise.reject(new Error(`Unexpected POST ${url}`))
-    )
+  vi.spyOn(api, 'post').mockImplementation(async (url) => {
+    if (url === '/api/token/7/key') {throw proofRequiredError()}
+    if (url === '/api/verify') {return {data: {success: true, data: {}}}}
+    throw new Error(`Unexpected POST ${url}`)
+  })
   render(<Harness />)
   await userEvent.click(screen.getByRole('button', { name: 'Reveal Single' }))
   await userEvent.click(await screen.findByRole('button', { name: 'Cancel' }))
   await waitFor(() =>
     expect(screen.getByLabelText('Single key')).toHaveTextContent('Hidden')
   )
-  expect(post.mock.calls.map(([url]) => url)).toEqual([])
 })

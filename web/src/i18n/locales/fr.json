@@ -6769,6 +6769,23 @@
     "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch et les autres clients compatibles OpenAI lisent automatiquement votre solde restant à ces adresses. Authentifiez-vous avec votre clé d'API.",
     "Copy address": "Copier l'adresse",
     "Use your API key as the Bearer token. The base URL used by every protocol is": "Utilisez votre clé d'API comme Bearer Token. L'URL de base commune à tous les protocoles est",
-    "CC Switch intro": "Import en un clic depuis la console, ou configurez manuellement l'URL de base et la clé d'API. L'affichage du solde utilise les points de terminaison de facturation ci-dessous."
+    "CC Switch intro": "Import en un clic depuis la console, ou configurez manuellement l'URL de base et la clé d'API. L'affichage du solde utilise les points de terminaison de facturation ci-dessous.",
+    "Add Keys": "Ajouter des clés",
+    "Paste one API key per line. Duplicate keys are skipped automatically.": "Collez une clé API par ligne. Les clés en double sont ignorées automatiquement.",
+    "Add {{count}} Keys": "Ajouter {{count}} clés",
+    "{{count}} key(s) will be added": "{{count}} clé(s) seront ajoutées",
+    "Test All Keys": "Tester toutes les clés",
+    "Test this key": "Tester cette clé",
+    "Key test passed": "Test de clé réussi",
+    "Key test failed": "Échec du test de clé",
+    "Key test done: {{ok}} ok / {{fail}} failed": "Test des clés terminé : {{ok}} ok / {{fail}} échecs",
+    "Keys added": "Clés ajoutées",
+    "Failed to add keys": "Échec de l'ajout des clés",
+    "OK": "OK",
+    "FAIL": "FAIL",
+    "Require verification to view own API key": "Exiger une vérification pour voir sa propre clé API",
+    "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "Désactivé (par défaut), les utilisateurs connectés voient leurs propres clés API sans seconde vérification. Activez pour rétablir la vérification renforcée.",
+    "Require verification to view channel keys": "Exiger une vérification pour voir les clés de canal",
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Désactivé (par défaut), les administrateurs consultent et testent les clés de canal sans seconde vérification. Activez pour rétablir la vérification renforcée."
   }
 }

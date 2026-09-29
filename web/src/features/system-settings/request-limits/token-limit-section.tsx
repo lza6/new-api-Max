@@ -32,8 +32,13 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 
-import { SettingsForm } from '../components/settings-form-layout'
+import {
+  SettingsForm,
+  SettingsSwitchContent,
+  SettingsSwitchItem,
+} from '../components/settings-form-layout'
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useUpdateOption } from '../hooks/use-update-option'
@@ -41,6 +46,8 @@ import { useUpdateOption } from '../hooks/use-update-option'
 const tokenLimitSchema = z.object({
   token_setting: z.object({
     max_user_tokens: z.number().min(1),
+    require_verification_to_read_own_key: z.boolean(),
+    require_verification_to_read_channel_key: z.boolean(),
   }),
 })
 
@@ -49,6 +56,8 @@ type TokenLimitFormInput = z.input<typeof tokenLimitSchema>
 
 type NormalizedTokenLimitValues = {
   'token_setting.max_user_tokens': number
+  'token_setting.require_verification_to_read_own_key': boolean
+  'token_setting.require_verification_to_read_channel_key': boolean
 }
 
 type TokenLimitSectionProps = {
@@ -60,6 +69,10 @@ const buildFormDefaults = (
 ): TokenLimitFormInput => ({
   token_setting: {
     max_user_tokens: defaults['token_setting.max_user_tokens'],
+    require_verification_to_read_own_key:
+      defaults['token_setting.require_verification_to_read_own_key'],
+    require_verification_to_read_channel_key:
+      defaults['token_setting.require_verification_to_read_channel_key'],
   },
 })
 
@@ -67,6 +80,10 @@ const normalizeFormValues = (
   values: TokenLimitFormValues
 ): NormalizedTokenLimitValues => ({
   'token_setting.max_user_tokens': values.token_setting.max_user_tokens,
+  'token_setting.require_verification_to_read_own_key':
+    values.token_setting.require_verification_to_read_own_key,
+  'token_setting.require_verification_to_read_channel_key':
+    values.token_setting.require_verification_to_read_channel_key,
 })
 
 export function TokenLimitSection({ defaultValues }: TokenLimitSectionProps) {
@@ -83,11 +100,13 @@ export function TokenLimitSection({ defaultValues }: TokenLimitSectionProps) {
   }, [defaultValues, form])
 
   const onSubmit = async (values: TokenLimitFormValues) => {
-    const key = 'token_setting.max_user_tokens' as const
     const normalized = normalizeFormValues(values)
-    const value = normalized[key]
-    if (value !== defaultValues[key]) {
-      await updateOption.mutateAsync({ key, value })
+    for (const key of Object.keys(normalized) as Array<
+      keyof NormalizedTokenLimitValues
+    >) {
+      if (normalized[key] !== defaultValues[key]) {
+        await updateOption.mutateAsync({ key, value: normalized[key] })
+      }
     }
   }
 
@@ -124,6 +143,56 @@ export function TokenLimitSection({ defaultValues }: TokenLimitSectionProps) {
                 </FormDescription>
                 <FormMessage />
               </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='token_setting.require_verification_to_read_own_key'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>
+                    {t('Require verification to view own API key')}
+                  </FormLabel>
+                  <FormDescription>
+                    {t(
+                      'When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='token_setting.require_verification_to_read_channel_key'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>
+                    {t('Require verification to view channel keys')}
+                  </FormLabel>
+                  <FormDescription>
+                    {t(
+                      'When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Switch
+                    checked={field.value}
+                    onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+              </SettingsSwitchItem>
             )}
           />
         </SettingsForm>

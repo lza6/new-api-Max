@@ -112,19 +112,19 @@ export async function updateApiKeyStatus(
 // G1/T8: requires a step-up security proof (scope `token.key.read`).
 export async function fetchTokenKey(
   id: number,
-  proofToken: string
+  proofToken?: string
 ): Promise<{ success: boolean; message?: string; data?: { key: string } }> {
   const res = await api.post(`/api/token/${id}/key`, undefined, {
-    headers: { 'X-Security-Proof': proofToken },
+    headers: proofToken ? { 'X-Security-Proof': proofToken } : undefined,
   })
   return res.data
 }
 
 // Batch fetch real (unmasked) keys for multiple tokens.
-// G1/T8: requires a step-up security proof bound to the exact id set.
+// proofToken 仅在站点强制验证时传入（见 use-token-key-disclosure 的兼容策略）。
 export async function fetchTokenKeysBatch(
   ids: number[],
-  proofToken: string
+  proofToken?: string
 ): Promise<{
   success: boolean
   message?: string
@@ -133,7 +133,7 @@ export async function fetchTokenKeysBatch(
   const res = await api.post(
     '/api/token/batch/keys',
     { ids },
-    { headers: { 'X-Security-Proof': proofToken } }
+    { headers: proofToken ? { 'X-Security-Proof': proofToken } : undefined }
   )
   return res.data
 }

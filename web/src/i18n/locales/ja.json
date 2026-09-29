@@ -499,7 +499,7 @@
     "API Key mode: use APIKey|Region": "APIキーモード: use APIKey | Region",
     "API Key Quota": "APIキー割当",
     "API Key updated successfully": "APIキーが正常に更新されました",
-    "API Keys": "APIキー",
+    "API Keys": "API キー",
     "API Private Key": "API 秘密鍵",
     "API Requests": "APIリクエスト",
     "API secret": "APIシークレット",
@@ -6769,6 +6769,23 @@
     "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch など OpenAI 互換クライアントは、以下のアドレスから残りの残高を自動的に読み取ります。API キーで認証してください。",
     "Copy address": "アドレスをコピー",
     "Use your API key as the Bearer token. The base URL used by every protocol is": "API キーを Bearer Token として使用します。全プロトコル共通の接続先は",
-    "CC Switch intro": "コンソールからワンクリックでインポートできます。手動で Base URL と API キーを設定する場合は、残高表示が下記の課金エンドポイントを参照します。"
+    "CC Switch intro": "コンソールからワンクリックでインポートできます。手動で Base URL と API キーを設定する場合は、残高表示が下記の課金エンドポイントを参照します。",
+    "Add Keys": "キーを追加",
+    "Paste one API key per line. Duplicate keys are skipped automatically.": "1 行に 1 つの API キーを貼り付けてください。重複キーは自動的にスキップされます。",
+    "Add {{count}} Keys": "{{count}} 個のキーを追加",
+    "{{count}} key(s) will be added": "{{count}} 個のキーが追加されます",
+    "Test All Keys": "すべてのキーを一括テスト",
+    "Test this key": "このキーをテスト",
+    "Key test passed": "キーテスト成功",
+    "Key test failed": "キーテスト失敗",
+    "Key test done: {{ok}} ok / {{fail}} failed": "キーテスト完了：{{ok}} 件成功 / {{fail}} 件失敗",
+    "Keys added": "キーを追加しました",
+    "Failed to add keys": "キーの追加に失敗しました",
+    "OK": "OK",
+    "FAIL": "FAIL",
+    "Require verification to view own API key": "自分の API キー表示に再認証を要求",
+    "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "オフ（既定）の場合、ログイン済みユーザーは再認証なしで自分の API キーを表示できます。オンにすると再認証が復活します。",
+    "Require verification to view channel keys": "チャネルキー表示に再認証を要求",
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "オフ（既定）の場合、管理者は再認証なしでチャネルキーを表示・テストできます。オンにすると再認証が復活します。"
   }
 }

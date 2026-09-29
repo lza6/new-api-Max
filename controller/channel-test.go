@@ -39,6 +39,9 @@ type testResult struct {
 	context     *gin.Context
 	localErr    error
 	newAPIError *types.NewAPIError
+	// keyIndex 是本次测试实际使用的多 key 索引（-1 表示非多 key 或未知）。
+	// 单 key/批量 key 测试接口用它回传「测的是哪个 key」。
+	keyIndex int
 }
 
 func normalizeChannelTestEndpoint(channel *model.Channel, endpointType string) string {
@@ -70,6 +73,14 @@ func resolveChannelTestUserID(c *gin.Context) (int, error) {
 }
 
 func testChannel(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool) testResult {
+	return testChannelWithKey(ctx, channel, testUserID, testModel, endpointType, isStream, -1)
+}
+
+// testChannelWithKey 与 testChannel 相同，但可指定使用第 keyIndex 个密钥
+// （keyIndex < 0 时沿用渠道自身的 key 选择逻辑）。用于「测试单个 key」与
+// 「批量测试所有 key」。指定索引时先按索引取 key 并写入上下文，覆盖
+// SetupContextForSelectedChannel 的自动选 key 结果。
+func testChannelWithKey(ctx context.Context, channel *model.Channel, testUserID int, testModel string, endpointType string, isStream bool, keyIndex int) testResult {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -175,6 +186,19 @@ func testChannel(ctx context.Context, channel *model.Channel, testUserID int, te
 			localErr:    newAPIError,
 			newAPIError: newAPIError,
 		}
+	}
+	// 指定 key 索引时覆盖自动选中的 key（单 key 测试 / 批量测试所有 key）。
+	if keyIndex >= 0 {
+		keys := channel.GetKeys()
+		if keyIndex >= len(keys) {
+			return testResult{
+				context:  c,
+				localErr: fmt.Errorf("key index %d out of range (channel has %d keys)", keyIndex, len(keys)),
+			}
+		}
+		common.SetContextKey(c, constant.ContextKeyChannelKey, keys[keyIndex])
+		common.SetContextKey(c, constant.ContextKeyChannelIsMultiKey, true)
+		common.SetContextKey(c, constant.ContextKeyChannelMultiKeyIndex, keyIndex)
 	}
 
 	// Determine relay format based on endpoint type or request path
@@ -1157,4 +1181,152 @@ func TestAllChannels(c *gin.Context) {
 			"status":  task.Status,
 		},
 	})
+}
+
+// --- 多 key 测试：单 key / 批量 ---
+
+// keyTestResult 单个密钥的测试结果。
+type keyTestResult struct {
+	Index     int    `json:"index"`
+	Ok        bool   `json:"ok"`
+	Message   string `json:"message"`
+	TimeMs    int64  `json:"time_ms"`
+	ErrorCode string `json:"error_code,omitempty"`
+	Preview   string `json:"key_preview"`
+}
+
+// previewKey 返回密钥前若干字符用于识别（不泄露完整密钥）。
+func previewKey(key string) string {
+	if len(key) <= 10 {
+		return key
+	}
+	return key[:10] + "..."
+}
+
+// TestChannelKey 测试多 key 渠道的单个密钥是否可调用。
+// POST /api/channel/:id/key/test?key_index=N[&model=..&endpoint_type=..&stream=..]
+func TestChannelKey(c *gin.Context) {
+	channelId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	keyIndexStr := c.Query("key_index")
+	if keyIndexStr == "" {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "缺少 key_index 参数"})
+		return
+	}
+	keyIndex, err := strconv.Atoi(keyIndexStr)
+	if err != nil || keyIndex < 0 {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "key_index 非法"})
+		return
+	}
+
+	channel, err := getChannelForTest(c, channelId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	result := runSingleKeyTest(c, channel, keyIndex,
+		c.Query("model"), c.Query("endpoint_type"), parseTestStream(c))
+	c.JSON(http.StatusOK, result)
+}
+
+// TestChannelKeys 批量测试多 key 渠道的全部密钥（并发受限）。
+// POST /api/channel/:id/keys/test[?model=..&endpoint_type=..]
+func TestChannelKeys(c *gin.Context) {
+	channelId, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	channel, err := getChannelForTest(c, channelId)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	keys := channel.GetKeys()
+	if len(keys) == 0 {
+		c.JSON(http.StatusOK, gin.H{"success": false, "message": "该渠道没有可测试的密钥"})
+		return
+	}
+	testModel := c.Query("model")
+	endpointType := c.Query("endpoint_type")
+
+	// 并发度限制为 3，避免对上游造成突发压力（2C2G 网关 + 上游限流友好）。
+	const maxConcurrency = 3
+	sem := make(chan struct{}, maxConcurrency)
+	results := make([]keyTestResult, len(keys))
+	var waitGroup sync.WaitGroup
+	for i := range keys {
+		waitGroup.Add(1)
+		go func(idx int) {
+			defer waitGroup.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+			results[idx] = runSingleKeyTest(c, channel, idx, testModel, endpointType, false)
+		}(i)
+	}
+	waitGroup.Wait()
+
+	okCount := 0
+	for _, r := range results {
+		if r.Ok {
+			okCount++
+		}
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "",
+		"data": gin.H{
+			"total":      len(results),
+			"ok_count":   okCount,
+			"fail_count": len(results) - okCount,
+			"results":    results,
+		},
+	})
+}
+
+// getChannelForTest 取渠道（优先缓存）。
+func getChannelForTest(c *gin.Context, channelId int) (*model.Channel, error) {
+	channel, err := model.CacheGetChannel(channelId)
+	if err == nil && channel != nil {
+		return channel, nil
+	}
+	return model.GetChannelById(channelId, true)
+}
+
+func parseTestStream(c *gin.Context) bool {
+	stream, _ := strconv.ParseBool(c.Query("stream"))
+	return stream
+}
+
+// runSingleKeyTest 用第 keyIndex 个密钥对渠道发起一次最小测试请求。
+func runSingleKeyTest(c *gin.Context, channel *model.Channel, keyIndex int, testModel, endpointType string, isStream bool) keyTestResult {
+	preview := ""
+	if keys := channel.GetKeys(); keyIndex >= 0 && keyIndex < len(keys) {
+		preview = previewKey(keys[keyIndex])
+	}
+	testUserID, err := resolveChannelTestUserID(c)
+	if err != nil {
+		return keyTestResult{Index: keyIndex, Ok: false, Message: err.Error(), Preview: preview}
+	}
+	requestCtx := context.Background()
+	if c.Request != nil {
+		requestCtx = c.Request.Context()
+	}
+	result := testChannelWithKey(requestCtx, channel, testUserID, testModel, endpointType, isStream, keyIndex)
+	if result.localErr != nil {
+		return keyTestResult{Index: keyIndex, Ok: false, Message: result.localErr.Error(), Preview: preview}
+	}
+	if result.newAPIError != nil {
+		return keyTestResult{
+			Index:     keyIndex,
+			Ok:        false,
+			Message:   result.newAPIError.Error(),
+			ErrorCode: string(result.newAPIError.GetErrorCode()),
+			Preview:   preview,
+		}
+	}
+	return keyTestResult{Index: keyIndex, Ok: true, Message: "", Preview: preview}
 }
