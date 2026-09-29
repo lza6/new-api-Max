@@ -6804,6 +6804,11 @@
     "{{count}} tables affected": "{{count}} tables affectées",
     "{{count}} warnings": "{{count}} avertissements",
     "Import failed": "Échec de l'import",
-    "Restore database backup?": "Restaurer la sauvegarde de la base ?"
+    "Restore database backup?": "Restaurer la sauvegarde de la base ?",
+    "Unified Protocol": "Protocole unifié",
+    "Smart Routing": "Routage intelligent",
+    "Route every request to the healthiest upstream": "Chaque requête est routée vers l’amont le plus sain",
+    "Usage and cost visible before you commit": "Usage et coût visibles avant de vous engager",
+    "One endpoint for every provider and SDK": "Un seul point d’accès pour tous les fournisseurs et SDK"
   }
 }

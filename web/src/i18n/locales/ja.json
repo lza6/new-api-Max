@@ -6804,6 +6804,11 @@
     "{{count}} tables affected": "{{count}} テーブルに影響",
     "{{count}} warnings": "{{count}} 件の警告",
     "Import failed": "インポートに失敗しました",
-    "Restore database backup?": "データベースを復元しますか？"
+    "Restore database backup?": "データベースを復元しますか？",
+    "Unified Protocol": "統一プロトコル",
+    "Smart Routing": "スマートルーティング",
+    "Route every request to the healthiest upstream": "すべてのリクエストを最も健全な上流へ自動ルーティング",
+    "Usage and cost visible before you commit": "利用量とコストを契約前に確認できます",
+    "One endpoint for every provider and SDK": "すべてのプロバイダーと SDK を 1 つのエンドポイントに"
   }
 }

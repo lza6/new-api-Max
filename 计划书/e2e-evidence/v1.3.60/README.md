@@ -31,3 +31,28 @@ POST /api/token/batch/keys (as other)  → 404 TOKEN_NOT_FOUND
 
 ## 未部署说明
 按用户指示处于**部署冻结期**：本批未执行线上部署，故以本地真实浏览器 E2E 作为完成度凭证。
+
+---
+
+## 首页 3D 优化验证（v1.3.60 第 2 批）
+
+**实现**：`web/src/features/home/components/sections/hero-3d-showcase.tsx`
+纯 CSS 3D（`perspective` + `rotateX/Y` + `translateZ`）+ motion 指针视差，
+**零 WebGL 依赖**（首页 LCP 预算敏感，three.js 会显著拖慢）。
+
+| 验证项 | 结果 | 证据 |
+|---|---|---|
+| 桌面暗色完整渲染（hero→统计→特性→三步→CTA→页脚） | ✅ | final-desktop-dark.png |
+| 3D 三层清晰、纵深可辨、标签全部可见 | ✅ | home3-hero.png |
+| 移动端 390px 完整渲染、无横向溢出 | ✅ | final-mobile.png |
+| 平板 768px | ✅ | final-tablet.png |
+| **`prefers-reduced-motion: reduce` 下内容仍可见** | ✅ 3/3 层 + h1 | a11y-reduced-motion.png |
+| 3D 层在窄屏隐藏（`hidden sm:block`，装饰性内容不占首屏） | ✅ | 组件内 |
+| i18n 7 语言无漂移 | ✅ | locale-consistency 2/2 |
+
+### 迭代中修正的两个真实缺陷（自审发现）
+1. **层间遮挡**：初版三层等高卡片重叠 34px，下方标签被上层压住 → 改为偏移 52/104px +
+   内容顶部对齐，被覆盖的仅是空白区。
+2. **内容可能永久不可见**（严重）：初版用 `initial={{opacity:0}} + whileInView`——
+   若 IntersectionObserver 未触发（截图工具、旧浏览器、JS 延迟），内容**永不显示**。
+   已改为 `initial={false} + animate`：**默认可见，动画仅作增强**。

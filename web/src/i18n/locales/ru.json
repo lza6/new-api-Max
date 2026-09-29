@@ -6804,6 +6804,11 @@
     "{{count}} tables affected": "Затронуто таблиц: {{count}}",
     "{{count}} warnings": "Предупреждений: {{count}}",
     "Import failed": "Не удалось выполнить импорт",
-    "Restore database backup?": "Восстановить базу из резервной копии?"
+    "Restore database backup?": "Восстановить базу из резервной копии?",
+    "Unified Protocol": "Единый протокол",
+    "Smart Routing": "Умная маршрутизация",
+    "Route every request to the healthiest upstream": "Каждый запрос уходит на самый здоровый апстрим",
+    "Usage and cost visible before you commit": "Расход и стоимость видны до оплаты",
+    "One endpoint for every provider and SDK": "Одна точка входа для всех провайдеров и SDK"
   }
 }

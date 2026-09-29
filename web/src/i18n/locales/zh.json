@@ -6804,6 +6804,11 @@
     "{{count}} tables affected": "影响 {{count}} 张表",
     "{{count}} warnings": "{{count}} 条警告",
     "Import failed": "导入失败",
-    "Restore database backup?": "恢复数据库备份？"
+    "Restore database backup?": "恢复数据库备份？",
+    "Unified Protocol": "统一协议",
+    "Smart Routing": "智能路由",
+    "Route every request to the healthiest upstream": "每个请求都自动落到最健康的上游",
+    "Usage and cost visible before you commit": "用量与花费在下单前就一目了然",
+    "One endpoint for every provider and SDK": "一个地址接入所有供应商与客户端"
   }
 }

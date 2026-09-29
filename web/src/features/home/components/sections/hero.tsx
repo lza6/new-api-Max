@@ -24,6 +24,8 @@ import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { useStatus } from '@/hooks/use-status'
 
+import { Hero3DShowcase } from './hero-3d-showcase'
+
 import { lazy, Suspense } from 'react'
 
 const HeroTerminalDemo = lazy(() =>
@@ -236,14 +238,16 @@ export function Hero(props: HeroProps) {
           </div>
         </div>
 
-        {/* Right Column: Hero Terminal API Demo */}
+        {/* Right Column: 3D showcase (decorative) + live terminal demo */}
         <div
-          className='landing-animate-fade-up flex w-full justify-center opacity-0 lg:col-span-6'
+          className='landing-animate-fade-up flex w-full flex-col items-center gap-8 opacity-0 lg:col-span-6'
           style={{ animationDelay: '320ms' }}
         >
           <Suspense fallback={<div className='mt-8 h-64 w-full rounded-lg border bg-muted/40 lg:mt-0' />}>
-            <HeroTerminalDemo className='mt-8 lg:mt-0' />
+            <HeroTerminalDemo className='mt-8 w-full lg:mt-0' />
           </Suspense>
+          {/* 3D 分层展示：纯 CSS perspective，尊重 prefers-reduced-motion */}
+          <Hero3DShowcase />
         </div>
       </div>
     </section>

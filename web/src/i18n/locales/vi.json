@@ -6804,6 +6804,11 @@
     "{{count}} tables affected": "Ảnh hưởng {{count}} bảng",
     "{{count}} warnings": "{{count}} cảnh báo",
     "Import failed": "Nhập thất bại",
-    "Restore database backup?": "Phục hồi bản sao lưu?"
+    "Restore database backup?": "Phục hồi bản sao lưu?",
+    "Unified Protocol": "Giao thức thống nhất",
+    "Smart Routing": "Định tuyến thông minh",
+    "Route every request to the healthiest upstream": "Mọi yêu cầu được định tuyến tới máy chủ khỏe nhất",
+    "Usage and cost visible before you commit": "Lượng dùng và chi phí hiển thị trước khi bạn trả tiền",
+    "One endpoint for every provider and SDK": "Một điểm truy cập cho mọi nhà cung cấp và SDK"
   }
 }
