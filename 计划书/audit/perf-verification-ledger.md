@@ -306,7 +306,10 @@
 - **US-3 零停机**：`/opt/new-api/deploy-zero-downtime.sh` 蓝绿交替端口（探测 Caddy 当前上游 → 用空闲端口起新容器 `NODE_TYPE=slave` → 健康检查 → `caddy reload` 切流 → 停旧容器；任一步失败回滚，旧容器全程在服务）。**实测：构建期 25 连打 25/25 200，切流耗时 4 秒**。2C2G 可行依据：new-api 实测仅 141MiB，可用内存 1065MB。
 - **关键约束（勿破）**：新容器**必须** `NODE_TYPE=slave`，否则后台任务（subscription_reset/cleanup/authz）会与旧容器重复执行。
 - **模型广场「机房部署」**：排查结论=数据侧与前端过滤均已正确（`/api/pricing` enable_groups 含该分组、abilities enabled=t、`filterByGroup` 按 includes 过滤、`getAvailableGroups` 求交展示），属数据修复前旧状态/缓存，**未改任何前端过滤代码**。
-- **验证**：go build/vet exit 0；controller+middleware+common+setting 全绿；前端 typecheck/lint/vitest 12/12/i18n 2/2；生产 E2E 单key测试 4/4 ok、批量 ok_count=4 fail=0、查看渠道key 200 无 proof、add_keys 幂等拒绝重复。
+- **验证（修正版，2026-09-30 复核）**：go build/vet exit 0；**middleware / common / setting 全绿**；
+  **controller 全量当时实为 FAIL**（9 项既有噪声 + 本批引入的 i18n panic，见记录 0028 更正）——
+  此前写「controller 全绿」不准确，已更正。前端 typecheck/lint/vitest 12/12/i18n 2/2；
+  生产 E2E 单key测试 4/4 ok、批量 ok_count=4 fail=0、查看渠道key 200 无 proof、add_keys 幂等拒绝重复。
 - **回滚**：两个开关设 true 恢复旧行为；`rollback.sh v1.3.58` 退版本。
 
 ## 记录 0026 · v1.3.60 上游错误归类 + 数据库灾备 + 首页3D（2026-09-29/30）
@@ -331,6 +334,28 @@
 - **批量测试防御**：加 key 数上限 200 + 整批总超时（默认 400s，`timeout_seconds` 可覆盖）+ 响应 `timed_out`。
 - **跨渠道状态**：对话框切渠道时补重置 `testResults/testingIndex`。
 - **文档一致性**：spec §3 兼容性边界如实记录（强制模式下旧前端 403）；plan AD-2 明确「key 测试不改动健康分」。
-- **验证**：`go build/vet` 绿；controller+middleware 全绿；前端 **keys+channels 119/119**；typecheck 绿。
+- **验证（修正版）**：`go build/vet` 绿；middleware 全绿；**controller 全量 FAIL**（见记录 0028 更正：
+  9 项既有噪声 + i18n panic；定向用例全绿）；前端 **keys+channels 119/119**；typecheck 绿。
 - **防重复（新增）**：① 改「验证/弹窗」类前端逻辑后，**必须 grep 全仓所有断言旧流程的测试**（`grep -rn "step-up\|Verify to view" web/src --include=*test*`），
   否则漏改测试 = CI 红；② 组件改图标按钮时必须带 `aria-label`（axe button-name 是 critical）。
+
+
+## 记录 0028 · v1.3.62 二次审查修复（2026-09-30）
+- **审查复验发现 v1.3.60 引入、v1.3.61 未修的 CI 阻断回归**，逐条复核属实：
+  - **P0-A**：`controller/token.go` 的 404 分支用了 `i18n.T(c, ...)`，但 `controller/main_test.go` 的
+    `TestMain` **不初始化 i18n** → `bundle == nil` → `NewLocalizer(nil,...)` **panic** →
+    `go test ./controller/` **全量 FAIL（433s）**。**我用 `TestAPITokenAuditDatabaseMatrix` 实测复现 panic**。
+    修复：① `TestMain` 加 `_ = i18n.Init()`；② `i18n.Translate` 加 **nil-bundle 保护**
+    （`if bundle == nil { return key }`，与 main.go「i18n 非关键」契约一致）。
+  - **P0-B**：`token_test.go` 的 `foreign key view` / `batch keys no matches` 仍期望 200，
+    与新 404 语义冲突。修复：测试结构体加 `status` 字段，两用例改期望 404，断言改用 `tc.status`。
+  - **P1-A**：`TestChannelKeys` 的上限/空渠道/超时分支**零覆盖**（本批最大新逻辑）→ 补 3 个用例。
+  - **P1-B**：台账 0025/0027 写「controller 全绿」**不实** → 已更正（同条记录）。
+- **验证**：`go test ./controller/` 全量 **0 panic**（此前 panic 直接终止进程）；剩余 9 项失败
+  **经 git stash 基线对照确认与本批无关**（既有噪声，含 `TestSiteSubscriptionStatsAggregates`、
+  `TestAdminSetUserSubscriptionTierInvalidatesCache` 两项新录：隔离跑 PASS / 全量 FAIL = 顺序依赖）。
+- **纪律（写进记忆）**：
+  ① **新增 `i18n.T` 调用前先确认测试链路已 `i18n.Init()`**，否则整个测试包会 panic；
+     `i18n.Translate` 现已有 nil 保护，但测试仍应显式 Init 以贴近生产。
+  ② **改 HTTP 状态码语义后必须 grep 全仓断言旧状态码的测试**（`grep -rn "assert.Equal(t, 200" controller/*_test.go`）。
+  ③ **声称「全绿」前必须跑该包的全量测试**——定向 `-run` 通过 ≠ 包全量通过（本次 P0-A 正是如此漏掉）。

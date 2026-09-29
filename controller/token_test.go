@@ -676,7 +676,9 @@ func verifyAPITokenAudit(t *testing.T) {
 		success                          bool
 		params                           string
 		initialStatus                    int
-		failWrite, rateLimit, usePAT     bool
+		// status 为期望 HTTP 状态码；0 表示默认 200。
+		status                       int
+		failWrite, rateLimit, usePAT bool
 	}{
 		{name: "create", method: "POST", path: "/", body: `{"name":"created","expired_time":-1,"unlimited_quota":true}`, action: "token.create", success: true},
 		{name: "invalid create", method: "POST", path: "/", body: `{"name":"attempt","remain_quota":-1}`, action: "token.create", params: `{"name":"attempt"}`},
@@ -697,12 +699,12 @@ func verifyAPITokenAudit(t *testing.T) {
 		{name: "missing delete", method: "DELETE", path: "/999999", action: "token.delete", params: `{"id":999999}`},
 		{name: "key view", method: "POST", path: "/$id/key", action: "token.key_view", success: true, params: `{"id":$id,"name":"owned"}`},
 		{name: "PAT key view", method: "POST", path: "/$id/key", action: "token.key_view", success: true, params: `{"id":$id,"name":"owned"}`, usePAT: true},
-		{name: "foreign key view", method: "POST", path: "/$other/key", action: "token.key_view", params: `{"id":$other}`},
+		{name: "foreign key view", method: "POST", path: "/$other/key", action: "token.key_view", params: `{"id":$other}`, status: 404},
 		{name: "rate limited key view", method: "POST", path: "/$id/key", action: "token.key_view", params: `{"id":$id}`, rateLimit: true},
 		{name: "batch delete partial and duplicate", method: "POST", path: "/batch", body: `{"ids":[$id,$id,$other,999999]}`, action: "token.delete_batch", success: true, params: `{"requested_ids":[$id,$id,$other,999999],"total":4,"count":1}`},
 		{name: "empty batch delete", method: "POST", path: "/batch", body: `{"ids":[]}`, action: "token.delete_batch", params: `{"requested_ids":[],"total":0}`},
 		{name: "batch keys partial and duplicate", method: "POST", path: "/batch/keys", body: `{"ids":[$id,$id,$other,999999]}`, action: "token.key_view_batch", success: true, params: `{"requested_ids":[$id,$id,$other,999999],"total":4,"count":1,"returned_ids":[$id]}`},
-		{name: "batch keys no matches", method: "POST", path: "/batch/keys", body: `{"ids":[$other,999999]}`, action: "token.key_view_batch", success: true, params: `{"requested_ids":[$other,999999],"total":2,"count":0,"returned_ids":[]}`},
+		{name: "batch keys no matches", method: "POST", path: "/batch/keys", body: `{"ids":[$other,999999]}`, action: "token.key_view_batch", params: `{"requested_ids":[$other,999999],"total":2}`, status: 404},
 		{name: "empty batch keys", method: "POST", path: "/batch/keys", body: `{"ids":[]}`, action: "token.key_view_batch", params: `{"requested_ids":[],"total":0}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -773,7 +775,11 @@ func verifyAPITokenAudit(t *testing.T) {
 			if tc.rateLimit {
 				assert.Equal(t, 429, response.Code)
 			} else {
-				assert.Equal(t, 200, response.Code)
+				expectedStatus := tc.status
+				if expectedStatus == 0 {
+					expectedStatus = 200
+				}
+				assert.Equal(t, expectedStatus, response.Code)
 				assert.Equal(t, tc.success, decodeAPIResponse(t, response).Success)
 			}
 			assert.Equal(t, user.Id, operation.UserId)

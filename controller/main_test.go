@@ -6,6 +6,7 @@ import (
 
 	"github.com/glebarez/sqlite"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/i18n"
 	"github.com/lza6/new-api-Max/model"
 	"gorm.io/gorm"
 )
@@ -28,6 +29,10 @@ func TestMain(m *testing.M) {
 
 	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
 	common.RedisEnabled = false
+	// i18n 必须初始化：多个 controller 用例通过 i18n.T 生成错误文案
+	// （如 GetTokenKey 的 404 分支）。测试进程不会执行 main()，这里显式 Init
+	// 才能与生产一致；Init 失败不阻断（与 main.go 同一契约）。
+	_ = i18n.Init()
 	common.BatchUpdateEnabled = false
 	common.LogConsumeEnabled = true
 

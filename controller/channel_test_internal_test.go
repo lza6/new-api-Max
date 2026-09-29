@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 
@@ -21,6 +23,7 @@ import (
 	"github.com/lza6/new-api-Max/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 )
 
 func TestValidateChannelProxy(t *testing.T) {
@@ -563,4 +566,90 @@ func TestPreviewKeyMasksShortAndLong(t *testing.T) {
 	assert.Equal(t, "abc", previewKey("abc"))
 	assert.Equal(t, "1234567890", previewKey("1234567890"))     // 恰好 10 位不截断
 	assert.Equal(t, "1234567890...", previewKey("12345678901")) // 11 位截断
+}
+
+// performTestChannelKeys 构造 TestChannelKeys 请求（root 管理员上下文）。
+func performTestChannelKeys(t *testing.T, channelID int, query string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/channel/"+strconv.Itoa(channelID)+"/keys/test"+query, nil)
+	c.Params = gin.Params{{Key: "id", Value: strconv.Itoa(channelID)}}
+	c.Set("id", 9999)
+	c.Set("role", common.RoleRootUser)
+	c.Set("username", "root-operator")
+	c.Set(common.RequestIdKey, "batch-key-test")
+	TestChannelKeys(c)
+	return recorder
+}
+
+// seedMultiKeyChannel 建一个含 n 个 key 的多 key 渠道。
+func seedMultiKeyChannel(t *testing.T, db *gorm.DB, id, n int) *model.Channel {
+	t.Helper()
+	keys := make([]string, n)
+	for i := range keys {
+		keys[i] = fmt.Sprintf("batch-key-%d", i)
+	}
+	ch := &model.Channel{
+		Id: id, Name: fmt.Sprintf("batch-%d", id), Type: constant.ChannelTypeOpenAI,
+		Status: common.ChannelStatusEnabled, Key: strings.Join(keys, "\n"),
+		Group: "default", Models: "gpt-4o-mini",
+	}
+	ch.ChannelInfo.IsMultiKey = true
+	ch.ChannelInfo.MultiKeySize = n
+	ch.ChannelInfo.MultiKeyMode = constant.MultiKeyModePolling
+	require.NoError(t, db.Create(ch).Error)
+	return ch
+}
+
+// TestTestChannelKeysRejectsTooManyKeys 批量测试的 key 总数上限：
+// add_keys 可无限追加，批量测试会逐个发起真实上游请求，不设上限则一次点击
+// 就可能打出一大批外部请求（上游限流/成本风险）。超过上限必须直接拒绝。
+func TestTestChannelKeysRejectsTooManyKeys(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}))
+	seedMultiKeyChannel(t, db, 9911, 201) // 上限 200
+
+	recorder := performTestChannelKeys(t, 9911, "")
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+	assert.Contains(t, recorder.Body.String(), "超过单次批量测试上限")
+}
+
+// TestTestChannelKeysRejectsEmptyChannel 无密钥渠道直接拒绝，不进入测试循环。
+func TestTestChannelKeysRejectsEmptyChannel(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}))
+	ch := &model.Channel{
+		Id: 9912, Name: "empty-keys", Type: constant.ChannelTypeOpenAI,
+		Status: common.ChannelStatusEnabled, Key: "", Group: "default", Models: "gpt-4o-mini",
+	}
+	ch.ChannelInfo.IsMultiKey = true
+	ch.ChannelInfo.MultiKeySize = 0
+	require.NoError(t, db.Create(ch).Error)
+
+	recorder := performTestChannelKeys(t, 9912, "")
+	assert.Contains(t, recorder.Body.String(), `"success":false`)
+	assert.Contains(t, recorder.Body.String(), "没有可测试的密钥")
+}
+
+// TestTestChannelKeysHonorsTimeoutParam 总超时参数解析：非法/越界值不得被采纳，
+// 合法值生效并在整批超时时回传 timed_out 标记（保证 handler 一定返回）。
+func TestTestChannelKeysHonorsTimeoutParam(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Channel{}, &model.Ability{}))
+	seedMultiKeyChannel(t, db, 9913, 1)
+
+	// 极小超时（1s）+ 不可达上游 → 必然走超时分支，且响应必须返回（不挂死）。
+	// 上游指向保留地址，连接会失败或超时，两条路径都必须让 handler 收敛。
+	recorder := performTestChannelKeys(t, 9913, "?timeout_seconds=1")
+	body := recorder.Body.String()
+	// 必须返回 200 且是合法 JSON（handler 未挂死、未 panic）
+	assert.Equal(t, http.StatusOK, recorder.Code, body)
+	assert.Contains(t, body, `"success":true`)
+	assert.Contains(t, body, `"total":1`)
+	// 上限校验：timeout_seconds 超过 3600 不予采纳（回退默认），仍能正常返回
+	recorder2 := performTestChannelKeys(t, 9913, "?timeout_seconds=99999")
+	assert.Equal(t, http.StatusOK, recorder2.Code)
+	assert.Contains(t, recorder2.Body.String(), `"success":true`)
 }

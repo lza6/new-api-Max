@@ -92,8 +92,15 @@ func T(c *gin.Context, key string, args ...map[string]any) string {
 	return Translate(lang, key, args...)
 }
 
-// Translate translates a message key for the specified language
+// Translate translates a message key for the specified language.
+//
+// 未初始化（bundle == nil，例如单元测试未调 Init、或 Init 失败）时直接返回 key：
+// main.go 约定 i18n 非关键、初始化失败不阻断启动，因此这里也必须能安全降级，
+// 不能因缺翻译而 panic 掉调用方（曾导致 controller 测试包整体崩溃）。
 func Translate(lang, key string, args ...map[string]any) string {
+	if bundle == nil {
+		return key
+	}
 	loc := GetLocalizer(lang)
 
 	config := &i18n.LocalizeConfig{
