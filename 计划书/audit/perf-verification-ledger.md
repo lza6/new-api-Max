@@ -317,3 +317,20 @@
 - **首页 3D + 可用性缺陷**：新增纯 CSS 3D `hero-3d-showcase.tsx`（零 WebGL）。**重要教训**：`initial={{opacity:0}} + whileInView` 在 IO 未触发时（整页截图/旧浏览器/JS 失败）内容**永久不可见** → 必须 `initial={false} + animate`（默认可见、动画增强）。
 - **本地 E2E（部署冻结期替代）**：Playwright 13/13 + 首页 4 视图截图 + reduced-motion 3/3 可见。证据 `计划书/e2e-evidence/v1.3.60/`。
 - **防重复**：① 起本地 E2E 服务必须**先 `bun run build` 再重启 Go**（`go:embed web/dist` 是编译期快照，只改前端不重启=白测）；② 用 `go run` 时监听进程是子进程，`taskkill` 需按端口 PID；③ 密钥 reveal 的真实路径是「点掩码 → Popover」，复制按钮是 Tooltip 无 aria-label，正向证据用 "API Key 已解锁" toast。
+
+## 记录 0027 · v1.3.61 独立审查修复（2026-09-30）
+- **独立审查对 v1.3.59 给 Request Changes**，2 阻塞 + 7 Required 全部复核属实并修复。
+- **C-1（最重要，前端静默失效）**：`readServerCode()` 先读 `error.code`；**axios 对所有 4xx 一律设 `error.code='ERR_BAD_REQUEST'`**，
+  业务 code 只在 `response.data.code`。→ 「站点强制验证时回退弹窗」整条路径是死代码。
+  **教训（写进纪律）**：读 axios 错误码必须**先读 `response.data.code`**；判 `ERR_` 前缀排除传输层码。
+  测试必须用**真实 axios 形状**（带 `code:'ERR_BAD_REQUEST'`），否则会造出假阳性。
+- **C-2**：本批令 `a11y-keys-stepup.test.tsx` / `api-key-listing.test.tsx`（断言旧 step-up 流程）变红 → 按新契约重写。
+  **顺带修真实 a11y 缺陷**：`api-keys-cells.tsx` 复制按钮纯图标无 `aria-label`（axe `button-name` critical）。
+- **契约**：`keyTestResult.TimeMs` 原从未赋值（恒 0）、`testResult.keyIndex` 死字段、前端读不存在的 `res.time`
+  → 统一为后端实测 `time_ms` / 前端读 `res.time_ms`。
+- **批量测试防御**：加 key 数上限 200 + 整批总超时（默认 400s，`timeout_seconds` 可覆盖）+ 响应 `timed_out`。
+- **跨渠道状态**：对话框切渠道时补重置 `testResults/testingIndex`。
+- **文档一致性**：spec §3 兼容性边界如实记录（强制模式下旧前端 403）；plan AD-2 明确「key 测试不改动健康分」。
+- **验证**：`go build/vet` 绿；controller+middleware 全绿；前端 **keys+channels 119/119**；typecheck 绿。
+- **防重复（新增）**：① 改「验证/弹窗」类前端逻辑后，**必须 grep 全仓所有断言旧流程的测试**（`grep -rn "step-up\|Verify to view" web/src --include=*test*`），
+  否则漏改测试 = CI 红；② 组件改图标按钮时必须带 `aria-label`（axe button-name 是 critical）。
