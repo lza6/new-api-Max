@@ -299,3 +299,12 @@
 - **deploy.sh 两处 bug 已修**：① `cd "$SRC"` 后未切回，`docker compose up` 跑了源码目录 compose（容器名冲突）；② `git fetch origin tag` 不带 `--force`，tag 被 force-push 后静默用旧镜像 → 必须 `git fetch --force origin "+refs/tags/$TAG:refs/tags/$TAG"`。备份 `deploy.sh.bak-before-fix-20260929-170235`。
 - **部署验收**：v1.3.58（image created 10:49:57 UTC）；前端 bundle `static/js/index.d83eebd18d.js` 含 `Balance query endpoints` ✓；真实推理 `/v1/chat/completions` 200；40 分钟内 OOM=0 / 限流失败=0 / HTTP 500=0；Redis 1.99M/48M；load 0.29。
 - **防重复**：① 改 `deploy.sh` 后必须 `bash -n` 校验 + 确认 `docker compose` 在 `/opt/new-api`（非 `-src`）；② force-push tag 后服务器必须 `git fetch --force` 否则部署旧镜像；③ 生产"503"先分辨**全站 503**（Caddy no upstreams）还是**单模型无渠道**（`model_not_found`），后者是渠道配置问题。
+
+## 记录 0025 · §006 密钥自主管理 + 渠道 Key 运维 + 零停机热更新（2026-09-29，v1.3.59）
+- **US-1 免二次验证**：`token_setting.require_verification_to_read_own_key`（默认 false）。安全边界是 controller 层 `GetTokenByIds(id, userId)` 归属校验；中间件在开关关时直接放行。前端 `use-token-key-disclosure.ts` 改为「先免 proof 请求 → 命中 `SECURITY_PROOF_*` 才弹窗重试」，站点开关任意配置都能工作（无需能力探测端点）。
+- **US-2 渠道 Key 运维**：新增 `add_keys`（追加/去重/拒空/拒非多key）、`POST /api/channel/:id/key/test?key_index=N`、`POST /api/channel/:id/keys/test`（并发上限 3）；`require_verification_to_read_channel_key`（默认 false）。
+- **US-3 零停机**：`/opt/new-api/deploy-zero-downtime.sh` 蓝绿交替端口（探测 Caddy 当前上游 → 用空闲端口起新容器 `NODE_TYPE=slave` → 健康检查 → `caddy reload` 切流 → 停旧容器；任一步失败回滚，旧容器全程在服务）。**实测：构建期 25 连打 25/25 200，切流耗时 4 秒**。2C2G 可行依据：new-api 实测仅 141MiB，可用内存 1065MB。
+- **关键约束（勿破）**：新容器**必须** `NODE_TYPE=slave`，否则后台任务（subscription_reset/cleanup/authz）会与旧容器重复执行。
+- **模型广场「机房部署」**：排查结论=数据侧与前端过滤均已正确（`/api/pricing` enable_groups 含该分组、abilities enabled=t、`filterByGroup` 按 includes 过滤、`getAvailableGroups` 求交展示），属数据修复前旧状态/缓存，**未改任何前端过滤代码**。
+- **验证**：go build/vet exit 0；controller+middleware+common+setting 全绿；前端 typecheck/lint/vitest 12/12/i18n 2/2；生产 E2E 单key测试 4/4 ok、批量 ok_count=4 fail=0、查看渠道key 200 无 proof、add_keys 幂等拒绝重复。
+- **回滚**：两个开关设 true 恢复旧行为；`rollback.sh v1.3.58` 退版本。
