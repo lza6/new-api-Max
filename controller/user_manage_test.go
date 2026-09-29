@@ -667,3 +667,62 @@ func TestGetUserDistinguishesNotFoundFromQueryFailure(t *testing.T) {
 	invalid := performGetUserRequest(t, "not-a-number", common.RoleRootUser)
 	assert.NotEqual(t, http.StatusNotFound, invalid.Code)
 }
+
+// performBillingRequest 构造 GET billing 端点请求，token_id/id 由调用方注入。
+func performBillingRequest(t *testing.T, handler gin.HandlerFunc, tokenID, userID int, path string) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, path, nil)
+	if tokenID > 0 {
+		c.Set("token_id", tokenID)
+	}
+	c.Set("id", userID)
+	handler(c)
+	return recorder
+}
+
+// TestBillingSubscriptionReportsAccountBalanceForUnlimitedToken 生产回归（2026-09-29）：
+// 无限额度密钥此前在 /v1/dashboard/billing/subscription 直接返回 100000000，
+// CC Switch 等按 hard_limit_usd - total_usage/100 计算余量的客户端会显示
+// "$999999"，用户据此无法得知真实余额（生产 1026 个启用密钥里 1001 个 unlimited）。
+// 现改为回退上报归属账户的真实额度（总额度 - 已用 = 剩余），语义与有限额度密钥一致。
+func TestBillingSubscriptionReportsAccountBalanceForUnlimitedToken(t *testing.T) {
+	db := setupManageUserTestDB(t)
+	require.NoError(t, db.AutoMigrate(&model.Token{}))
+	previousDisplay := common.DisplayTokenStatEnabled
+	common.DisplayTokenStatEnabled = true
+	t.Cleanup(func() { common.DisplayTokenStatEnabled = previousDisplay })
+
+	user := model.User{
+		Username: "billing-unlimited-user", Password: "password", Role: common.RoleCommonUser,
+		Status: common.UserStatusEnabled, Group: "default", Quota: 500000, UsedQuota: 100000,
+	}
+	require.NoError(t, db.Create(&user).Error)
+
+	unlimited := model.Token{
+		UserId: user.Id, Key: "billing-unlimited-key", Name: "unlimited",
+		Status: common.TokenStatusEnabled, UnlimitedQuota: true,
+	}
+	require.NoError(t, db.Create(&unlimited).Error)
+
+	recorder := performBillingRequest(t, GetSubscription, unlimited.Id, user.Id, "/v1/dashboard/billing/subscription")
+	require.Equal(t, http.StatusOK, recorder.Code)
+	var sub OpenAISubscriptionResponse
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &sub))
+	// quota_per_unit=500000 => (500000+100000)/500000 = 1.2
+	assert.InDelta(t, 1.2, sub.HardLimitUSD, 1e-9, "无限额度密钥必须上报账户真实额度而非 100000000")
+	assert.NotEqual(t, float64(100000000), sub.HardLimitUSD)
+
+	// 有限额度密钥保持原语义（密钥维度额度）。
+	limited := model.Token{
+		UserId: user.Id, Key: "billing-limited-key", Name: "limited",
+		Status: common.TokenStatusEnabled, RemainQuota: 400000, UsedQuota: 100000,
+	}
+	require.NoError(t, db.Create(&limited).Error)
+	recorder2 := performBillingRequest(t, GetSubscription, limited.Id, user.Id, "/v1/dashboard/billing/subscription")
+	var sub2 OpenAISubscriptionResponse
+	require.NoError(t, common.Unmarshal(recorder2.Body.Bytes(), &sub2))
+	assert.InDelta(t, 1.0, sub2.HardLimitUSD, 1e-9)
+}

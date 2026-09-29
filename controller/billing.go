@@ -38,6 +38,21 @@ func GetSubscription(c *gin.Context) {
 		})
 		return
 	}
+	// [fix-billing] 无限额度密钥回退账户余额：此前直接返回 100000000，
+	// CC Switch 等按 hard_limit_usd - total_usage/100 计算剩余余额的客户端会
+	// 显示 "$999999"，用户据此无法得知真实余量（生产 1026 个启用密钥里 1001 个
+	// 是 unlimited，即绝大多数用户看到的都是这个假数字）。无限额度密钥改为上报
+	// 其归属账户的真实额度，语义与有限额度密钥一致（总额度 - 已用 = 剩余）。
+	unlimitedFallback := token != nil && token.UnlimitedQuota
+	if unlimitedFallback {
+		remainQuota, err = model.GetUserQuota(c.GetInt("id"), false)
+		if err != nil {
+			openAIError := types.OpenAIError{Message: err.Error(), Type: "upstream_error"}
+			c.JSON(200, gin.H{"error": openAIError})
+			return
+		}
+		usedQuota, _ = model.GetUserUsedQuota(c.GetInt("id"))
+	}
 	quota := remainQuota + usedQuota
 	amount := float64(quota)
 	// OpenAI 兼容接口中的 *_USD 字段含义保持“额度单位”对应值：
@@ -52,9 +67,6 @@ func GetSubscription(c *gin.Context) {
 		// amount 保持 tokens 数值
 	default:
 		amount = amount / common.QuotaPerUnit
-	}
-	if token != nil && token.UnlimitedQuota {
-		amount = 100000000
 	}
 	subscription := OpenAISubscriptionResponse{
 		Object:             "billing_subscription",
