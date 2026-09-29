@@ -350,6 +350,16 @@ func SetApiRouter(router *gin.Engine) {
 			systemInfoRoute.DELETE("/instances/:node_name", controller.DeleteStaleSystemInstance)
 		}
 
+		// 数据库导出/导入（灾备）：含全站密钥与用户数据，权限收紧到 RootAuth。
+		// 导出为流式下载；导入为 multipart 上传，语义是「只插入缺失行」。
+		dbRoute := apiRouter.Group("/system/db")
+		dbRoute.Use(middleware.RootAuth())
+		{
+			dbRoute.GET("/export/info", controller.ExportDatabaseInfo)
+			dbRoute.GET("/export", controller.ExportDatabase)
+			dbRoute.POST("/import", middleware.CriticalRateLimit(), controller.ImportDatabase)
+		}
+
 		dataRoute := apiRouter.Group("/data")
 		dataRoute.GET("/", middleware.AdminAuth(), controller.GetAllQuotaDates)
 		dataRoute.GET("/users", middleware.AdminAuth(), controller.GetQuotaDatesByUser)

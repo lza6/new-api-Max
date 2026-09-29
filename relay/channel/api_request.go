@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 
 	common2 "github.com/lza6/new-api-Max/common"
@@ -511,6 +512,69 @@ func isRequestTimeout(err error) bool {
 // override < 0 → 非法值，回退全局；
 // override == 0 → 显式关闭整请求超时（交给上游决定，真正的透传）；
 // override > 0 → 渠道自定义超时秒数。
+// isUpstreamUnreachable 判断错误是否为「网关到上游的网络层失败」—— 请求从未
+// 到达上游应用，因此上游侧无任何记录。覆盖三类：
+//  1. 连接被拒（connection refused）/ 网络不可达（no route to host）
+//  2. TLS 或连接中途断开（EOF / unexpected EOF / connection reset）
+//  3. DNS 解析失败（no such host）
+//
+// 注意：超时（Timeout）不算「不可达」，由 isRequestTimeout 单独映射 504。
+func isUpstreamUnreachable(err error) bool {
+	if err == nil {
+		return false
+	}
+	// 超时优先由 504 分支处理，不在这里重复归类。
+	if isRequestTimeout(err) {
+		return false
+	}
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return true
+	}
+	var opErr *net.OpError
+	if errors.As(err, &opErr) {
+		return true
+	}
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) ||
+		errors.Is(err, syscall.ECONNREFUSED) || errors.Is(err, syscall.ECONNRESET) ||
+		errors.Is(err, syscall.EHOSTUNREACH) || errors.Is(err, syscall.ENETUNREACH) {
+		return true
+	}
+	// 兜底：Go 的 http 包在连接中途断开时常返回未包装的字符串错误，
+	// 无法用 errors.Is 匹配，退化为关键字判定（仅在网络层分支使用，不影响业务错误）。
+	msg := strings.ToLower(err.Error())
+	for _, marker := range []string{
+		"connection refused", "no route to host", "network is unreachable",
+		"unexpected eof", "connection reset", "broken pipe",
+		"no such host", "tls handshake timeout", "remote end closed connection",
+	} {
+		if strings.Contains(msg, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// summarizeNetworkError 把底层网络错误压成一句人话，供客户端直接展示
+// （避免把 Go 的完整 URL/Dial 细节透给终端用户，同时保留可诊断信息）。
+func summarizeNetworkError(err error) string {
+	msg := strings.ToLower(err.Error())
+	switch {
+	case strings.Contains(msg, "connection refused"):
+		return "connection refused"
+	case strings.Contains(msg, "no route to host"):
+		return "no route to host"
+	case strings.Contains(msg, "no such host"):
+		return "dns resolution failed"
+	case strings.Contains(msg, "unexpected eof"), strings.Contains(msg, "remote end closed connection"):
+		return "connection closed by upstream"
+	case strings.Contains(msg, "connection reset"), strings.Contains(msg, "broken pipe"):
+		return "connection reset by upstream"
+	default:
+		return "network error to upstream"
+	}
+}
+
 func resolveRelayTimeout(globalSeconds int, override *int) (seconds int, overridden bool) {
 	if override == nil || *override < 0 {
 		return globalSeconds, false
@@ -587,6 +651,16 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 			// 上游总超时（如 RELAY_TIMEOUT）：映射 504，语义准确、可观测可辨。
 			return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeDoRequestFailed, http.StatusGatewayTimeout,
 				types.ErrOptionWithHideErrMsg("upstream request timed out"))
+		}
+		if isUpstreamUnreachable(err) {
+			// [修复防御] 网络层失败（连接被拒 / TLS 中断 unexpected EOF / DNS 失败）
+			// 请求根本没到达上游应用，上游侧不会有记录——此前统一报 500 会让用户
+			// 误判为「网关内部故障」，监控也无法与真实 500 分离。
+			// 映射 502 Bad Gateway + upstream_unreachable 错误码，语义准确；
+			// status>=500 仍命中 ErrClassServerError → 渠道冷却与重试语义不变。
+			logger.LogWarn(c, "upstream unreachable (network layer, request never reached upstream): "+err.Error())
+			return nil, types.NewErrorWithStatusCode(err, types.ErrorCodeUpstreamUnreachable, http.StatusBadGateway,
+				types.ErrOptionWithHideErrMsg("upstream unreachable: "+summarizeNetworkError(err)))
 		}
 		return nil, types.NewError(err, types.ErrorCodeDoRequestFailed, types.ErrOptionWithHideErrMsg("upstream error: do request failed"))
 	}

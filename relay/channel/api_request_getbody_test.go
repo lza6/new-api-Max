@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -629,4 +630,48 @@ func TestResolveRelayTimeout(t *testing.T) {
 	sec, overridden = resolveRelayTimeout(global, &negative)
 	assert.False(t, overridden, "negative override falls back to global")
 	assert.Equal(t, global, sec)
+}
+
+// TestIsUpstreamUnreachable 生产回归（2026-09-29）：上游返回
+// `dial tcp x.x.x.x:443: connect: connection refused` 与 `unexpected EOF` 时，
+// 请求从未到达上游应用（上游侧无记录）。此前统一报 500，用户误判为网关内部
+// 故障且监控无法与真实 500 分离；现映射 502 + upstream_unreachable。
+func TestIsUpstreamUnreachable(t *testing.T) {
+	// 连接被拒（用户实际遇到的上游错误）
+	assert.True(t, isUpstreamUnreachable(&url.Error{
+		Op:  "Post",
+		URL: "https://token.54421666.xyz/v1/chat/completions",
+		Err: &net.OpError{Op: "dial", Err: syscall.ECONNREFUSED},
+	}))
+	// 连接中途被掐断（unexpected EOF，无包装）
+	assert.True(t, isUpstreamUnreachable(fmt.Errorf("Post \"https://up\": unexpected EOF")))
+	// DNS 解析失败
+	assert.True(t, isUpstreamUnreachable(&net.DNSError{Err: "no such host", Name: "bad.example"}))
+	// connection reset / broken pipe
+	assert.True(t, isUpstreamUnreachable(fmt.Errorf("read tcp: connection reset by peer")))
+	assert.True(t, isUpstreamUnreachable(fmt.Errorf("write tcp: broken pipe")))
+
+	// 超时必须由 504 分支处理，不能被归为不可达
+	assert.False(t, isUpstreamUnreachable(context.DeadlineExceeded))
+	assert.False(t, isUpstreamUnreachable(&url.Error{Op: "Post", URL: "https://up", Err: timeoutNetErr{fmt.Errorf("slow")}}))
+	// 业务错误不得被误判
+	assert.False(t, isUpstreamUnreachable(fmt.Errorf("invalid api key")))
+	assert.False(t, isUpstreamUnreachable(nil))
+}
+
+// TestSummarizeNetworkError 网络错误摘要必须是可读短句（不泄露完整 URL/Dial 细节）。
+func TestSummarizeNetworkError(t *testing.T) {
+	cases := map[string]string{
+		`Post "https://x/v1": dial tcp 1.2.3.4:443: connect: connection refused`: "connection refused",
+		`Post "https://x/v1": unexpected EOF`:                                    "connection closed by upstream",
+		`dial tcp: lookup bad.example: no such host`:                             "dns resolution failed",
+		`read tcp: connection reset by peer`:                                     "connection reset by upstream",
+		`dial tcp: connect: no route to host`:                                    "no route to host",
+		`something totally unknown`:                                              "network error to upstream",
+	}
+	for input, want := range cases {
+		got := summarizeNetworkError(fmt.Errorf("%s", input))
+		assert.Equal(t, want, got, input)
+		assert.NotContains(t, got, "https://", "摘要不得包含完整 URL")
+	}
 }

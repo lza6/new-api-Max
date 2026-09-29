@@ -6786,6 +6786,24 @@
     "Require verification to view own API key": "Exiger une vérification pour voir sa propre clé API",
     "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "Désactivé (par défaut), les utilisateurs connectés voient leurs propres clés API sans seconde vérification. Activez pour rétablir la vérification renforcée.",
     "Require verification to view channel keys": "Exiger une vérification pour voir les clés de canal",
-    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Désactivé (par défaut), les administrateurs consultent et testent les clés de canal sans seconde vérification. Activez pour rétablir la vérification renforcée."
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Désactivé (par défaut), les administrateurs consultent et testent les clés de canal sans seconde vérification. Activez pour rétablir la vérification renforcée.",
+    "Database Backup": "Sauvegarde de la base de données",
+    "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.": "Exportez un instantané complet de la base, ou restaurez-en un. L'import ajoute uniquement les lignes manquantes — il ne supprime ni n'écrase jamais les données existantes.",
+    "Export": "Exporter",
+    "{{count}} rows": "{{count}} lignes",
+    "{{count}} tables will be included": "{{count}} tables seront incluses",
+    "Loading table list…": "Chargement de la liste des tables…",
+    "Include log database (large)": "Inclure la base de journaux (volumineuse)",
+    "Download backup": "Télécharger la sauvegarde",
+    "Backup downloaded": "Sauvegarde téléchargée",
+    "Backup failed": "Échec de la sauvegarde",
+    "Import": "Importer",
+    "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.": "L'import ajoute uniquement les lignes manquantes. Les lignes existantes avec le même ID sont ignorées — vos données actuelles ne seront ni supprimées ni modifiées.",
+    "Choose backup file": "Choisir le fichier de sauvegarde",
+    "Import done: {{count}} rows added": "Import terminé : {{count}} lignes ajoutées",
+    "{{count}} tables affected": "{{count}} tables affectées",
+    "{{count}} warnings": "{{count}} avertissements",
+    "Import failed": "Échec de l'import",
+    "Restore database backup?": "Restaurer la sauvegarde de la base ?"
   }
 }

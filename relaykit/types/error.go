@@ -48,6 +48,11 @@ const (
 	ErrorCodeInvalidApiType     ErrorCode = "invalid_api_type"
 	ErrorCodeJsonMarshalFailed  ErrorCode = "json_marshal_failed"
 	ErrorCodeDoRequestFailed    ErrorCode = "do_request_failed"
+	// ErrorCodeUpstreamUnreachable 网关与上游之间的网络层失败：连接被拒、
+	// TLS/连接中途断开（unexpected EOF）、DNS 解析失败等。请求未到达上游应用，
+	// 因此上游侧不会有任何记录。语义上是网关的「坏网关」而非「内部错误」，
+	// 故返回 502 而非 500 —— 让用户、监控、告警都能与「网关自身故障」区分开。
+	ErrorCodeUpstreamUnreachable ErrorCode = "upstream_unreachable"
 	ErrorCodeGetChannelFailed   ErrorCode = "get_channel_failed"
 	ErrorCodeGenRelayInfoFailed ErrorCode = "gen_relay_info_failed"
 

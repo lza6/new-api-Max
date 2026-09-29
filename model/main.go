@@ -398,6 +398,29 @@ func migrateDB() error {
 	return nil
 }
 
+// BackupTables 返回备份/恢复覆盖的主库表（与 AutoMigrate 的集合保持一致）。
+// 顺序即导入时的插入顺序；导入用 INSERT ... ON CONFLICT DO NOTHING 语义，
+// 因此外键次序不构成硬约束，但保持确定性便于复现。
+func BackupTables() []any {
+	return []any{
+		&Channel{}, &Token{}, &User{}, &UserSession{}, &AuthFlow{},
+		&ExternalIdentityClaim{}, &PasskeyCredential{}, &Option{},
+		&LoginEncryptionKey{}, &Redemption{}, &RedemptionUsage{}, &ChannelCombo{},
+		&Ability{}, &Midjourney{}, &TopUp{}, &QuotaData{}, &Task{},
+		&TaskEvent{}, &TaskPlugin{}, &Model{}, &Vendor{}, &PrefillGroup{},
+		&Setup{}, &TwoFA{}, &TwoFABackupCode{}, &Checkin{}, &SubscriptionPlan{},
+		&SubscriptionOrder{}, &UserSubscription{}, &SubscriptionPreConsumeRecord{},
+		&CustomOAuthProvider{}, &UserOAuthBinding{}, &PerfMetric{},
+		&SystemInstance{}, &SystemTask{}, &SystemTaskLock{}, &CasbinRule{},
+		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &EventDelivery{},
+	}
+}
+
+// LogTables 返回日志库表（体积大，备份时默认排除，可显式包含）。
+func LogTables() []any {
+	return []any{&Log{}, &AuditLog{}}
+}
+
 func migrateLOGDB() error {
 	if err := MigrateAuditLogs(); err != nil {
 		return err

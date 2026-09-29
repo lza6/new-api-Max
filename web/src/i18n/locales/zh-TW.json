@@ -6786,6 +6786,24 @@
     "Require verification to view own API key": "查看自己的 API 金鑰需要二次驗證",
     "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "關閉（預設）時，已登入使用者查看自己的金鑰無需二次驗證。開啟可恢復二次驗證。",
     "Require verification to view channel keys": "查看渠道金鑰需要二次驗證",
-    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "關閉（預設）時，管理員查看與測試渠道金鑰無需二次驗證。開啟可恢復二次驗證。"
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "關閉（預設）時，管理員查看與測試渠道金鑰無需二次驗證。開啟可恢復二次驗證。",
+    "Database Backup": "資料庫備份",
+    "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.": "匯出資料庫完整快照，或從快照還原。匯入只新增缺少的列，絕不刪除或覆寫既有資料。",
+    "Export": "匯出",
+    "{{count}} rows": "{{count}} 列",
+    "{{count}} tables will be included": "將包含 {{count}} 張表",
+    "Loading table list…": "正在載入表清單…",
+    "Include log database (large)": "包含日誌庫（體積大）",
+    "Download backup": "下載備份",
+    "Backup downloaded": "備份已下載",
+    "Backup failed": "備份失敗",
+    "Import": "匯入",
+    "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.": "匯入僅新增缺少的列：相同 ID 的既有列會被略過，你目前的資料不會被刪除或修改。",
+    "Choose backup file": "選擇備份檔案",
+    "Import done: {{count}} rows added": "匯入完成：新增 {{count}} 列",
+    "{{count}} tables affected": "影響 {{count}} 張表",
+    "{{count}} warnings": "{{count}} 條警告",
+    "Import failed": "匯入失敗",
+    "Restore database backup?": "還原資料庫備份？"
   }
 }

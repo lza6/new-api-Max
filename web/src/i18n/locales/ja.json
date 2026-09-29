@@ -6786,6 +6786,24 @@
     "Require verification to view own API key": "自分の API キー表示に再認証を要求",
     "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "オフ（既定）の場合、ログイン済みユーザーは再認証なしで自分の API キーを表示できます。オンにすると再認証が復活します。",
     "Require verification to view channel keys": "チャネルキー表示に再認証を要求",
-    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "オフ（既定）の場合、管理者は再認証なしでチャネルキーを表示・テストできます。オンにすると再認証が復活します。"
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "オフ（既定）の場合、管理者は再認証なしでチャネルキーを表示・テストできます。オンにすると再認証が復活します。",
+    "Database Backup": "データベースバックアップ",
+    "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.": "データベースの完全なスナップショットをエクスポート、または復元します。インポートは不足行を追加するだけで、既存データを削除・上書きしません。",
+    "Export": "エクスポート",
+    "{{count}} rows": "{{count}} 行",
+    "{{count}} tables will be included": "{{count}} テーブルが含まれます",
+    "Loading table list…": "テーブル一覧を読み込み中…",
+    "Include log database (large)": "ログデータベースを含める（大容量）",
+    "Download backup": "バックアップをダウンロード",
+    "Backup downloaded": "バックアップをダウンロードしました",
+    "Backup failed": "バックアップに失敗しました",
+    "Import": "インポート",
+    "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.": "インポートは不足行を追加するだけです。同じ ID の既存行はスキップされ、現在のデータは削除・変更されません。",
+    "Choose backup file": "バックアップファイルを選択",
+    "Import done: {{count}} rows added": "インポート完了：{{count}} 行を追加",
+    "{{count}} tables affected": "{{count}} テーブルに影響",
+    "{{count}} warnings": "{{count}} 件の警告",
+    "Import failed": "インポートに失敗しました",
+    "Restore database backup?": "データベースを復元しますか？"
   }
 }

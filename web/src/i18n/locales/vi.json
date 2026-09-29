@@ -6786,6 +6786,24 @@
     "Require verification to view own API key": "Yêu cầu xác minh để xem khóa API của chính mình",
     "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "Khi tắt (mặc định), người dùng đã đăng nhập xem khóa API của mình mà không cần xác minh lại. Bật để khôi phục xác minh nâng cao.",
     "Require verification to view channel keys": "Yêu cầu xác minh để xem khóa kênh",
-    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Khi tắt (mặc định), quản trị viên xem và kiểm tra khóa kênh mà không cần xác minh lại. Bật để khôi phục xác minh nâng cao."
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Khi tắt (mặc định), quản trị viên xem và kiểm tra khóa kênh mà không cần xác minh lại. Bật để khôi phục xác minh nâng cao.",
+    "Database Backup": "Sao lưu cơ sở dữ liệu",
+    "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.": "Xuất bản chụp toàn bộ cơ sở dữ liệu, hoặc phục hồi từ đó. Nhập chỉ thêm các hàng còn thiếu — không bao giờ xóa hoặc ghi đè dữ liệu hiện có.",
+    "Export": "Xuất",
+    "{{count}} rows": "{{count}} hàng",
+    "{{count}} tables will be included": "Sẽ bao gồm {{count}} bảng",
+    "Loading table list…": "Đang tải danh sách bảng…",
+    "Include log database (large)": "Bao gồm cơ sở dữ liệu log (lớn)",
+    "Download backup": "Tải bản sao lưu",
+    "Backup downloaded": "Đã tải bản sao lưu",
+    "Backup failed": "Sao lưu thất bại",
+    "Import": "Nhập",
+    "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.": "Nhập chỉ thêm các hàng còn thiếu. Các hàng hiện có cùng ID sẽ bị bỏ qua — dữ liệu hiện tại của bạn sẽ không bị xóa hay sửa đổi.",
+    "Choose backup file": "Chọn tệp sao lưu",
+    "Import done: {{count}} rows added": "Nhập xong: đã thêm {{count}} hàng",
+    "{{count}} tables affected": "Ảnh hưởng {{count}} bảng",
+    "{{count}} warnings": "{{count}} cảnh báo",
+    "Import failed": "Nhập thất bại",
+    "Restore database backup?": "Phục hồi bản sao lưu?"
   }
 }

@@ -6786,6 +6786,24 @@
     "Require verification to view own API key": "查看自己的 API 密钥需要二次验证",
     "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "关闭（默认）时，已登录用户查看自己的密钥无需二次验证。开启可恢复二次验证。",
     "Require verification to view channel keys": "查看渠道密钥需要二次验证",
-    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "关闭（默认）时，管理员查看与测试渠道密钥无需二次验证。开启可恢复二次验证。"
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "关闭（默认）时，管理员查看与测试渠道密钥无需二次验证。开启可恢复二次验证。",
+    "Database Backup": "数据库备份",
+    "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.": "导出数据库完整快照，或从快照恢复。导入只新增缺失的行，绝不删除或覆盖既有数据。",
+    "Export": "导出",
+    "{{count}} rows": "{{count}} 行",
+    "{{count}} tables will be included": "将包含 {{count}} 张表",
+    "Loading table list…": "正在加载表清单…",
+    "Include log database (large)": "包含日志库（体积大）",
+    "Download backup": "下载备份",
+    "Backup downloaded": "备份已下载",
+    "Backup failed": "备份失败",
+    "Import": "导入",
+    "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.": "导入仅新增缺失的行：相同 ID 的既有行会被跳过，你当前的数据不会被删除或修改。",
+    "Choose backup file": "选择备份文件",
+    "Import done: {{count}} rows added": "导入完成：新增 {{count}} 行",
+    "{{count}} tables affected": "影响 {{count}} 张表",
+    "{{count}} warnings": "{{count}} 条警告",
+    "Import failed": "导入失败",
+    "Restore database backup?": "恢复数据库备份？"
   }
 }

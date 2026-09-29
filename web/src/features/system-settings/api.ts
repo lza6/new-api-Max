@@ -105,3 +105,50 @@ export async function fetchUpstreamRatios(request: FetchUpstreamRatiosRequest) {
   )
   return res.data
 }
+
+// ============================================================================
+// 数据库导出 / 导入（灾备）
+// ============================================================================
+
+/** 备份预览：将包含哪些表、各表行数。 */
+export async function getDatabaseBackupInfo() {
+  const res = await api.get<{
+    success: boolean
+    data?: { tables: string[]; counts: Record<string, number>; total: number; hint?: string }
+  }>('/api/system/db/export/info')
+  return res.data
+}
+
+/**
+ * 下载数据库备份（gzip 压缩的 JSON Lines）。
+ * 用 axios 的 blob 响应类型触发浏览器下载，不经过内存字符串拼接。
+ */
+export async function downloadDatabaseBackup(includeLogs: boolean) {
+  const res = await api.get('/api/system/db/export', {
+    params: includeLogs ? { include_logs: 'true' } : undefined,
+    responseType: 'blob',
+    // 备份可能较大，给足超时（默认 30s 会截断大库导出）。
+    timeout: 30 * 60 * 1000,
+  })
+  return res as unknown as { data: Blob; headers: Record<string, string> }
+}
+
+/** 上传备份文件并导入（只插入缺失行，不删除既有数据）。 */
+export async function importDatabaseBackup(file: File) {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await api.post<{
+    success: boolean
+    message?: string
+    data?: {
+      inserted: Record<string, number>
+      skipped: Record<string, number>
+      total: number
+      errors?: string[]
+    }
+  }>('/api/system/db/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30 * 60 * 1000,
+  })
+  return res.data
+}

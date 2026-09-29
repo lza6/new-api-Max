@@ -471,3 +471,29 @@ func TestTrafficCacheStoresOnlyDailyAggregates(t *testing.T) {
 	assert.Equal(t, total, total2)
 	assert.Equal(t, requestCount, requestCount2)
 }
+
+// TestProcessChannelErrorPreservesUnreachableClass 生产回归（2026-09-29）：
+// upstream_unreachable（网络层失败，请求从未到达上游）必须保留其精确错误码，
+// 不得被降格覆盖成笼统的 upstream_unavailable —— 前者保证「请求未被处理、
+// 客户端可安全重试」，是排障与重试决策的关键信息。
+func TestProcessChannelErrorPreservesUnreachableClass(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	c.Set(common.RequestIdKey, "unreachable-class-test")
+
+	unreachable := types.NewErrorWithStatusCode(
+		errors.New("dial tcp 70.39.183.88:443: connect: connection refused"),
+		types.ErrorCodeUpstreamUnreachable,
+		http.StatusBadGateway,
+	)
+	processChannelError(c, types.ChannelError{ChannelId: 49, ChannelName: "t", ChannelType: 1}, unreachable, nil)
+	assert.Equal(t, types.ErrorCodeUpstreamUnreachable, unreachable.GetErrorCode(),
+		"unreachable 分类不得被覆盖")
+
+	// 普通 502（无精确分类）仍归一为 upstream_unavailable
+	generic := types.NewErrorWithStatusCode(errors.New("bad gateway"), types.ErrorCodeDoRequestFailed, http.StatusBadGateway)
+	processChannelError(c, types.ChannelError{ChannelId: 50, ChannelName: "t", ChannelType: 1}, generic, nil)
+	assert.Equal(t, types.ErrorCodeUpstreamUnavailable, generic.GetErrorCode())
+}

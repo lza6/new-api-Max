@@ -6786,6 +6786,24 @@
     "Require verification to view own API key": "Require verification to view own API key",
     "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.",
     "Require verification to view channel keys": "Require verification to view channel keys",
-    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification."
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.",
+    "Database Backup": "Database Backup",
+    "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.": "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.",
+    "Export": "Export",
+    "{{count}} rows": "{{count}} rows",
+    "{{count}} tables will be included": "{{count}} tables will be included",
+    "Loading table list…": "Loading table list…",
+    "Include log database (large)": "Include log database (large)",
+    "Download backup": "Download backup",
+    "Backup downloaded": "Backup downloaded",
+    "Backup failed": "Backup failed",
+    "Import": "Import",
+    "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.": "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.",
+    "Choose backup file": "Choose backup file",
+    "Import done: {{count}} rows added": "Import done: {{count}} rows added",
+    "{{count}} tables affected": "{{count}} tables affected",
+    "{{count}} warnings": "{{count}} warnings",
+    "Import failed": "Import failed",
+    "Restore database backup?": "Restore database backup?"
   }
 }

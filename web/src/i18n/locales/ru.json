@@ -6786,6 +6786,24 @@
     "Require verification to view own API key": "Требовать проверку для просмотра своего ключа API",
     "When off (default), signed-in users reveal their own API keys without a second verification step. Turn on to restore step-up verification.": "Выключено (по умолчанию): вошедшие пользователи видят свои ключи без повторной проверки. Включите, чтобы вернуть двухэтапную проверку.",
     "Require verification to view channel keys": "Требовать проверку для просмотра ключей канала",
-    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Выключено (по умолчанию): администраторы видят и тестируют ключи канала без повторной проверки. Включите, чтобы вернуть двухэтапную проверку."
+    "When off (default), administrators can view and test channel keys without a second verification step. Turn on to restore step-up verification.": "Выключено (по умолчанию): администраторы видят и тестируют ключи канала без повторной проверки. Включите, чтобы вернуть двухэтапную проверку.",
+    "Database Backup": "Резервная копия базы данных",
+    "Export a full snapshot of the database, or restore one. Imports only add missing rows — they never delete or overwrite existing data.": "Экспортируйте полный снимок базы данных или восстановите его. Импорт только добавляет отсутствующие строки — он никогда не удаляет и не перезаписывает существующие данные.",
+    "Export": "Экспорт",
+    "{{count}} rows": "{{count}} строк",
+    "{{count}} tables will be included": "Будет включено таблиц: {{count}}",
+    "Loading table list…": "Загрузка списка таблиц…",
+    "Include log database (large)": "Включить базу журналов (большой объём)",
+    "Download backup": "Скачать резервную копию",
+    "Backup downloaded": "Резервная копия скачана",
+    "Backup failed": "Не удалось создать резервную копию",
+    "Import": "Импорт",
+    "Importing adds missing rows only. Existing rows with the same ID are skipped — your current data will not be deleted or modified.": "Импорт только добавляет отсутствующие строки. Существующие строки с тем же ID пропускаются — текущие данные не будут удалены или изменены.",
+    "Choose backup file": "Выберите файл резервной копии",
+    "Import done: {{count}} rows added": "Импорт завершён: добавлено строк — {{count}}",
+    "{{count}} tables affected": "Затронуто таблиц: {{count}}",
+    "{{count}} warnings": "Предупреждений: {{count}}",
+    "Import failed": "Не удалось выполнить импорт",
+    "Restore database backup?": "Восстановить базу из резервной копии?"
   }
 }

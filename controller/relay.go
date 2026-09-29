@@ -490,7 +490,11 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	case service.ErrClassRateLimited:
 		err.SetErrorCode(types.ErrorCodeRateLimited)
 	case service.ErrClassServerError, service.ErrClassTimeout:
-		if !types.IsChannelError(err) {
+		// [修复防御] upstream_unreachable 是比 upstream_unavailable 更精确的
+		// 分类：它表示「请求从未到达上游应用」（网络层失败），因此上游侧无记录、
+		// 请求保证未被处理——客户端可安全重试。不要把它降格覆盖成笼统的
+		// upstream_unavailable（那会丢失「可安全重试」这一关键信息）。
+		if !types.IsChannelError(err) && err.GetErrorCode() != types.ErrorCodeUpstreamUnreachable {
 			err.SetErrorCode(types.ErrorCodeUpstreamUnavailable)
 		}
 	}
