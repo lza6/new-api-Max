@@ -6760,6 +6760,15 @@
     "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "サブスクリプションは期限切れで自動的に停止します。自動更新や請求はありません。このページからいつでも手動で更新できます。",
     "This plan does not support balance renewal. Manage it from your wallet.": "このプランは残高での更新に対応していません。ウォレットで管理してください。",
     "Top up balance": "残高をチャージ",
-    "{{count}} plans on sale": "販売中プラン: {{count}} 件"
+    "{{count}} plans on sale": "販売中プラン: {{count}} 件",
+    "Total quota": "総クォータ",
+    "Returns remaining plus consumed quota as a USD amount": "「残りクォータ + 使用済みクォータ」を米ドル金額で返します",
+    "Consumed quota": "使用済みクォータ",
+    "Returns the consumed amount for balance display": "消費済み金額を返します（クライアントの残高表示用）",
+    "Balance query endpoints": "残高照会エンドポイント",
+    "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch など OpenAI 互換クライアントは、以下のアドレスから残りの残高を自動的に読み取ります。API キーで認証してください。",
+    "Copy address": "アドレスをコピー",
+    "Use your API key as the Bearer token. The base URL used by every protocol is": "API キーを Bearer Token として使用します。全プロトコル共通の接続先は",
+    "CC Switch intro": "コンソールからワンクリックでインポートできます。手動で Base URL と API キーを設定する場合は、残高表示が下記の課金エンドポイントを参照します。"
   }
 }

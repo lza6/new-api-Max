@@ -6760,6 +6760,15 @@
     "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.",
     "This plan does not support balance renewal. Manage it from your wallet.": "This plan does not support balance renewal. Manage it from your wallet.",
     "Top up balance": "Top up balance",
-    "{{count}} plans on sale": "{{count}} plans on sale"
+    "{{count}} plans on sale": "{{count}} plans on sale",
+    "Total quota": "Total quota",
+    "Returns remaining plus consumed quota as a USD amount": "Returns remaining plus consumed quota as a USD amount",
+    "Consumed quota": "Consumed quota",
+    "Returns the consumed amount for balance display": "Returns the consumed amount for balance display",
+    "Balance query endpoints": "Balance query endpoints",
+    "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.",
+    "Copy address": "Copy address",
+    "Use your API key as the Bearer token. The base URL used by every protocol is": "Use your API key as the Bearer token. The base URL used by every protocol is",
+    "CC Switch intro": "One-click import from the console, or configure Base URL and API key manually. The balance display uses the site billing endpoints listed below."
   }
 }

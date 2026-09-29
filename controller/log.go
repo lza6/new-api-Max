@@ -174,22 +174,26 @@ func GetLogsTraffic(c *gin.Context) {
 	// [fix-perf] 管理端流量统计：原实现拉窗口内全量 other JSON（生产 38 万行）
 	// 实测 1246-1448ms（线上 SLOW SQL 最多）。数据非实时敏感，加 60s Redis 缓存
 	// 根治重复全表扫描；Redis 未启用时静默跳过。
+	// [fix-oom] 缓存值只允许按日聚合行（≤days 组），绝不写入窗口内全量原始行：
+	// 生产曾把 44 万行 / 290MB+ 的 Rows 塞进 maxmemory 48MB 的 Redis，
+	// 触发 OOM 并连带打挂限流与会话缓存，最终 Caddy 摘上游全站 503（2026-09-29）。
+	// total/请求数由 byDay 重算，口径与未命中时一致。
 	cacheKey := fmt.Sprintf("traffic:day:%d", days)
 	if common.RedisEnabled {
 		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
-			var cachedPayload struct {
-				Rows   []service.TrafficRecord
-				ByDay  []service.DailyTraffic
-				Total  int64
-				ReqCnt int64
-			}
-			if common.Unmarshal([]byte(cached), &cachedPayload) == nil && cachedPayload.ByDay != nil {
+			var cachedByDay []service.DailyTraffic
+			if common.Unmarshal([]byte(cached), &cachedByDay) == nil && cachedByDay != nil {
+				var cachedTotal, cachedRequests int64
+				for i := range cachedByDay {
+					cachedTotal += cachedByDay[i].Bytes
+					cachedRequests += int64(cachedByDay[i].Requests)
+				}
 				common.ApiSuccess(c, gin.H{
 					"days":           days,
-					"total_requests": cachedPayload.ReqCnt,
-					"total_bytes":    cachedPayload.Total,
-					"total_mb":       float64(cachedPayload.Total) / (1024 * 1024),
-					"by_day":         cachedPayload.ByDay,
+					"total_requests": cachedRequests,
+					"total_bytes":    cachedTotal,
+					"total_mb":       float64(cachedTotal) / (1024 * 1024),
+					"by_day":         cachedByDay,
 				})
 				return
 			}
@@ -210,13 +214,8 @@ func GetLogsTraffic(c *gin.Context) {
 		total += byDay[i].Bytes
 	}
 	if common.RedisEnabled {
-		payload := struct {
-			Rows   []service.TrafficRecord `json:"rows"`
-			ByDay  []service.DailyTraffic  `json:"by_day"`
-			Total  int64                   `json:"total"`
-			ReqCnt int64                   `json:"req_cnt"`
-		}{Rows: rows, ByDay: byDay, Total: total, ReqCnt: int64(len(rows))}
-		if raw, err := common.Marshal(payload); err == nil {
+		// [fix-oom] 只缓存按日聚合结果（≤days 行），不缓存窗口内全量原始行。
+		if raw, err := common.Marshal(byDay); err == nil {
 			_ = common.RedisSet(cacheKey, string(raw), time.Minute)
 		}
 	}

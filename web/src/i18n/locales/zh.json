@@ -6760,6 +6760,15 @@
     "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "订阅到期后会自动停止，不会自动扣费。您可随时在本页手动续费。",
     "This plan does not support balance renewal. Manage it from your wallet.": "该套餐不支持余额续费，请在钱包中管理。",
     "Top up balance": "充值余额",
-    "{{count}} plans on sale": "在售套餐 {{count}} 个"
+    "{{count}} plans on sale": "在售套餐 {{count}} 个",
+    "Total quota": "总额度",
+    "Returns remaining plus consumed quota as a USD amount": "返回「剩余额度 + 已用额度」的美元金额",
+    "Consumed quota": "已用额度",
+    "Returns the consumed amount for balance display": "返回已消耗金额，供客户端显示余量",
+    "Balance query endpoints": "余额查询地址",
+    "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch 等兼容 OpenAI 协议的客户端会从以下地址自动读取你的剩余余额。请使用 API 密钥鉴权。",
+    "Copy address": "复制地址",
+    "Use your API key as the Bearer token. The base URL used by every protocol is": "用你的 API 密钥作为 Bearer Token。所有协议共用的接入地址是",
+    "CC Switch intro": "可从控制台一键导入，也可手动填写接入地址与 API 密钥。余额显示读取下方列出的站点计费地址。"
   }
 }

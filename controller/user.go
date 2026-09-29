@@ -391,7 +391,21 @@ func GetUser(c *gin.Context) {
 	}
 	user, err := model.GetUserById(id, false)
 	if err != nil {
-		common.ApiError(c, err)
+		// [fix-ux] 区分「确实不存在」与「查询本身失败」：管理员点用户时曾出现
+		// 「有时能显示、有时提示没有该用户」。根因是两类失败共用同一分支——
+		// gorm.ErrRecordNotFound（真不存在）与 DB 超时/连接池耗尽（基础设施故障）
+		// 都返回 success:false + 原始错误文本，前端无法分辨，一律显示成"用户不存在"。
+		// 现在：真不存在返回 404 + 稳定错误码；其余按内部错误处理，不回显 DB 原文。
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			c.JSON(http.StatusNotFound, gin.H{
+				"success": false,
+				"code":    "USER_NOT_FOUND",
+				"message": i18n.T(c, i18n.MsgUserNotExists),
+			})
+			return
+		}
+		logger.LogError(c.Request.Context(), fmt.Sprintf("failed to load user %d: %v", id, err))
+		common.ApiErrorMsg(c, "failed to load user")
 		return
 	}
 	myRole := c.GetInt("role")

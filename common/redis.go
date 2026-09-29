@@ -61,9 +61,20 @@ func ParseRedisOption() *redis.Options {
 	return opt
 }
 
+// MaxRedisValueBytes 限制单个 Redis 缓存值体积（1 MiB）。
+// 生产 Redis maxmemory 仅数十 MB（当前 48MB），任何「把全量查询结果整体塞缓存」
+// 的写入都会瞬间打爆实例：OOM command not allowed → 主线程阻塞 → 限流/会话
+// 缓存全部失败 → 上游被健康检查摘除 → 全站 503（2026-09-29 生产事故根因之一）。
+// 超限直接拒写并记日志，调用方按缓存未命中降级（不做 fail-closed）。
+const MaxRedisValueBytes = 1 << 20
+
 func RedisSet(key string, value string, expiration time.Duration) error {
 	if DebugEnabled {
 		SysLog(fmt.Sprintf("Redis SET: key=%s, value=%s, expiration=%v", key, value, expiration))
+	}
+	if len(value) > MaxRedisValueBytes {
+		SysError(fmt.Sprintf("Redis SET rejected: value for key %q is %d bytes, exceeding the %d-byte limit", key, len(value), MaxRedisValueBytes))
+		return fmt.Errorf("redis value too large: %d bytes for key %q (limit %d)", len(value), key, MaxRedisValueBytes)
 	}
 	ctx := context.Background()
 	return RDB.Set(ctx, key, value, expiration).Err()

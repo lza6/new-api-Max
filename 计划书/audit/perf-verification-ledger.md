@@ -278,3 +278,16 @@
 - **§4.3.3 P3**：落档建议仅文档，不实现（护栏）。
 - **验证**：后端 service/model 全量测试绿 + quota_warn 7 用例 + 到期提醒 4 用例；前端 typecheck/oxlint/i18n 无漂移；E2E 13/13 三断点截图；独立审查 2 轮收敛（P1-1/P1-2 修复）。
 - **防重复**：① 本机 E2E 起服务需 kill 占用 3000 的旧进程再 go run（go:embed 编译快照，改前端必须重启 Go 服务）；② compliance 端点 POST /api/option/payment_compliance 需 dashboard session Bearer（用 login 返回 access_token 即可，非 sk-token）；③ 套餐 API 路径：公开 GET /api/subscription/plans（挂 UserAuth）、admin POST /api/subscription/admin/plans、绑定 POST /api/subscription/admin/bind、续费复用 POST /api/subscription/balance/pay。
+
+## 记录 0023 · §4.4 生产事故 #2 修复批（2026-09-29，v1.3.58）
+- **事故**：Redis maxmemory 48MB 被打爆 → 限流 fail-closed 500 → /api/status >2s → Caddy 摘上游 → 全站 503（详见生产记忆 freeapi-production-deploy.md 事故 #2）。
+- **三处代码修复 + 回归测试**：
+  1. `controller/log.go` `GetLogsTraffic` 只缓存按日聚合（`byDay`，≤90 行）；total/请求数由 byDay 重算。测试 `controller/TestTrafficCacheStoresOnlyDailyAggregates`（断言缓存值不含 other/request_bytes 且 <1024B）。
+  2. `common/redis.go` `RedisSet` 新增 `MaxRedisValueBytes = 1MiB` 硬上限（超限拒写 + `SysError` 记日志），堵死所有大对象进缓存的路径。测试 `common/TestRedisSetRejectsOversizedValue`（超限不残留 key、边界值放行）。
+  3. `middleware/rate-limit.go` IP/用户限流在 Redis 出错时降级 `inMemoryRateLimiter`，不再 fail-closed 500；`userRedisRateLimiter` 签名改为 (mark, userID) 以便降级复用同一桶；`rateLimitFactory`/`userRateLimitFactory` 提前 `Init` 内存桶避免首用竞态。测试 `middleware/TestRedisFailurePolicies`（Redis 断开 → 首个请求放行、超配额 429、用户桶按 user 维度）。
+- **用户侧体验修复**：`controller/user.go:GetUser` 区分 `gorm.ErrRecordNotFound`（404 + code USER_NOT_FOUND）与 DB 故障（不回显 DB 原文）；`web/.../user-info-dialog.tsx` 失败态与空态分离 + 重试按钮。测试 `controller/TestGetUserDistinguishesNotFoundFromQueryFailure`、`web .../user-info-dialog.test.tsx`（3 用例）。
+- **钱包余额查询**：新增 `web/src/features/wallet/components/wallet-usage-endpoints-card.tsx`（展示 `/v1/dashboard/billing/subscription|usage` + 复制），`/tool-setup` 增 CC Switch 预设；i18n 8+1 key × 7 语言（`bun run i18n:sync` 规范化，diff 仅 11 行/文件）。测试 `wallet-usage-endpoints-card.test.tsx`（3 用例）。
+- **生产运维同步（未改代码）**：Redis 泄漏的 3 个 orphan `redis-cli MONITOR` 连接（omem 各 448MB，合计 ~1.3GB）已 kill；compose 已加 `--client-output-buffer-limit "normal 32mb 16mb 60"` 防复发（含备份 `docker-compose.yml.bak-pre-redisguard-*`）；渠道 46 改为 4 key 轮询（`multi_key_mode=polling`、`auto_ban=1`）。
+- **归因结论（上游 vs 网关）**：渠道 46 `/v1/responses` 的三条 400（`unknown field "summary"`、`function_call.arguments must contain valid JSON`、`field ***.BudgetTokens invalid, should be at most 32000`）**全部由上游 `api.kabuai.cn` 产生**；本仓 `DisallowUnknownFields` 0 命中、`***` 是本仓 `MaskSensitiveInfo` 脱敏产物、上游 request-id 前缀 `8268d9f6` 非本仓构建前缀（本仓 `fd097e04`）。上游对同一 payload 10 次里 1 次 400 → 上游多实例配置不一致（间歇）。
+- **既有噪声复核**：`controller` 全量仍红 8 项（TestAuditDatabaseMatrix/SessionLimit/Kling/ResetPassword×2/SendEmailVerification），已用 `git stash` 对照确认与本批零改动，与台账既有噪声表一致；单独跑同一子集仍红 → 顺序/环境依赖，非本批回归。
+- **防重复**：① 改限流器时注意 `userRedisRateLimiter` 现在是 (mark, userID) 签名，不要再传裸 key；② `RedisSet` 的 1MiB 上限会影响任何"缓存大对象"的新代码，新增缓存前先算体积；③ 生产 Redis 的 MONITOR 连接会吃光内存，排查时先 `CLIENT LIST | grep monitor`。

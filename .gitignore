@@ -54,6 +54,7 @@ go.work.sum
 /.cline/
 /.codebuddy/
 /.codegraph/
+/.codex/
 /.continue/
 /.junie/
 /.kiro/

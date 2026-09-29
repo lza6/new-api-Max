@@ -201,6 +201,10 @@ func TestRedisFixedWindowRepairsCounterWithoutTTL(t *testing.T) {
 	assert.False(t, redisServer.Exists(key), "a recovered counter must not remain permanently rate-limited")
 }
 
+// TestRedisFailurePolicies 生产回归（2026-09-29 全站 503 事故）：Redis 不可用时
+// 限流不得 fail-closed 返回 500——那会把一次缓存故障放大成全站 5xx（上游被
+// Caddy 健康检查摘除）。IP 桶与用户桶都必须降级到进程内存限流：首个请求放行，
+// 超出窗口配额后返回 429（限流效果保留），且响应体符合既有 429 契约。
 func TestRedisFailurePolicies(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	_, redisClient := useRateLimitMiniRedis(t)
@@ -222,12 +226,17 @@ func TestRedisFailurePolicies(t *testing.T) {
 	})
 
 	ipResponse := performRateLimitRequest(router, "/ip", "192.0.2.60:12345")
-	assert.Equal(t, http.StatusInternalServerError, ipResponse.Code)
-	assert.Empty(t, ipResponse.Body.String())
+	require.Equal(t, http.StatusNoContent, ipResponse.Code, "Redis 故障时首个 IP 请求应被放行而非 500")
+	ipLimited := performRateLimitRequest(router, "/ip", "192.0.2.60:12345")
+	require.Equal(t, http.StatusTooManyRequests, ipLimited.Code, "内存降级桶必须继续限制超配额请求")
+	assert.JSONEq(t, `{"error":{"message":"rate limited, please retry later","type":"rate_limited","code":"rate_limited"}}`, ipLimited.Body.String())
+
 	userResponse := performRateLimitRequest(router, "/user", "192.0.2.61:12345")
-	assert.Equal(t, http.StatusInternalServerError, userResponse.Code)
-	assert.Empty(t, userResponse.Body.String())
-	assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/email", "192.0.2.62:12345").Code)
+	require.Equal(t, http.StatusNoContent, userResponse.Code, "Redis 故障时首个用户请求应被放行而非 500")
+	userLimited := performRateLimitRequest(router, "/user", "192.0.2.62:12345")
+	require.Equal(t, http.StatusTooManyRequests, userLimited.Code, "用户桶降级后仍按用户维度限流（IP 变化不影响）")
+
+	assert.Equal(t, http.StatusNoContent, performRateLimitRequest(router, "/email", "192.0.2.63:12345").Code)
 }
 
 func TestRequestModelNamePeekRestoresBody(t *testing.T) {

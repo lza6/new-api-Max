@@ -109,6 +109,11 @@ func redisFixedWindowTake(ctx context.Context, key string, maxRequestNum int, du
 	return allowedValue == 1, count, ttlSeconds, nil
 }
 
+// redisRateLimiter 按客户端 IP 限流。Redis 不可用（实例故障、OOM、网络抖动）
+// 时降级为本进程内存限流而非 fail-closed 500：fail-closed 会把一次缓存故障
+// 放大成全站 5xx——2026-09-29 生产事故中 Redis OOM 导致限流 EVAL 全部失败，
+// 246 次请求被直接转成 500，/api/status 变慢后上游被 Caddy 摘除，全站 503。
+// 降级保留限流效果（内存桶与 Redis 桶参数一致），只在跨实例部署时精度下降。
 func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string) {
 	allowed, _, ttlSeconds, err := redisFixedWindowTake(
 		c.Request.Context(),
@@ -117,9 +122,8 @@ func redisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark st
 		duration,
 	)
 	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("rate limit check failed (mark=%s): %v", mark, err))
-		c.Status(http.StatusInternalServerError)
-		c.Abort()
+		logger.LogError(c.Request.Context(), fmt.Sprintf("rate limit check failed (mark=%s), falling back to in-memory limiter: %v", mark, err))
+		memoryRateLimiter(c, maxRequestNum, duration, mark)
 		return
 	}
 	if !allowed {
@@ -157,13 +161,15 @@ func writeRateLimited(c *gin.Context, retryAfterSeconds int64) {
 }
 
 func rateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gin.Context) {
+	// It's safe to call multi times. Keep the fallback ready before requests
+	// arrive so a concurrent Redis outage cannot race the in-memory limiter's
+	// first initialization.
+	inMemoryRateLimiter.Init(common.RateLimitKeyExpirationDuration)
 	if common.RedisEnabled {
 		return func(c *gin.Context) {
 			redisRateLimiter(c, maxRequestNum, duration, mark)
 		}
 	}
-	// It's safe to call multi times.
-	inMemoryRateLimiter.Init(common.RateLimitKeyExpirationDuration)
 	return func(c *gin.Context) {
 		memoryRateLimiter(c, maxRequestNum, duration, mark)
 	}
@@ -257,6 +263,10 @@ func UploadRateLimit() func(c *gin.Context) {
 // instead of client IP, making it resistant to proxy rotation attacks.
 // Must be used AFTER authentication middleware (UserAuth).
 func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c *gin.Context) {
+	// It's safe to call multi times. Keep the fallback ready before requests
+	// arrive so a concurrent Redis outage cannot race the in-memory limiter's
+	// first initialization.
+	inMemoryRateLimiter.Init(common.RateLimitKeyExpirationDuration)
 	if common.RedisEnabled {
 		return func(c *gin.Context) {
 			userID := c.GetInt("id")
@@ -265,11 +275,9 @@ func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c
 				c.Abort()
 				return
 			}
-			userRedisRateLimiter(c, maxRequestNum, duration, redisUserRateLimitKey(mark, userID))
+			userRedisRateLimiter(c, maxRequestNum, duration, mark, userID)
 		}
 	}
-	// It's safe to call multi times.
-	inMemoryRateLimiter.Init(common.RateLimitKeyExpirationDuration)
 	return func(c *gin.Context) {
 		userID := c.GetInt("id")
 		if userID == 0 {
@@ -277,22 +285,33 @@ func userRateLimitFactory(maxRequestNum int, duration int64, mark string) func(c
 			c.Abort()
 			return
 		}
-		key := fmt.Sprintf("%s:user:%d", mark, userID)
-		if !inMemoryRateLimiter.Request(key, maxRequestNum, duration) {
-			writeRateLimited(c, duration)
-			return
-		}
+		memoryUserRateLimiter(c, maxRequestNum, duration, mark, userID)
 	}
 }
 
-// userRedisRateLimiter is like redisRateLimiter but accepts a pre-built key
-// (to support user-ID-based keys).
-func userRedisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, key string) {
-	allowed, _, ttlSeconds, err := redisFixedWindowTake(c.Request.Context(), key, maxRequestNum, duration)
+// memoryUserRateLimiter 是 userRedisRateLimiter 的进程内存降级实现，
+// 与 Redis 桶使用同一 key 语义（mark + userID）与窗口参数。
+func memoryUserRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string, userID int) {
+	key := fmt.Sprintf("%s:user:%d", mark, userID)
+	if !inMemoryRateLimiter.Request(key, maxRequestNum, duration) {
+		writeRateLimited(c, duration)
+		return
+	}
+}
+
+// userRedisRateLimiter is like redisRateLimiter but keyed by authenticated user
+// ID (to support user-ID-based keys). Redis 不可用时与 redisRateLimiter 一样
+// 降级到进程内存限流，而不是 fail-closed 500（理由见 redisRateLimiter）。
+func userRedisRateLimiter(c *gin.Context, maxRequestNum int, duration int64, mark string, userID int) {
+	allowed, _, ttlSeconds, err := redisFixedWindowTake(
+		c.Request.Context(),
+		redisUserRateLimitKey(mark, userID),
+		maxRequestNum,
+		duration,
+	)
 	if err != nil {
-		logger.LogError(c.Request.Context(), fmt.Sprintf("rate limit check failed (key=%s): %v", key, err))
-		c.Status(http.StatusInternalServerError)
-		c.Abort()
+		logger.LogError(c.Request.Context(), fmt.Sprintf("rate limit check failed (mark=%s, user=%d), falling back to in-memory limiter: %v", mark, userID, err))
+		memoryUserRateLimiter(c, maxRequestNum, duration, mark, userID)
 		return
 	}
 	if !allowed {

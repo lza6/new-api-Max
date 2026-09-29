@@ -21,6 +21,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Dialog } from '@/components/dialog'
+import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { formatQuota, formatCompactNumber } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -51,18 +52,30 @@ export function UserInfoDialog({
   const { t } = useTranslation()
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  // [fix-ux] 失败态与空态必须分开：此前任何失败（限流 500、DB 超时）都让
+  // userInfo 保持 null，面板渲染「暂无用户信息」，看起来像"用户不存在"。
+  // 管理员因此看到"有时能显示、有时说没有该用户"。现在失败显示错误提示
+  // + 重试按钮，只有真的查不到才显示空态。
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
   const fetchUserInfo = useCallback(
     async (id: number) => {
       setIsLoading(true)
+      setErrorMessage(null)
       try {
         const result = await getUserInfo(id)
         if (result.success) {
           setUserInfo(result.data || null)
         } else {
+          setUserInfo(null)
+          setErrorMessage(
+            result.message || t('Failed to fetch user information')
+          )
           handleServerError(result, t('Failed to fetch user information'))
         }
       } catch (error) {
+        setUserInfo(null)
+        setErrorMessage(t('Failed to fetch user information'))
         handleServerError(error, t('Failed to fetch user information'))
       } finally {
         setIsLoading(false)
@@ -172,7 +185,19 @@ export function UserInfoDialog({
           )}
         </div>
       )}
-      {!isLoading && !userInfo && (
+      {!isLoading && !userInfo && errorMessage && (
+        <div className='flex flex-col items-center gap-3 py-8 text-center'>
+          <p className='text-destructive text-sm'>{errorMessage}</p>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => userId && fetchUserInfo(userId)}
+          >
+            {t('Retry')}
+          </Button>
+        </div>
+      )}
+      {!isLoading && !userInfo && !errorMessage && (
         <div className='text-muted-foreground py-8 text-center text-sm'>
           {t('No user information available')}
         </div>

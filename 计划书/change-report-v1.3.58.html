@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>new-api v1.3.58 变更报告 · 生产事故 #2 修复（Redis OOM → 503）</title>
+<style>
+  :root { --bg:#0f1115; --card:#171a21; --ink:#e6e8eb; --mut:#8b93a1; --acc:#4f8cff; --ok:#2eb872; --warn:#e8a33d; }
+  * { box-sizing:border-box; }
+  body { background:var(--bg); color:var(--ink); font:15px/1.7 "Segoe UI",system-ui,sans-serif; margin:0; padding:2rem 1rem; }
+  .wrap { max-width:920px; margin:0 auto; }
+  h1 { font-size:1.8rem; margin:.2rem 0 1.2rem; }
+  h2 { font-size:1.25rem; margin:2rem 0 .7rem; border-bottom:2px solid #262c38; padding-bottom:.4rem; }
+  p, li { color:#d4d8de; }
+  .meta { color:var(--mut); font-size:.85rem; margin-bottom:1.6rem; }
+  table { border-collapse:collapse; width:100%; margin:1rem 0; }
+  th,td { border:1px solid #262c38; padding:.45rem .7rem; text-align:left; vertical-align:top; font-size:.88rem; }
+  th { background:#1c212b; color:var(--mut); }
+  code { background:#232936; padding:1px 6px; border-radius:4px; font-size:.82em; color:#a8c8ff; }
+  pre { background:#10141b; border:1px solid #262c38; padding:.8rem; overflow:auto; border-radius:8px; font-size:.8rem; }
+  .card { background:var(--card); border:1px solid #262c38; border-radius:12px; padding:1rem 1.2rem; margin:1rem 0; }
+  .badge { display:inline-block; padding:2px 10px; border-radius:999px; font-size:.74rem; font-weight:600; }
+  .b-ok { background:#123b2a; color:var(--ok); } .b-warn { background:#3d2f12; color:var(--warn); }
+  .quiz { margin-top:2.4rem; }
+  .q { background:var(--card); border:1px solid #262c38; border-radius:12px; padding:.9rem 1.1rem; margin:1rem 0; }
+  .q label { display:block; margin:.3rem 0; cursor:pointer; }
+  .q input { margin-right:.5rem; }
+  .q .fb { font-size:.84rem; margin-top:.3rem; display:none; }
+  .ok .fb, .bad .fb { display:block; }
+  .ok { border-color:var(--ok); } .bad { border-color:var(--warn); }
+  button { background:var(--acc); color:#fff; border:0; padding:.5rem 1.3rem; border-radius:8px; font-size:.95rem; cursor:pointer; margin-top:.5rem; }
+  .foot { color:var(--mut); font-size:.78rem; margin-top:2.4rem; border-top:1px solid #262c38; padding-top:1rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>🧾 new-api v1.3.58 变更报告 — 生产事故 #2 修复（Redis OOM → 限流 fail-closed → 全站 503）</h1>
+<div class="meta">main · 2026-09-29 · 事故根因已用生产时间戳对齐证实 · 修复含 3 处后端 + 2 处前端 + 5 个回归测试</div>
+
+<h2>1. 上下文（Context）</h2>
+<div class="card"><p>用户报告线上近 100 条错误 + 「复制密钥有问题」+ 「访问网站偶尔 500/503」。排查发现 Caddy 24h 内 <code>no upstreams available</code> <b>503 共 1093 次</b>，网关 <code>rate limit check failed</code> <b>280 次</b>（其中 246 次直接转 500），Redis <code>OOM command not allowed</code> <b>434 次且仍在持续</b>。</p></div>
+
+<h2>2. 直觉（Why）——事故链与设计取舍</h2>
+<div class="card"><ul>
+  <li><b>触发</b>：管理员打开 <code>/usage-logs/common</code> → 前端 <code>getLogsTraffic(30)</code> → <code>GET /api/log/traffic?days=30</code>（实测 27-45s）。</li>
+  <li><b>写爆 Redis</b>：handler 把 30 天窗口内<b>全量 442,661 行</b>日志的 <code>other</code> JSON（291MB）整体 marshal 后 <code>RedisSet</code>，而 Redis <code>maxmemory</code> 仅 48MB。</li>
+  <li><b>内存顶格</b>：<code>used_memory_peak 769.97M</code>；redis 容器 cgroup peak <code>100663296</code>（顶满 <code>mem_limit 96m</code>）→ 返回 OOM → 主线程阻塞。</li>
+  <li><b>fail-closed 放大</b>：限流 Lua <code>EVAL</code> 全挂 → <code>middleware/rate-limit.go</code> 把 Redis 错误直接转 <code>500</code>（近 24h 246 次）。</li>
+  <li><b>上游被摘</b>：<code>/api/status</code> &gt;2s → Caddy <code>health_timeout 2s / health_fails 3</code> 判死唯一上游 → <code>no upstreams available</code> 503 × 1093。</li>
+  <li><b>时间戳铁证</b>：07:32:02-07 的 16 次 OOM ↔ 07:32:07 traffic 完成；07:36 / 07:49 / 07:52 / 07:53 四轮全部重合。</li>
+  <li><b>取舍</b>：限流降级<b>保留限流效果</b>（内存桶参数与 Redis 桶一致）而非直接放行——宁可跨实例精度下降，也不把一次缓存故障放大成全站 5xx。</li>
+</ul></div>
+
+<h2>3. 做了什么（What）</h2>
+<table>
+  <tr><th>#</th><th>文件</th><th>变更</th><th>回归测试</th></tr>
+  <tr><td>1</td><td><code>controller/log.go</code></td><td><code>GetLogsTraffic</code> 只缓存按日聚合 <code>byDay</code>（≤90 行）；<code>total</code>/请求数由 byDay 重算，口径不变</td><td><code>TestTrafficCacheStoresOnlyDailyAggregates</code></td></tr>
+  <tr><td>2</td><td><code>common/redis.go</code></td><td><code>RedisSet</code> 新增 <code>MaxRedisValueBytes = 1 MiB</code> 硬上限：超限拒写 + <code>SysError</code> 记日志，调用方按未命中降级</td><td><code>TestRedisSetRejectsOversizedValue</code></td></tr>
+  <tr><td>3</td><td><code>middleware/rate-limit.go</code></td><td>IP/用户限流 Redis 出错时降级 <code>inMemoryRateLimiter</code>（不再 500）；<code>userRedisRateLimiter</code> 改签名 <code>(mark, userID)</code> 以复用同一内存桶；工厂提前 <code>Init</code> 防首用竞态</td><td><code>TestRedisFailurePolicies</code>（改写为降级断言）</td></tr>
+  <tr><td>4</td><td><code>controller/user.go</code></td><td><code>GetUser</code> 区分「真不存在」（404 + <code>USER_NOT_FOUND</code>）与「查询失败」（不回显 DB 原文）</td><td><code>TestGetUserDistinguishesNotFoundFromQueryFailure</code></td></tr>
+  <tr><td>5</td><td><code>web/.../user-info-dialog.tsx</code></td><td>失败态与空态分离：失败显示错误 + 重试按钮，只有真查不到才显示空态（修「有时能显示有时说没有该用户」）</td><td><code>user-info-dialog.test.tsx</code>（3 用例）</td></tr>
+  <tr><td>6</td><td><code>web/.../wallet-usage-endpoints-card.tsx</code>（新增）</td><td>钱包页展示余额查询地址（<code>/v1/dashboard/billing/subscription</code>、<code>/v1/dashboard/billing/usage</code>）+ 复制按钮；<code>/tool-setup</code> 新增 CC Switch 预设</td><td><code>wallet-usage-endpoints-card.test.tsx</code>（3 用例）</td></tr>
+</table>
+
+<h2>4. 归因结论：渠道 46 的三条 400 是上游问题</h2>
+<div class="card">
+<p>用户提供的三条报错，逐条核实<b>全部来自上游 <code>api.kabuai.cn</code></b>，本网关只做透传 + 记录：</p>
+<table>
+  <tr><th>报错文案</th><th>归因证据</th></tr>
+  <tr><td><code>json: unknown field "summary"</code></td><td>全仓 Go 源码 <code>DisallowUnknownFields</code> <b>0 命中</b>；本仓解码器是裸 <code>json.Unmarshal</code>（未知字段静默丢弃）；渠道 46 开了 <code>pass_through_body_enabled=true</code>，出站 body 与客户端逐字节一致。上游直连复现同一条错误。</td></tr>
+  <tr><td><code>function_call.arguments must contain valid JSON</code></td><td>全仓 Go/JS 文案 <b>0 命中</b>；上游直连同一 payload 复现。</td></tr>
+  <tr><td><code>field ***.BudgetTokens invalid, should be at most 32000</code></td><td><code>***</code> 是本仓 <code>MaskSensitiveInfo</code> 的脱敏产物（<code>relaykit/relayconvert/kitutil/mask.go</code>）；<code>32000</code> 与 <code>should be at most</code> 在本仓 0 命中。</td></tr>
+</table>
+<p><b>间歇性证据</b>：同一 payload 连打 10 次，<b>第 9 次</b>才 400（run1-8 ok / run9 REJECTED / run10 ok）→ 上游多实例配置不一致。另：上游 request-id 前缀 <code>8268d9f6</code> ≠ 本仓构建前缀 <code>fd097e04</code>，佐证上游是另一套 new-api 中转。</p>
+</div>
+
+<h2>5. 生产运维同步（未改代码，已执行）</h2>
+<div class="card"><ul>
+  <li><span class="badge b-ok">已清</span> Redis 里泄漏的 <b>3 个 orphan <code>redis-cli MONITOR</code> 连接</b>（<code>omem=469762072</code> 各 448MB，合计 ~1.3GB）——这才是 <code>used_memory_peak 2.81G</code> 的真凶；kill 后 <code>used_memory</code> 从 <b>1.31G → 2.41M</b>。</li>
+  <li><span class="badge b-ok">已加固</span> compose 追加 <code>--client-output-buffer-limit "normal 32mb 16mb 60"</code>，防止再被拖死（备份 <code>docker-compose.yml.bak-pre-redisguard-*</code>）。</li>
+  <li><span class="badge b-ok">已配渠道</span> 渠道 46「按次稳定」由 1 key 改为 <b>4 key 轮询</b>（<code>multi_key_mode=polling</code>）+ <code>auto_ban=1</code>；已重启网关加载新配置。</li>
+  <li><span class="badge b-ok">已验</span> 恢复后 <code>/api/status</code> 外网 200 / 24-28ms；<code>/v1/dashboard/billing/*</code> 返回 200 与真实额度；近 2 分钟限流错误 0 次。</li>
+</ul></div>
+
+<h2>6. 验证证据</h2>
+<div class="card">
+<table>
+  <tr><th>验证</th><th>命令</th><th>结果</th></tr>
+  <tr><td>后端构建</td><td><code>go build ./...</code></td><td>exit 0</td></tr>
+  <tr><td>relaykit 独立构建</td><td><code>cd relaykit &amp;&amp; GOWORK=off go build ./...</code></td><td>exit 0</td></tr>
+  <tr><td>vet</td><td><code>go vet ./common/... ./controller/... ./middleware/...</code></td><td>exit 0</td></tr>
+  <tr><td>新增/改写回归</td><td><code>go test ./common/ ./middleware/ -count=1</code></td><td><code>ok common 5.98s</code> / <code>ok middleware 4.43s</code></td></tr>
+  <tr><td>controller 定向</td><td><code>go test ./controller/ -run 'TestGetUser...|TestTrafficCache...|TestBandwidth...'</code></td><td><code>ok 3.02s</code></td></tr>
+  <tr><td>前端类型</td><td><code>bun run typecheck</code>（tsgo -b）</td><td>exit 0</td></tr>
+  <tr><td>前端 lint</td><td><code>bunx oxlint</code>（5 个改动文件）</td><td>无 error</td></tr>
+  <tr><td>前端测试</td><td><code>bunx vitest run</code>（3 个套件）</td><td><b>8/8 passed</b></td></tr>
+  <tr><td>i18n 一致性</td><td><code>bunx vitest run src/i18n/locale-consistency.test.ts</code></td><td>2/2 passed（7 语言 key 集合一致）</td></tr>
+  <tr><td>生产 E2E</td><td>上游直连 vs 网关对照、10 次间歇复现</td><td>见第 4 节</td></tr>
+</table>
+<p><b>已知噪声（非本批回归）</b>：<code>controller</code> 全量仍有 8 项红（<code>TestAuditDatabaseMatrix</code>、<code>TestSessionLimit...</code>、<code>TestKling...</code>、<code>TestResetPassword×2</code>、<code>TestSendEmailVerificationAntiEnumeration</code>）——已用 <code>git stash</code> 对照确认与本次改动零关系，与台账既有噪声表一致。</p>
+</div>
+
+<h2>7. 交付状态</h2>
+<div class="card"><ul>
+  <li><span class="badge b-ok">本地</span> main 待提交；<code>VERSION</code> → <code>v1.3.58</code>。</li>
+  <li><span class="badge b-ok">已止血</span> Redis MONITOR 泄漏已清除、缓冲区上限已加固 —— 全站 503 的即时风险已解除。</li>
+  <li><span class="badge b-warn">待部署</span> 代码修复需 <code>./deploy.sh v1.3.58</code> 才上生产（当前生产仍跑 v1.3.55，未含本批修复）。</li>
+  <li>剩余：渠道 46 上游间歇 400 属上游方问题，可选做请求体降级（去掉 <code>reasoning.summary</code>）规避。</li>
+</ul></div>
+
+<div class="quiz">
+<h2>7. 📝 变更测验（你必须通过）</h2>
+<div class="q" data-a="1"><p><b>Q1.</b> 全站 503 的直接触发点是什么？</p>
+  <label><input type="radio" name="q1" value="1"> 管理员打开 /usage-logs/common → GetLogsTraffic 把 30 天全量 44 万行（291MB）写进 maxmemory 仅 48MB 的 Redis</label>
+  <label><input type="radio" name="q1" value="0"> Caddy 配置写错</label>
+  <label><input type="radio" name="q1" value="0"> 上游 API 挂了</label><div class="fb"></div></div>
+<div class="q" data-a="1"><p><b>Q2.</b> 为什么「fail-closed 500」会把故障放大？</p>
+  <label><input type="radio" name="q2" value="1"> Redis 一挂，所有限流 EVAL 失败 → 246 次请求转 500 → /api/status 变慢 → Caddy 判死上游 → 全站 503</label>
+  <label><input type="radio" name="q2" value="0"> 500 会被浏览器重试</label>
+  <label><input type="radio" name="q2" value="0"> 没有影响</label><div class="fb"></div></div>
+<div class="q" data-a="1"><p><b>Q3.</b> 修复后 Redis 不可用时限流怎么表现？</p>
+  <label><input type="radio" name="q3" value="1"> 降级到进程内存限流——首个请求放行，超配额仍返回 429（保留限流效果），不再 500</label>
+  <label><input type="radio" name="q3" value="0"> 完全不限流，全部放行</label>
+  <label><input type="radio" name="q3" value="0"> 仍然返回 500</label><div class="fb"></div></div>
+<div class="q" data-a="1"><p><b>Q4.</b> <code>MaxRedisValueBytes</code> 的作用与取值？</p>
+  <label><input type="radio" name="q4" value="1"> 1 MiB 硬上限：超过就拒写 + 记日志，堵死任何「把全量结果塞缓存」的路径；边界值（恰好 1MiB）放行</label>
+  <label><input type="radio" name="q4" value="0"> 限制 key 数量</label>
+  <label><input type="radio" name="q4" value="0"> 没作用</label><div class="fb"></div></div>
+<div class="q" data-a="1"><p><b>Q5.</b> 渠道 46 那三条 400 是谁产生的？关键证据？</p>
+  <label><input type="radio" name="q5" value="1"> 上游 api.kabuai.cn。证据：本仓 DisallowUnknownFields 0 命中、`***` 是本仓脱敏产物、上游直连同一 payload 可复现，且 10 次里第 9 次才 400（上游多实例不一致）</label>
+  <label><input type="radio" name="q5" value="0"> 本网关产生的</label>
+  <label><input type="radio" name="q5" value="0"> 无法判断</label><div class="fb"></div></div>
+<div class="q" data-a="1"><p><b>Q6.</b> Redis <code>used_memory_peak 2.81G</code> 的真正来源？</p>
+  <label><input type="radio" name="q6" value="1"> 3 个泄漏的 orphan redis-cli MONITOR 连接，每个 omem 448MB（合计 ~1.3GB）；kill 后 used_memory 从 1.31G 降到 2.41M</label>
+  <label><input type="radio" name="q6" value="0"> 业务数据增长</label>
+  <label><input type="radio" name="q6" value="0"> Redis 配置的 maxmemory 太高</label><div class="fb"></div></div>
+<div class="q" data-a="1"><p><b>Q7.</b> 「管理员点用户有时能显示有时说没有该用户」修了什么？</p>
+  <label><input type="radio" name="q7" value="1"> 后端区分「真不存在」（404 + USER_NOT_FOUND）与「查询失败」（不回显 DB 原文）；前端把失败态与空态分开，失败给错误 + 重试按钮</label>
+  <label><input type="radio" name="q7" value="0"> 只是加了缓存</label>
+  <label><input type="radio" name="q7" value="0"> 删掉了用户列表</label><div class="fb"></div></div>
+<div class="q" data-a="1"><p><b>Q8.</b> 钱包页新增的余额查询地址是哪两条？</p>
+  <label><input type="radio" name="q8" value="1"> <code>/v1/dashboard/billing/subscription</code>（总额度）与 <code>/v1/dashboard/billing/usage</code>（已用量），Bearer 用 API 密钥</label>
+  <label><input type="radio" name="q8" value="0"> <code>/api/user/self</code> 与 <code>/api/status</code></label>
+  <label><input type="radio" name="q8" value="0"> 没有新增</label><div class="fb"></div></div>
+<button onclick="grade()">提交测验</button>
+<div class="score" id="score"></div>
+</div>
+
+<div class="foot">生成：2026-09-29 · 数据源：真实命令输出与生产证据 · 测验答案均可从上文核对</div>
+</div>
+<script>
+function grade() {
+  const qs = document.querySelectorAll('.q'); let ok = 0;
+  qs.forEach((q, i) => { const sel = q.querySelector('input[name="q'+(i+1)+'"]:checked'); const fb=q.querySelector('.fb'); q.classList.remove('ok','bad');
+    if (sel && sel.value === q.dataset.a) { ok++; q.classList.add('ok'); fb.textContent='✅ 正确。'; }
+    else { q.classList.add('bad'); fb.textContent = sel ? '❌ 答错，请核对上文。' : '⚠️ 未作答。'; } });
+  const pct = Math.round(ok/qs.length*100);
+  document.getElementById('score').textContent = '得分：'+ok+'/'+qs.length+'（'+pct+'%）' + (pct===100 ? ' — 🎉 满分！' : ' — 请重读本报告后重试。');
+}
+</script>
+</body>
+</html>

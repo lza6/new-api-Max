@@ -6760,6 +6760,15 @@
     "Subscriptions stop automatically when they expire. No automatic renewal or charge. You can renew manually from this page at any time.": "Les abonnements s'arrêtent automatiquement à l'expiration. Aucun renouvellement ni prélèvement automatique. Vous pouvez renouveler manuellement depuis cette page à tout moment.",
     "This plan does not support balance renewal. Manage it from your wallet.": "Ce plan ne prend pas en charge le renouvellement par solde. Gérez-le depuis votre portefeuille.",
     "Top up balance": "Recharger le solde",
-    "{{count}} plans on sale": "{{count}} plans en vente"
+    "{{count}} plans on sale": "{{count}} plans en vente",
+    "Total quota": "Quota total",
+    "Returns remaining plus consumed quota as a USD amount": "Renvoie le quota restant plus consommé en montant USD",
+    "Consumed quota": "Quota consommé",
+    "Returns the consumed amount for balance display": "Renvoie le montant consommé pour l'affichage du solde",
+    "Balance query endpoints": "Points de terminaison de consultation du solde",
+    "CC Switch and other OpenAI-compatible clients read your remaining balance from these addresses automatically. Authenticate with your API key.": "CC Switch et les autres clients compatibles OpenAI lisent automatiquement votre solde restant à ces adresses. Authentifiez-vous avec votre clé d'API.",
+    "Copy address": "Copier l'adresse",
+    "Use your API key as the Bearer token. The base URL used by every protocol is": "Utilisez votre clé d'API comme Bearer Token. L'URL de base commune à tous les protocoles est",
+    "CC Switch intro": "Import en un clic depuis la console, ou configurez manuellement l'URL de base et la clé d'API. L'affichage du solde utilise les points de terminaison de facturation ci-dessous."
   }
 }

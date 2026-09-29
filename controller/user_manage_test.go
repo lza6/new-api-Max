@@ -606,3 +606,64 @@ func TestManageUserQuotaCacheUsesCommittedIntegerDifference(t *testing.T) {
 		})
 	}
 }
+
+// performGetUserRequest 构造 GET /api/user/:id 的管理员上下文请求。
+func performGetUserRequest(t *testing.T, userID string, role int) *httptest.ResponseRecorder {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/user/"+userID, nil)
+	c.Params = gin.Params{{Key: "id", Value: userID}}
+	c.Set("id", 9999)
+	c.Set("role", role)
+	c.Set("username", "root-operator")
+	c.Set(common.RequestIdKey, "get-user-test-request")
+	GetUser(c)
+	return recorder
+}
+
+// TestGetUserDistinguishesNotFoundFromQueryFailure 生产回归（2026-09-29）：
+// 管理员在用户列表点用户时出现「有时能显示、有时提示没有该用户」。
+// 根因是 controller/user.go 把 gorm.ErrRecordNotFound（确实不存在）与
+// DB 超时/连接池耗尽（基础设施故障）合并进同一 200+success:false 分支，
+// 前端无法区分，统一渲染成"用户不存在"。修复后：真不存在 → 404 + 稳定
+// 错误码 USER_NOT_FOUND；查询失败 → 200 + success:false 且不回显 DB 原文。
+func TestGetUserDistinguishesNotFoundFromQueryFailure(t *testing.T) {
+	db := setupManageUserTestDB(t)
+
+	// 1) 真不存在：404 + 稳定错误码。
+	missing := performGetUserRequest(t, "424242", common.RoleRootUser)
+	assert.Equal(t, http.StatusNotFound, missing.Code)
+	assert.Contains(t, missing.Body.String(), `"code":"USER_NOT_FOUND"`)
+	assert.Contains(t, missing.Body.String(), `"success":false`)
+
+	// 2) 存在：200 + data，行为不变。
+	user := model.User{
+		Username: "get-user-visible", Password: "password", Role: common.RoleCommonUser,
+		Status: common.UserStatusEnabled, Group: "default",
+	}
+	require.NoError(t, db.Create(&user).Error)
+	found := performGetUserRequest(t, strconv.Itoa(user.Id), common.RoleRootUser)
+	assert.Equal(t, http.StatusOK, found.Code)
+	assert.Contains(t, found.Body.String(), `"success":true`)
+	assert.Contains(t, found.Body.String(), "get-user-visible")
+
+	// 3) 查询失败（模拟 DB 故障）：不能伪装成"用户不存在"。
+	failed := db.Callback().Query().After("gorm:query").Register("test:get_user_query_failure", func(tx *gorm.DB) {
+		if tx.Statement.Table == "users" {
+			tx.AddError(errors.New("connection pool exhausted"))
+		}
+	})
+	require.NoError(t, failed)
+	failureResponse := performGetUserRequest(t, strconv.Itoa(user.Id), common.RoleRootUser)
+	assert.NotEqual(t, http.StatusNotFound, failureResponse.Code,
+		"基础设施故障不得被报成用户不存在")
+	assert.NotContains(t, failureResponse.Body.String(), "connection pool exhausted",
+		"不应把原始 DB 错误文本回显给前端")
+	require.NoError(t, db.Callback().Query().Remove("test:get_user_query_failure"))
+
+	// 4) 非法 id：仍走参数错误分支。
+	invalid := performGetUserRequest(t, "not-a-number", common.RoleRootUser)
+	assert.NotEqual(t, http.StatusNotFound, invalid.Code)
+}

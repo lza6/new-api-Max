@@ -372,3 +372,102 @@ func TestBandwidthLeaderboardRedisCache(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, first, second, "缓存命中应返回相同数据且不依赖 DB")
 }
+
+// queryTrafficByDayCache 抽取 GetLogsTraffic 的缓存读写路径，便于独立单测：
+// 只有按日聚合结果进缓存，且命中缓存时 total/请求数由 byDay 重算。
+func queryTrafficByDayCache(t *testing.T, days int) ([]service.DailyTraffic, int64, int64, bool) {
+	t.Helper()
+	cacheKey := fmt.Sprintf("traffic:day:%d", days)
+	if common.RedisEnabled {
+		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
+			var cachedByDay []service.DailyTraffic
+			if common.Unmarshal([]byte(cached), &cachedByDay) == nil && cachedByDay != nil {
+				var cachedTotal, cachedRequests int64
+				for i := range cachedByDay {
+					cachedTotal += cachedByDay[i].Bytes
+					cachedRequests += int64(cachedByDay[i].Requests)
+				}
+				return cachedByDay, cachedTotal, cachedRequests, true
+			}
+		}
+	}
+	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+	var rows []service.TrafficRecord
+	require.NoError(t, model.LOG_DB.Model(&model.Log{}).
+		Select("created_at", "other").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
+		Scan(&rows).Error)
+	byDay := service.AggregateTrafficByDay(rows, time.Local)
+	var total, requestCount int64
+	for i := range byDay {
+		total += byDay[i].Bytes
+		requestCount += int64(byDay[i].Requests)
+	}
+	if common.RedisEnabled {
+		if raw, err := common.Marshal(byDay); err == nil {
+			_ = common.RedisSet(cacheKey, string(raw), time.Minute)
+		}
+	}
+	return byDay, total, requestCount, false
+}
+
+// TestTrafficCacheStoresOnlyDailyAggregates 生产回归（2026-09-29 全站 503 事故）：
+// traffic 缓存必须只保存按日聚合行，绝不能把窗口内全量原始行写进 Redis。
+// 44 万行 / 290MB+ 的缓存值在 maxmemory 数十 MB 的实例上触发 OOM，
+// 连带打挂限流与会话缓存。同时验证命中缓存后 total/请求数口径与原实现一致。
+func TestTrafficCacheStoresOnlyDailyAggregates(t *testing.T) {
+	previousDB, previousLogDB := model.DB, model.LOG_DB
+	previousMainDatabaseType := common.MainDatabaseType()
+	previousLogDatabaseType := common.LogDatabaseType()
+	previousRedisEnabled := common.RedisEnabled
+	oldRDB := common.RDB
+
+	database, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	sqlDB, err := database.DB()
+	require.NoError(t, err)
+	require.NoError(t, database.AutoMigrate(&model.Log{}))
+	model.DB, model.LOG_DB = database, database
+	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
+
+	server := miniredis.RunT(t)
+	common.RDB = redis.NewClient(&redis.Options{Addr: server.Addr(), MaxRetries: -1})
+	common.RedisEnabled = true
+	t.Cleanup(func() {
+		_ = common.RDB.Close()
+		common.RDB = oldRDB
+		common.RedisEnabled = previousRedisEnabled
+		model.DB, model.LOG_DB = previousDB, previousLogDB
+		common.SetDatabaseTypes(previousMainDatabaseType, previousLogDatabaseType)
+		require.NoError(t, sqlDB.Close())
+	})
+
+	now := time.Now().Unix()
+	logs := []*model.Log{
+		{Type: model.LogTypeConsume, ModelName: "m1", CreatedAt: now, Other: `{"request_bytes":100,"response_bytes":900}`},
+		{Type: model.LogTypeConsume, ModelName: "m1", CreatedAt: now, Other: `{"request_bytes":50,"response_bytes":50}`},
+		{Type: model.LogTypeConsume, ModelName: "m2", CreatedAt: now - 86400, Other: `{"request_bytes":10,"response_bytes":10}`},
+	}
+	require.NoError(t, database.Create(&logs).Error)
+
+	byDay, total, requestCount, cached := queryTrafficByDayCache(t, 30)
+	require.False(t, cached, "首次必须未命中缓存")
+	require.Len(t, byDay, 2)
+	// 今日 100+900 与 50+50，昨日 10+10。
+	assert.Equal(t, int64(1120), total)
+	assert.Equal(t, int64(3), requestCount)
+
+	cachedRaw, err := server.Get("traffic:day:30")
+	require.NoError(t, err)
+	assert.NotContains(t, cachedRaw, "other", "缓存值不得包含全量原始行")
+	assert.NotContains(t, cachedRaw, "request_bytes", "缓存值不得包含逐条字节字段")
+	assert.Less(t, len(cachedRaw), 1024, "缓存值应只含按日聚合行（≤90 行）")
+
+	// 命中缓存：清空 DB 后结果不变，且 total/请求数由 byDay 重算得出。
+	require.NoError(t, database.Delete(&logs).Error)
+	byDay2, total2, requestCount2, cached2 := queryTrafficByDayCache(t, 30)
+	assert.True(t, cached2, "二次必须命中缓存")
+	assert.Equal(t, byDay, byDay2)
+	assert.Equal(t, total, total2)
+	assert.Equal(t, requestCount, requestCount2)
+}
