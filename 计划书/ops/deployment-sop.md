@@ -1,154 +1,117 @@
-# 部署 / 回滚 SOP（new-api-Max · v1.3.28）
+# 部署 / 回滚 SOP（new-api-Max · v1.3.59）
 
-> 更新：2026-09-25（T11-1）· 版本基线 v1.3.28（HEAD a0d0589f5）。恢复自 git HEAD 并补齐
-> blue-green 零停机滚动更新脚本（scripts/rolling-update-newapi-v3.sh，commit a0d0589f5）的衔接。
-> 适用：fork 仓库 lza6/new-api-Max（origin main），服务器 /opt/new-api（docker compose，端口 3000，
-> 主库 PG + Redis + 独立日志库；Caddy 反代 freeapi.tingfengai.art）。fork 的 push 触发不建 → 构建/发布用 `workflow_dispatch`。
+> 更新：2026-09-29 · 版本基线 v1.3.59（HEAD 6a08f6f55）
+> 适用：fork 仓库 `lza6/new-api-Max`（origin main）· 服务器 `/opt/new-api`（Docker Compose 单机）
+> 生产：`https://freeapi.tingfengai.art` · 服务器 `103.233.252.213`（2C2G · 5Mbps · Ubuntu 20.04）
+> 架构：new-api（本地构建镜像）+ postgres:15 + redis（maxmemory 48mb）· Caddy 反代 + 自动 HTTPS
 
-## 0. 发布链路（build → tag → workflow_dispatch → 服务器 compose → healthcheck → 回滚）
-1. 代码：main 分支推 **主题 commit**（禁 `-f`）；本地与远端 SHA 核对一致。
-2. 版本：更新 `VERSION`（当前 v1.3.28）→ 主题 commit。
-3. 镜像（fork 环境二选一）：
-   - CI：`gh workflow run docker-build.yml --repo lza6/new-api-Max -f tag=<TAG>`（手动 dispatch，勿依赖 push 触发）。
-   - 服务器直连：`cd /opt/new-api-src && git checkout <TAG> && docker build -t new-api:local-<TAG> .`
-4. 备份当前 compose（回滚用）：`cp /opt/new-api/docker-compose.yml /opt/new-api/docker-compose.yml.bak-pre-v<OLD>`；
-   旧镜像打备份标签：`docker tag new-api:local-<OLD> new-api:latest-pre-v<OLD>-backup`。
-5. 换镜像：编辑 compose 镜像为 `new-api:local-<TAG>`（或 `ghcr.io/lza6/new-api-max:<TAG>`），`docker compose up -d new-api`。
-6. 健康检查：`docker compose ps`（Up healthy）；`docker exec new-api env | grep -E 'VERSION|RELAY_|MEMORY_|LOG_'` 核对环境。
-7. 线上验收：`curl -s https://freeapi.tingfengai.art/api/status | grep version` 与响应头 `X-New-Api-Version: v1.3.x`；抽样真实请求（流式 200+DONE）。
-8. 证据存档：`计划书/e2e-evidence/prod-v<TAG>-acceptance.json` + 本 SOP 记录。
+---
 
-## 1. 零停机滚动更新（blue-green，a0d0589f5 实机验证）
-- 脚本：`scripts/rolling-update-newapi-v3.sh <IMAGE_TAG>`（`IMAGE=ghcr.io/lza6/new-api-max:<TAG>`）
-- 原理：Caddy 反代在 :3000（master）与 :3002（standby）之间原子切换，**绝不在 Caddy 仍路由到该上游时杀掉它**：
-  - A) 若存在 standby 且被路由：先把 Caddy 切到 :3000-only，再替换 standby（新版本）
-  - B) standby 健康后原子切换到 :3002-only，再经 compose 替换 master（新镜像）
-  - C) 切回 dual（:3000 :3002）；清理旧 rolling 容器（:3001）
-- 健康门：standby 每 1s curl `127.0.0.1:3002/api/status`（最多 40s）；master 同理（最多 60s）。
-- 回滚机制：ERR trap 恢复已知健康的 Caddy 配置（master-only 或 standby-only）；切换前 `caddy validate` 校验配置。
-- 生产实证（commit 消息）：v1.3.27↔v1.3.28 两轮真实版本切换，持续负载下 **0 HTTP 5xx**。
-- 环境注入：standby 容器注入 `NODE_NAME=new-api-next`、`NODE_TYPE=slave`、复用 `/opt/new-api/.env` + PG/Redis DSN
-  （SQL_DSN / REDIS_CONN_STRING 从 docker-compose.yml 提取）。
-- 回滚（针对该脚本）：重跑脚本切回旧 TAG，或手工 `docker compose up -d new-api` 指回 `.bak-pre-vXXX` 镜像标签。
+## 0. 铁律
 
-## 2. 回滚（故障时 1 分钟级）
+1. **发布默认用零停机脚本** `deploy-zero-downtime.sh`；`deploy.sh` 会先停后起（5-15s 中断），仅在必要时用。
+2. **不做自动部署**：只有用户明确要求时才动生产。
+3. **镜像本地构建**：不再依赖 ghcr / watchtower（固定 tag 不会被 watchtower 更新，曾致「版本没变」误判）。
+4. **发布前先备份** compose；任何一步失败脚本自动回滚，旧容器全程在服务。
+5. 发版顺序：`VERSION` bump → 主题 commit → push main → `git push origin <tag>` → 服务器部署。
+
+---
+
+## 1. 标准发布（零停机，推荐）
+
+```bash
+# 服务器上执行（需用户明确授权）
+cd /opt/new-api
+./deploy-zero-downtime.sh v1.3.60
+```
+
+流程（脚本内自动，日志 `/tmp/deploy-zd-<tag>.log`）：
+1. 探测 Caddy 当前上游端口（3000 或 3001）→ 选**空闲**端口
+2. `git fetch --force origin +refs/tags/<tag>:refs/tags/<tag>` + `git checkout -f <tag>`（`/opt/new-api-src`）
+3. `docker build -t new-api:<tag> .`（约 2-4 分钟）
+4. `docker run` 新容器（临时名 `new-api-next`，`NODE_TYPE=slave`）
+5. 轮询 `http://127.0.0.1:<port>/api/status` 直到健康（≤90s）
+6. `sed` 改 Caddyfile 上游 + `caddy reload`（毫秒级）
+7. 外网自检 → 停旧容器 → `docker rename` 新容器为 `new-api`
+
+**前置检查**：可用内存 > 400MB（脚本自动判断，不足则 abort）。
+
+**实测基线（v1.3.58 → v1.3.59）**：构建期外部 25 连打 **25/25=200**；切流耗时 **4 秒**；数据完整。
+
+### ⚠️ 关键约束
+- 新容器**必须** `NODE_TYPE=slave`：后台任务（`subscription_reset_task` / `auth_cleanup` / `authz.Init` / task event cleanup / web protection cleanup）由 `common.IsMasterNode` 门控，master 会与旧容器**重复执行**。
+- 环境变量：脚本用 `--env-file /opt/new-api/.env` + 显式 `SQL_DSN`/`REDIS_CONN_STRING`（`.env` 内不含这两项）。
+- **部署后 Caddy 上游可能是 3001**（端口交替）：排查前先 `grep reverse_proxy /etc/caddy/Caddyfile`。
+
+---
+
+## 2. 回滚（零停机，1 分钟内）
+
 ```bash
 cd /opt/new-api
-cp docker-compose.yml.bak-pre-v<OLD> docker-compose.yml   # 还原 compose（含镜像标签）
-docker compose up -d new-api                                # 用旧镜像重建
-curl -s https://freeapi.tingfengai.art/api/status | grep version   # 确认回退
+./rollback.sh v1.3.58          # 目标 tag 镜像必须已在本机（docker images new-api）
 ```
-- 镜像回退：compose 指向 `new-api:latest-pre-v<OLD>-backup`（步骤 4 已打标签）或 reborn 旧 tag。
-- 数据库无需回滚（本 SOP 不破坏 schema；若含迁移，先在 scratch 库跑三库幂等再上线）。
 
-## 3. Watchtower 自更新（如用）
-- 节点 label：compose 给 new-api 加 `labels: com.centurylinklabs.watchtower.enable=true`，仅更新 new-api，不碰 redis/postgres。
-- 参数：`--restart always --poll-interval 300 --label-enable`（避免 24h 轮询与不扫）。
-- 注意：fork push 触发不建，watchtower 只负责「镜像已更新」后的自动拉取；镜像构建仍用 dispatch。
-- 与 blue-green 的关系：watchtower 只适合单实例常规升级；多实例零停机走 §1 脚本（其自己拉镜像/切流）。
+机制与发布相同（蓝绿 + Caddy reload），失败自动恢复 Caddy 上游，旧容器不停。
+若目标 tag 镜像不在本机：`cd /opt/new-api-src && git checkout <tag> && docker build -t new-api:<tag> .`
 
-## 4. 运维/排障
-- 磁盘防满：服务器 systemd/cron `docker system prune -af --filter "until=48h"`（保留最近 1-2 个备份标签手动清）。
-- 慢首字：确认 compose 已注入 `MEMORY_CACHE_ENABLED=true`、`LOG_FLUSH_ENABLED=true`、连接池收敛、429 退避 env。
-- 5xx=上游超时：`RELAY_TIMEOUT`（>max prefill）与 `relay.non_stream_first_byte_timeout`；超时语义 504（非 500）。
-- 渠道 429/502：单渠道超卖 → 增加健康渠道 + `CHANNEL_HEALTH_ROUTING`（灰度后可开，v1.3.28 默认 on）。
-- LB 健康探测：`/api/status` 已从全局 API 限流豁免（commit 866f23e24），Caddy health_uri 可用 1s 间隔轮询。
+### 安全类放宽的回滚（无需重新部署）
+两个验证开关改回 `true` 即恢复旧行为（系统设置 → 安全 → Token 限制，热更新）：
+- `token_setting.require_verification_to_read_own_key`
+- `token_setting.require_verification_to_read_channel_key`
 
-## 4.1 生产 503 事故复盘（2026-09-26，v1.3.41 修复闭环）
+---
 
-### 现象
-- 公网 `https://freeapi.tingfengai.art/api/status` 持续 503（Server: Caddy，Content-Length: 0）。
-- 宿主机 `curl http://127.0.0.1:3000/api/status` 与 :3002 均 429；容器内 `wget` 却 200。
+## 3. 应急：普通滚动（`deploy.sh`，会有短暂中断）
 
-### 根因链（三层，逐层定位）
-1. **Caddy 健康检查误判**：Caddyfile 是旧激进参数 `health_timeout 1s / health_fails 1 / health_passes 1`
-   （v1.3.39 加固未部署到线上）→ 一次非 200 即摘流。
-2. **健康检查来源被 Web 防护封禁**：Caddy 从宿主机发请求，经 Docker NAT 后容器看到 ClientIP=
-   **Docker 网关 `172.18.0.1`**；Web 防护按 IP 速率自动封禁该地址（`banned_ips` 记录
-   reason=`auto:web_rate_limit`，24h）。此后 /api/status 返回 `ip_banned` 429。
-3. **双上游全被摘 → 公网 503**：`no upstreams available`。
-
-### 定位命令（按序）
 ```bash
-# 1) 看 Caddy 日志确认 429/摘流
-journalctl -u caddy --since '10 min ago' | grep -E 'health|unhealthy|no upstreams'
-# 2) 直连后端区分层：宿主机 curl vs 容器内 wget
-curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/api/status   # 429 → 应用/防护层
-docker exec new-api wget -qO- http://127.0.0.1:3000/api/status | head -c 200  # 200 → 是封禁非宕机
-# 3) 查 banned_ips（关键：Docker 网关 IP 是否被封）
-docker exec postgres psql -U newapi -d new-api -c "SELECT id, ip, reason, expires_at FROM banned_ips;"
-# 4) 确认 ClientIP 来源（NAT 后是 172.18.0.1）
+cd /opt/new-api
+./deploy.sh v1.3.60     # 见 §1 步骤 2-5，但用 docker compose up（先停后起，5-15s 中断）
+```
+仅在零停机脚本不可用（如内存不足、磁盘告急）时使用。
+
+---
+
+## 4. 发版前质量门（本地）
+
+```bash
+# 后端
+go build ./... && go vet ./... && (cd relaykit && GOWORK=off go build ./...)
+go test ./controller/ ./middleware/ ./common/ ./setting/... -count=1
+# 前端
+cd web && bun run typecheck && bunx oxlint -c .oxlintrc.json <改动文件> && bunx vitest run <相关目录>
+bun run i18n:sync    # 新增文案必须 7 语言回填，locale-consistency 测试须通过
 ```
 
-### 修复（v1.3.41 已含代码侧，运维侧按此执行）
-1. **清封禁**：`DELETE FROM banned_ips WHERE ip IN ('172.18.0.1','127.0.0.1','::1');`
-2. **Caddyfile 加固**（v1.3.39 参数）：`health_interval 2s / health_timeout 2s / health_fails 3 / health_passes 2`。
-3. **升级到含豁免的镜像**：v1.3.41 起 `middleware/rate-limit.go` 的 `isHealthProbePath` 对
-   GET /api/status 豁免 GA 全局限流；Web 防护侧不应封禁健康检查来源（后续版本持续加固）。
-4. 验证：`curl -s https://freeapi.tingfengai.art/api/status | grep version` + 连续 20 次健康检查 0 失败。
+---
 
-### 防复发清单
-- [ ] Caddyfile 恒为 `3/2/2s/2s`（reload 后 `systemctl is-active caddy`）。
-- [ ] banned_ips 监控：定期查 `reason='auto:web_rate_limit'` 且 ip ∈ Docker 网段。
-- [ ] 升级镜像后必须核对 `X-New-Api-Version` 头（本机 `curl -sI`）。
-- [ ] 部署任何版本前先验证 `docker exec new-api curl 127.0.0.1:3000/api/status` = 200（非 429）。
+## 5. 线上验收（每次发布后）
 
-## 5. 演练与备份
-- 干跑：STAGING 同版本模拟「build→up→curl→回滚」；恢复演练记录留 `计划书/ops/`。
-- 备份：compose 快照 + DB dump（pg_dump）+ 计划书证据目录；保留策略：最近 1-2 个备份。
-- blue-green 预演：先在 STAGING 跑 `rolling-update-newapi-v3.sh` 干跑两轮版本切换，确认 Caddy validate/reload 链无回归。
-
-## 6. 生产加固基线（2026-09-25 v1.3.26 实机验证；v1.3.28 沿用）
-
-> 下列加固已在 freeapi.tingfengai.art 生效，新环境按此基线部署。
-
-### 容器资源与日志
-- **日志轮转**（docker json-file）：`logging: {driver: json-file, options: {max-size: "50m", max-file: "5"}}`
-  → 容器 stdout 日志有界，防磁盘撑爆。
-- **资源限制**：`mem_limit: 2g` + `cpus: "2.0"` + `stop_grace_period: 30s`
-  → 单容器不耗尽宿主机（生产实测峰值 ~150MB / 3% CPU）。
-- **应用日志**：`command: --log-dir /app/logs` 内部按时间段自动切文件（有界）。
-
-### 自更新
-- **Watchtower**（仅更新 new-api）：compose 给 new-api 加
-  `labels: com.centurylinklabs.watchtower.enable=true`；watchtower 容器
-  `--restart always --poll-interval 300 --label-enable`。
-
-### 性能 env（生产验证）
-```yaml
-MEMORY_CACHE_ENABLED=true  SYNC_FREQUENCY=60
-LOG_FLUSH_ENABLED=true     LOG_FLUSH_INTERVAL=1000  LOG_FLUSH_BATCH=500
-RELAY_TIMEOUT=900          RELAY_429_RETRY_DELAY=1000  RELAY_429_MAX_RETRIES=2
-SQL_MAX_OPEN_CONNS=64      SQL_MAX_IDLE_CONNS=16   SQL_MAX_LIFETIME=300
+```bash
+curl -sI https://freeapi.tingfengai.art/api/status | grep -i x-new-api-version   # 版本号
+for i in $(seq 1 30); do curl -s -o /dev/null -w '%{http_code} ' -m 8 https://freeapi.tingfengai.art/api/status; done; echo
+docker ps --format '{{.Names}}\t{{.Image}}\t{{.Status}}'                          # 容器 healthy
+docker exec postgres psql -U newapi -d new-api -t -c 'SELECT count(*) FROM users;'  # 数据完整
+docker logs new-api --since 10m 2>&1 | grep -cE '\| 5[0-9]{2} \|'                 # 5xx 计数
 ```
+证据存档：`计划书/e2e-evidence/prod-v<tag>-acceptance.json`。
 
-### 数据库备份（P0，2026-09-25 建立）
-- 脚本：`/usr/local/bin/backup-newapi.sh`（docker exec pg_dump + gzip → /opt/backup/new-api/）
-- Cron：每日 03:10（`10 3 * * *`），保留 7 天（`find -mtime +7 -delete`）
-- 验证：首次备份 40MB / 43 张表 / gzip 完整 / users/channels/logs/tokens 均在。
-- 恢复：`zcat /opt/backup/new-api/newapi-<TS>.sql.gz | docker exec -i postgres psql -U newapi -d new-api`
+---
 
-### 慢查询防护（v1.3.24-26）
-- 带宽/流量排行已 SQL 聚合 + 60s Redis 缓存（SLOW SQL 从 25 条/2h → 0）。
-- 排查命令：`docker logs new-api --since 2h | grep 'SLOW SQL'`；命中后查
-  `controller/log.go` 对应 handler（queryModelBandwidthLeaderboard / GetBandwidthLeaderboard / GetLogsTraffic）。
+## 6. 排障速查
 
-## 7. 透传模式 token 计费说明（上游决定，v1.3.15 起）
+| 现象 | 先查 |
+|---|---|
+| 全站 503 | `free -m` / `docker exec redis redis-cli INFO memory` / Caddy 日志 `no upstreams available` |
+| 单模型「无可用渠道」503 | 渠道是否被删/禁用；`abilities` 表该模型是否有 `enabled=t` 且渠道 status=1 |
+| Redis 内存高但 DBSIZE 小 | `docker exec redis redis-cli -a <pwd> CLIENT LIST \| grep monitor`（MONITOR 连接吃内存） |
+| 版本没变 | Caddy 上游端口（3000/3001）；`docker inspect new-api --format '{{.Config.Image}}'` |
+| 迭代期请求中断 | 用 `deploy-zero-downtime.sh`（先起新后停旧） |
 
-### 现状（已确认）
-- **结算/日志 token + 缓存 token 全部以上游 usage 为准**：`summary.CacheTokens = usage.PromptTokensDetails.CachedTokens`
-  （service/text_quota.go:265），`usage_billing_path=upstream`（生产实测日志证据）。
-- **网关不覆盖上游 token/cache 计数**；`local_count_tokens` 仅用于「上游未返回 usage」的降级路径
-  （gemini/audio 等特殊渠道强制本地计数）。
+---
 
-### 预扣费估算（网关唯一"算 token"处）
-- 预扣用 `EstimateRequestToken`（本地估算，`CountToken` env 默认 true）——**仅用于预扣防欠费**，
-  结算按上游 usage 多退少补，**不改变最终计费**。
-- 若希望透传渠道完全由上游决定 + 降低首字延迟/CPU：
-  - compose 设 `CountToken=false` → 预扣估算返回 0（token_counter.go:182），预扣走最小额，
-    结算仍按上游 usage 补扣。**权衡**：低额度用户瞬时可用额变大（结算前可能超用），
-    免费/信任用户无影响。**回滚**：改回 true 重启。
+## 7. 已知生产约束（不可变更）
 
-### 推荐
-- 免费/公益网关：`CountToken=false`（省 CPU、首字更快，预扣风险可接受）。
-- 商业计费网关：保持 `CountToken=true`（预扣精度优先，避免超用）。
+- **2C2G / 5Mbps**：任何「双实例常驻 + 构建 + 数据库」组合都会触发 swap 风暴 → 503。动 compose 前先算内存总账。
+- Redis `maxmemory 48mb` + `client-output-buffer-limit normal 32mb 16mb 60`：**任何把 DB 全量结果塞 Redis 的代码都是定时炸弹**（`RedisSet` 已有 1MiB 硬上限）。
+- 构建期（`docker build` 大 Go 项目）会吃满内存，构建期 load 可到 40 —— 零停机脚本已把构建放在起新容器之前。
