@@ -308,3 +308,12 @@
 - **模型广场「机房部署」**：排查结论=数据侧与前端过滤均已正确（`/api/pricing` enable_groups 含该分组、abilities enabled=t、`filterByGroup` 按 includes 过滤、`getAvailableGroups` 求交展示），属数据修复前旧状态/缓存，**未改任何前端过滤代码**。
 - **验证**：go build/vet exit 0；controller+middleware+common+setting 全绿；前端 typecheck/lint/vitest 12/12/i18n 2/2；生产 E2E 单key测试 4/4 ok、批量 ok_count=4 fail=0、查看渠道key 200 无 proof、add_keys 幂等拒绝重复。
 - **回滚**：两个开关设 true 恢复旧行为；`rollback.sh v1.3.58` 退版本。
+
+## 记录 0026 · v1.3.60 上游错误归类 + 数据库灾备 + 首页3D（2026-09-29/30）
+- **上游网络层失败误报 500（用户实际投诉）**：日志 `dial tcp 70.39.183.88:443: connect: connection refused` / `unexpected EOF` 被归为 500。真因：请求在 TCP/TLS 层中断、**从未到达上游应用**（故上游无记录）。修复：新增 `ErrorCodeUpstreamUnreachable` + `isUpstreamUnreachable()` + `summarizeNetworkError()`，映射 **502**；`processChannelError` 保留该分类不降格为 `upstream_unavailable`。超时仍 504。测试 `TestIsUpstreamUnreachable` / `TestSummarizeNetworkError` / `TestProcessChannelErrorPreservesUnreachableClass`。
+- **数据库导出/导入**：`GET /api/system/db/export[/info]` + `POST /api/system/db/import`（RootAuth）。**纯 Go + gzip + JSON Lines 流式**（不依赖容器 pg_dump；内存与表大小无关；三库同码）。**导入语义=只插入缺失行（冲突跳过），绝不删除/覆盖**，可安全重放；格式版本校验、16MiB 单行上限、1GiB 体积上限、未知表跳过、导入后刷新 option/渠道/定价缓存。测试 `TestBackupRoundTrip`（含幂等重放）/`...RejectsGarbage`/`...HigherVersionRejected`。
+- **关键词**：新表清单入口 `model.BackupTables()` / `model.LogTables()`；改 AutoMigrate 时须同步。
+- **越权读取密钥改 404**：免 step-up 后归属校验是唯一边界；此前越权返回 200+错误文本、批量返回 200+空 map（可枚举）。现统一 **404 + TOKEN_NOT_FOUND**。测试 `TestTokenKeyDisclosureOwnershipAndStatus`。
+- **首页 3D + 可用性缺陷**：新增纯 CSS 3D `hero-3d-showcase.tsx`（零 WebGL）。**重要教训**：`initial={{opacity:0}} + whileInView` 在 IO 未触发时（整页截图/旧浏览器/JS 失败）内容**永久不可见** → 必须 `initial={false} + animate`（默认可见、动画增强）。
+- **本地 E2E（部署冻结期替代）**：Playwright 13/13 + 首页 4 视图截图 + reduced-motion 3/3 可见。证据 `计划书/e2e-evidence/v1.3.60/`。
+- **防重复**：① 起本地 E2E 服务必须**先 `bun run build` 再重启 Go**（`go:embed web/dist` 是编译期快照，只改前端不重启=白测）；② 用 `go run` 时监听进程是子进程，`taskkill` 需按端口 PID；③ 密钥 reveal 的真实路径是「点掩码 → Popover」，复制按钮是 Tooltip 无 aria-label，正向证据用 "API Key 已解锁" toast。
