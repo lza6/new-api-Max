@@ -952,3 +952,15 @@
 **模型广场「机房部署」不显示**：排查结论 = 数据侧已正确（`/api/pricing` 返回 `enable_groups:["机房部署","default"]`，匿名 `usable_group` 含 `机房部署`，abilities `机房部署|deepseek-v4.1-flash|46|enabled=t`），前端 `filterByGroup` 按 `enable_groups.includes(group)` 过滤、`getAvailableGroups` 展示分组标签均正确 → 属数据修复前的旧状态/浏览器缓存，非代码缺陷。**未改动任何前端过滤代码。**
 
 **质量门**：`go build ./...` / `go vet ./...` exit 0；controller/middleware/common/setting 全绿；`bun run typecheck` exit 0；oxlint 改动文件无 error；vitest 12/12 + i18n 一致性 2/2。
+
+### 九-补 US-3 零停机发布实测与回滚脚本（2026-09-29）
+
+| 项 | 状态 | 证据 |
+|---|---|---|
+| 蓝绿发布脚本 | ✅ DONE | `/opt/new-api/deploy-zero-downtime.sh`；v1.3.58→v1.3.59 实测切流 4 秒 |
+| 零中断证明 | ✅ DONE | 构建期外部 25 连打 **25/25 = 200** |
+| 回滚脚本重写 | ✅ DONE | `/opt/new-api/rollback.sh`（旧版指向 ghcr 已过时）→ 蓝绿同机制，备份 `.bak-*` |
+| 部署 SOP 更新 | ✅ DONE | `计划书/ops/deployment-sop.md` 更新到 v1.3.59 |
+| 技能库更新 | ✅ DONE | `.claude/skills/new-api-add-feature/SKILL.md` 增 §6 step-up 放宽纪律 + §7 零停机发布 |
+| 边界测试补齐 | ✅ DONE | `TestRunSingleKeyTestRejectsOutOfRangeIndex`、`TestPreviewKeyMasksShortAndLong`；`go test -race` 通过 |
+| 并发安全复核 | ✅ DONE | gin `GetInt` 有 RWMutex；`GetNextEnabledKey` 在 `GetChannelPollingLock` 内读 `MultiKeyPollingIndex`；`-race` 全绿 |
