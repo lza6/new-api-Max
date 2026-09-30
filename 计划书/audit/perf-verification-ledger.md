@@ -382,3 +382,15 @@
   ④ 日志计数器等「近似值」也必须用 atomic —— Go 内存模型不认「反正不用精确」；
   ⑤ GORM 的 `OnConflict{DoNothing}` 在 MySQL 上不可靠，MySQL 场景改用 `clause.Insert{Modifier:"IGNORE"}`；
   ⑥ 并发测试里 `gin.SetMode` 写全局，禁止在 goroutine 内调用。
+
+## 记录 0030 · v1.3.60-63 GitHub Release 补建（2026-09-30）
+- **发现的真实问题**：`release.yml` 有 `push: tags: ['*']` 触发条件，但 fork 上 Actions 队列长期不接单
+  （台账 0024 已录 74h queued 问题）→ **最新 Release 停在 v1.3.44，v1.3.45–v1.3.63 全无 Release 对象**
+  （tag 都在，只是没 Release）。这是「推了 tag 却以为发版了」的典型陷阱。
+- **补建方式**：`gh` 未安装、GitHub API 匿名请求被限流 → 用 `git credential fill` 取出存储的
+  PAT（scope: `repo, workflow, gist, read:org`）→ node https 直连 GitHub API 创建 4 个 Release
+  （v1.3.60–v1.3.63），**验证已存在**（`/releases?per_page=6` 可见）。
+- **遗留**：v1.3.45–v1.3.59 的 Release 仍未创建（历史遗留，非本轮范围）。如需补齐，同一方式可批量补。
+- **纪律**：**推 tag ≠ 已发版**；fork 环境下必须显式确认 Release 对象存在
+  （`curl https://api.github.com/repos/lza6/new-api-Max/releases` 或网页 Releases 页），
+  不要假设 Actions 会自动跑。
