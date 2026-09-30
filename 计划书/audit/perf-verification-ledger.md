@@ -406,3 +406,26 @@
 - **轮询游标读锁回退**：我曾加 `channelSyncLock.RLock` 于读点，4 连跑 1 次间歇失败（锁顺序风险），
   回退为「依赖 GetChannelPollingLock 串行化同渠道轮询」的最小设计后 3/3 全绿。
   **纪律**：给已被上层锁串行化的路径再叠锁 ≠ 更安全，先证明锁序无环。
+
+## 记录 0032 · v1.3.64 第三轮审查修复（2026-09-30）
+- **R1（HIGH，数据完整性）MySQL 导入静默篡改数据**：上版为修语法错误改用 `INSERT IGNORE`，
+  但它吞掉**主键冲突以外的所有错误**。真机实测：`VARCHAR` 超长 → `err=nil, rows=1` **静默截断**入库；
+  `NOT NULL` 写 NULL → `err=nil, rows=1` **静默强转** `''`。PG 则分别抛 `22001`/`23502` 且 0 行。
+  → **三库语义不一致 + 数据被静默改**。修复：MySQL 改 `ON DUPLICATE KEY UPDATE <pk>=<pk>`
+  （只吞主键冲突，主键列按 GORM schema 解析以支持复合主键）。
+  实测修复后：冲突 `inserted=0/skipped=1` 口径不变；超长报 `1406`、NULL 报 `1048`。
+  永久回归 `service/db_backup_error_matrix_test.go`（三库）。
+- **R2（flaky）**：`assert.Equal(peak, 3)` 要求并发峰值必然打满、`elapsed < 5s` 依赖负载 →
+  本机 3 连跑 1 次红。契约是 `peak <= 3`。改 `peak >= 2` + 上界 30s，保留 `>= 600ms` 下界。
+- **R3（我上轮的误判，已纠正）**：我曾给轮询游标加读锁又回退，理由「4 连跑 1 次失败」——
+  **但那次失败正是 R2 的 flaky 测试**，不是读锁的证据（审查者正确指出）。复核锁序：
+  全仓不存在「持 channelSyncLock 再求 GetChannelPollingLock」的反向路径 → 读锁不成环。
+  恢复读锁后 **4 连跑全绿（77/77/79/83s）**。
+- **S1**：`fail_count` 曾把「超时未执行」计入失败 → 新增 `unexecuted_count`/`executed_fail_count`。
+- **纪律（新增）**：
+  ① **MySQL 的 `INSERT IGNORE` 会静默吞掉超长/NOT NULL 等错误**——凡「冲突跳过」语义，
+     MySQL 必须用 `ON DUPLICATE KEY UPDATE <pk>=<pk>`；`INSERT IGNORE` 只适合「确定不会出错」的场景。
+  ② **压测断言只能写契约（`peak <= N`），不能写调度结果（`peak == N`）**，否则慢机必假红；
+     耗时同理，只宜作下界证据，不宜作严格上界。
+  ③ **回退一个已实施的修复前，必须先确认失败签名**——是目标缺陷、还是别的 flaky 测试。
+     我本轮就因未核对签名而误回退，被审查者纠正。
