@@ -274,7 +274,9 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 				logger.LogDebug(nil, "channel %d polling index set", channel.Id)
 			}
 		}()
-		// Start from the saved polling index and look for the next enabled key
+		// Start from the saved polling index and look for the next enabled key.
+		// 同渠道的轮询读写由上面的 GetChannelPollingLock 串行化，故此处读是安全的；
+		// 跨渠道各自独立。（写点见下方 defer → SetChannelPollingIndex。）
 		start := channelInfo.MultiKeyPollingIndex
 		if start < 0 || start >= len(keys) {
 			start = 0
