@@ -45,10 +45,18 @@
 - **可维护**：配置项走既有 `operation_setting` 注册机制（热更新）
 - **可回滚**：3 项均可用配置开关关闭，恢复旧行为
 
-## 4. 成功指标
-- `POST /api/token/:id/key` 无 proof 时返回 200（开关开启态）
-- 多 key 面板可新增/测试/批量测试（E2E 截图 + API 证据）
-- 发布窗口 `/api/status` 30 连打 100% 200，中断 < 1s
+## 4. 成功指标（2026-09-30 按实测回填）
+
+- [x] `POST /api/token/:id/key` 无 proof 时返回 200（开关默认关闭态）。
+  **证据**：`middleware/secure_verification.go:70`（开关关 → `c.Next()` 直接放行）；`middleware/secure_verification_test.go:20` `TestOwnTokenKeyReadSkipsStepUpByDefault`；本地真实浏览器 E2E「查看自己的密钥未弹二次验证」「完整密钥确实被揭示（已解锁 toast）」两项 `ok:true`（`计划书/e2e-evidence/v1.3.60/results.json`）。
+  批量：`POST /api/token/batch/keys` ≤100 条同样免 proof（`middleware/secure_verification.go:105` 上限）。
+- [x] 多 key 面板可新增 / 单测 / 批量测试，且有可核验的 API 证据。
+  **证据**：路由 `router/channel-router.go:55-56`；`controller/channel-test.go:1205` / `:1234`；单测 `controller/channel_test_internal_test.go:490`（add_keys）、`:609`/`:620`/`:638`（批量上限/空渠道/超时）。
+  **生产 E2E**：单 key 4/4 `ok:true`、批量 `ok_count:4 fail_count:0`、查看渠道 key 200 无 `SECURITY_PROOF_REQUIRED`、add_keys 幂等拒绝重复 —— 记载于 `计划书/change-report-v1.3.59.html` 第 5 节（**该批未在仓库归档原始结果 JSON**）。
+  **本地 E2E**：`计划书/e2e-evidence/v1.3.60/`（13 项全 ok，含 `c1-fallback-dialog.png` 回退弹窗截图 + `backup-export.sqljson.gz` 真实导出件）。
+- [x] 发布窗口 `/api/status` 连续请求 100% 200，中断 < 1s。
+  **证据（实测口径，与目标的差异如实标注）**：实际执行的是 **25 连打 25/25 = 200**（非 30 连打），数字来自 `计划书/ops/deployment-sop.md:39` 与 `计划书/workflow_status.md` 第九节；切流耗时 4 秒，发布窗口内非 200 计数为 **0**。
+  **边界**：脚本 `/opt/new-api/deploy-zero-downtime.sh` 在生产机、不在仓库，本指标无法在仓库内复现 —— 标注「待复现」。
 
 ## 5. 明确不在范围（Out of Scope）
 - 多实例/负载均衡改造（2C2G 单机不适用，仅在文档给出升级路径）

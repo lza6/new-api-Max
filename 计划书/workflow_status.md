@@ -964,3 +964,75 @@
 | 技能库更新 | ✅ DONE | `.claude/skills/new-api-add-feature/SKILL.md` 增 §6 step-up 放宽纪律 + §7 零停机发布 |
 | 边界测试补齐 | ✅ DONE | `TestRunSingleKeyTestRejectsOutOfRangeIndex`、`TestPreviewKeyMasksShortAndLong`；`go test -race` 通过 |
 | 并发安全复核 | ✅ DONE | gin `GetInt` 有 RWMutex；`GetNextEnabledKey` 在 `GetChannelPollingLock` 内读 `MultiKeyPollingIndex`；`-race` 全绿 |
+
+---
+
+## 十、v1.3.60-62 密钥运维与审查闭环（2026-09-30）
+
+> 承接第九节（v1.3.59 密钥自主管理）。本批 = 一次生产投诉修复 + 一次灾备能力 + 两轮独立审查收口。
+> 证据纪律：下表「证据」列均为仓库内可核对的 file:line 或 tag；**无法核对的一律标注**。
+
+### 10.1 v1.3.60 — 上游错误归类 / 数据库灾备 / 密钥越权 / 首页 3D
+
+| 项 | 任务 | 状态 | 证据（file:line / tag） |
+|---|---|---|---|
+| 上游网络层失败误报 500 | 新增 `ErrorCodeUpstreamUnreachable`，TCP/TLS 层中断映射 **502**（超时仍 504） | ✅ 已修 | `relaykit/types/error.go:55`；`relay/channel/api_request.go:522`（`isUpstreamUnreachable`）/`:560`（`summarizeNetworkError`）/`:662`（502）；`controller/relay.go:497`（不降格为 `upstream_unavailable`）；tag `v1.3.60` |
+| 上游分类回归防护 | `upstream_unreachable` 不得被覆盖为笼统 `upstream_unavailable` | ✅ 已修 | `controller/relay.go:493-499`；测试 `relay/channel/api_request_getbody_test.go:639`、`controller/relay_error_log_test.go:477/:488` |
+| 数据库导出/导入 | `GET /api/system/db/export[/info]` + `POST /api/system/db/import`（RootAuth）；纯 Go + gzip + JSON Lines 流式 | ✅ DONE | 路由 `router/api-router.go:358-360`；handler `controller/db_backup.go:30/:59/:100`；服务 `service/db_backup.go:73`（导出）/`:206`（导入） |
+| 导入语义 | **只插入缺失行（冲突跳过），绝不删除/覆盖**，可安全重放 | ✅ DONE | `service/db_backup.go:296`（`insertRows` 返回 inserted/skipped）；测试 `service/db_backup_test.go:52`（往返+幂等重放）/`:91`（非本格式拒绝）/`:110`（未来版本拒绝） |
+| 备份表清单单一来源 | `model.BackupTables()` / `model.LogTables()`，改 AutoMigrate 须同步 | ✅ DONE | `model/main.go:404` / `:420`；消费点 `service/db_backup.go:91/:95/:319/:329` |
+| 越权读取密钥改 404 | 免 step-up 后归属是唯一边界；原「200+错误文本 / 200+空 map」可被枚举 → 统一 **404 + `TOKEN_NOT_FOUND`** | ✅ 已修 | `controller/token.go:200-206`（单条）/`:563`、`:576`（批量）；测试 `controller/token_key_test.go:23` |
+| 首页 3D 能力展示 | 纯 CSS 3D（零 WebGL） | ✅ DONE | `web/src/features/home/components/sections/hero-3d-showcase.tsx`；引用 `hero.tsx:27` |
+| 首页内容永久不可见缺陷 | `initial={{opacity:0}} + whileInView` 在 IO 未触发时内容永久不可见 → 必须 `initial={false} + animate` | ✅ 已修 | 同上组件；本地 E2E 首页 4 视图 + reduced-motion 可见（`计划书/e2e-evidence/v1.3.60/`） |
+
+### 10.2 v1.3.61 — 独立审查（对 v1.3.59 给 Request Changes）修复
+
+| 项 | 任务 | 状态 | 证据（file:line / tag） |
+|---|---|---|---|
+| C-1（最重要，前端静默失效） | `readServerCode()` 原先读 `error.code`；**axios 对所有 4xx 一律设 `error.code='ERR_BAD_REQUEST'`**，业务码只在 `response.data.code` → 「站点强制验证时回退弹窗」整条路径是死代码 | ✅ 已修 | `web/src/features/keys/hooks/use-token-key-disclosure.ts:65`（`readServerCode` 定义）/`:60-63`（注释写明顺序纪律与原因）；tag `v1.3.61` |
+| C-2（a11y 契约） | `a11y-keys-stepup.test.tsx` / `api-key-listing.test.tsx` 断言旧 step-up 流程而变红 → 按新契约重写；顺带修复制按钮纯图标无 `aria-label`（axe `button-name` critical） | ✅ 已修 | `web/src/features/keys/components/__tests__/a11y-keys-stepup.test.tsx`、`api-key-listing.test.tsx`；`web/src/features/keys/components/api-keys-cells.tsx:129` |
+| 契约统一（`TimeMs` 死字段） | `keyTestResult.TimeMs` 从未赋值（恒 0）、`keyIndex` 死字段、前端读不存在的 `res.time` → 统一为后端实测 `time_ms` / 前端读 `res.time_ms` | ✅ 已修 | `controller/channel-test.go:1190`（字段）/`:1361`（起测）/`:1363`（耗时）；`web/src/features/channels/api.ts:712`；`multi-key-manage-dialog.tsx:194` |
+| 批量测试防御 | 加 key 数上限 **200** + 整批总超时（默认 400s，`timeout_seconds` 可覆盖且钳制 ≤3600）+ 响应 `timed_out` | ✅ DONE | `controller/channel-test.go:1252`、`:1267-1273`、`:1324-1325` |
+| 跨渠道状态污染 | 对话框切渠道时补重置 `testResults` / `testingIndex` | ✅ 已修 | `web/src/features/channels/components/dialogs/multi-key-manage-dialog.tsx:129-130` |
+| 文档一致性 | spec §3 如实记录强制模式下旧前端 403；plan AD-2 明确 key 测试不改健康分 | ✅ DONE | `spec.md:38-42`；`plan.md:20-21` |
+| 验证（修正版） | middleware 全绿；**controller 全量 FAIL**（见 10.3 更正）；前端 keys+channels **119/119**；typecheck 绿 | ⚠️ 部分 | `计划书/audit/perf-verification-ledger.md` 记录 0027 |
+
+### 10.3 v1.3.62 — 二次审查修复（CI 阻断回归 + 文档不实）
+
+| 项 | 任务 | 状态 | 证据（file:line / tag） |
+|---|---|---|---|
+| P0-A（CI 阻断） | `controller/token.go` 404 分支用了 `i18n.T`，但 `controller/main_test.go` 的 `TestMain` **未初始化 i18n** → `bundle == nil` → `NewLocalizer(nil,...)` panic → `go test ./controller/` 全量 FAIL（433s） | ✅ 已修 | ① `i18n/i18n.go:100-103`（`Translate` 加 `if bundle == nil { return key }` 保护，与 main.go「i18n 非关键」契约一致）；② `controller/main_test.go:35`（`_ = i18n.Init()`）；tag `v1.3.62` |
+| P0-B（404 期望） | `token_test.go` 的 `foreign key view` / `batch keys no matches` 仍期望 200，与新 404 语义冲突 → 表格驱动加 `status` 字段并改期望 404 | ✅ 已修 | `controller/token_test.go:702`、`:707` |
+| P1-A（覆盖率缺口） | `TestChannelKeys` 的上限/空渠道/超时分支**零覆盖**（本批最大新逻辑）→ 补 3 个用例 | ✅ 已修 | `controller/channel_test_internal_test.go:609`（`...RejectsTooManyKeys`）/`:620`（`...RejectsEmptyChannel`）/`:638`（`...HonorsTimeoutParam`） |
+| P1-B（文档更正） | 台账 0025/0027 写「controller 全绿」**不实** → 已更正 | ✅ 已修 | `计划书/audit/perf-verification-ledger.md` 记录 0025 / 0027 / 0028 |
+
+### 10.4 本批验证口径（不得简化为「全绿」）
+
+| 范围 | 真实结果 |
+|---|---|
+| `go build ./...` · `go vet ./...` | exit 0 ✅ |
+| `go test ./middleware/ ./common/ ./setting/...` | 全量 PASS ✅ |
+| `go test ./controller/` | **全量 FAIL：仍有 9 项既有噪声失败**（`git stash` 基线对照确认与本批无关；其中 `TestSiteSubscriptionStatsAggregates`（`controller/site_stats_test.go:19`）、`TestAdminSetUserSubscriptionTierInvalidatesCache`（`controller/site_stats_test.go:87`）属顺序依赖 — 隔离跑 PASS / 全量 FAIL）。**v1.3.62 已消除本批引入的 i18n panic，现 0 panic** ⚠️ |
+| 前端 `bun run typecheck` / oxlint | exit 0 / 改动文件无 error ✅ |
+| 前端 vitest（keys + channels） | 119/119 ✅ |
+| i18n `bun run i18n:sync` + 一致性测试 | 无漂移、2/2 ✅ |
+| 本地真实浏览器 E2E | `计划书/e2e-evidence/v1.3.60/results.json` 13 项全 `ok:true` ✅ |
+| 生产 E2E（v1.3.59） | 单 key 4/4、批量 `ok_count=4 fail_count=0`、查看渠道 key 200 无 proof、add_keys 幂等；**仅记载于 `计划书/change-report-v1.3.59.html`，仓库未归档原始结果 JSON** ⚠️ |
+
+### 10.5 本批沉淀的纪律（写进记忆）
+
+1. **读 axios 错误码必须先读 `response.data.code`**，并排除 `ERR_` 前缀的传输层码；测试必须用**真实 axios 形状**（带 `code:'ERR_BAD_REQUEST'`），否则造出假阳性。
+2. **新增 `i18n.T` 调用前，先确认测试链路已 `i18n.Init()`**；`i18n.Translate` 现已有 nil-bundle 保护，但测试仍应显式 Init 以贴近生产。
+3. **改 HTTP 状态码语义后，必须 grep 全仓断言旧状态码的测试**（`grep -rn "assert.Equal(t, 200" controller/*_test.go`）。
+4. **声称「全绿」前必须跑该包的全量测试** —— 定向 `-run` 通过 ≠ 包全量通过（P0-A 正是如此漏掉）。
+5. **改「验证/弹窗」类前端逻辑后，必须 grep 全仓所有断言旧流程的测试**（`grep -rn "step-up\|Verify to view" web/src --include=*test*`）。
+6. **组件改图标按钮时必须带 `aria-label`**（axe `button-name` 为 critical）。
+7. **起本地 E2E 服务必须先 `bun run build` 再重启 Go**（`go:embed web/dist` 是编译期快照，只改前端不重启 = 白测）。
+
+### 10.6 口径不一致项（如实登记，待用户裁决）
+
+| 项 | 冲突内容 |
+|---|---|
+| v1.3.59 是否已上线 | `计划书/change-report-v1.3.59.html` 写「已上线，生产 v1.3.59 零停机切换」；`计划书/ops/deployment-sop.md:3` 写「生产未切」。以部署纪律（**按需部署，非每批部署**）与 SOP 为准 |
+| 零停机实测样本数 | spec §4 原目标「30 连打」；实测为 **25 连打 25/25=200**（SOP `:39`）。数字以实测为准 |
+| 零停机脚本可复现性 | `/opt/new-api/deploy-zero-downtime.sh` 在生产机，**不在仓库**；仓库内 `.codex/tmp/rollback.sh` 与之无关。该项无法在仓库内复现，标注「待复现」 |

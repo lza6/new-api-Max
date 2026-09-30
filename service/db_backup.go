@@ -297,10 +297,18 @@ func insertRows(table string, records []map[string]any) (inserted, skipped int64
 	if len(records) == 0 {
 		return 0, 0, nil
 	}
-	// 用 GORM 的 Table().Create 批量插入，冲突跳过由数据库方言决定：
-	// 三库统一用 clause.OnConflict{DoNothing:true}（GORM 会生出
-	// PostgreSQL/SQLite 的 ON CONFLICT DO NOTHING 与 MySQL 的 INSERT IGNORE）。
-	tx := model.DB.Table(table).Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(records, 200)
+	// [fix-mysql] 三库冲突跳过必须分支处理，不能只靠 clause.OnConflict：
+	// GORM 在 **MySQL** 上把 `clause.OnConflict{DoNothing:true}` + map 数据渲染成
+	// `ON DUPLICATE KEY UPDATE `（尾随空格 + 空更新子句）→ **MySQL 语法错误**
+	// （Error 1064），导入在 MySQL 上完全不可用。三库矩阵测试实测证实。
+	// 正确做法：MySQL 用 INSERT IGNORE 表修饰符，PostgreSQL/SQLite 用
+	// ON CONFLICT DO NOTHING（由 clause.OnConflict 正确渲染）。
+	var tx *gorm.DB
+	if common.UsingMainDatabase(common.DatabaseTypeMySQL) {
+		tx = model.DB.Table(table).Clauses(clause.Insert{Modifier: "IGNORE"}).CreateInBatches(records, 200)
+	} else {
+		tx = model.DB.Table(table).Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(records, 200)
+	}
 	if tx.Error != nil {
 		return 0, 0, tx.Error
 	}

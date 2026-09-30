@@ -1574,6 +1574,17 @@ func ManageMultiKeys(c *gin.Context) {
 	lock.Lock()
 	defer lock.Unlock()
 
+	// [fix-lost-update] 上面的 channel 是在**加锁之前**读的，且 modify 类 action
+	// （add_keys / delete_key / ...）会基于 channel.Key 计算新集合再整体写回。
+	// 并发请求各自持有加锁前的陈旧快照 → 后写者覆盖先写者，**静默丢 key**
+	// （并发 add_keys 压测实测：期望并集 61 条，实际只剩 6 条）。
+	// 因此在锁内重新读取最新渠道，保证「读-改-写」基于最新状态。
+	if request.Action != "get_key_status" {
+		if latest, err := model.GetChannelById(request.ChannelId, true); err == nil && latest != nil {
+			channel = latest
+		}
+	}
+
 	switch request.Action {
 	case "get_key_status":
 		keys := channel.GetKeys()

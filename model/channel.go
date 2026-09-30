@@ -47,12 +47,12 @@ type Channel struct {
 	OtherInfo         string  `json:"other_info"`
 	// ProbeResult B4-1 渠道验真探测报告（json 字符串，见 service/probe）。
 	// 新列 TEXT，三库 AutoMigrate 自动补齐；只增不改语义。
-	ProbeResult *string `json:"probe_result" gorm:"type:text"`
-	Tag         *string `json:"tag" gorm:"index"`
-	Setting           *string `json:"setting" gorm:"type:text"` // 渠道额外设置
-	ParamOverride     *string `json:"param_override" gorm:"type:text"`
-	HeaderOverride    *string `json:"header_override" gorm:"type:text"`
-	Remark            *string `json:"remark" gorm:"type:varchar(255)" validate:"max=255"`
+	ProbeResult    *string `json:"probe_result" gorm:"type:text"`
+	Tag            *string `json:"tag" gorm:"index"`
+	Setting        *string `json:"setting" gorm:"type:text"` // 渠道额外设置
+	ParamOverride  *string `json:"param_override" gorm:"type:text"`
+	HeaderOverride *string `json:"header_override" gorm:"type:text"`
+	Remark         *string `json:"remark" gorm:"type:varchar(255)" validate:"max=255"`
 	// add after v0.8.5
 	ChannelInfo ChannelInfo `json:"channel_info" gorm:"type:json"`
 
@@ -259,14 +259,19 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 		if err != nil {
 			return "", 0, types.NewError(err, types.ErrorCodeGetChannelFailed, types.ErrOptionWithSkipRetry())
 		}
+		// [fix-race] 轮询索引的推进只允许写「缓存权威对象」（channelInfo），
+		// 绝不写调用方传入的 channel.ChannelInfo —— 后者在内存缓存模式下是
+		// **多个并发请求共享的同一个指针**（CacheGetChannel 直接返回缓存里的
+		// *Channel），写它会与其他请求的读（本函数的 debug 日志、GetKeys、
+		// 上下文快照）形成数据竞争，实测可触发 race 并 panic。
+		// 锁 GetChannelPollingLock 保证「读-改-写」序列原子；写目标改为
+		// channelInfo（同样受 channelSyncLock 保护）后不再触碰共享指针。
+		var nextIndex int
+		// 由专有函数在正确的锁内写回，避免直接触碰可能被共享/被缓存锁保护的字段。
 		defer func() {
+			SetChannelPollingIndex(channel.Id, channelInfo, nextIndex)
 			if common.DebugEnabled {
-				logger.LogDebug(nil, "channel %d polling index: %d", channel.Id, channel.ChannelInfo.MultiKeyPollingIndex)
-			}
-			if !common.MemoryCacheEnabled {
-				_ = channel.SaveChannelInfo()
-			} else {
-				// CacheUpdateChannel(channel)
+				logger.LogDebug(nil, "channel %d polling index set", channel.Id)
 			}
 		}()
 		// Start from the saved polling index and look for the next enabled key
@@ -277,8 +282,8 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 		for i := range keys {
 			idx := (start + i) % len(keys)
 			if getStatus(idx) == common.ChannelStatusEnabled {
-				// update polling index for next call (point to the next position)
-				channel.ChannelInfo.MultiKeyPollingIndex = (idx + 1) % len(keys)
+				// 记录下一个索引；由 defer 在锁内写回缓存权威对象（不碰共享指针）
+				nextIndex = (idx + 1) % len(keys)
 				return keys[idx], idx, nil
 			}
 		}
@@ -292,6 +297,34 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 
 func (channel *Channel) SaveChannelInfo() error {
 	return DB.Model(channel).Update("channel_info", channel.ChannelInfo).Error
+}
+
+// SetChannelPollingIndex 在多 key 轮询模式下把下一个索引写回渠道信息。
+//
+// [fix-race] 该函数存在的原因：内存缓存模式下 CacheGetChannel 直接返回缓存里的
+// *Channel 指针，多个并发请求共享同一对象。若在请求路径上直接写
+// `channel.ChannelInfo.MultiKeyPollingIndex`，会与其他请求对同一对象的读形成
+// **数据竞争**（实测 race detector 报错并 panic）。
+// 因此：
+//   - 写「缓存权威对象」时持有 channelSyncLock 的写锁；
+//   - 非缓存模式直接写库（此时每个请求各自持有独立的 Channel 副本）。
+// 调用方必须已持有该渠道的 GetChannelPollingLock，保证「读-改-写」序列原子。
+func SetChannelPollingIndex(channelID int, info *ChannelInfo, nextIndex int) {
+	if info == nil {
+		return
+	}
+	if common.MemoryCacheEnabled {
+		channelSyncLock.Lock()
+		defer channelSyncLock.Unlock()
+		info.MultiKeyPollingIndex = nextIndex
+		return
+	}
+	// 无内存缓存：info 指向调用方私有副本，直接写库即可。
+	info.MultiKeyPollingIndex = nextIndex
+	if err := DB.Model(&Channel{Id: channelID}).
+		Update("channel_info", *info).Error; err != nil {
+		logger.LogWarn(nil, fmt.Sprintf("failed to persist channel %d polling index: %v", channelID, err))
+	}
 }
 
 func (channel *Channel) GetModels() []string {

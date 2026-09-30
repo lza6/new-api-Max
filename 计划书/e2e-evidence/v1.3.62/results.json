@@ -1,0 +1,81 @@
+{
+  "ranAt": "2026-09-29T23:51:53.935Z",
+  "base": "http://127.0.0.1:3000",
+  "results": [
+    {
+      "name": "登录成功",
+      "ok": true,
+      "detail": "http://127.0.0.1:3000/dashboard"
+    },
+    {
+      "name": "备份分区可见",
+      "ok": true
+    },
+    {
+      "name": "防错提示（不删除不覆盖）",
+      "ok": true
+    },
+    {
+      "name": "导出下载为有效 gzip",
+      "ok": true,
+      "detail": "3376 bytes"
+    },
+    {
+      "name": "密钥列表非空（防假阳性）",
+      "ok": true,
+      "detail": "rows=3"
+    },
+    {
+      "name": "找到掩码密钥触发器",
+      "ok": true
+    },
+    {
+      "name": "查看自己的密钥未弹二次验证",
+      "ok": true
+    },
+    {
+      "name": "密钥确实被揭示（已解锁 toast）",
+      "ok": true
+    },
+    {
+      "name": "多 key 渠道已创建（API）",
+      "ok": true,
+      "detail": "{\"message\":\"\",\"success\":true}"
+    },
+    {
+      "name": "渠道列表含 e2e-multikey",
+      "ok": true
+    },
+    {
+      "name": "多密钥面板打开",
+      "ok": true
+    },
+    {
+      "name": "「一键测试全部密钥」按钮存在",
+      "ok": true
+    },
+    {
+      "name": "「新增密钥」按钮存在",
+      "ok": true
+    },
+    {
+      "name": "行内「测试」按钮存在",
+      "ok": true
+    },
+    {
+      "name": "一键测试全部有结果返回（未挂死）",
+      "ok": true,
+      "detail": "13655ms"
+    },
+    {
+      "name": "本地 API 健康",
+      "ok": true,
+      "detail": "status=200"
+    },
+    {
+      "name": "浏览器控制台无致命错误",
+      "ok": true,
+      "detail": ""
+    }
+  ]
+}

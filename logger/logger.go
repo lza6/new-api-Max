@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -26,9 +27,13 @@ const (
 
 const maxLogCount = 1000000
 
-var logCount int
+// logCount 与 setupLogWorking 会被所有并发日志调用读写。
+// [fix-race] 原实现把 logCount 当「近似计数，不加锁」——但未同步的整数自增
+// 在 Go 内存模型下就是数据竞争（并发压测下 race detector 会报错并导致测试
+// panic）。用 atomic 既保留「近似计数、不阻塞日志」的原意，又消除竞争。
+var logCount atomic.Int64
 var setupLogLock sync.Mutex
-var setupLogWorking bool
+var setupLogWorking atomic.Bool
 var currentLogPath string
 var currentLogPathMu sync.RWMutex
 var currentLogFile *os.File
@@ -41,7 +46,7 @@ func GetCurrentLogPath() string {
 
 func SetupLogger() {
 	defer func() {
-		setupLogWorking = false
+		setupLogWorking.Store(false)
 	}()
 	if *common.LogDir != "" {
 		ok := setupLogLock.TryLock()
@@ -113,10 +118,9 @@ func logHelper(ctx context.Context, level string, msg string) {
 	}
 	_, _ = fmt.Fprintf(writer, "[%s] %v | %s | %s \n", level, now.Format("2006/01/02 - 15:04:05"), id, msg)
 	common.LogWriterMu.RUnlock()
-	logCount++ // we don't need accurate count, so no lock here
-	if logCount > maxLogCount && !setupLogWorking {
-		logCount = 0
-		setupLogWorking = true
+	// 近似计数：用 atomic 避免数据竞争（无需精确，故不做 CAS 语义的严格递增）。
+	if logCount.Add(1) > maxLogCount && setupLogWorking.CompareAndSwap(false, true) {
+		logCount.Store(0)
 		gopool.Go(func() {
 			SetupLogger()
 		})

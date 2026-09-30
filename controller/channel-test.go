@@ -1277,6 +1277,17 @@ func TestChannelKeys(c *gin.Context) {
 	const maxConcurrency = 3
 	sem := make(chan struct{}, maxConcurrency)
 	results := make([]keyTestResult, len(keys))
+	// [fix-race+honest-response] 每个槽位先写「未执行」占位；worker 完成后用
+	// 真实结果覆盖。这样：
+	//   1) handler 在 ctx 超时后立即序列化时，读到的是「未执行」而非**零值**
+	//      （零值会伪造成 index:0 + 空 message，让第 0 个 key 看起来失败、
+	//      真实失败位置消失 —— 响应报文不可信）；
+	//   2) 未完成的槽位永远是明确语义，不会被误解为成功。
+	for i := range results {
+		results[i] = keyTestResult{Index: i, Ok: false, Message: "批量测试整体超时，未执行该密钥"}
+	}
+	// 所有对 results 的写都在 mu 保护下；超时分支读取时也持锁，消除数据竞争。
+	var resultsMu sync.Mutex
 	var waitGroup sync.WaitGroup
 	for i := range keys {
 		waitGroup.Add(1)
@@ -1285,19 +1296,21 @@ func TestChannelKeys(c *gin.Context) {
 			select {
 			case sem <- struct{}{}:
 			case <-ctx.Done():
-				results[idx] = keyTestResult{Index: idx, Ok: false, Message: "批量测试整体超时，未执行该密钥"}
-				return
+				return // 占位已是「未执行」，无需再写
 			}
 			defer func() { <-sem }()
 			if ctx.Err() != nil {
-				results[idx] = keyTestResult{Index: idx, Ok: false, Message: "批量测试整体超时，未执行该密钥"}
-				return
+				return // 同上
 			}
-			results[idx] = runSingleKeyTest(ctx, channel, idx, testModel, endpointType, false)
+			res := runSingleKeyTest(ctx, channel, idx, testModel, endpointType, false)
+			resultsMu.Lock()
+			results[idx] = res
+			resultsMu.Unlock()
 		}(i)
 	}
 
-	// 等待完成或总超时；超时后不再等剩余 goroutine（它们会因 ctx 取消而快速返回）。
+	// 等待完成或总超时；超时后不再等剩余 goroutine（它们会因 ctx 取消而快速返回），
+	// 但读取 results 前必须与仍在途的 worker 写回互斥。
 	done := make(chan struct{})
 	go func() { waitGroup.Wait(); close(done) }()
 	timedOut := false
@@ -1307,17 +1320,22 @@ func TestChannelKeys(c *gin.Context) {
 		timedOut = true
 	}
 
+	resultsMu.Lock()
+	snapshot := make([]keyTestResult, len(results))
+	copy(snapshot, results)
+	resultsMu.Unlock()
+
 	okCount := 0
-	for _, r := range results {
+	for _, r := range snapshot {
 		if r.Ok {
 			okCount++
 		}
 	}
 	payload := gin.H{
-		"total":      len(results),
+		"total":      len(snapshot),
 		"ok_count":   okCount,
-		"fail_count": len(results) - okCount,
-		"results":    results,
+		"fail_count": len(snapshot) - okCount,
+		"results":    snapshot,
 	}
 	// 整批超时时明确告知调用方结果不完整，避免把「未执行」误读成「失败/通过」。
 	if timedOut {
