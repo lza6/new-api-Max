@@ -359,3 +359,26 @@
      `i18n.Translate` 现已有 nil 保护，但测试仍应显式 Init 以贴近生产。
   ② **改 HTTP 状态码语义后必须 grep 全仓断言旧状态码的测试**（`grep -rn "assert.Equal(t, 200" controller/*_test.go`）。
   ③ **声称「全绿」前必须跑该包的全量测试**——定向 `-run` 通过 ≠ 包全量通过（本次 P0-A 正是如此漏掉）。
+
+## 记录 0029 · v1.3.63 高并发压测自检（2026-09-30）
+- **方法**：新增 `controller/channel_key_stress_test.go`（9 个并发/边界测试，含可控慢上游 `httptest`）；
+  新增 `service/db_backup_matrix_test.go`（真实三库矩阵）。**压测真的抓到了 5 个缺陷**。
+- **P0-1 批量测试响应不可信 + 数据竞争**：`TestChannelKeys` 超时后立即序列化 `results`，
+  而 worker 之后才写 `results[idx]` → 零值槽位伪造成 `index:0`、真实失败位置消失；且读写并发。
+  修复：预填占位 + `resultsMu` 互斥 + snapshot。实测：上游挂 10s / `timeout_seconds=1` → **1.02s 返回**、6/6 槽位正确。
+- **P0-2 add_keys 并发丢 key**：`ManageMultiKeys` **加锁前**读 channel，并发请求基于同一陈旧快照
+  计算新集合并覆盖写回 → 实测期望并集 61 条、**实际只剩 6 条**。修复：锁内重读。
+- **P0-3 轮询索引写共享对象**：`CacheGetChannel` 返回缓存内 `*Channel` 共享指针，
+  `GetNextEnabledKey` 直接写其 `MultiKeyPollingIndex` → race + panic。
+  修复：新增 `model.SetChannelPollingIndex`（`channelSyncLock` 写锁内写权威对象）。
+- **P0-4 logger race（既有）**：`logCount++` 注释称「近似不加锁」但未同步自增即 race → 改 `atomic`。
+- **P0-5 数据库导入在 MySQL 完全不可用**：GORM 把 `clause.OnConflict{DoNothing:true}`+map 渲染成
+  `ON DUPLICATE KEY UPDATE `（空子句）→ **Error 1064**。修复：MySQL 用 `clause.Insert{Modifier:"IGNORE"}`。
+- **验证**：`go test -race` 15 项全绿 0 race；三库矩阵 SQLite/MySQL/PG 全 PASS；conformance 全绿；浏览器 E2E 17/17。
+- **纪律（新增）**：
+  ① 并发写 slice 槽位必须互斥，且**超时/提前返回时必须用快照**，否则零值会伪造出 index:0 的假结果；
+  ② 「读-改-写」整体覆盖型操作（add_keys/delete_key）**必须在锁内重读最新状态**，否则静默丢更新；
+  ③ 内存缓存模式下 `CacheGetChannel` 返回**共享指针**，禁止在请求路径直接写其字段；
+  ④ 日志计数器等「近似值」也必须用 atomic —— Go 内存模型不认「反正不用精确」；
+  ⑤ GORM 的 `OnConflict{DoNothing}` 在 MySQL 上不可靠，MySQL 场景改用 `clause.Insert{Modifier:"IGNORE"}`；
+  ⑥ 并发测试里 `gin.SetMode` 写全局，禁止在 goroutine 内调用。
