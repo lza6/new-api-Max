@@ -385,6 +385,13 @@ export interface KeysTestSummary {
   total: number
   ok_count: number
   fail_count: number
+  /** 整批超时时未执行（未跑）的 key 数；与「执行后失败」区分，避免误报密钥失效。 */
+  unexecuted_count?: number
+  /** 已执行但失败的 key 数（fail_count - unexecuted_count）。 */
+  executed_fail_count?: number
+  /** 整批是否因总超时提前收敛（结果不完整）。 */
+  timed_out?: boolean
+  timeout_seconds?: number
   results: KeyTestResult[]
 }
 

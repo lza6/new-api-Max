@@ -179,12 +179,15 @@ func (up *keyStressUpstream) authKeys() map[string]int {
 type keyBatchTestResponse struct {
 	Success bool `json:"success"`
 	Data    struct {
-		Total          int             `json:"total"`
-		OkCount        int             `json:"ok_count"`
-		FailCount      int             `json:"fail_count"`
-		TimedOut       bool            `json:"timed_out"`
-		TimeoutSeconds int             `json:"timeout_seconds"`
-		Results        []keyTestResult `json:"results"`
+		Total          int  `json:"total"`
+		OkCount        int  `json:"ok_count"`
+		FailCount      int  `json:"fail_count"`
+		TimedOut       bool `json:"timed_out"`
+		TimeoutSeconds int  `json:"timeout_seconds"`
+		// S1: 「未执行」与「执行后失败」分开计数，避免把挂起误报成密钥失效。
+		UnexecutedCount   int             `json:"unexecuted_count"`
+		ExecutedFailCount int             `json:"executed_fail_count"`
+		Results           []keyTestResult `json:"results"`
 	} `json:"data"`
 }
 
@@ -255,14 +258,19 @@ func TestBatchKeyTestCapsUpstreamConcurrency(t *testing.T) {
 	require.False(t, response.Data.TimedOut)
 
 	peak := upstream.maxActive.Load()
+	// 契约是「峰值不得超过 3」。**不要**断言峰值必然等于 3 —— 那是调度结果，
+	// 在负载高的机器上可能峰值只有 2（慢机/抢占），会造成 flaky 假红（已实测）。
+	// 真正证明「上限生效」的证据是下面两条：峰值>1（确实并发了）且耗时符合分轮特征。
 	assert.LessOrEqual(t, peak, int32(3), "上游并发峰值不得越过批量测试并发上限 3")
-	assert.Equal(t, int32(3), peak, "并发上限应被真实打满（20 个 key 同时排队）")
+	assert.GreaterOrEqual(t, peak, int32(2), "应观察到并发>1（否则无法证明并发上限是在起作用的路径上）")
 	assert.Equal(t, int32(keyCount), upstream.hits.Load(), "每个 key 恰好测试一次")
 
 	// 上限为 3 时 20 个 key 至少需要 ceil(20/3) 轮 × 120ms ≈ 800ms；
 	// 若并发上限未生效（20 并发）耗时会接近 120ms。
+	// 上界放宽到 30s：慢机/CI 上耗时可显著拉长，耗时**不是**契约（契约是并发上限），
+	// 用它做严格上界只会制造假红。下界才是「上限生效」的证据。
 	assert.GreaterOrEqual(t, elapsed, 600*time.Millisecond, "耗时过短说明并发上限未生效")
-	assert.Less(t, elapsed, 5*time.Second)
+	assert.Less(t, elapsed, 30*time.Second, "异常耗时（远超分轮预期）需排查")
 	t.Logf("实测：上游并发峰值=%d（上限 3），上游命中=%d，批量耗时=%v",
 		peak, upstream.hits.Load(), elapsed)
 	upstream.waitIdle(t, 2*time.Second)
@@ -345,6 +353,12 @@ func TestBatchKeyTestReturnsOnBatchTimeout(t *testing.T) {
 	assert.Equal(t, keyCount, response.Data.Total)
 	assert.Equal(t, 0, response.Data.OkCount)
 	assert.Equal(t, keyCount, response.Data.FailCount, "超时后所有 key 都不得算作成功")
+	// S1：超时批次里「未执行」应单独计数（不等于 fail_count 全部），
+	// 且未执行 + 已执行失败 = fail_count，口径自洽。
+	assert.GreaterOrEqual(t, response.Data.UnexecutedCount, 1, "超时批次必须有未执行的 key")
+	assert.Equal(t, response.Data.FailCount,
+		response.Data.UnexecutedCount+response.Data.ExecutedFailCount,
+		"未执行 + 已执行失败 必须等于 fail_count")
 
 	// 超时后每个 key 都必须带失败标记（要么是「未执行」，要么是取消/超时类错误）。
 	// 注意不要断言恰好 keyCount-3 个「未执行」：被释放的信号量名额可能让第 4 个

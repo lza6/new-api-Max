@@ -275,9 +275,14 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 			}
 		}()
 		// Start from the saved polling index and look for the next enabled key.
-		// 同渠道的轮询读写由上面的 GetChannelPollingLock 串行化，故此处读是安全的；
-		// 跨渠道各自独立。（写点见下方 defer → SetChannelPollingIndex。）
-		start := channelInfo.MultiKeyPollingIndex
+		// [fix-race] 读也走 GetChannelPollingIndex（在 channelSyncLock 读锁内），
+		// 与写点 SetChannelPollingIndex（写锁）形成同一把锁的 happens-before。
+		// 仅靠 GetChannelPollingLock 不够：缓存重建（InitChannelCache 在
+		// channelSyncLock 写锁内）会改写同一字段，两把锁之间没有 happens-before。
+		// 锁序安全性：channelSyncLock 子树内不存在 GetChannelPollingLock 调用
+		// （全仓核实），故「pollingLock → channelSyncLock(R)」不会与任何
+		// 反向路径成环。
+		start := GetChannelPollingIndex(channelInfo)
 		if start < 0 || start >= len(keys) {
 			start = 0
 		}
@@ -299,6 +304,22 @@ func (channel *Channel) GetNextEnabledKey() (string, int, *types.NewAPIError) {
 
 func (channel *Channel) SaveChannelInfo() error {
 	return DB.Model(channel).Update("channel_info", channel.ChannelInfo).Error
+}
+
+// GetChannelPollingIndex 读取多 key 轮询游标（与 SetChannelPollingIndex 同锁）。
+//
+// [fix-race] 读必须与写用同一把 channelSyncLock：缓存重建（InitChannelCache）
+// 在 channelSyncLock 写锁内改写该字段，而 GetChannelPollingLock 与
+// channelSyncLock 之间没有 happens-before，单靠前者无法排除竞争。
+func GetChannelPollingIndex(info *ChannelInfo) int {
+	if info == nil {
+		return 0
+	}
+	if common.MemoryCacheEnabled {
+		channelSyncLock.RLock()
+		defer channelSyncLock.RUnlock()
+	}
+	return info.MultiKeyPollingIndex
 }
 
 // SetChannelPollingIndex 在多 key 轮询模式下把下一个索引写回渠道信息。

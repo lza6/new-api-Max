@@ -1192,6 +1192,10 @@ type keyTestResult struct {
 	Preview   string `json:"key_preview"`
 }
 
+// unexecutedMessageFragment 是「因整批超时未执行」的文案片段。
+// 抽成常量以便计数与占位文案保持一致（改文案不会再漏改计数）。
+const unexecutedMessageFragment = "未执行该密钥"
+
 // previewKey 返回密钥前若干字符用于识别（不泄露完整密钥）。
 func previewKey(key string) string {
 	if len(key) <= 10 {
@@ -1284,7 +1288,7 @@ func TestChannelKeys(c *gin.Context) {
 	//      真实失败位置消失 —— 响应报文不可信）；
 	//   2) 未完成的槽位永远是明确语义，不会被误解为成功。
 	for i := range results {
-		results[i] = keyTestResult{Index: i, Ok: false, Message: "批量测试整体超时，未执行该密钥"}
+		results[i] = keyTestResult{Index: i, Ok: false, Message: "批量测试整体超时，" + unexecutedMessageFragment}
 	}
 	// 所有对 results 的写都在 mu 保护下；超时分支读取时也持锁，消除数据竞争。
 	var resultsMu sync.Mutex
@@ -1325,17 +1329,25 @@ func TestChannelKeys(c *gin.Context) {
 	copy(snapshot, results)
 	resultsMu.Unlock()
 
-	okCount := 0
+	okCount, unexecutedCount := 0, 0
 	for _, r := range snapshot {
 		if r.Ok {
 			okCount++
 		}
+		// 「未执行」与「执行后失败」语义不同：超时未跑的 key 不代表 key 失效，
+		// 单独计数，避免前端把挂起误报成密钥失效（fail_count 仍含它们以保持
+		// 向后兼容，但调用方可据 unexecuted_count 精确区分）。
+		if strings.Contains(r.Message, unexecutedMessageFragment) {
+			unexecutedCount++
+		}
 	}
 	payload := gin.H{
-		"total":      len(snapshot),
-		"ok_count":   okCount,
-		"fail_count": len(snapshot) - okCount,
-		"results":    snapshot,
+		"total":               len(snapshot),
+		"ok_count":            okCount,
+		"fail_count":          len(snapshot) - okCount,
+		"unexecuted_count":    unexecutedCount,
+		"executed_fail_count": len(snapshot) - okCount - unexecutedCount,
+		"results":             snapshot,
 	}
 	// 整批超时时明确告知调用方结果不完整，避免把「未执行」误读成「失败/通过」。
 	if timedOut {

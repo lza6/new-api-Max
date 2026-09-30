@@ -297,15 +297,37 @@ func insertRows(table string, records []map[string]any) (inserted, skipped int64
 	if len(records) == 0 {
 		return 0, 0, nil
 	}
-	// [fix-mysql] 三库冲突跳过必须分支处理，不能只靠 clause.OnConflict：
-	// GORM 在 **MySQL** 上把 `clause.OnConflict{DoNothing:true}` + map 数据渲染成
-	// `ON DUPLICATE KEY UPDATE `（尾随空格 + 空更新子句）→ **MySQL 语法错误**
-	// （Error 1064），导入在 MySQL 上完全不可用。三库矩阵测试实测证实。
-	// 正确做法：MySQL 用 INSERT IGNORE 表修饰符，PostgreSQL/SQLite 用
-	// ON CONFLICT DO NOTHING（由 clause.OnConflict 正确渲染）。
+	// 三库冲突跳过必须分支处理，且**不能**用 MySQL 的 INSERT IGNORE：
+	//   1) GORM 在 MySQL 上把 `clause.OnConflict{DoNothing:true}` + map 数据渲染成
+	//      `ON DUPLICATE KEY UPDATE `（尾随空格 + 空更新子句）→ **Error 1064**。
+	//   2) `INSERT IGNORE` 虽然语法正确，但它**吞掉主键冲突以外的所有错误**：
+	//      实测 VARCHAR(5) 写 10 字符 → err=nil 且值被**静默截断**入库；
+	//      NOT NULL 列写 NULL → err=nil 且被**静默强转**为 ''/0。
+	//      这会让「schema 漂移的旧备份」在 MySQL 上**报告导入成功、行数正确、
+	//      内容却被篡改**，而同一文件在 PG/SQLite 上会明确报错 —— 语义不一致。
+	// 正确做法：MySQL 用 `ON DUPLICATE KEY UPDATE <pk>=<pk>`（只吞主键冲突，
+	// 其它错误照报；实测超长返回 Error 1406、NOT NULL 返回 Error 1048），
+	// PG/SQLite 用 `ON CONFLICT DO NOTHING`。
 	var tx *gorm.DB
 	if common.UsingMainDatabase(common.DatabaseTypeMySQL) {
-		tx = model.DB.Table(table).Clauses(clause.Insert{Modifier: "IGNORE"}).CreateInBatches(records, 200)
+		pkCols := primaryKeyColumns(table)
+		// DoUpdates 需要 clause.Set（[]clause.Assignment）；pk = pk 自赋值
+		// 使冲突行「更新为原值」= 语义上无操作，只吞主键冲突。
+		set := make(clause.Set, 0, len(pkCols))
+		for _, pk := range pkCols {
+			set = append(set, clause.Assignment{
+				Column: clause.Column{Name: pk},
+				Value:  clause.Column{Table: clause.CurrentTable, Name: pk},
+			})
+		}
+		if len(set) == 0 {
+			// 找不到主键列（理论上不应发生）：退回 DoNothing 语义的等价写法，
+			// 但记日志以便排查，避免变成「静默全放行」。
+			logger.LogWarn(nil, fmt.Sprintf("backup import: no primary key columns detected for table %q; duplicate rows may not be skipped", table))
+		}
+		tx = model.DB.Table(table).
+			Clauses(clause.OnConflict{DoUpdates: set}).
+			CreateInBatches(records, 200)
 	} else {
 		tx = model.DB.Table(table).Clauses(clause.OnConflict{DoNothing: true}).CreateInBatches(records, 200)
 	}
@@ -319,6 +341,28 @@ func insertRows(table string, records []map[string]any) (inserted, skipped int64
 		skipped = 0
 	}
 	return inserted, skipped, nil
+}
+
+// primaryKeyColumns 返回指定表的主键列名（按 GORM schema 解析，支持复合主键）。
+// 供 MySQL 的 `ON DUPLICATE KEY UPDATE <pk>=<pk>` 使用 —— 必须是真实主键列，
+// 否则 MySQL 会把它当作普通列自赋值，冲突时仍会插入重复行。
+func primaryKeyColumns(table string) []string {
+	index := backupTableIndex()
+	proto, ok := index[table]
+	if !ok {
+		return nil
+	}
+	stmt := &gorm.Statement{DB: model.DB}
+	if err := stmt.Parse(proto); err != nil || stmt.Schema == nil {
+		return nil
+	}
+	cols := make([]string, 0, len(stmt.Schema.PrimaryFieldDBNames))
+	for _, name := range stmt.Schema.PrimaryFieldDBNames {
+		if name != "" {
+			cols = append(cols, name)
+		}
+	}
+	return cols
 }
 
 // backupTableIndex 返回「表名 → 模型」的索引，用于导入时的表名校验。
