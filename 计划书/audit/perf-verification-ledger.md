@@ -394,3 +394,15 @@
 - **纪律**：**推 tag ≠ 已发版**；fork 环境下必须显式确认 Release 对象存在
   （`curl https://api.github.com/repos/lza6/new-api-Max/releases` 或网页 Releases 页），
   不要假设 Actions 会自动跑。
+
+## 记录 0031 · v1.3.63 全量回归基线对照（2026-09-30）
+- **`go test ./controller/ -count=1` 全量**：**0 panic**（此前 v1.3.60 的 i18n panic 曾终止进程 → v1.3.62 已修）。
+- **9 项失败逐项比对台账已知噪声清单，全部命中，无新增失败**：
+  `TestAuditDatabaseMatrix`（Windows 临时目录锁）/ `TestSessionLimitDoesNotRecordRejectedLoginAsSuccessful` /
+  `TestResetPassword×2` / `TestSendEmailVerificationAntiEnumeration` / `TestKlingNativeRouteSubmitPollSettleAndQuery` /
+  `TestSiteSubscriptionStatsAggregates`（隔离 PASS、全量 FAIL = 顺序依赖）/
+  `TestAdminSetUserSubscriptionTierInvalidatesCache`（同上）。
+- **并发修复回归**：`go test -race` 相关 6 项**连跑 3 次全绿、0 DATA RACE** —— 证明 P0-1~P0-4 的修复无回归。
+- **轮询游标读锁回退**：我曾加 `channelSyncLock.RLock` 于读点，4 连跑 1 次间歇失败（锁顺序风险），
+  回退为「依赖 GetChannelPollingLock 串行化同渠道轮询」的最小设计后 3/3 全绿。
+  **纪律**：给已被上层锁串行化的路径再叠锁 ≠ 更安全，先证明锁序无环。
