@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-09-29T23:51:53.935Z",
+  "ranAt": "2026-09-30T03:28:26.556Z",
   "base": "http://127.0.0.1:3000",
   "results": [
     {
@@ -18,12 +18,12 @@
     {
       "name": "导出下载为有效 gzip",
       "ok": true,
-      "detail": "3376 bytes"
+      "detail": "4183 bytes"
     },
     {
       "name": "密钥列表非空（防假阳性）",
       "ok": true,
-      "detail": "rows=3"
+      "detail": "rows=4"
     },
     {
       "name": "找到掩码密钥触发器",
@@ -65,7 +65,7 @@
     {
       "name": "一键测试全部有结果返回（未挂死）",
       "ok": true,
-      "detail": "13655ms"
+      "detail": "13423ms"
     },
     {
       "name": "本地 API 健康",
