@@ -82,6 +82,8 @@ func GetLiveRequests(c *gin.Context) {
 		"compressed_bytes_sum":  snap.CompressedBytesSum,
 		"avg_compression_ratio": snap.AvgCompressionRatio,
 		"avg_first_response_ms": snap.AvgFirstResponseMs,
+		"avg_upload_ms":         snap.AvgUploadMs,
+		"avg_upstream_ttfb_ms":  snap.AvgUpstreamTtfbMs,
 		"network_in_mbps":       inMBps,
 		"network_out_mbps":      outMBps,
 		"concurrency":           conc,

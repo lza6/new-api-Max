@@ -111,6 +111,9 @@ export type LiveRequestEntry = {
   compressed_bytes: number
   compressed: boolean
   first_response_ms: number
+  upstream_connect_ms: number
+  upstream_upload_ms: number
+  upstream_ttfb_ms: number
   status_code?: number
   error_msg?: string
   finished_at?: number
@@ -132,6 +135,8 @@ export type LiveRequestsData = {
   compressed_bytes_sum: number
   avg_compression_ratio: number
   avg_first_response_ms: number
+  avg_upload_ms: number
+  avg_upstream_ttfb_ms: number
   network_in_mbps: number
   network_out_mbps: number
   concurrency: LiveConcurrencyStats

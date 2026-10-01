@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"regexp"
 	"strings"
 	"sync"
@@ -612,6 +613,55 @@ func resolveRelayTimeout(globalSeconds int, override *int) (seconds int, overrid
 	return *override, true
 }
 
+// withUpstreamTimingTrace 注入 httptrace 钩子，采集三段耗时（相对发起时刻）：
+// 建连（ConnectStart→ConnectDone，含 TLS）、请求体写完（WroteRequest）、
+// 上游响应头到达（GotFirstResponseByte）。全部采集完后一次性回调
+// info.OnUpstreamTiming，供实时面板展示「上传 vs 上游首 token」的拆分。
+//
+// 采用 mutex 保护共享时间点（钩子可能在不同 goroutine 触发）。仅在
+// info.OnUpstreamTiming 非 nil 时由调用方启用，未启用则零开销。
+func withUpstreamTimingTrace(ctx context.Context, info *common.RelayInfo, c *gin.Context) context.Context {
+	start := time.Now()
+	var mu sync.Mutex
+	var connectDone, wroteDone, firstByte time.Time
+	toMs := func(t time.Time) int64 {
+		if t.IsZero() {
+			return -1
+		}
+		return t.Sub(start).Milliseconds()
+	}
+	emit := func() {
+		connectMs := toMs(connectDone)
+		uploadMs := toMs(wroteDone)
+		ttfbMs := toMs(firstByte)
+		info.UpstreamConnectMs = connectMs
+		info.UpstreamUploadMs = uploadMs
+		info.UpstreamTtfbMs = ttfbMs
+		if info.OnUpstreamTiming != nil {
+			info.OnUpstreamTiming(connectMs, uploadMs, ttfbMs)
+		}
+	}
+	trace := &httptrace.ClientTrace{
+		ConnectDone: func(_, _ string, _ error) {
+			mu.Lock()
+			connectDone = time.Now()
+			mu.Unlock()
+		},
+		WroteRequest: func(_ httptrace.WroteRequestInfo) {
+			mu.Lock()
+			wroteDone = time.Now()
+			mu.Unlock()
+		},
+		GotFirstResponseByte: func() {
+			mu.Lock()
+			firstByte = time.Now()
+			mu.Unlock()
+			emit()
+		},
+	}
+	return httptrace.WithClientTrace(ctx, trace)
+}
+
 func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http.Response, error) {
 	// B1-2 SSRF 二次解析：在即将发起上游请求时再次校验目标地址（防 DNS
 	// rebinding「保存合法、使用时解析到内网」窗口）。结果按 host 缓存 5 分钟。
@@ -672,6 +722,12 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 				}
 			}()
 		}
+	}
+
+	// 延迟拆解：用 httptrace 采集「建连/上传/首字节」三段耗时，供实时面板区分
+	// 「网关→上游上传」与「上游首 token」。仅在有回调时启用（零开销路径）。
+	if info != nil && info.OnUpstreamTiming != nil {
+		req = req.WithContext(withUpstreamTimingTrace(req.Context(), info, c))
 	}
 
 	resp, err := relayClient.Do(req)

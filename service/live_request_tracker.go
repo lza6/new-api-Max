@@ -59,6 +59,12 @@ type LiveRequestEntry struct {
 	// 首字（流式）/上游响应时间（毫秒）；0 表示尚未收到上游响应。
 	FirstResponseMs int64 `json:"first_response_ms"`
 
+	// 延迟拆解（毫秒，-1 表示该段未发生）。用于区分「网关→上游上传」与
+	// 「上游首 token」，定位延迟卡在哪段。
+	UpstreamConnectMs int64 `json:"upstream_connect_ms"`
+	UpstreamUploadMs  int64 `json:"upstream_upload_ms"`
+	UpstreamTtfbMs    int64 `json:"upstream_ttfb_ms"`
+
 	// 终态字段（phase=done/error 时有效）。
 	StatusCode int    `json:"status_code,omitempty"`
 	ErrorMsg   string `json:"error_msg,omitempty"`
@@ -85,6 +91,16 @@ func LiveBegin(reqId string, entry LiveRequestEntry) {
 	entry.Phase = LivePhaseReceived
 	if entry.StartedAt == 0 {
 		entry.StartedAt = time.Now().Unix()
+	}
+	// 计时字段默认 -1（未采集），避免零值被当作「0ms」计入平均。
+	if entry.UpstreamConnectMs == 0 {
+		entry.UpstreamConnectMs = -1
+	}
+	if entry.UpstreamUploadMs == 0 {
+		entry.UpstreamUploadMs = -1
+	}
+	if entry.UpstreamTtfbMs == 0 {
+		entry.UpstreamTtfbMs = -1
 	}
 	liveRequests.mu.Lock()
 	defer liveRequests.mu.Unlock()
@@ -139,6 +155,15 @@ func LiveSetCompression(reqId string, originalBytes, compressedBytes int64, comp
 // LiveSetFirstResponse 记录首字/上游响应耗时（毫秒）。
 func LiveSetFirstResponse(reqId string, firstResponseMs int64) {
 	liveUpdate(reqId, func(e *LiveRequestEntry) { e.FirstResponseMs = firstResponseMs })
+}
+
+// LiveSetUpstreamTiming 记录延迟拆解：建连/上传/上游首字节耗时（毫秒）。
+func LiveSetUpstreamTiming(reqId string, connectMs, uploadMs, ttfbMs int64) {
+	liveUpdate(reqId, func(e *LiveRequestEntry) {
+		e.UpstreamConnectMs = connectMs
+		e.UpstreamUploadMs = uploadMs
+		e.UpstreamTtfbMs = ttfbMs
+	})
 }
 
 // LiveEnd 结束请求：移出进行中，进入最近完成窗口。
@@ -197,6 +222,10 @@ type LiveRequestsSnapshot struct {
 	AvgCompressionRatio float64 `json:"avg_compression_ratio"`
 	// AvgFirstResponseMs 进行中+最近完成请求的平均首字（毫秒，仅统计已有首字的）。
 	AvgFirstResponseMs int64 `json:"avg_first_response_ms"`
+	// AvgUploadMs / AvgUpstreamTtfbMs 平均上传耗时 / 平均上游首字节耗时（毫秒，
+	// 仅统计已采集到计时的请求）。用于区分「上传」与「上游」谁在拖慢首字。
+	AvgUploadMs       int64 `json:"avg_upload_ms"`
+	AvgUpstreamTtfbMs int64 `json:"avg_upstream_ttfb_ms"`
 }
 
 // GetLiveRequestsSnapshot 返回当前实时请求快照（含聚合）。
@@ -227,6 +256,8 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 
 	// 聚合：压缩率与平均首字（进行中 + 最近完成，避免只看到瞬时值）。
 	var frtSum, frtCount int64
+	var uploadSum, uploadCount int64
+	var ttfbSum, ttfbCount int64
 	accumulate := func(e *LiveRequestEntry) {
 		if e.Compressed && e.OriginalBytes > 0 {
 			snap.CompressedCount++
@@ -236,6 +267,14 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 		if e.FirstResponseMs > 0 {
 			frtSum += e.FirstResponseMs
 			frtCount++
+		}
+		if e.UpstreamUploadMs >= 0 {
+			uploadSum += e.UpstreamUploadMs
+			uploadCount++
+		}
+		if e.UpstreamTtfbMs >= 0 {
+			ttfbSum += e.UpstreamTtfbMs
+			ttfbCount++
 		}
 	}
 	for _, e := range snap.Active {
@@ -249,6 +288,12 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 	}
 	if frtCount > 0 {
 		snap.AvgFirstResponseMs = frtSum / frtCount
+	}
+	if uploadCount > 0 {
+		snap.AvgUploadMs = uploadSum / uploadCount
+	}
+	if ttfbCount > 0 {
+		snap.AvgUpstreamTtfbMs = ttfbSum / ttfbCount
 	}
 	return snap
 }

@@ -74,3 +74,23 @@ func TestLiveRequestTracker_UncompressedNotCountedInRatio(t *testing.T) {
 	assert.Equal(t, 0, snap.CompressedCount)
 	assert.EqualValues(t, 0, snap.AvgCompressionRatio, "未压缩请求不参与压缩率统计")
 }
+
+func TestLiveRequestTracker_UpstreamTimingAggregation(t *testing.T) {
+	ResetLiveRequestsForTest()
+	defer ResetLiveRequestsForTest()
+
+	LiveBegin("r1", LiveRequestEntry{Model: "m"})
+	LiveSetUpstreamTiming("r1", 120, 40, 800)
+	LiveBegin("r2", LiveRequestEntry{Model: "m"})
+	LiveSetUpstreamTiming("r2", 100, 60, 1200)
+
+	snap := GetLiveRequestsSnapshot()
+	// 平均上传 (40+60)/2 = 50；平均上游首字节 (800+1200)/2 = 1000
+	assert.EqualValues(t, 50, snap.AvgUploadMs)
+	assert.EqualValues(t, 1000, snap.AvgUpstreamTtfbMs)
+
+	// 未采集计时的请求（-1）不计入平均。
+	LiveBegin("r3", LiveRequestEntry{Model: "m"})
+	snap = GetLiveRequestsSnapshot()
+	assert.EqualValues(t, 50, snap.AvgUploadMs, "r3 无计时不应拉低平均")
+}

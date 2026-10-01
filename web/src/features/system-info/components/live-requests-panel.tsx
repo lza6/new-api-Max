@@ -157,6 +157,59 @@ function CompressionHint(props: { entry: LiveRequestEntry }) {
   )
 }
 
+function FirstTokenCell(props: { entry: LiveRequestEntry }) {
+  const { t } = useTranslation()
+  const { entry } = props
+  if (entry.first_response_ms <= 0) {
+    return <span className='text-muted-foreground tabular-nums'>—</span>
+  }
+  const hasSplit = entry.upstream_ttfb_ms >= 0
+  if (!hasSplit) {
+    return <span className='tabular-nums'>{formatDuration(entry.first_response_ms)}</span>
+  }
+  // 上传耗时（负值/未采集视为 0）与上游首字节耗时。
+  const uploadMs = Math.max(0, entry.upstream_upload_ms)
+  const ttfbMs = Math.max(0, entry.upstream_ttfb_ms)
+  const total = Math.max(1, uploadMs + ttfbMs)
+  const uploadPct = (uploadMs / total) * 100
+  return (
+    <TooltipProvider delay={100}>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <span className='inline-flex flex-col gap-0.5 tabular-nums'>
+              <span>{formatDuration(entry.first_response_ms)}</span>
+              {/* 分段条：上传（amber）vs 上游（blue） */}
+              <span className='bg-muted flex h-1 w-16 overflow-hidden rounded-full'>
+                <span className='bg-amber-500' style={{ width: `${uploadPct}%` }} />
+                <span className='bg-blue-500' style={{ width: `${100 - uploadPct}%` }} />
+              </span>
+            </span>
+          }
+        />
+        <TooltipContent className='max-w-60'>
+          <div className='space-y-1 text-xs'>
+            <div className='flex items-center justify-between gap-3'>
+              <span className='flex items-center gap-1.5'>
+                <span className='size-2 rounded-full bg-amber-500' aria-hidden='true' />
+                {t('Upload to upstream')}
+              </span>
+              <span className='font-mono'>{formatDuration(uploadMs)}</span>
+            </div>
+            <div className='flex items-center justify-between gap-3'>
+              <span className='flex items-center gap-1.5'>
+                <span className='size-2 rounded-full bg-blue-500' aria-hidden='true' />
+                {t('Upstream first token')}
+              </span>
+              <span className='font-mono'>{formatDuration(ttfbMs)}</span>
+            </div>
+          </div>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 function RequestRow(props: { entry: LiveRequestEntry }) {
   const { t } = useTranslation()
   const { entry } = props
@@ -195,8 +248,8 @@ function RequestRow(props: { entry: LiveRequestEntry }) {
           {phaseLabel}
         </Badge>
       </div>
-      <div className='text-muted-foreground tabular-nums'>
-        {entry.first_response_ms > 0 ? formatDuration(entry.first_response_ms) : '—'}
+      <div className='min-w-0'>
+        <FirstTokenCell entry={entry} />
       </div>
       <div className='text-right tabular-nums'>
         {formatDuration(entry.elapsed_ms)}
@@ -264,6 +317,14 @@ function LiveRequestsContent(props: { data: LiveRequestsData }) {
         <StatCard
           label={t('Avg first token')}
           value={data.avg_first_response_ms > 0 ? formatDuration(data.avg_first_response_ms) : '—'}
+          hint={
+            data.avg_upload_ms >= 0 || data.avg_upstream_ttfb_ms >= 0
+              ? t('upload {{upload}} · upstream {{upstream}}', {
+                  upload: formatDuration(Math.max(0, data.avg_upload_ms)),
+                  upstream: formatDuration(Math.max(0, data.avg_upstream_ttfb_ms)),
+                })
+              : undefined
+          }
         />
         <StatCard
           label={t('Network in')}

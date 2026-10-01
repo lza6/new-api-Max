@@ -95,6 +95,15 @@ type RelayInfo struct {
 	// OnFirstResponse 首字回调（controller 注入，实时请求详情用）。参数为
 	// 首字耗时毫秒。nil 时无副作用。放在此处以避免 relay/common → service 循环依赖。
 	OnFirstResponse func(firstResponseMs int64)
+
+	// 延迟拆解（httptrace 采集，毫秒；-1 表示该段未发生）。
+	// 用于实时面板区分「网关→上游上传耗时」与「上游首 token 耗时」，定位瓶颈。
+	UpstreamConnectMs int64 // 建连（含 TLS）耗时
+	UpstreamUploadMs  int64 // 请求体写入上游耗时（WroteRequest）
+	UpstreamTtfbMs    int64 // 上游响应头到达耗时（GotFirstResponseByte）
+	// OnUpstreamTiming 上游计时回调（controller 注入，实时面板用）。nil 无副作用。
+	OnUpstreamTiming func(connectMs, uploadMs, ttfbMs int64)
+
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool

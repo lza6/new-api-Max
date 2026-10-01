@@ -140,6 +140,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	relayInfo.OnFirstResponse = func(firstResponseMs int64) {
 		service.LiveSetFirstResponse(relayInfo.RequestId, firstResponseMs)
 	}
+	relayInfo.OnUpstreamTiming = func(connectMs, uploadMs, ttfbMs int64) {
+		service.LiveSetUpstreamTiming(relayInfo.RequestId, connectMs, uploadMs, ttfbMs)
+	}
 	defer func() {
 		statusCode := 200
 		errMsg := ""
