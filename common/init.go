@@ -121,6 +121,12 @@ func InitEnv() {
 	RelayResponseHeaderTimeout = GetEnvOrDefault("RELAY_RESPONSE_HEADER_TIMEOUT", 1800)
 	RelayMaxIdleConns = GetEnvOrDefault("RELAY_MAX_IDLE_CONNS", 500)
 	RelayMaxIdleConnsPerHost = GetEnvOrDefault("RELAY_MAX_IDLE_CONNS_PER_HOST", 100)
+	// 出站请求体压缩：默认允许（渠道级 opt-in 才真正生效），阈值默认 1MB。
+	// 关键背景：生产 5Mbps 上行是首字延迟根因——网关把大请求体完整上传上游时，
+	// 出口带宽被打满，frt 与 request_bytes 单调正相关（>20MB → 200s+）。
+	// gzip 请求体（上游已验证接受）可把 JSON 文本压缩到 ~1%，显著缩短上传时间。
+	RelayRequestCompressionEnabled = GetEnvOrDefaultBool("RELAY_REQUEST_COMPRESSION_ENABLED", true)
+	RelayRequestCompressionThresholdKB = GetEnvOrDefault("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB", 1024)
 	Relay429RetryDelayMs = GetEnvOrDefault("RELAY_429_RETRY_DELAY", 1000)
 	Relay429MaxRetries = GetEnvOrDefault("RELAY_429_MAX_RETRIES", 2)
 	LogFlushEnabled = os.Getenv("LOG_FLUSH_ENABLED") == "true"

@@ -6699,6 +6699,8 @@
     "Cost Detail": "Détail du coût",
     "Equivalent API cost": "Coût API équivalent",
     "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "La requête a expiré en attendant le service en amont. Réessayez ou passez au streaming.",
+    "Compress Request Body": "Compress Request Body",
+    "Gzip the upstream request body when it is large (>= 1MB). Only enable for upstreams that accept Content-Encoding: gzip.": "Compresse le corps de la requête (gzip) lorsqu’il est volumineux (>= 1 Mo). À activer uniquement pour les amonts acceptant Content-Encoding: gzip.",
     "Disable Stream First Token Timeout": "Disable Stream First Token Timeout",
     "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)",
     "Relay Timeout (seconds)": "Relay Timeout (seconds)",

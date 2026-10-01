@@ -326,6 +326,14 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, fmt.Errorf("get request url failed: %w", err)
 	}
 	logger.LogDebug(c, "fullRequestURL: %s", common.SanitizeURLForLog(fullRequestURL))
+	// [修复防御] 出站请求体压缩（渠道 opt-in）：大 JSON 请求体 gzip 后上传，
+	// 缩短 5Mbps 上行下的首字延迟（frt 与 request_bytes 单调正相关）。
+	// 返回 compressed=true 时必须在本次请求结束前 Close 存储，并设置
+	// Content-Encoding: gzip。fail-open：任何异常都退回明文，绝不拒绝请求。
+	requestBody, compressed, compressionCloser, _ := common.MaybeCompressOutboundBody(c, info, requestBody)
+	if compressionCloser != nil {
+		defer compressionCloser.Close()
+	}
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
 		return nil, fmt.Errorf("new request failed: %w", err)
@@ -343,6 +351,11 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		return nil, err
 	}
 	applyHeaderOverrideToRequest(req, headerOverride)
+	// [修复防御] 压缩后必须标记 Content-Encoding，且置于 header override 之后：
+	// 编码必须与实际 body 一致，不能被 override 改写成错误值导致上游解析失败。
+	if compressed {
+		req.Header.Set("Content-Encoding", "gzip")
+	}
 	resp, err := doRequest(c, req, info)
 	if err != nil {
 		return nil, fmt.Errorf("do request failed: %w", err)

@@ -184,6 +184,17 @@ var RelayResponseHeaderTimeout int // unit is second
 var RelayMaxIdleConns int
 var RelayMaxIdleConnsPerHost int
 
+// RelayRequestCompressionEnabled 出站请求体压缩总开关（默认 true=允许，作为
+// 运维 kill-switch）。置 false 时任何渠道都不压缩，行为与压缩功能上线前一致。
+// 真正生效还需渠道级 setting.request_compression=true（默认关）。
+// 声明即给默认 true：InitEnv 会覆盖它，而测试/未跑 InitEnv 的路径拿到与生产
+// 一致的默认值。
+var RelayRequestCompressionEnabled = true
+
+// RelayRequestCompressionThresholdKB 出站请求体压缩阈值（KB，默认 1024=1MB）。
+// 请求体小于该值时压缩收益不足以覆盖 CPU 开销，直接明文转发。
+var RelayRequestCompressionThresholdKB = 1024
+
 // Relay429RetryDelayMs 429 有界退避等待毫秒数（默认 1000 = 1s）。
 var Relay429RetryDelayMs int
 

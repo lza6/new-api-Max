@@ -6699,6 +6699,8 @@
     "Cost Detail": "Детализация стоимости",
     "Equivalent API cost": "Эквивалентная стоимость API",
     "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "Время ожидания вышестоящего сервиса истекло. Повторите попытку или используйте потоковый режим.",
+    "Compress Request Body": "Compress Request Body",
+    "Gzip the upstream request body when it is large (>= 1MB). Only enable for upstreams that accept Content-Encoding: gzip.": "Сжимает тело запроса (gzip) при большом размере (>= 1 МБ). Включайте только для апстримов, принимающих Content-Encoding: gzip.",
     "Disable Stream First Token Timeout": "Disable Stream First Token Timeout",
     "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)",
     "Relay Timeout (seconds)": "Relay Timeout (seconds)",

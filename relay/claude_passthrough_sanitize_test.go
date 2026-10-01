@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/lza6/new-api-Max/common"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	relayconstant "github.com/lza6/new-api-Max/relay/constant"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -93,4 +94,45 @@ func TestSanitizeOpenAIPassThroughReasoningEffort(t *testing.T) {
 			t.Errorf("body %q: got %q, want %q", tc.body, got, tc.wantJSON)
 		}
 	}
+}
+
+// 大 prompt 透传优化：无 reasoning_effort 键时应快速跳过整体解析。
+func TestReplayableContainsReasoningEffortKey(t *testing.T) {
+	t.Parallel()
+	cases := []struct {
+		name string
+		body string
+		want bool
+	}{
+		{"absent", `{"model":"m","messages":[{"role":"user","content":"` + strings.Repeat("x", 500) + `"}]}`, false},
+		{"snake", `{"model":"m","reasoning_effort":"high"}`, true},
+		{"camel", `{"model":"m","ReasoningEffort":"high"}`, true},
+		{"keyAcrossChunkBoundary", `{"model":"m","x":"` + strings.Repeat("a", 29) + `reasoning_effort":"low"}`, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			body, closer, err := relaycommon.NewOutboundJSONBody([]byte(tc.body))
+			require.NoError(t, err)
+			defer closer.Close()
+			got, err := replayableContainsReasoningEffortKey(body)
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+// 无 reasoning_effort 的大 body 透传时不得改变字节（快速路径原样返回）。
+func TestSanitizeOpenAIPassThroughReasoningEffort_FastPathUnchanged(t *testing.T) {
+	t.Parallel()
+	payload := `{"model":"m","messages":[{"role":"user","content":"` + strings.Repeat("hello world ", 1000) + `"}]}`
+	body, closer, err := relaycommon.NewOutboundJSONBody([]byte(payload))
+	require.NoError(t, err)
+	defer closer.Close()
+
+	out := sanitizeOpenAIPassThroughReasoningEffort(body, relayconstant.RelayModeChatCompletions)
+	assert.True(t, out == body, "无关键时须原样返回同一 body，不做解析/重序列化")
+
+	raw, err := io.ReadAll(out)
+	require.NoError(t, err)
+	assert.Equal(t, payload, string(raw))
 }

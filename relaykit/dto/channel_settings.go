@@ -34,6 +34,12 @@ type ChannelSettings struct {
 	// HTTP2ConnectionShards spreads HTTP/2 traffic across N independent transports
 	// (1-8). Zero/unset means 1. Ignored when HTTPProtocol is "http1".
 	HTTP2ConnectionShards int `json:"http2_connection_shards,omitempty"`
+	// RequestCompression 渠道级出站请求体 gzip 压缩（默认关，opt-in）。
+	// 开启后，网关把 ≥ 阈值的上游请求体 gzip 压缩后再发送（Content-Encoding:
+	// gzip），仅当上游接受时有效——不接受的渠道保持明文，避免 400。
+	// 动机：5Mbps 上行下大 prompt 上传时间主导首字延迟（frt 与 request_bytes
+	// 单调正相关）。仅对可识别为 JSON 的请求体生效，压缩后仍大于原文时自动放弃。
+	RequestCompression bool `json:"request_compression,omitempty"`
 }
 
 const (

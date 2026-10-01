@@ -264,6 +264,7 @@ export const channelFormSchema = z
     http_protocol: z.enum(['auto', 'http1']).optional(),
     http2_connection_shards: z.number().int().optional(),
     pass_through_body_enabled: z.boolean().optional(),
+    request_compression: z.boolean().optional(),
     disable_stream_first_token_timeout: z.boolean().optional(),
     relay_timeout_seconds: z
       .number()
@@ -452,6 +453,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   http_protocol: HTTP_PROTOCOL_AUTO,
   http2_connection_shards: 1,
   pass_through_body_enabled: false,
+  request_compression: false,
   disable_stream_first_token_timeout: false,
   relay_timeout_seconds: undefined,
   system_prompt: '',
@@ -495,6 +497,7 @@ export function transformChannelToFormDefaults(
     http_protocol: HTTP_PROTOCOL_AUTO as 'auto' | 'http1',
     http2_connection_shards: 1,
     pass_through_body_enabled: false,
+    request_compression: false,
     disable_stream_first_token_timeout: false,
     relay_timeout_seconds: undefined,
     system_prompt: '',
@@ -516,6 +519,7 @@ export function transformChannelToFormDefaults(
         http_protocol: protocol,
         http2_connection_shards: protocol === HTTP_PROTOCOL_HTTP1 ? 1 : shards,
         pass_through_body_enabled: parsed.pass_through_body_enabled || false,
+        request_compression: parsed.request_compression || false,
         disable_stream_first_token_timeout:
           parsed.disable_stream_first_token_timeout || false,
         relay_timeout_seconds:
@@ -643,6 +647,7 @@ export function buildSettingJSON(formData: ChannelFormValues): string {
     thinking_to_content: formData.thinking_to_content || false,
     proxy: formData.proxy?.trim() || '',
     pass_through_body_enabled: formData.pass_through_body_enabled || false,
+    request_compression: formData.request_compression || false,
     disable_stream_first_token_timeout:
       formData.disable_stream_first_token_timeout || false,
     system_prompt: formData.system_prompt || '',

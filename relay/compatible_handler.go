@@ -1,6 +1,7 @@
 package relay
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net/http"
@@ -227,9 +228,22 @@ func sanitizeOpenAIPassThroughReasoningEffort(body io.Reader, relayMode int) io.
 	if relayMode != relayconstant.RelayModeChatCompletions {
 		return body
 	}
+	// [性能] 大 prompt 透传优化：绝大多数请求体不含 reasoning_effort。先做
+	// 流式探测（可回放 body 无需整体入内存），不含键时**原样返回**——既不
+	// ReadAll 几十 MB，也不 Unmarshal 成 map 再 Marshal 回来。语义与「解析后
+	// 发现无键」完全一致（不改变任何字段）。
+	if replayable, ok := body.(common.ReplayableBody); ok {
+		hasKey, scanErr := replayableContainsReasoningEffortKey(replayable)
+		if scanErr == nil && !hasKey {
+			return body
+		}
+	}
 	raw, err := io.ReadAll(body)
 	if err != nil {
 		return body
+	}
+	if !bytesContainsReasoningEffortKey(raw) {
+		return newBytesReader(raw)
 	}
 	var obj map[string]any
 	if err := common.Unmarshal(raw, &obj); err != nil || obj == nil {
@@ -289,4 +303,54 @@ func sanitizeOpenAIPassThroughReasoningEffort(body io.Reader, relayMode int) io.
 		return newBytesReader(raw)
 	}
 	return newBytesReader(cleaned)
+}
+
+// bytesContainsReasoningEffortKey 字节级探测请求体是否可能含 reasoning_effort
+// 键（大小写两种拼写）。仅用于「快速跳过无关键的大 body」，因此只需无假阴性：
+// 命中任何候选拼写即返回 true（宁可多走一次解析，也不能漏掉真实键）。
+func bytesContainsReasoningEffortKey(raw []byte) bool {
+	return bytes.Contains(raw, []byte("reasoning_effort")) ||
+		bytes.Contains(raw, []byte("ReasoningEffort"))
+}
+
+// replayableContainsReasoningEffortKey 流式探测可回放请求体是否含 reasoning_effort
+// 键，全程只持有固定大小窗口，不把大 body 整体读入内存。使用独立 reader，
+// 不扰动原 body 的游标。扫描失败返回 error，调用方回退到常规路径。
+func replayableContainsReasoningEffortKey(body common.ReplayableBody) (bool, error) {
+	reader, err := body.NewReader()
+	if err != nil {
+		return false, err
+	}
+	defer reader.Close()
+
+	// 键最长 16 字节（"ReasoningEffort"），窗口留 2 倍余量避免跨块边界漏配。
+	const window = 32
+	needleLower := []byte("reasoning_effort")
+	needleUpper := []byte("ReasoningEffort")
+	carry := make([]byte, 0, window)
+	chunk := make([]byte, window)
+
+	for {
+		n, readErr := reader.Read(chunk)
+		if n > 0 {
+			// 拼上一块的尾部窗口，避免键被块边界截断而漏配。
+			windowBytes := make([]byte, 0, len(carry)+n)
+			windowBytes = append(windowBytes, carry...)
+			windowBytes = append(windowBytes, chunk[:n]...)
+			if bytes.Contains(windowBytes, needleLower) || bytes.Contains(windowBytes, needleUpper) {
+				return true, nil
+			}
+			if len(windowBytes) > window {
+				carry = append(carry[:0], windowBytes[len(windowBytes)-window:]...)
+			} else {
+				carry = append(carry[:0], windowBytes...)
+			}
+		}
+		if readErr != nil {
+			if errors.Is(readErr, io.EOF) {
+				return false, nil
+			}
+			return false, readErr
+		}
+	}
 }

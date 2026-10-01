@@ -6699,6 +6699,8 @@
     "Cost Detail": "费用明细",
     "Equivalent API cost": "等价 API 成本",
     "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "请求等待上游服务超时。请重试或改用流式请求。",
+    "Compress Request Body": "压缩请求体",
+    "Gzip the upstream request body when it is large (>= 1MB). Only enable for upstreams that accept Content-Encoding: gzip.": "请求体较大（≥1MB）时用 gzip 压缩后再发往上游。仅对接受 Content-Encoding: gzip 的上游开启。",
     "Disable Stream First Token Timeout": "关闭流式首包超时",
     "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "上游首包较慢时不判定渠道失败，由上游决定返回时机（透传）",
     "Relay Timeout (seconds)": "中继超时（秒）",

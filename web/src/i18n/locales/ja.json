@@ -6699,6 +6699,8 @@
     "Cost Detail": "コスト詳細",
     "Equivalent API cost": "API 相当コスト",
     "The request timed out waiting for the upstream service. Please try again or switch to streaming.": "アップストリームの応答待ちがタイムアウトしました。再試行するかストリーミングに切り替えてください。",
+    "Compress Request Body": "リクエストボディを圧縮",
+    "Gzip the upstream request body when it is large (>= 1MB). Only enable for upstreams that accept Content-Encoding: gzip.": "リクエストボディが大きい場合（1MB 以上）に gzip 圧縮して上流へ送信します。Content-Encoding: gzip を受け付ける上流のみ有効にしてください。",
     "Disable Stream First Token Timeout": "Disable Stream First Token Timeout",
     "Do not fail a stream when the first token is slow; let upstream decide (passthrough)": "Do not fail a stream when the first token is slow; let upstream decide (passthrough)",
     "Relay Timeout (seconds)": "Relay Timeout (seconds)",
