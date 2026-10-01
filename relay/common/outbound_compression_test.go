@@ -54,7 +54,7 @@ func TestMaybeCompressOutboundBody_Disabled(t *testing.T) {
 func TestMaybeCompressOutboundBody_CompressesLargeJSON(t *testing.T) {
 	t.Parallel()
 	payload := []byte(`{"model":"m","messages":[{"role":"user","content":"` + strings.Repeat("hello world ", 200000) + `"}]}`)
-	require.Greater(t, len(payload), 1<<20, "fixture must exceed the 1MB threshold")
+	require.Greater(t, len(payload), 256<<10, "fixture must exceed the 256KB default threshold")
 
 	body, closer, err := NewOutboundJSONBody(payload)
 	require.NoError(t, err)
@@ -234,4 +234,28 @@ func TestMaybeCompressOutboundBody_NonReplayableUncompressedReturnsReplayableRea
 	got, err := io.ReadAll(out)
 	require.NoError(t, err)
 	assert.Equal(t, payload, got)
+}
+
+// 300KB 请求在 256KB 默认阈值下应被压缩（此前 1MB 阈值会跳过）。
+func TestMaybeCompressOutboundBody_300KBCompressedAtNewThreshold(t *testing.T) {
+	// 不 t.Parallel：读取全局阈值默认值。
+	assert.Equal(t, 256, common.RelayRequestCompressionThresholdKB, "默认阈值应为 256KB")
+
+	payload := []byte(`{"model":"m","messages":[{"role":"user","content":"` + strings.Repeat("hello world ", 25000) + `"}]}`)
+	require.Greater(t, len(payload), 256<<10)
+	require.Less(t, len(payload), 1<<20, "fixture 应落在 256KB-1MB 区间")
+
+	body, closer, err := NewOutboundJSONBody(payload)
+	require.NoError(t, err)
+	defer closer.Close()
+
+	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	require.NotNil(t, out)
+	if outCloser != nil {
+		defer outCloser.Close()
+	}
+	assert.True(t, compressed, "300KB 请求在 256KB 阈值下应被压缩")
+	got, err := io.ReadAll(out)
+	require.NoError(t, err)
+	assert.Equal(t, payload, gzipDecompress(t, got))
 }

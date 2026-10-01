@@ -191,9 +191,11 @@ var RelayMaxIdleConnsPerHost int
 // 一致的默认值。
 var RelayRequestCompressionEnabled = true
 
-// RelayRequestCompressionThresholdKB 出站请求体压缩阈值（KB，默认 1024=1MB）。
+// RelayRequestCompressionThresholdKB 出站请求体压缩阈值（KB，默认 256=256KB）。
 // 请求体小于该值时压缩收益不足以覆盖 CPU 开销，直接明文转发。
-var RelayRequestCompressionThresholdKB = 1024
+// 256KB 是实测权衡：生产 300K-1MB 请求占比约 50%、平均首字 7.5s，是用户可感知
+// 的延迟区间；256KB 的 BestSpeed 压缩仅约 44ms，远小于收益。
+var RelayRequestCompressionThresholdKB = 256
 
 // Relay429RetryDelayMs 429 有界退避等待毫秒数（默认 1000 = 1s）。
 var Relay429RetryDelayMs int

@@ -126,7 +126,7 @@ func InitEnv() {
 	// 出口带宽被打满，frt 与 request_bytes 单调正相关（>20MB → 200s+）。
 	// gzip 请求体（上游已验证接受）可把 JSON 文本压缩到 ~1%，显著缩短上传时间。
 	RelayRequestCompressionEnabled = GetEnvOrDefaultBool("RELAY_REQUEST_COMPRESSION_ENABLED", true)
-	RelayRequestCompressionThresholdKB = GetEnvOrDefault("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB", 1024)
+	RelayRequestCompressionThresholdKB = GetEnvOrDefault("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB", 256)
 	Relay429RetryDelayMs = GetEnvOrDefault("RELAY_429_RETRY_DELAY", 1000)
 	Relay429MaxRetries = GetEnvOrDefault("RELAY_429_MAX_RETRIES", 2)
 	LogFlushEnabled = os.Getenv("LOG_FLUSH_ENABLED") == "true"

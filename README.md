@@ -354,7 +354,7 @@ docker run --name new-api -d --restart always \
 | `RELAY_RESPONSE_HEADER_TIMEOUT` | How long the relay waits for upstream **response headers**, seconds; set `0` to disable. Only bounds the header wait -- streaming after the headers arrive is unaffected. Note that non-streaming upstreams usually send headers only once generation finishes, so leave headroom | `1800` |
 | `STREAMING_TIMEOUT` | Streaming timeout (seconds) | `300` |
 | `RELAY_REQUEST_COMPRESSION_ENABLED` | Global kill-switch for outbound request-body compression. When `true`, channels with `setting.request_compression=true` gzip the upstream request body (≥ threshold). Useful when upstream upload bandwidth is the first-token bottleneck | `true` |
-| `RELAY_REQUEST_COMPRESSION_THRESHOLD_KB` | Request-body size (KB) below which compression is skipped (not worth the CPU) | `1024` |
+| `RELAY_REQUEST_COMPRESSION_THRESHOLD_KB` | Request-body size (KB) below which compression is skipped (not worth the CPU). 256KB covers the common 300KB–1MB prompt range at ~44ms CPU cost | `256` |
 | `STREAM_SCANNER_MAX_BUFFER_MB` | Max per-line buffer (MB) for the stream scanner; increase when upstream sends huge image/base64 payloads | `64` |
 | `MAX_REQUEST_BODY_MB` | Max request body size (MB, counted **after decompression**; prevents huge requests/zip bombs from exhausting memory). Exceeding it returns `413` | `32` |
 | `AZURE_DEFAULT_API_VERSION` | Azure API version | `2025-04-01-preview` |
