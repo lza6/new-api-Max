@@ -1,0 +1,25 @@
+{
+  "version": "v1.3.70",
+  "deployed_at": "2026-10-01T22:33:31+08:00",
+  "deploy_method": "deploy-zero-downtime.sh (blue-green)",
+  "upstream_port": 3001,
+  "external_check": "15/15 = 200",
+  "errors_500": 0,
+  "memory_available_mb": 944,
+  "feature": "latency breakdown (upload vs upstream prefill) via httptrace",
+  "local_e2e_breakdown": {
+    "request": "1.8MB prompt, stream",
+    "connect_ms": 6,
+    "upload_ms": 692,
+    "upstream_ttfb_ms": 5874,
+    "first_response_ms": 7250,
+    "elapsed_ms": 7448,
+    "interpretation": "81% of first-token latency is upstream prefill; upload is only 9.5%"
+  },
+  "production_compression_5min": {
+    "total_compressions": 31,
+    "under_1MB": 31,
+    "note": "all 31 compressed requests are <1MB — the 256KB threshold now covers the 300KB-1MB range that was previously skipped"
+  },
+  "endpoint": "GET /api/system-info/live-requests (RootAuth, 401 unauthenticated)"
+}
