@@ -1,0 +1,35 @@
+{
+  "version": "v1.3.69",
+  "deployed_at": "2026-10-01T22:33:52+08:00",
+  "deploy_method": "deploy-zero-downtime.sh (blue-green)",
+  "upstream_port": 3000,
+  "external_check": "15/15 = 200",
+  "errors_500_related_to_change": 0,
+  "memory_available_mb": 970,
+  "features": [
+    "live request detail panel (system-info page)",
+    "outbound compression threshold 1MB -> 256KB"
+  ],
+  "live_requests_api": {
+    "endpoint": "GET /api/system-info/live-requests",
+    "auth": "RootAuth",
+    "unauthenticated_status": 401,
+    "local_e2e": {
+      "in_progress": "phase=upstream orig=1800103 comp=11285 compressed=true elapsed=3710ms",
+      "finished": "phase=done status=200 frt=8766ms compressed=true ratio=0.6%"
+    }
+  },
+  "compression_threshold_change": {
+    "before_kb": 1024,
+    "after_kb": 256,
+    "evidence": "347106B request -> 178502B (51.4%); 271999B -> 106285B (39.1%); 471197B -> 141642B (30.1%)",
+    "production_coverage_1h_before": "286/572 (50%) requests in 300KB-1MB were UNcompressed at 1MB threshold"
+  },
+  "production_frt_by_body_bucket_5min": {
+    "lt256k": {"n": 61, "avg_frt_s": 3.6},
+    "256k-1MB": {"n": 43, "avg_frt_s": 4.4},
+    "1-5MB": {"n": 11, "avg_frt_s": 10.2},
+    "gt5MB": {"n": 10, "avg_frt_s": 36.7}
+  },
+  "root_cause_finding": "Latency is dominated by UPSTREAM PREFILL, not our upload bandwidth. Direct-to-upstream first-real-token: 30KB->3.1s, 100KB->3.4s, 300KB->8.5s, 800KB->21.8s. 2MB body upload takes only 0.36s. Compression helps upload but cannot reduce upstream prefill."
+}
