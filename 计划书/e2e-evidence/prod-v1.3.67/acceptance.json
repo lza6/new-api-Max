@@ -1,0 +1,26 @@
+{
+  "tag": "v1.3.67",
+  "deployedAt": "2026-10-01T12:47:00+08:00",
+  "method": "deploy-zero-downtime.sh (蓝绿，零停机)",
+  "upstreamPortAfterDeploy": 3000,
+  "changes": [
+    "优雅退出排空日志队列（main.go StopConsumeLogFlusher）",
+    "consume_log_flusher worker 单批落库 recover 防御（panic 只丢该批次）",
+    "distributor.no_available_channel 文案补模型名引导（en/zh-CN/zh-TW）"
+  ],
+  "configChange": {
+    "file": "/opt/new-api/.env",
+    "added": "LOG_FLUSH_ENABLED=true",
+    "backup": ".env.bak-<timestamp>",
+    "effect": "消费日志异步批量落库，把每请求一次 INSERT 移出请求收尾路径"
+  },
+  "checks": {
+    "version_header": "x-new-api-version: v1.3.67",
+    "external_status_30x": "30/30 = 200",
+    "container": "new-api (new-api:v1.3.67) Up healthy",
+    "async_log_enabled_in_container": "LOG_FLUSH_ENABLED=true",
+    "logs_persisted_last_5min": 112,
+    "flusher_warnings": "none (no queue-full / no batch failure)",
+    "post_deploy_500_count": 0
+  }
+}
