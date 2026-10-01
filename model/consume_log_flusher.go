@@ -2,6 +2,7 @@ package model
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -77,15 +78,14 @@ func consumeLogFlusherLoop(ctx context.Context) {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	var pending []*Log
+	// flush 落库当前批次；失败先整批重试一次，仍失败逐行回退（坏行丢弃并告警，
+	// 好行保住，计费日志不丢），绝不 panic/crash。
 	flush := func() {
 		if len(pending) == 0 {
 			return
 		}
 		batch := pending
 		pending = nil
-		// P1-2 失败语义：批写失败先整批重试一次（瞬时错误）；仍失败则
-		// 逐行回退——坏行丢弃并告警，好行保住（计费日志不丢），绝不
-		// panic/crash。
 		if err := LOG_DB.CreateInBatches(batch, 200).Error; err != nil {
 			consumeFlushMetrics.Retries.Add(1)
 			if retryErr := LOG_DB.CreateInBatches(batch, 200).Error; retryErr != nil {
@@ -105,20 +105,46 @@ func consumeLogFlusherLoop(ctx context.Context) {
 		}
 		consumeFlushMetrics.LastBatchSize.Store(int64(len(batch)))
 	}
+	// safeFlush 把单批落库包进 recover：worker 是长生命周期单例，任何意外 panic
+	// 若任其传播会静默杀死落库协程（此后只走「队列满同步兜底」而失去异步收益且
+	// 无信号）。改为记录根因、丢弃该批次、循环继续消费队列。
+	safeFlush := func() {
+		defer func() {
+			if r := recover(); r != nil {
+				consumeFlushMetrics.Failures.Add(1)
+				common.SysError("consume log flush panic (batch dropped, loop continues): " + anyToString(r))
+			}
+		}()
+		flush()
+	}
 	for {
 		select {
 		case <-ctx.Done():
-			flush()
+			safeFlush()
 			return
 		case log := <-consumeLogQueue:
 			pending = append(pending, log)
 			consumeFlushMetrics.QueueDepth.Store(int64(len(consumeLogQueue)))
 			if len(pending) >= batchSize {
-				flush()
+				safeFlush()
 			}
 		case <-ticker.C:
-			flush()
+			safeFlush()
 		}
+	}
+}
+
+// anyToString 把 recover 到的任意值安全转成字符串（nil / string / error 均可）。
+func anyToString(v any) string {
+	switch t := v.(type) {
+	case nil:
+		return "<nil>"
+	case string:
+		return t
+	case error:
+		return t.Error()
+	default:
+		return fmt.Sprintf("%v", t)
 	}
 }
 

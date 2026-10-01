@@ -249,6 +249,10 @@ func main() {
 		common.SysError(fmt.Sprintf("server forced to shutdown: %v", err))
 	}
 	// http.Server.Shutdown 已关闭空闲连接；此处无需再 CloseIdleConnections。
+	// 停止异步消费日志 worker 并排空队列，避免优雅退出丢失已入队但未落库的日志。
+	// （docker rm -f 走 SIGKILL 时仍可能丢一个批次，属已文档化的权衡。）
+	model.StopConsumeLogFlusher()
+
 	// 内存中的看板数据保存入库，避免重启丢失未落库数据 (issue #5679)
 	if common.DataExportEnabled {
 		model.SaveQuotaDataCache()
