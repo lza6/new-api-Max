@@ -371,9 +371,10 @@ func AdminUpdateSubscriptionPlanStatus(c *gin.Context) {
 	common.ApiSuccess(c, nil)
 }
 
-// AdminDeleteSubscriptionPlan 删除一个订阅套餐。当仍有用户订阅引用该套餐时
-// 拒绝删除（需先删除/作废这些订阅），避免静默降级或产生悬空引用。历史订单与
-// 兑换码保留各自 plan_id 作为存档，不受影响。
+// AdminDeleteSubscriptionPlan 删除一个订阅套餐。
+// 产品语义（2026-10-01）：套餐被用户订阅引用时**仍允许删除**，且绝不静默
+// 剥夺订阅——受影响用户的活跃订阅转为永久（end_time=-1），套餐行删除；
+// 订阅订单/兑换码保留 plan_id 作为历史存证。
 func AdminDeleteSubscriptionPlan(c *gin.Context) {
 	if !requirePaymentCompliance(c) {
 		return
@@ -383,7 +384,8 @@ func AdminDeleteSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "无效的ID")
 		return
 	}
-	if err := model.AdminDeleteSubscriptionPlan(id); err != nil {
+	affectedUserIds, err := model.AdminDeleteSubscriptionPlan(id)
+	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			common.ApiErrorMsg(c, "套餐不存在")
 			return
@@ -392,7 +394,10 @@ func AdminDeleteSubscriptionPlan(c *gin.Context) {
 		return
 	}
 	model.InvalidateSubscriptionPlanCache(id)
-	common.ApiSuccess(c, nil)
+	common.ApiSuccess(c, gin.H{
+		"deleted":           true,
+		"affected_user_ids": affectedUserIds,
+	})
 }
 
 type AdminBindSubscriptionRequest struct {

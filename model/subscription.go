@@ -1102,33 +1102,67 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 	return "", nil
 }
 
-// AdminDeleteSubscriptionPlan hard-deletes a subscription plan. Deletion is
-// refused while any user subscription still references the plan (regardless of
-// status) so we never orphan or silently downgrade live subscriptions; the
-// administrator must remove or invalidate those first. Historical
-// subscription_orders and redemption codes KEEP their plan_id as a durable
-// record and are intentionally not touched.
-func AdminDeleteSubscriptionPlan(planId int) error {
+// AdminDeleteSubscriptionPlan hard-deletes a subscription plan. Per product
+// decision (2026-10-01): plans referenced by history MAY be deleted, and the
+// deletion must NOT strip or extend anyone's entitlement. Semantics:
+//   - existing subscriptions KEEP their plan_id and their original end_time —
+//     they continue to bill / rate-limit / gate exactly as before (an
+//     unexpired sub is honoured until it naturally expires; nothing becomes
+//     perpetual, nothing is silently revoked);
+//   - the plan's config is snapshotted into subscription_plan_grant so
+//     GetPlanForSubscription can still resolve billing/limiter config after the
+//     plan row is gone;
+//   - the plan row is then removed so the management list can move on.
+// subscription_orders / redemption codes keep their plan_id as history.
+func AdminDeleteSubscriptionPlan(planId int) (affectedUserIds []int, err error) {
 	if planId <= 0 {
-		return errors.New("invalid planId")
+		return nil, errors.New("invalid planId")
 	}
-	return DB.Transaction(func(tx *gorm.DB) error {
-		var count int64
-		if err := tx.Model(&UserSubscription{}).Where("plan_id = ?", planId).Count(&count).Error; err != nil {
+	err = DB.Transaction(func(tx *gorm.DB) error {
+		var plan SubscriptionPlan
+		if err := tx.Where("id = ?", planId).First(&plan).Error; err != nil {
 			return err
 		}
-		if count > 0 {
-			return fmt.Errorf("该套餐下仍有 %d 条订阅记录，请先删除或作废这些订阅", count)
+		plan.NormalizeDefaults()
+
+		var usersWithSubs []int
+		if err := tx.Model(&UserSubscription{}).Select("DISTINCT user_id").
+			Where("plan_id = ?", planId).Pluck("user_id", &usersWithSubs).Error; err != nil {
+			return err
 		}
+
+		// 存套餐配置快照：删行后计费/限流/访问判定仍能工作（订阅按各自 end_time
+		// 自然结束，权益不延长也不剥夺）。
+		payload, mErr := common.Marshal(plan)
+		if mErr != nil {
+			return mErr
+		}
+		if err := tx.Where("plan_id = ?", planId).Delete(&SubscriptionPlanGrant{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Create(&SubscriptionPlanGrant{
+			PlanId:      planId,
+			Title:       plan.Title,
+			Subtitle:    plan.Subtitle,
+			TotalAmount: plan.TotalAmount,
+			Payload:     string(payload),
+		}).Error; err != nil {
+			return err
+		}
+
 		res := tx.Where("id = ?", planId).Delete(&SubscriptionPlan{})
 		if res.Error != nil {
 			return res.Error
 		}
-		if res.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
+
+		// 受影响用户的缓存刷新（订阅本身的 plan_id/end_time 原样保留）。
+		affectedUserIds = usersWithSubs
+		for _, uid := range usersWithSubs {
+			InvalidateActiveSubscriptionCache(uid)
 		}
 		return nil
 	})
+	return affectedUserIds, err
 }
 
 func resetUserSubscriptionTx(tx *gorm.DB, sub *UserSubscription, plan *SubscriptionPlan, now int64, advanceResetTime bool) error {
@@ -1653,6 +1687,46 @@ type SubscriptionPlanInfo struct {
 	PlanTitle string
 }
 
+// SubscriptionPlanGrant 是 AdminDeleteSubscriptionPlan 删除套餐时，为受影响
+// 活跃订阅保存的套餐配置快照（plan_id 已删除，后续计费/限流/访问判定靠它
+// 继续工作；订阅永久化，绝不因删除套餐而剥夺权益）。一张订阅一行。
+type SubscriptionPlanGrant struct {
+	Id        int    `json:"id" gorm:"primaryKey"`
+	PlanId    int    `json:"plan_id" gorm:"index"`
+	Title     string `json:"title"`
+	Subtitle  string `json:"subtitle"`
+	TotalAmount int64 `json:"total_amount"`
+	// 完整序列化套餐配置（含 Models/UpgradeGroup/DowngradeGroup/档位/重置周期）。
+	Payload string `json:"payload" gorm:"type:text"`
+}
+
+// GetPlanForSubscription 返回订阅「实际生效」的套餐：套餐行仍在则正常读取；
+// 该订阅的套餐已被删除时，回落到删除时保存的配置快照（subscription_plan_grant），
+// 保证计费/限流/访问判定在删套餐后继续工作（订阅按原 end_time 自然结束）。
+func GetPlanForSubscription(sub *UserSubscription) (*SubscriptionPlan, error) {
+	if sub == nil {
+		return nil, errors.New("nil subscription")
+	}
+	plan, err := GetSubscriptionPlanById(sub.PlanId)
+	if err == nil && plan != nil {
+		return plan, nil
+	}
+	// 套餐行已删除：回落删除时保存的配置快照。
+	var grant SubscriptionPlanGrant
+	if gErr := DB.Where("plan_id = ?", sub.PlanId).First(&grant).Error; gErr != nil {
+		if err != nil {
+			return nil, err
+		}
+		return nil, gErr
+	}
+	var snap SubscriptionPlan
+	if uErr := common.UnmarshalJsonStr(grant.Payload, &snap); uErr != nil {
+		return nil, uErr
+	}
+	snap.NormalizeDefaults()
+	return &snap, nil
+}
+
 func GetSubscriptionPlanInfoByUserSubscriptionId(userSubscriptionId int) (*SubscriptionPlanInfo, error) {
 	if userSubscriptionId <= 0 {
 		return nil, errors.New("invalid userSubscriptionId")
@@ -1665,7 +1739,7 @@ func GetSubscriptionPlanInfoByUserSubscriptionId(userSubscriptionId int) (*Subsc
 	if err := DB.Where("id = ?", userSubscriptionId).First(&sub).Error; err != nil {
 		return nil, err
 	}
-	plan, err := getSubscriptionPlanByIdTx(nil, sub.PlanId)
+	plan, err := GetPlanForSubscription(&sub)
 	if err != nil {
 		return nil, err
 	}

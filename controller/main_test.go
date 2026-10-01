@@ -52,6 +52,7 @@ func TestMain(m *testing.M) {
 		&model.PrefillGroup{}, &model.Setup{}, &model.TwoFA{}, &model.TwoFABackupCode{},
 		&model.Checkin{}, &model.SubscriptionPlan{}, &model.SubscriptionOrder{},
 		&model.UserSubscription{}, &model.SubscriptionPreConsumeRecord{},
+		&model.SubscriptionPlanGrant{},
 		&model.CustomOAuthProvider{}, &model.UserOAuthBinding{}, &model.PerfMetric{},
 		&model.SystemInstance{}, &model.SystemTask{}, &model.SystemTaskLock{},
 		&model.CasbinRule{}, &model.AuthzRole{}, &model.BannedIP{},

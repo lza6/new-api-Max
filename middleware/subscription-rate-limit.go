@@ -98,7 +98,7 @@ func resolveFromSubscriptionSummaries(subs []model.SubscriptionSummary) (concurr
 	if sub == nil {
 		return 0, 0, false
 	}
-	plan, err := model.GetSubscriptionPlanById(sub.PlanId)
+	plan, err := model.GetPlanForSubscription(sub)
 	if err != nil || plan == nil {
 		return 0, 0, false
 	}

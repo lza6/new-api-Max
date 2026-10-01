@@ -83,7 +83,7 @@ func CheckSubscriptionModelAccess(userId int, modelName string) (bool, string, e
 	if sub == nil {
 		return true, "", nil
 	}
-	plan, err := model.GetSubscriptionPlanById(sub.PlanId)
+	plan, err := model.GetPlanForSubscription(sub)
 	if err != nil || plan == nil {
 		return true, "", nil
 	}

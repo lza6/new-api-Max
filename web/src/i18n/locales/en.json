@@ -1585,7 +1585,6 @@
     "Delete": "Delete",
     "Delete plan": "Delete plan",
     "Delete plan {{plan}}?": "Delete plan {{plan}}?",
-    "This permanently removes the plan. Plans with existing user subscriptions cannot be deleted until those subscriptions are removed.": "This permanently removes the plan. Plans with existing user subscriptions cannot be deleted until those subscriptions are removed.",
     "Delete (": "Delete (",
     "Delete {{count}} API key(s)?": "Delete {{count}} API key(s)?",
     "Delete {{count}} models?": "Delete {{count}} models?",
@@ -6812,6 +6811,7 @@
     "Smart Routing": "Smart Routing",
     "Route every request to the healthiest upstream": "Route every request to the healthiest upstream",
     "Usage and cost visible before you commit": "Usage and cost visible before you commit",
-    "One endpoint for every provider and SDK": "One endpoint for every provider and SDK"
+    "One endpoint for every provider and SDK": "One endpoint for every provider and SDK",
+    "This permanently removes the plan from the management list. Users who already subscribed keep their existing subscription until it expires; nothing is removed from them.": "This permanently removes the plan from the management list. Users who already subscribed keep their existing subscription until it expires; nothing is removed from them."
   }
 }

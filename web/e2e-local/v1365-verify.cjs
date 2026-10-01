@@ -156,14 +156,22 @@ async function adminApi(page) {
       )
     }
 
-    // ---------- C. 被引用套餐拒绝删除（先测，避免行被删后无法测） ----------
+    // ---------- C. 被引用套餐也能删除（新语义：有订阅也能删，不剥夺权益） ----------
     const usedDel = await api(`/api/subscription/admin/plans/${usedId}`, { method: 'DELETE' })
-    const usedRefused = usedDel.body?.success === false
+    const usedDeleted = usedDel.body?.success === true
     record(
-      '被订阅引用的套餐删除被拒绝',
-      usedRefused,
-      `status=${usedDel.status} msg=${usedDel.body?.message}`
+      '被订阅引用的套餐也能删除（不被历史记录卡住）',
+      usedDeleted,
+      `status=${usedDel.status} affected=${JSON.stringify(usedDel.body?.data?.affected_user_ids)}`
     )
+    // 订阅本身仍在（不被删除/剥夺）——查订阅日志确认该套餐订阅仍存在。
+    const subsAfter = await api(`/api/subscription/admin/users/1/subscriptions`)
+    const stillHasSub = (subsAfter.body?.data || []).some((s) => s.subscription?.plan_id === usedId)
+    record('删除套餐后用户订阅保留（不剥夺权益）', stillHasSub)
+    const usedGone = !(await api(`/api/subscription/admin/plans`)).body?.data?.some(
+      (p) => p.plan?.id === usedId
+    )
+    record('被引用套餐删除后不再出现在列表', usedGone)
 
     // ---------- B. 无引用套餐真实删除 ----------
     const freeDel = await api(`/api/subscription/admin/plans/${freeId}`, { method: 'DELETE' })

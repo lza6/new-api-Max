@@ -1585,7 +1585,6 @@
     "Delete": "刪除",
     "Delete plan": "刪除套餐",
     "Delete plan {{plan}}?": "刪除套餐 {{plan}}？",
-    "This permanently removes the plan. Plans with existing user subscriptions cannot be deleted until those subscriptions are removed.": "此操作將永久刪除該套餐。若仍有使用者訂閱參照該套餐，需先刪除這些訂閱後才能刪除。",
     "Delete (": "刪除 (",
     "Delete {{count}} API key(s)?": "刪除 {{count}} 個 API 金鑰？",
     "Delete {{count}} models?": "刪除 {{count}} 個模型？",
@@ -6812,6 +6811,7 @@
     "Smart Routing": "智慧路由",
     "Route every request to the healthiest upstream": "每個請求都自動導向最健康的上游",
     "Usage and cost visible before you commit": "用量與花費在付款前就一目瞭然",
-    "One endpoint for every provider and SDK": "一個位址接入所有供應商與客戶端"
+    "One endpoint for every provider and SDK": "一個位址接入所有供應商與客戶端",
+    "This permanently removes the plan from the management list. Users who already subscribed keep their existing subscription until it expires; nothing is removed from them.": "此操作會將該套餐從管理清單中永久刪除。已訂閱的使用者會保留其現有訂閱直至到期，不會被移除任何權益。"
   }
 }

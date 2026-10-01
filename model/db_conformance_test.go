@@ -119,7 +119,7 @@ func conformanceModels() []any {
 		&QuotaData{}, &Task{}, &TaskEvent{}, &TaskPlugin{}, &Model{},
 		&Vendor{}, &PrefillGroup{}, &Setup{}, &TwoFA{}, &TwoFABackupCode{},
 		&Checkin{}, &SubscriptionOrder{}, &UserSubscription{},
-		&SubscriptionPreConsumeRecord{}, &CustomOAuthProvider{},
+		&SubscriptionPreConsumeRecord{}, &SubscriptionPlanGrant{}, &CustomOAuthProvider{},
 		&UserOAuthBinding{}, &PerfMetric{}, &SystemInstance{},
 		&SystemTask{}, &SystemTaskLock{}, &CasbinRule{}, &AuthzRole{},
 		&BannedIP{}, &WebRequestLog{}, &SubscriptionPlan{}, &EventDelivery{},

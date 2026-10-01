@@ -62,7 +62,7 @@ export function DeletePlanDialog() {
       onOpenChange={(nextOpen) => !nextOpen && setOpen(null)}
       title={t('Delete plan {{plan}}?', { plan: planLabel })}
       desc={t(
-        'This permanently removes the plan. Plans with existing user subscriptions cannot be deleted until those subscriptions are removed.'
+        'This permanently removes the plan from the management list. Users who already subscribed keep their existing subscription until it expires; nothing is removed from them.'
       )}
       confirmText={t('Delete')}
       handleConfirm={handleConfirm}

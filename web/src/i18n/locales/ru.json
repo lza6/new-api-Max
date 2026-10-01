@@ -1585,7 +1585,6 @@
     "Delete": "Удалить",
     "Delete plan": "Удалить тариф",
     "Delete plan {{plan}}?": "Удалить тариф {{plan}}?",
-    "This permanently removes the plan. Plans with existing user subscriptions cannot be deleted until those subscriptions are removed.": "Это навсегда удалит тариф. Тарифы с существующими пользовательскими подписками нельзя удалить, пока эти подписки не будут удалены.",
     "Delete (": "Удалить (",
     "Delete {{count}} API key(s)?": "Удалить {{count}} API-ключ(а/ей)?",
     "Delete {{count}} models?": "Удалить {{count}} моделей?",
@@ -6812,6 +6811,7 @@
     "Smart Routing": "Умная маршрутизация",
     "Route every request to the healthiest upstream": "Каждый запрос уходит на самый здоровый апстрим",
     "Usage and cost visible before you commit": "Расход и стоимость видны до оплаты",
-    "One endpoint for every provider and SDK": "Одна точка входа для всех провайдеров и SDK"
+    "One endpoint for every provider and SDK": "Одна точка входа для всех провайдеров и SDK",
+    "This permanently removes the plan from the management list. Users who already subscribed keep their existing subscription until it expires; nothing is removed from them.": "Это навсегда удалит тариф из списка управления. Пользователи с действующей подпиской сохранят её до истечения срока; ничего у них не отнимается."
   }
 }

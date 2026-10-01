@@ -1585,7 +1585,6 @@
     "Delete": "Supprimer",
     "Delete plan": "Supprimer le forfait",
     "Delete plan {{plan}}?": "Supprimer le forfait {{plan}} ?",
-    "This permanently removes the plan. Plans with existing user subscriptions cannot be deleted until those subscriptions are removed.": "Cette action supprime définitivement le forfait. Les forfaits ayant des abonnements utilisateurs existants ne peuvent pas être supprimés tant que ceux-ci n'ont pas été supprimés.",
     "Delete (": "Supprimer (",
     "Delete {{count}} API key(s)?": "Supprimer {{count}} clé(s) API ?",
     "Delete {{count}} models?": "Supprimer {{count}} modèles ?",
@@ -6812,6 +6811,7 @@
     "Smart Routing": "Routage intelligent",
     "Route every request to the healthiest upstream": "Chaque requête est routée vers l’amont le plus sain",
     "Usage and cost visible before you commit": "Usage et coût visibles avant de vous engager",
-    "One endpoint for every provider and SDK": "Un seul point d’accès pour tous les fournisseurs et SDK"
+    "One endpoint for every provider and SDK": "Un seul point d’accès pour tous les fournisseurs et SDK",
+    "This permanently removes the plan from the management list. Users who already subscribed keep their existing subscription until it expires; nothing is removed from them.": "Cela supprime définitivement le forfait de la liste de gestion. Les utilisateurs déjà abonnés conservent leur abonnement existant jusqu'à son expiration ; rien ne leur est retiré."
   }
 }

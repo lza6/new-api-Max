@@ -1,5 +1,5 @@
 {
-  "ranAt": "2026-09-30T15:24:15.650Z",
+  "ranAt": "2026-10-01T03:07:45.676Z",
   "base": "http://127.0.0.1:3000",
   "results": [
     {
@@ -10,12 +10,12 @@
     {
       "name": "创建可删套餐（API）",
       "ok": true,
-      "detail": "id=3"
+      "detail": "id=5"
     },
     {
       "name": "创建被引用套餐（API）",
       "ok": true,
-      "detail": "id=4"
+      "detail": "id=6"
     },
     {
       "name": "为被引用套餐绑定一条订阅（API）",
@@ -25,7 +25,7 @@
     {
       "name": "订阅管理页显示新套餐行",
       "ok": true,
-      "detail": "E2E-Free-1790781839611"
+      "detail": "E2E-Free-1790824050650"
     },
     {
       "name": "行操作菜单含「Delete plan」",
@@ -36,9 +36,17 @@
       "ok": true
     },
     {
-      "name": "被订阅引用的套餐删除被拒绝",
+      "name": "被订阅引用的套餐也能删除（不被历史记录卡住）",
       "ok": true,
-      "detail": "status=200 msg=该套餐下仍有 1 条订阅记录，请先删除或作废这些订阅"
+      "detail": "status=200 affected=[1]"
+    },
+    {
+      "name": "删除套餐后用户订阅保留（不剥夺权益）",
+      "ok": true
+    },
+    {
+      "name": "被引用套餐删除后不再出现在列表",
+      "ok": true
     },
     {
       "name": "无引用套餐删除成功",

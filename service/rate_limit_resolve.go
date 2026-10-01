@@ -16,7 +16,7 @@ func ResolveUserRateLimit(userId int, group string) (concurrency, rpm int, sourc
 		if subs, err := model.GetAllActiveUserSubscriptions(userId); err == nil && len(subs) > 0 {
 			sub := subs[0].Subscription
 			if sub != nil {
-				if plan, err := model.GetSubscriptionPlanById(sub.PlanId); err == nil && plan != nil {
+				if plan, err := model.GetPlanForSubscription(sub); err == nil && plan != nil {
 					c, r := sub.EffectiveTier(plan.ConcurrencyLimit, plan.RpmLimit)
 					if c > 0 || r > 0 {
 						return c, r, "subscription"

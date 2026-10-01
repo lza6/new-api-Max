@@ -1585,7 +1585,6 @@
     "Delete": "削除",
     "Delete plan": "プランを削除",
     "Delete plan {{plan}}?": "プラン {{plan}} を削除しますか？",
-    "This permanently removes the plan. Plans with existing user subscriptions cannot be deleted until those subscriptions are removed.": "このプランを完全に削除します。既存のユーザーサブスクリプションが参照しているプランは、それらを削除するまで削除できません。",
     "Delete (": "削除 (",
     "Delete {{count}} API key(s)?": "{{count}}個のAPIキーを削除しますか？",
     "Delete {{count}} models?": "{{count}} 件のモデルを削除しますか？",
@@ -6812,6 +6811,7 @@
     "Smart Routing": "スマートルーティング",
     "Route every request to the healthiest upstream": "すべてのリクエストを最も健全な上流へ自動ルーティング",
     "Usage and cost visible before you commit": "利用量とコストを契約前に確認できます",
-    "One endpoint for every provider and SDK": "すべてのプロバイダーと SDK を 1 つのエンドポイントに"
+    "One endpoint for every provider and SDK": "すべてのプロバイダーと SDK を 1 つのエンドポイントに",
+    "This permanently removes the plan from the management list. Users who already subscribed keep their existing subscription until it expires; nothing is removed from them.": "このプランを管理リストから完全に削除します。既に購読しているユーザーは、有効期限が切れるまで現在のサブスクリプションを保持します。ユーザーから何も取り除かれません。"
   }
 }
