@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
 
 	"github.com/gin-gonic/gin"
@@ -21,7 +22,7 @@ import (
 // （实测 >20MB → 200s+）。JSON 文本可压到 ~1%，显著缩短上传时间。
 //
 // 契约：
-//   - 返回 (body, compressed, closer, err)。compressed=true 时调用方必须在请求
+//   - 返回 (body, compressed, closer)。compressed=true 时调用方必须在请求
 //     结束后 closer.Close()，并给上游请求设置 Content-Encoding: gzip。
 //   - fail-open 且**永不返回 nil body**：任何前置条件不满足、压缩失败、或压缩后
 //     不小于原文时，都回退为可用的明文 body（compressed=false，closer=nil）——
@@ -30,15 +31,15 @@ import (
 //     ReplayableBody；明文回退是 *bytes.Reader（net/http 自动为其生成 GetBody）。
 //
 // 仅网关自行序列化的 JSON 请求体走此路径；multipart/表单/websocket 不涉及。
-func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) (io.Reader, bool, io.Closer, error) {
+func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) (io.Reader, bool, io.Closer) {
 	if body == nil || info == nil {
-		return body, false, nil, nil
+		return body, false, nil
 	}
 	if !common.RelayRequestCompressionEnabled {
-		return body, false, nil, nil
+		return body, false, nil
 	}
 	if info.ChannelMeta == nil || !info.ChannelSetting.RequestCompression {
-		return body, false, nil, nil
+		return body, false, nil
 	}
 
 	threshold := int64(common.RelayRequestCompressionThresholdKB) << 10
@@ -48,51 +49,58 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 	if replayable, ok := body.(common.ReplayableBody); ok {
 		size := replayable.Size()
 		if threshold > 0 && size < threshold {
-			return body, false, nil, nil
+			return body, false, nil
 		}
 		reader, err := replayable.NewReader()
 		if err != nil {
 			logCompressionWarn(c, fmt.Sprintf("request compression: cannot open replay reader, sending uncompressed: %v", err))
-			return body, false, nil, nil
+			return body, false, nil
 		}
 		compressed, err := gzipBytes(reader)
 		_ = reader.Close()
 		if err != nil {
 			logCompressionWarn(c, fmt.Sprintf("request compression: gzip failed, sending uncompressed: %v", err))
-			return body, false, nil, nil
+			return body, false, nil
 		}
 		if int64(len(compressed)) >= size {
 			// 压缩无收益（已压缩内容/极小 body）：保持明文。
-			return body, false, nil, nil
+			return body, false, nil
 		}
 		compressedBody, closer, ok := storeCompressedBody(c, compressed, size)
 		if !ok {
 			// 存储失败：原 body 仍完整可用，原样转发。
-			return body, false, nil, nil
+			return body, false, nil
 		}
-		return compressedBody, true, closer, nil
+		return compressedBody, true, closer
 	}
 
-	// 非可回放 body：先整体读入内存。此类 body 本就在内存中，读取成本可忽略。
+	// 非可回放 body：先整体读入内存。此类 body 本就在内存中（如透传重序列化后的
+	// *bytes.Reader），读取成本可忽略。加 MaxRequestBodyMB 上界作防御——即便未来
+	// 传入无界 reader，也不会把整个流读进内存。
 	// 未压缩时直接返回 *bytes.Reader —— net/http 会为其自动设置 ContentLength
 	// 与 GetBody（无需自建 storage，避免内存/磁盘缓存计数与文件泄漏）。
-	raw, err := io.ReadAll(body)
+	maxBodyMB := constant.MaxRequestBodyMB
+	if maxBodyMB <= 0 {
+		maxBodyMB = 128 // 与 InitEnv 默认一致；未跑 InitEnv 的测试/路径兜底
+	}
+	limit := (int64(maxBodyMB) << 20) + 1
+	raw, err := io.ReadAll(io.LimitReader(body, limit))
 	if err != nil {
 		logCompressionWarn(c, fmt.Sprintf("request compression: cannot read body, sending uncompressed: %v", err))
-		return body, false, nil, nil
+		return body, false, nil
 	}
 	if threshold > 0 && int64(len(raw)) < threshold {
-		return bytes.NewReader(raw), false, nil, nil
+		return bytes.NewReader(raw), false, nil
 	}
 	compressed, err := gzipBytes(bytes.NewReader(raw))
 	if err != nil || len(compressed) >= len(raw) {
-		return bytes.NewReader(raw), false, nil, nil
+		return bytes.NewReader(raw), false, nil
 	}
 	compressedBody, closer, ok := storeCompressedBody(c, compressed, int64(len(raw)))
 	if !ok {
-		return bytes.NewReader(raw), false, nil, nil
+		return bytes.NewReader(raw), false, nil
 	}
-	return compressedBody, true, closer, nil
+	return compressedBody, true, closer
 }
 
 // storeCompressedBody 把压缩后的字节封装成可回放 body。返回 ok=false 表示

@@ -330,7 +330,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	// 缩短 5Mbps 上行下的首字延迟（frt 与 request_bytes 单调正相关）。
 	// 返回 compressed=true 时必须在本次请求结束前 Close 存储，并设置
 	// Content-Encoding: gzip。fail-open：任何异常都退回明文，绝不拒绝请求。
-	requestBody, compressed, compressionCloser, _ := common.MaybeCompressOutboundBody(c, info, requestBody)
+	requestBody, compressed, compressionCloser := common.MaybeCompressOutboundBody(c, info, requestBody)
 	if compressionCloser != nil {
 		defer compressionCloser.Close()
 	}
