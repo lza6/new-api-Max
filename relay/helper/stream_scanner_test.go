@@ -927,3 +927,77 @@ func TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_EmptyBodyStillFai
 	require.NotNil(t, fatalErr, "空响应体 + fallover on 仍必须判定失败（空壳流兜底不因透传开关放松）")
 	assert.Equal(t, types.ErrorCodeDoRequestFailed, fatalErr.GetErrorCode())
 }
+
+// TestStreamScannerHandler_NonContentChunksReleaseBufferAtDeadline
+// 生产回归（2026-09-30）：上游持续发送「可识别为数据但非 content」的块
+// （role-only 首块 / 空 delta 心跳），迟迟没有 content。旧实现停掉首包计时器
+// 却继续扣住缓冲 → 缓冲被无界持有，用户被扣住响应头直到真 content 或 [DONE]，
+// 首字延迟被放大到数分钟；若该上游最终没有 content，还会触发空壳重试 → 500。
+// 修复后：计时器保留为「缓冲持有上限」，到期时缓冲非空即放行透传（不判失败）。
+func TestStreamScannerHandler_NonContentChunksReleaseBufferAtDeadline(t *testing.T) {
+	rs := relay_setting.GetRelaySetting()
+	oldFallover := rs.StreamFallover
+	oldTimeout := rs.StreamFirstTokenTimeout
+	rs.StreamFallover = true
+	rs.StreamFirstTokenTimeout = 1 // 1s 首包/缓冲持有上限，加速测试
+	t.Cleanup(func() {
+		rs.StreamFallover = oldFallover
+		rs.StreamFirstTokenTimeout = oldTimeout
+	})
+
+	pipeR, pipeW := io.Pipe()
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		// role-only 首块 + 空 delta 心跳：都不是 content，但确实是上游发来的数据。
+		_, _ = pipeW.Write([]byte("data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n"))
+		time.Sleep(1500 * time.Millisecond) // 超过 1s 缓冲持有上限
+		_, _ = pipeW.Write([]byte("data: {\"choices\":[{\"delta\":{}}]}\n"))
+		_, _ = pipeW.Write([]byte("data: {\"choices\":[{\"delta\":{\"content\":\"FINAL-ANSWER\"}}]}\n"))
+		_, _ = pipeW.Write([]byte("data: [DONE]\n"))
+		_ = pipeW.Close()
+	}()
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	resp := &http.Response{Body: io.NopCloser(pipeR)}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+
+	var got []string
+	fatalErr := StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {
+		got = append(got, data)
+		_, _ = c.Writer.WriteString(data + "\n")
+	})
+	<-done
+
+	assert.Nil(t, fatalErr, "上游有数据但首包无 content 时，不得判失败（应放行缓冲继续透传）")
+	assert.Contains(t, recorder.Body.String(), "FINAL-ANSWER", "客户端应最终收到 content")
+}
+
+// TestStreamScannerHandler_StreamEndWithOnlyNonContentReleasesBuffer
+// 生产回归（2026-09-30）：上游整条流只有 role-only/空 delta（无 content、无
+// reasoning），旧实现把「未 commit」一律判空壳 → 反复重试 → 最终 500。
+// 修复后：流结束时缓冲非空即放行给客户端，绝不因「未识别出 content」失败。
+func TestStreamScannerHandler_StreamEndWithOnlyNonContentReleasesBuffer(t *testing.T) {
+	rs := relay_setting.GetRelaySetting()
+	oldFallover := rs.StreamFallover
+	rs.StreamFallover = true
+	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+
+	body := "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n" +
+		"data: {\"choices\":[{\"delta\":{}}]}\n" +
+		"data: [DONE]\n"
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	resp := &http.Response{Body: io.NopCloser(strings.NewReader(body))}
+	info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+
+	fatalErr := StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {
+		_, _ = c.Writer.WriteString(data + "\n")
+	})
+
+	assert.Nil(t, fatalErr, "上游发过数据（即使无 content）不得判空壳失败")
+	assert.Contains(t, recorder.Body.String(), "assistant", "已缓冲的上游数据应放行给客户端")
+}

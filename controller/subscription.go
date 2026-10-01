@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -363,6 +364,30 @@ func AdminUpdateSubscriptionPlanStatus(c *gin.Context) {
 		return
 	}
 	if err := model.DB.Model(&model.SubscriptionPlan{}).Where("id = ?", id).Update("enabled", *req.Enabled).Error; err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	model.InvalidateSubscriptionPlanCache(id)
+	common.ApiSuccess(c, nil)
+}
+
+// AdminDeleteSubscriptionPlan 删除一个订阅套餐。当仍有用户订阅引用该套餐时
+// 拒绝删除（需先删除/作废这些订阅），避免静默降级或产生悬空引用。历史订单与
+// 兑换码保留各自 plan_id 作为存档，不受影响。
+func AdminDeleteSubscriptionPlan(c *gin.Context) {
+	if !requirePaymentCompliance(c) {
+		return
+	}
+	id, _ := strconv.Atoi(c.Param("id"))
+	if id <= 0 {
+		common.ApiErrorMsg(c, "无效的ID")
+		return
+	}
+	if err := model.AdminDeleteSubscriptionPlan(id); err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			common.ApiErrorMsg(c, "套餐不存在")
+			return
+		}
 		common.ApiError(c, err)
 		return
 	}

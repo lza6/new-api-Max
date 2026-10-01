@@ -17,10 +17,15 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { Row } from '@tanstack/react-table'
-import { Pencil, Power, PowerOff, RotateCcw } from 'lucide-react'
+import { Pencil, Power, PowerOff, RotateCcw, Trash2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
+import { DataTableRowActionMenu } from '@/components/data-table/core/row-action-menu'
+import {
+  DropdownMenuItem,
+  DropdownMenuShortcut,
+} from '@/components/ui/dropdown-menu'
 import {
   Tooltip,
   TooltipContent,
@@ -53,6 +58,11 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
   const handleResetSubscriptions = () => {
     setCurrentRow(row.original)
     setOpen('reset-subscriptions')
+  }
+
+  const handleDelete = () => {
+    setCurrentRow(row.original)
+    setOpen('delete-plan')
   }
 
   return (
@@ -112,6 +122,15 @@ export function DataTableRowActions({ row }: DataTableRowActionsProps) {
         </TooltipTrigger>
         <TooltipContent>{toggleLabel}</TooltipContent>
       </Tooltip>
+
+      <DataTableRowActionMenu ariaLabel={t('Open menu')}>
+        <DropdownMenuItem onClick={handleDelete} variant='destructive'>
+          {t('Delete plan')}
+          <DropdownMenuShortcut>
+            <Trash2 size={16} />
+          </DropdownMenuShortcut>
+        </DropdownMenuItem>
+      </DataTableRowActionMenu>
     </div>
   )
 }

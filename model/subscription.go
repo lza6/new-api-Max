@@ -1102,6 +1102,35 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 	return "", nil
 }
 
+// AdminDeleteSubscriptionPlan hard-deletes a subscription plan. Deletion is
+// refused while any user subscription still references the plan (regardless of
+// status) so we never orphan or silently downgrade live subscriptions; the
+// administrator must remove or invalidate those first. Historical
+// subscription_orders and redemption codes KEEP their plan_id as a durable
+// record and are intentionally not touched.
+func AdminDeleteSubscriptionPlan(planId int) error {
+	if planId <= 0 {
+		return errors.New("invalid planId")
+	}
+	return DB.Transaction(func(tx *gorm.DB) error {
+		var count int64
+		if err := tx.Model(&UserSubscription{}).Where("plan_id = ?", planId).Count(&count).Error; err != nil {
+			return err
+		}
+		if count > 0 {
+			return fmt.Errorf("该套餐下仍有 %d 条订阅记录，请先删除或作废这些订阅", count)
+		}
+		res := tx.Where("id = ?", planId).Delete(&SubscriptionPlan{})
+		if res.Error != nil {
+			return res.Error
+		}
+		if res.RowsAffected == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		return nil
+	})
+}
+
 func resetUserSubscriptionTx(tx *gorm.DB, sub *UserSubscription, plan *SubscriptionPlan, now int64, advanceResetTime bool) error {
 	if tx == nil || sub == nil || plan == nil {
 		return errors.New("invalid reset args")

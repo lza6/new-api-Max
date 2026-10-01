@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -180,8 +181,9 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		stopFirstTokenTimer()
 	}
 	// B1-1 空壳流标记：fallover 开启时，若流正常结束但从未遇到有效
-	// content/tool_call（缓冲从未 commit），判定本次渠道失败交还重试链。
-	emptyStream := false
+	// content/tool_call，且缓冲里也没有任何上游字节，才判定本次渠道失败交还
+	// 重试链。由 scanner goroutine / main 双方涉及，用 atomic 消除数据竞争。
+	var emptyStream atomic.Bool
 
 	ctx, cancel := context.WithCancel(context.Background())
 
@@ -370,11 +372,13 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 					info.ReceivedResponseCount++
 					commitBuffer()
 				} else {
-					// [修复防御] reasoning-only 增量：不 commit（空壳判定保持），
-					// 但停止首包超时计时——上游在正常传输 reasoning（deepseek 系
-					// 长思考流），不应被判「首包超时」。流结束仍由空壳检测兜底。
-					stopFirstTokenTimer()
-					logger.LogDebug(c, "stream first packet is reasoning-only, keep buffering")
+					// [修复防御] 上游已产出数据块但暂无法识别为 content（role-only /
+					// 空 delta / 非标准格式的 reasoning 字段）。此处**不再停掉首包计时器**：
+					// 计时器保留作为「缓冲持有上限」——到期时若缓冲已有字节则放行透传
+					// （见主 select），只有缓冲零字节（上游完全无声）才判首包失败。
+					// 否则缓冲会被无界持有，用户被扣住响应头直到首个 content 出现，
+					// 首字延迟被缓冲放大到数分钟（生产现象）。
+					logger.LogDebug(c, "stream first packet lacks recognizable content, keep buffering until hold deadline")
 				}
 
 				select {
@@ -387,10 +391,6 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			} else {
 				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonDone, nil)
 				logger.LogDebug(c, "received [DONE], stopping scanner")
-				// B1-1：流结束但缓冲从未 commit（全程仅 reasoning/空）→ 空壳流。
-				if fallover && bufferWriter != nil && !bufferWriter.Committed() {
-					emptyStream = true
-				}
 				return
 			}
 		}
@@ -402,10 +402,6 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 			}
 		}
 		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonEOF, nil)
-		// B1-1：流 EOF 结束但缓冲从未 commit（全程仅 reasoning/空）→ 空壳流。
-		if fallover && bufferWriter != nil && !bufferWriter.Committed() {
-			emptyStream = true
-		}
 	})
 
 	// B3-2 首包超时 channel：fallover 关闭/禁用超时时为 nil（select 永不命中）。
@@ -414,46 +410,87 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 		firstTokenCh = firstTokenTimer.C
 	}
 
-	// 主循环等待完成或超时
-	select {
-	case <-ticker.C:
-		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonTimeout, nil)
-	case <-stopChan:
-		// EndReason already set by the goroutine that triggered stopChan
-	case <-c.Request.Context().Done():
-		// 客户端断开：立即 cleanup 关闭上游 resp.Body，解除 scanner 阻塞并让上游停止生成，
-		// 避免为已放弃的请求继续消费上游 token。
-		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonClientGone, c.Request.Context().Err())
-	case <-firstTokenCh:
-		// B3-2 首包超时：上游一个有效 data 块都没发出（响应头未上线），
-		// 判定本次渠道失败，交还重试链换下一候选。
-		firstTokenTimedOut = true
-		info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonTimeout, nil)
+	// 主循环：等待流结束/超时/客户端断开。[修复防御] 首包计时器到期时若缓冲非空，
+	// **放行缓冲后必须继续等待流结束**（而非直接结束流），否则会把一个正在输出的
+	// 上游中途掐断——这正是本次修复要消除的「首字几分钟」链条上的新坑。
+	for {
+		select {
+		case <-ticker.C:
+			info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonTimeout, nil)
+			goto streamFinished
+		case <-stopChan:
+			// EndReason already set by the goroutine that triggered stopChan
+			goto streamFinished
+		case <-c.Request.Context().Done():
+			// 客户端断开：立即 cleanup 关闭上游 resp.Body，解除 scanner 阻塞并让上游停止生成，
+			// 避免为已放弃的请求继续消费上游 token。
+			info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonClientGone, c.Request.Context().Err())
+			goto streamFinished
+		case <-firstTokenCh:
+			// 首包计时器到期 = 缓冲持有上限到达。关键区分：
+			//   - 缓冲已有字节（上游活着，只是迟迟没产出可识别 content）→ 放行缓冲继续透传，
+			//     并继续等待流结束（firstTokenCh 置 nil 后本分支不再触发）。
+			//   - 缓冲为空（上游一个字节都没发）→ 判首包失败，交还重试链换下一候选。
+			if bufferWriter == nil || bufferWriter.Committed() {
+				// 计时器与 scanner 竞态：scanner 已先提交/无缓冲，忽略即可。
+			} else if bufferWriter.BufferedBytes() > 0 {
+				logger.LogWarn(c, fmt.Sprintf(
+					"stream first-token deadline (%ds) reached with %d bytes buffered but no recognizable content; releasing buffer and continuing passthrough",
+					relay_setting.GetStreamFirstTokenTimeout(), bufferWriter.BufferedBytes()))
+				commitBuffer()
+			} else {
+				firstTokenTimedOut = true
+				info.StreamStatus.SetEndReason(relaycommon.StreamEndReasonTimeout, nil)
+				goto streamFinished
+			}
+			// 放行后计时器已停止，避免重复命中；继续等待流自然结束。
+			firstTokenCh = nil
+		}
 	}
 
+streamFinished:
+
 	if firstTokenTimedOut {
-		logger.LogWarn(c, fmt.Sprintf("stream first-token timeout (%ds), failover to next channel", relay_setting.GetStreamFirstTokenTimeout()))
+		// [修复防御] 首包超时是「上游慢/无响应」而非「网关故障」：诚实映射 504
+		// Gateway Timeout，不再返回误导性的 500（生产「莫名 500」的另一真因）。
+		// 保留可观测日志，不静默吞错。
+		timeoutSecs := relay_setting.GetStreamFirstTokenTimeout()
+		logger.LogWarn(c, fmt.Sprintf("stream first-token timeout (%ds), upstream sent no data; failover to next channel", timeoutSecs))
 		fatalErr = types.NewError(
-			fmt.Errorf("upstream stream first-token timeout after %ds", relay_setting.GetStreamFirstTokenTimeout()),
+			fmt.Errorf("upstream stream first-token timeout after %ds (no data received)", timeoutSecs),
 			types.ErrorCodeDoRequestFailed,
+			types.ErrOptionWithStatusCode(http.StatusGatewayTimeout),
 			types.ErrOptionWithHideErrMsg("upstream stream timeout"),
 		)
 		return fatalErr
 	}
 
-	// B1-1 空壳流：流已正常结束但从未遇到有效 content/tool_call（仅 reasoning
-	// 或空响应体）。free-router 语义：reasoning only or empty stream → 换下一候选。
-	if emptyStream {
-		logger.LogWarn(c, "stream empty or reasoning-only (no content/tool_call), failover to next channel")
+	// B1-1 空壳流：流已正常结束但从未遇到有效 content/tool_call。free-router 语义：
+	// reasoning only or empty stream → 换下一候选。
+	// [修复防御] 必须先 cleanup()（wg.Wait 等所有缓冲写入落定）再判定，否则会与
+	// dataHandler goroutine 竞争读到「尚未写入」的缓冲字节，把有数据的流误判空壳。
+	cleanup()
+	if fallover && bufferWriter != nil && !bufferWriter.Committed() {
+		if buffered := bufferWriter.BufferedBytes(); buffered > 0 {
+			// 缓冲确有上游数据（role-only / 非识别 content 的心跳）：放行给客户端，
+			// 绝不判失败——否则对一个正在工作的上游反复重试并最终 500。
+			logger.LogWarn(c, fmt.Sprintf(
+				"stream ended without recognizable content but %d bytes were buffered; releasing to client instead of failing over", buffered))
+			bufferWriter.Commit()
+		} else {
+			emptyStream.Store(true)
+		}
+	}
+	if emptyStream.Load() {
+		logger.LogWarn(c, "stream empty (no data events at all), failover to next channel")
 		fatalErr = types.NewError(
-			fmt.Errorf("upstream stream empty or reasoning-only (no content/tool_call)"),
+			fmt.Errorf("upstream stream empty (no data received)"),
 			types.ErrorCodeDoRequestFailed,
 			types.ErrOptionWithHideErrMsg("upstream stream empty"),
 		)
 		return fatalErr
 	}
 
-	cleanup()
 	if info.StreamStatus.IsNormalEnd() && !info.StreamStatus.HasErrors() {
 		logger.LogInfo(c, fmt.Sprintf("stream ended: %s", info.StreamStatus.Summary()))
 	} else {

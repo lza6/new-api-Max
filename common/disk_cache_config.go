@@ -3,6 +3,7 @@ package common
 import (
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // DiskCacheConfig 磁盘缓存配置（由 performance_setting 包更新）
@@ -174,4 +175,30 @@ func IsDiskCacheAvailable(requestSize int64) bool {
 	maxBytes := GetDiskCacheMaxSizeBytes()
 	currentUsage := atomic.LoadInt64(&diskCacheStats.CurrentDiskUsageBytes)
 	return currentUsage+requestSize <= maxBytes
+}
+
+// DiskCacheEvictionSafeWindow 是容量淘汰的最小文件年龄：只有早于该窗口写入的
+// 缓存文件才允许被回收，避免误伤仍在读或回放的请求体。取得比单请求生命周期
+// 更保守的值。
+const DiskCacheEvictionSafeWindow = 2 * time.Minute
+
+// EnsureDiskCacheSpace 在写入 requestSize 字节前确保磁盘缓存有空间：接近或超过
+// 容量上限时**先淘汰最旧的缓存文件腾出空间**，再判断是否够用。返回 true 表示
+// 可以落盘（调用方随后应调用 CreateDiskCacheFile）。返回 false 表示即使淘汰后
+// 仍不足——调用方应据此**拒绝该请求**，而不是把大体积请求体回退到内存，否则
+// 会放大内存占用、抵消磁盘缓存的意义。容量上限 <=0 表示不限制。
+func EnsureDiskCacheSpace(requestSize int64) bool {
+	if !IsDiskCacheEnabled() {
+		return false
+	}
+	maxBytes := GetDiskCacheMaxSizeBytes()
+	if maxBytes <= 0 {
+		return true
+	}
+	currentUsage := atomic.LoadInt64(&diskCacheStats.CurrentDiskUsageBytes)
+	if currentUsage+requestSize <= maxBytes {
+		return true
+	}
+	_, _ = EnforceDiskCacheCapacity(DiskCacheEvictionSafeWindow, requestSize)
+	return IsDiskCacheAvailable(requestSize)
 }

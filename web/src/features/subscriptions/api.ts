@@ -66,6 +66,13 @@ export async function patchPlanStatus(
   return res.data
 }
 
+// Delete a subscription plan. Refused server-side while any user subscription
+// still references the plan (the server returns a message explaining why).
+export async function deletePlan(id: number): Promise<ApiResponse> {
+  const res = await api.delete(`/api/subscription/admin/plans/${id}`)
+  return res.data
+}
+
 // ============================================================================
 // Admin User Subscription Management
 // ============================================================================

@@ -282,47 +282,62 @@ func (d *diskStorage) IsDisk() bool {
 	return true
 }
 
-// CreateBodyStorage 根据数据大小创建合适的存储
+// CreateBodyStorage 根据数据大小创建合适的存储。
+//
+// 语义（重要）：启用磁盘缓存后，请求体 ≥ 阈值的一律走磁盘；磁盘容量不足时
+// 先淘汰最旧缓存腾空间，仍不足则**明确返回错误**，绝不回退内存——把大体积
+// 请求体甩回内存正是启用磁盘缓存要避免的事，会抵消其意义并放大 OOM 风险。
 func CreateBodyStorage(data []byte) (BodyStorage, error) {
 	size := int64(len(data))
 	threshold := GetDiskCacheThresholdBytes()
 
-	// 检查是否应该使用磁盘缓存
-	if IsDiskCacheEnabled() &&
-		size >= threshold &&
-		IsDiskCacheAvailable(size) {
+	if IsDiskCacheEnabled() && size >= threshold {
+		if !EnsureDiskCacheSpace(size) {
+			SysError(fmt.Sprintf("disk cache capacity exhausted (%d bytes used / %d limit); refusing %d-byte body instead of falling back to memory",
+				atomic.LoadInt64(&diskCacheStats.CurrentDiskUsageBytes), GetDiskCacheMaxSizeBytes(), size))
+			return nil, fmt.Errorf("disk cache capacity exhausted for %d-byte request body: %w", size, ErrRequestBodyTooLarge)
+		}
 		storage, err := newDiskStorage(data, GetDiskCachePath())
 		if err != nil {
-			// 如果磁盘存储失败，回退到内存存储
-			SysError(fmt.Sprintf("failed to create disk storage, falling back to memory: %v", err))
-			return newMemoryStorage(data), nil
+			SysError(fmt.Sprintf("disk storage write failed for %d-byte body: %v", size, err))
+			return nil, fmt.Errorf("disk storage creation failed: %w", err)
 		}
 		return storage, nil
 	}
 
+	// 小请求体（< 阈值）：走内存更快，磁盘缓存对小对象是负优化。
 	return newMemoryStorage(data), nil
 }
 
-// CreateBodyStorageFromReader 从 Reader 创建存储（用于大请求的流式处理）
+// CreateBodyStorageFromReader 从 Reader 创建存储（用于大请求的流式处理）。
+// 与 CreateBodyStorage 相同的容量语义：磁盘腾不出空间时明确失败，不回退内存。
 func CreateBodyStorageFromReader(reader io.Reader, contentLength int64, maxBytes int64) (BodyStorage, error) {
 	threshold := GetDiskCacheThresholdBytes()
 
-	// 如果启用了磁盘缓存且内容长度超过阈值，直接使用磁盘存储
+	// 已启用磁盘缓存且内容长度超过阈值：必须落盘。
 	if IsDiskCacheEnabled() &&
 		contentLength > 0 &&
-		contentLength >= threshold &&
-		IsDiskCacheAvailable(contentLength) {
+		contentLength >= threshold {
+		if !EnsureDiskCacheSpace(contentLength) {
+			SysError(fmt.Sprintf("disk cache capacity exhausted (%d bytes used / %d limit); refusing %d-byte streamed body instead of falling back to memory",
+				atomic.LoadInt64(&diskCacheStats.CurrentDiskUsageBytes), GetDiskCacheMaxSizeBytes(), contentLength))
+			return nil, fmt.Errorf("disk cache capacity exhausted for %d-byte request body: %w", contentLength, ErrRequestBodyTooLarge)
+		}
 		storage, err := newDiskStorageFromReader(reader, maxBytes, GetDiskCachePath())
 		if err != nil {
 			if IsRequestBodyTooLargeError(err) {
 				return nil, err
 			}
 			// 磁盘存储失败，reader 已被消费，无法安全回退
-			// 直接返回错误而非尝试回退（因为 reader 数据已丢失）
 			return nil, fmt.Errorf("disk storage creation failed: %w", err)
 		}
 		IncrementDiskCacheHits()
 		return storage, nil
+	}
+
+	// 长度未知（chunked）：小于阈值走内存，超过阈值溢写落盘，避免大请求体整体进内存。
+	if IsDiskCacheEnabled() && contentLength <= 0 {
+		return createBodyStorageSpill(reader, maxBytes, threshold)
 	}
 
 	// 使用内存读取
@@ -345,6 +360,59 @@ func CreateBodyStorageFromReader(reader io.Reader, contentLength int64, maxBytes
 		IncrementDiskCacheHits()
 	}
 	return storage, nil
+}
+
+// createBodyStorageSpill handles a request body whose total length is unknown
+// (chunked transfer) while the disk cache is enabled. It buffers at most the
+// disk-cache threshold in memory; anything larger is spilled to disk so a large
+// body is never held fully in memory. Returns ErrRequestBodyTooLarge if the
+// stream (or its serialized size) exceeds maxBytes, or a capacity error when
+// the disk cache cannot make room.
+func createBodyStorageSpill(reader io.Reader, maxBytes, threshold int64) (BodyStorage, error) {
+	prefix, err := io.ReadAll(io.LimitReader(reader, threshold+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(prefix)) <= threshold {
+		// Still under the threshold: a small body, memory is the right home.
+		return newMemoryStorage(prefix), nil
+	}
+
+	// Larger than the threshold: spill to disk. Make room first (evicting the
+	// oldest cache files) rather than falling back to memory.
+	if !EnsureDiskCacheSpace(int64(len(prefix))) {
+		return nil, fmt.Errorf("disk cache capacity exhausted for a chunked request body: %w", ErrRequestBodyTooLarge)
+	}
+	filePath, file, err := CreateDiskCacheFile(DiskCacheTypeBody)
+	if err != nil {
+		return nil, fmt.Errorf("disk storage creation failed: %w", err)
+	}
+	written, err := file.Write(prefix)
+	if err != nil {
+		file.Close()
+		os.Remove(filePath)
+		return nil, fmt.Errorf("disk storage write failed: %w", err)
+	}
+	rest, err := io.Copy(file, io.LimitReader(reader, maxBytes-int64(written)+1))
+	if err != nil {
+		file.Close()
+		os.Remove(filePath)
+		return nil, fmt.Errorf("disk storage write failed: %w", err)
+	}
+	written += int(rest)
+	if int64(written) > maxBytes {
+		file.Close()
+		os.Remove(filePath)
+		return nil, ErrRequestBodyTooLarge
+	}
+	if _, err := file.Seek(0, io.SeekStart); err != nil {
+		file.Close()
+		os.Remove(filePath)
+		return nil, fmt.Errorf("failed to seek temp file: %w", err)
+	}
+	IncrementDiskFiles(int64(written))
+	IncrementDiskCacheHits()
+	return &diskStorage{file: file, filePath: filePath, size: int64(written)}, nil
 }
 
 type replayableBodyReader struct {
