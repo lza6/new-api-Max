@@ -320,6 +320,14 @@ func applyHeaderOverrideToRequest(req *http.Request, headerOverride map[string]s
 	}
 }
 
+// bodySize 返回可回放请求体的字节数；不可回放时返回 0。
+func bodySize(body io.Reader) int64 {
+	if r, ok := body.(common2.ReplayableBody); ok {
+		return r.Size()
+	}
+	return 0
+}
+
 func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
@@ -330,9 +338,18 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	// 缩短 5Mbps 上行下的首字延迟（frt 与 request_bytes 单调正相关）。
 	// 返回 compressed=true 时必须在本次请求结束前 Close 存储，并设置
 	// Content-Encoding: gzip。fail-open：任何异常都退回明文，绝不拒绝请求。
+	originalSize := bodySize(requestBody)
 	requestBody, compressed, compressionCloser := common.MaybeCompressOutboundBody(c, info, requestBody)
 	if compressionCloser != nil {
 		defer compressionCloser.Close()
+	}
+	if info != nil && info.RequestId != "" {
+		// 实时请求详情：记录请求体压缩前后字节（未压缩时 compressedBytes=originalSize）。
+		compressedSize := originalSize
+		if compressed {
+			compressedSize = bodySize(requestBody)
+		}
+		service.LiveSetCompression(info.RequestId, originalSize, compressedSize, compressed)
 	}
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {

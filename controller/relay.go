@@ -128,6 +128,28 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		return
 	}
 
+	// 实时请求详情：注册进行中请求，供管理端面板展示；defer 结束时注销并归档。
+	service.LiveBegin(relayInfo.RequestId, service.LiveRequestEntry{
+		UserId:    relayInfo.UserId,
+		UserName:  relayInfo.UserEmail,
+		Model:     relayInfo.OriginModelName,
+		Group:     relayInfo.UsingGroup,
+		IsStream:  relayInfo.IsStream,
+		StartedAt: relayInfo.StartTime.Unix(),
+	})
+	relayInfo.OnFirstResponse = func(firstResponseMs int64) {
+		service.LiveSetFirstResponse(relayInfo.RequestId, firstResponseMs)
+	}
+	defer func() {
+		statusCode := 200
+		errMsg := ""
+		if newAPIError != nil {
+			statusCode = newAPIError.StatusCode
+			errMsg = newAPIError.Error()
+		}
+		service.LiveEnd(relayInfo.RequestId, statusCode, errMsg)
+	}()
+
 	// 订阅模型矩阵：有 active 订阅时，请求模型必须在套餐 Models 内
 	// （无订阅/未配置/查询失败 fail-open，沿用既有模型访问控制）。
 	if allowed, reason, accessErr := service.CheckSubscriptionModelAccess(relayInfo.UserId, relayInfo.OriginModelName); accessErr == nil && !allowed {
@@ -217,6 +239,7 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			break
 		}
 		addUsedChannel(c, channel.Id)
+		service.LiveSetChannel(relayInfo.RequestId, channel.Id, channel.Name, retryParam.GetRetry())
 		if billingErr := service.PrepareTieredBillingForSelectedGroup(c, relayInfo); billingErr != nil {
 			newAPIError = billingErr
 			break

@@ -1,0 +1,263 @@
+package service
+
+import (
+	"sort"
+	"sync"
+	"time"
+)
+
+// LiveRequestTracker 进程内实时请求注册表：记录当前正在处理的 relay 请求，
+// 供管理端「实时请求详情」面板展示（哪些请求进行中/排队/已完成、压缩前后
+// 字节、已耗时、阶段等）。
+//
+// 设计取舍：
+//   - 纯内存、无锁热点最小化（RWMutex + 每次操作 O(1) 摊销），不落库、不阻塞请求路径。
+//   - 有界：最多保留 maxLiveRequests 条进行中记录，超出丢弃最旧（防极端并发下内存膨胀）。
+//   - 已完成请求保留一小段「最近完成」窗口，便于面板显示刚处理完的请求。
+//
+// 多实例部署时各实例各自维护（面板按实例聚合），与既有 system_instances 一致。
+
+const (
+	maxLiveRequests      = 2000 // 进行中记录上限
+	maxRecentlyFinished  = 200  // 最近完成保留条数
+	finishedRetentionSec = 60   // 最近完成保留时长（秒）
+)
+
+// LiveRequestPhase 请求所处阶段。
+type LiveRequestPhase string
+
+const (
+	LivePhaseReceived  LiveRequestPhase = "received"   // 已接收，尚未选中渠道
+	LivePhaseWaiting   LiveRequestPhase = "waiting"    // 等待并发令牌/排队
+	LivePhaseUpstream  LiveRequestPhase = "upstream"   // 已发往上游，等待/接收响应
+	LivePhaseStreaming LiveRequestPhase = "streaming"  // 流式接收中
+	LivePhaseDone      LiveRequestPhase = "done"       // 已完成
+	LivePhaseError     LiveRequestPhase = "error"      // 失败
+)
+
+// LiveRequestEntry 单个请求的实时快照。
+type LiveRequestEntry struct {
+	RequestId   string           `json:"request_id"`
+	UserId      int              `json:"user_id"`
+	UserName    string           `json:"user_name"`
+	Model       string           `json:"model"`
+	Group       string           `json:"group"`
+	ChannelId   int              `json:"channel_id"`
+	ChannelName string           `json:"channel_name"`
+	IsStream    bool             `json:"is_stream"`
+	Phase       LiveRequestPhase `json:"phase"`
+	StartedAt   int64            `json:"started_at"`   // unix 秒
+	ElapsedMs   int64            `json:"elapsed_ms"`   // 快照时已耗时
+	RetryIndex  int              `json:"retry_index"`  // 第几次渠道尝试（0 起）
+
+	// 请求体字节：OriginalBytes 是客户端原始大小；CompressedBytes 是压缩后发往
+	// 上游的大小（未压缩时为 0，Compressed=false）。压缩节省可据此计算。
+	OriginalBytes   int64 `json:"original_bytes"`
+	CompressedBytes int64 `json:"compressed_bytes"`
+	Compressed      bool  `json:"compressed"`
+
+	// 首字（流式）/上游响应时间（毫秒）；0 表示尚未收到上游响应。
+	FirstResponseMs int64 `json:"first_response_ms"`
+
+	// 终态字段（phase=done/error 时有效）。
+	StatusCode int    `json:"status_code,omitempty"`
+	ErrorMsg   string `json:"error_msg,omitempty"`
+	FinishedAt int64  `json:"finished_at,omitempty"`
+}
+
+type liveRequestTracker struct {
+	mu       sync.RWMutex
+	active   map[string]*LiveRequestEntry
+	finished []*LiveRequestEntry // 环形保留最近完成
+	order    []string            // active 的插入顺序（用于超限淘汰最旧）
+}
+
+var liveRequests = &liveRequestTracker{
+	active: make(map[string]*LiveRequestEntry),
+}
+
+// LiveBegin 注册一个新请求（请求进入 relay 处理时调用）。
+func LiveBegin(reqId string, entry LiveRequestEntry) {
+	if reqId == "" {
+		return
+	}
+	entry.RequestId = reqId
+	entry.Phase = LivePhaseReceived
+	if entry.StartedAt == 0 {
+		entry.StartedAt = time.Now().Unix()
+	}
+	liveRequests.mu.Lock()
+	defer liveRequests.mu.Unlock()
+	if _, exists := liveRequests.active[reqId]; !exists {
+		liveRequests.order = append(liveRequests.order, reqId)
+	}
+	liveRequests.active[reqId] = &entry
+	// 超限：淘汰最旧的进行中记录（正常情况下不会触发，防御极端并发）。
+	for len(liveRequests.active) > maxLiveRequests && len(liveRequests.order) > 0 {
+		oldest := liveRequests.order[0]
+		liveRequests.order = liveRequests.order[1:]
+		delete(liveRequests.active, oldest)
+	}
+}
+
+// liveUpdate 以互斥方式就地更新一个进行中请求（不存在则忽略）。
+func liveUpdate(reqId string, fn func(*LiveRequestEntry)) {
+	if reqId == "" {
+		return
+	}
+	liveRequests.mu.Lock()
+	defer liveRequests.mu.Unlock()
+	if e, ok := liveRequests.active[reqId]; ok {
+		fn(e)
+	}
+}
+
+// LiveSetChannel 记录选中的渠道与尝试序号。
+func LiveSetChannel(reqId string, channelId int, channelName string, retryIndex int) {
+	liveUpdate(reqId, func(e *LiveRequestEntry) {
+		e.ChannelId = channelId
+		e.ChannelName = channelName
+		e.RetryIndex = retryIndex
+		e.Phase = LivePhaseUpstream
+	})
+}
+
+// LiveSetPhase 更新请求阶段（waiting/upstream/streaming）。
+func LiveSetPhase(reqId string, phase LiveRequestPhase) {
+	liveUpdate(reqId, func(e *LiveRequestEntry) { e.Phase = phase })
+}
+
+// LiveSetCompression 记录请求体压缩结果（原始字节 → 压缩后字节）。
+func LiveSetCompression(reqId string, originalBytes, compressedBytes int64, compressed bool) {
+	liveUpdate(reqId, func(e *LiveRequestEntry) {
+		e.OriginalBytes = originalBytes
+		e.CompressedBytes = compressedBytes
+		e.Compressed = compressed
+	})
+}
+
+// LiveSetFirstResponse 记录首字/上游响应耗时（毫秒）。
+func LiveSetFirstResponse(reqId string, firstResponseMs int64) {
+	liveUpdate(reqId, func(e *LiveRequestEntry) { e.FirstResponseMs = firstResponseMs })
+}
+
+// LiveEnd 结束请求：移出进行中，进入最近完成窗口。
+func LiveEnd(reqId string, statusCode int, errMsg string) {
+	if reqId == "" {
+		return
+	}
+	now := time.Now()
+	liveRequests.mu.Lock()
+	defer liveRequests.mu.Unlock()
+	e, ok := liveRequests.active[reqId]
+	if !ok {
+		return
+	}
+	delete(liveRequests.active, reqId)
+	for i, id := range liveRequests.order {
+		if id == reqId {
+			liveRequests.order = append(liveRequests.order[:i], liveRequests.order[i+1:]...)
+			break
+		}
+	}
+	e.FinishedAt = now.Unix()
+	e.ElapsedMs = now.Sub(time.Unix(e.StartedAt, 0)).Milliseconds()
+	e.StatusCode = statusCode
+	e.ErrorMsg = errMsg
+	if errMsg != "" || statusCode >= 400 {
+		e.Phase = LivePhaseError
+	} else {
+		e.Phase = LivePhaseDone
+	}
+	liveRequests.finished = append(liveRequests.finished, e)
+	// 修剪：按数量与时间双重限制。
+	cutoff := now.Unix() - finishedRetentionSec
+	kept := liveRequests.finished[:0]
+	for _, f := range liveRequests.finished {
+		if f.FinishedAt >= cutoff {
+			kept = append(kept, f)
+		}
+	}
+	liveRequests.finished = kept
+	if len(liveRequests.finished) > maxRecentlyFinished {
+		liveRequests.finished = liveRequests.finished[len(liveRequests.finished)-maxRecentlyFinished:]
+	}
+}
+
+// LiveRequestsSnapshot 面板数据快照。
+type LiveRequestsSnapshot struct {
+	Active   []*LiveRequestEntry `json:"active"`
+	Finished []*LiveRequestEntry `json:"finished"`
+	// 聚合指标
+	ActiveCount      int     `json:"active_count"`
+	CompressedCount  int     `json:"compressed_count"`
+	OriginalBytesSum int64   `json:"original_bytes_sum"`
+	CompressedBytesSum int64 `json:"compressed_bytes_sum"`
+	// AvgCompressionRatio 压缩后/原始（仅统计已压缩请求；无数据时为 0）。
+	AvgCompressionRatio float64 `json:"avg_compression_ratio"`
+	// AvgFirstResponseMs 进行中+最近完成请求的平均首字（毫秒，仅统计已有首字的）。
+	AvgFirstResponseMs int64 `json:"avg_first_response_ms"`
+}
+
+// GetLiveRequestsSnapshot 返回当前实时请求快照（含聚合）。
+func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
+	now := time.Now()
+	liveRequests.mu.RLock()
+	defer liveRequests.mu.RUnlock()
+
+	snap := LiveRequestsSnapshot{
+		Active:   make([]*LiveRequestEntry, 0, len(liveRequests.active)),
+		Finished: make([]*LiveRequestEntry, 0, len(liveRequests.finished)),
+	}
+	// 进行中：复制并刷新 elapsed（不修改共享对象）。
+	for _, e := range liveRequests.active {
+		cp := *e
+		cp.ElapsedMs = now.Sub(time.Unix(e.StartedAt, 0)).Milliseconds()
+		snap.Active = append(snap.Active, &cp)
+	}
+	sort.Slice(snap.Active, func(i, j int) bool {
+		return snap.Active[i].StartedAt > snap.Active[j].StartedAt
+	})
+	// 最近完成：倒序（最新在前）。
+	for i := len(liveRequests.finished) - 1; i >= 0; i-- {
+		cp := *liveRequests.finished[i]
+		snap.Finished = append(snap.Finished, &cp)
+	}
+	snap.ActiveCount = len(snap.Active)
+
+	// 聚合：压缩率与平均首字（进行中 + 最近完成，避免只看到瞬时值）。
+	var frtSum, frtCount int64
+	accumulate := func(e *LiveRequestEntry) {
+		if e.Compressed && e.OriginalBytes > 0 {
+			snap.CompressedCount++
+			snap.OriginalBytesSum += e.OriginalBytes
+			snap.CompressedBytesSum += e.CompressedBytes
+		}
+		if e.FirstResponseMs > 0 {
+			frtSum += e.FirstResponseMs
+			frtCount++
+		}
+	}
+	for _, e := range snap.Active {
+		accumulate(e)
+	}
+	for _, e := range snap.Finished {
+		accumulate(e)
+	}
+	if snap.OriginalBytesSum > 0 {
+		snap.AvgCompressionRatio = float64(snap.CompressedBytesSum) / float64(snap.OriginalBytesSum)
+	}
+	if frtCount > 0 {
+		snap.AvgFirstResponseMs = frtSum / frtCount
+	}
+	return snap
+}
+
+// ResetLiveRequestsForTest 清空注册表（仅测试用）。
+func ResetLiveRequestsForTest() {
+	liveRequests.mu.Lock()
+	defer liveRequests.mu.Unlock()
+	liveRequests.active = make(map[string]*LiveRequestEntry)
+	liveRequests.finished = nil
+	liveRequests.order = nil
+}

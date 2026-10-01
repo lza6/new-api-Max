@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 
 import type {
+  LiveRequestsResponse,
   SystemInstanceDeleteResponse,
   SystemInstanceListResponse,
 } from './types'
@@ -26,6 +27,13 @@ import type {
 export async function listSystemInstances() {
   const res = await api.get<SystemInstanceListResponse>(
     '/api/system-info/instances'
+  )
+  return res.data
+}
+
+export async function getLiveRequests() {
+  const res = await api.get<LiveRequestsResponse>(
+    '/api/system-info/live-requests'
   )
   return res.data
 }

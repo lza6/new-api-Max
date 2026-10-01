@@ -92,6 +92,9 @@ type RelayInfo struct {
 	StartTime         time.Time
 	FirstResponseTime time.Time
 	isFirstResponse   bool
+	// OnFirstResponse 首字回调（controller 注入，实时请求详情用）。参数为
+	// 首字耗时毫秒。nil 时无副作用。放在此处以避免 relay/common → service 循环依赖。
+	OnFirstResponse func(firstResponseMs int64)
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool
@@ -906,6 +909,11 @@ func (info *RelayInfo) SetFirstResponseTime() {
 	if info.isFirstResponse {
 		info.FirstResponseTime = time.Now()
 		info.isFirstResponse = false
+		// 实时请求详情：首字回调（由 controller 注入，避免 relay/common → service
+		// 的循环依赖）。nil 时无副作用。
+		if info.OnFirstResponse != nil {
+			info.OnFirstResponse(info.FirstResponseTime.Sub(info.StartTime).Milliseconds())
+		}
 	}
 }
 

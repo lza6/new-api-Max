@@ -22,6 +22,7 @@ import { SectionPageLayout } from '@/components/layout'
 import { Badge } from '@/components/ui/badge'
 
 import { SystemInstancesPanel } from './components/system-instances-panel'
+import { LiveRequestsPanel } from './components/live-requests-panel'
 import { SystemTasksPanel } from './components/system-tasks-panel'
 
 export function SystemInfo() {
@@ -40,6 +41,7 @@ export function SystemInfo() {
       <SectionPageLayout.Content>
         <div className='space-y-4'>
           <SystemInstancesPanel />
+          <LiveRequestsPanel />
           <SystemTasksPanel />
         </div>
       </SectionPageLayout.Content>

@@ -85,3 +85,62 @@ export type SystemInstanceDeleteResponse = {
     deleted_count: number
   }
 }
+
+export type LiveRequestPhase =
+  | 'received'
+  | 'waiting'
+  | 'upstream'
+  | 'streaming'
+  | 'done'
+  | 'error'
+
+export type LiveRequestEntry = {
+  request_id: string
+  user_id: number
+  user_name: string
+  model: string
+  group: string
+  channel_id: number
+  channel_name: string
+  is_stream: boolean
+  phase: LiveRequestPhase
+  started_at: number
+  elapsed_ms: number
+  retry_index: number
+  original_bytes: number
+  compressed_bytes: number
+  compressed: boolean
+  first_response_ms: number
+  status_code?: number
+  error_msg?: string
+  finished_at?: number
+}
+
+export type LiveConcurrencyStats = {
+  enabled: boolean
+  active: number
+  waiting: number
+  limit: number
+}
+
+export type LiveRequestsData = {
+  active: LiveRequestEntry[]
+  finished: LiveRequestEntry[]
+  active_count: number
+  compressed_count: number
+  original_bytes_sum: number
+  compressed_bytes_sum: number
+  avg_compression_ratio: number
+  avg_first_response_ms: number
+  network_in_mbps: number
+  network_out_mbps: number
+  concurrency: LiveConcurrencyStats
+  compression_enabled: boolean
+  compression_threshold_kb: number
+}
+
+export type LiveRequestsResponse = {
+  success: boolean
+  message: string
+  data?: LiveRequestsData
+}
