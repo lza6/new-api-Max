@@ -1,0 +1,29 @@
+{
+  "tag": "v1.3.65",
+  "deployedAt": "2026-10-01T09:14:33+08:00",
+  "method": "deploy-zero-downtime.sh (蓝绿交替，零停机)",
+  "upstreamPortAfterDeploy": 3000,
+  "buildTime": "09:06:24 -> 09:14:27 (~8 min)",
+  "cutover": "~4s (09:14:30 健康 -> 09:14:33 外网自检通过)",
+  "checks": {
+    "version_header": "x-new-api-version: v1.3.65",
+    "external_status_12x": "12/12 = 200",
+    "container": "new-api (new-api:v1.3.65) Up healthy",
+    "memory": "used 679MB / avail 1083MB",
+    "data_integrity": { "users": 1333, "channels": 8 },
+    "post_deploy_500_count": 0
+  },
+  "known_non_regression": {
+    "503_count_30m": 57,
+    "cause": "No available channel for model deepseek-v4-flash under group default",
+    "analysis": "生产无 deepseek-v4-flash(无点) 渠道，仅有 deepseek-v4.1-flash；/api/pricing 亦只广告带点版本。用户请求不存在的模型 id 导致 503。部署前已存在，非本次回归。"
+  },
+  "localEvidence": {
+    "subscription_delete_e2e": "12/12 (计划书/e2e-evidence/v1.3.65)",
+    "relay_helper_full": "ok",
+    "common_full": "ok 46.4s",
+    "model_subscription": "ok 38.5s",
+    "controller_targeted": "ok 197.6s",
+    "relaykit_isolated_build": "ok"
+  }
+}
