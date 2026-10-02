@@ -94,3 +94,15 @@ func TestLiveRequestTracker_UpstreamTimingAggregation(t *testing.T) {
 	snap = GetLiveRequestsSnapshot()
 	assert.EqualValues(t, 50, snap.AvgUploadMs, "r3 无计时不应拉低平均")
 }
+
+// 无任何请求时，聚合上传/上游计时应为 -1（未采集），而非 0——
+// 否则前端会误显示「upload 0ms · upstream 0ms」。
+func TestLiveRequestTracker_EmptySnapshotUsesMinusOne(t *testing.T) {
+	ResetLiveRequestsForTest()
+	defer ResetLiveRequestsForTest()
+
+	snap := GetLiveRequestsSnapshot()
+	assert.EqualValues(t, -1, snap.AvgUploadMs)
+	assert.EqualValues(t, -1, snap.AvgUpstreamTtfbMs)
+	assert.EqualValues(t, 0, snap.AvgCompressionRatio)
+}

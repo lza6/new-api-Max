@@ -225,6 +225,7 @@ type LiveRequestsSnapshot struct {
 	AvgFirstResponseMs int64 `json:"avg_first_response_ms"`
 	// AvgUploadMs / AvgUpstreamTtfbMs 平均上传耗时 / 平均上游首字节耗时（毫秒，
 	// 仅统计已采集到计时的请求）。用于区分「上传」与「上游」谁在拖慢首字。
+	// 无数据时为 -1（未采集），调用方据此跳过展示，避免误显示「0ms」。
 	AvgUploadMs       int64 `json:"avg_upload_ms"`
 	AvgUpstreamTtfbMs int64 `json:"avg_upstream_ttfb_ms"`
 }
@@ -238,6 +239,9 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 	snap := LiveRequestsSnapshot{
 		Active:   make([]*LiveRequestEntry, 0, len(liveRequests.active)),
 		Finished: make([]*LiveRequestEntry, 0, len(liveRequests.finished)),
+		// 聚合计时默认 -1（未采集），避免前端把「无数据」误显示为「0ms」。
+		AvgUploadMs:       -1,
+		AvgUpstreamTtfbMs: -1,
 	}
 	// 进行中：复制并刷新 elapsed（不修改共享对象）。
 	for _, e := range liveRequests.active {

@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>变更报告 — 首字延迟治理 · 实时可观测性 · 延迟拆解</title>
+<style>
+  :root{--bg:#0b0e14;--card:#131721;--card2:#1a1f2e;--fg:#e6e9ef;--muted:#8b94a7;--accent:#5b9dff;--good:#3fb950;--warn:#d29922;--bad:#f85149;--border:#242a38}
+  @media (prefers-color-scheme: light){:root{--bg:#f6f8fb;--card:#fff;--card2:#eef2f8;--fg:#1a1f2e;--muted:#5a6377;--border:#dde3ee}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif}
+  .wrap{max-width:980px;margin:0 auto;padding:40px 20px 120px}
+  h1{font-size:30px;line-height:1.25;margin:0 0 8px}
+  .sub{color:var(--muted);margin:0 0 32px}
+  h2{font-size:21px;margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--border)}
+  p{margin:10px 0}
+  code{background:var(--card2);padding:2px 6px;border-radius:5px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace}
+  pre{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px;overflow:auto;font:13px ui-monospace,Menlo,monospace;line-height:1.5}
+  pre code{background:none;padding:0}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin:16px 0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+  th,td{border-bottom:1px solid var(--border);padding:9px 10px;text-align:left;vertical-align:top}
+  th{color:var(--muted);font-weight:600}
+  .tag{display:inline-block;font-size:12px;padding:1px 8px;border-radius:999px;border:1px solid var(--border);color:var(--muted)}
+  .good{color:var(--good)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+  .bar{height:12px;border-radius:6px;background:var(--card2);overflow:hidden;display:flex;margin:6px 0}
+  .bar i{display:block;height:100%}
+  .amber{background:#d29922}.blue{background:#5b9dff}
+  .kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin:16px 0}
+  .kpi .card{margin:0;padding:14px 16px}
+  .kpi .n{font-size:22px;font-weight:700}
+  .kpi .l{color:var(--muted);font-size:13px}
+  details{background:var(--card);border:1px solid var(--border);border-radius:10px;margin:12px 0;padding:4px 16px}
+  summary{cursor:pointer;font-weight:600;padding:10px 0}
+  .quiz{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 22px 20px;margin-top:20px}
+  .q{padding:16px 0;border-bottom:1px solid var(--border)}
+  .q:last-child{border-bottom:0}
+  .q .text{font-weight:600;margin-bottom:10px}
+  label{display:block;padding:8px 12px;border:1px solid var(--border);border-radius:8px;margin:6px 0;cursor:pointer;transition:.15s}
+  label:hover{border-color:var(--accent)}
+  label.right{border-color:var(--good);background:rgba(63,185,80,.12)}
+  label.wrong{border-color:var(--bad);background:rgba(248,81,73,.12)}
+  input{margin-right:9px}
+  .explain{color:var(--muted);font-size:13px;margin-top:8px;display:none}
+  .explain.show{display:block}
+  #score{position:sticky;bottom:0;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 18px;margin-top:20px;font-weight:600;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>变更报告：首字延迟治理 · 实时可观测性 · 延迟拆解</h1>
+<p class="sub">版本 v1.3.68 → v1.3.71 · 全部已上线生产（freeapi.tingfengai.art）</p>
+
+<h2>1. 背景与直觉</h2>
+<p>用户反馈：<em>「只要超过 300K 的请求，首字就被拉大，很难受」</em>，且怀疑我们上传慢。</p>
+<p>直觉上的头号嫌疑是<strong>5Mbps 上行带宽</strong>——网关把几十 MB 的 prompt 完整上传到美国上游，出口被打满。于是先做了两件事：<strong>出站请求体 gzip 压缩</strong>（省上传字节）+ <strong>实时面板</strong>（看见真相）。</p>
+<div class="card">
+<strong>但实测推翻了直觉。</strong> 通过 <code>httptrace</code> 精确分段后发现：
+<pre><code>上游直连「到首个真实 token」：
+  30KB  → 3.1s
+ 100KB  → 3.4s
+ 300KB  → 8.5s     ← 用户说的「300K 就慢」
+ 800KB  → 21.8s
+而 2MB body 上传只要 0.36s</code></pre>
+<p>结论：<strong>延迟的 80%+ 在上游 prefill（算力处理 prompt），不是我们的上传。</strong> 压缩只能省上传，省不了上游。这正是「延迟拆解」这个功能的由来——让任何人一眼看出瓶颈在哪一段，而不是猜。</p>
+</div>
+
+<h2>2. 做了什么（变更清单）</h2>
+<table>
+<tr><th>版本</th><th>变更</th><th>价值</th></tr>
+<tr><td><span class="tag">v1.3.68</span></td><td>出站请求体 gzip 压缩（渠道 opt-in）</td><td>大 prompt 上传字节降至 ~1%，出口拥塞缓解</td></tr>
+<tr><td><span class="tag">v1.3.69</span></td><td>实时请求详情面板 + 压缩阈值 1MB→256KB</td><td>看见进行中/排队/完成的请求；300K-1MB 也压缩</td></tr>
+<tr><td><span class="tag">v1.3.70</span></td><td>面板延迟拆解（上传 vs 上游 prefill）</td><td>一眼定位瓶颈段</td></tr>
+<tr><td><span class="tag">v1.3.71</span></td><td>消费日志记录延迟拆解</td><td>历史请求也能回看拆分</td></tr>
+<tr><td><span class="tag">fix</span></td><td>自我审查修复 4 处缺陷</td><td>竞态 / 尺寸 / 精度 / 半实现</td></tr>
+</table>
+
+<h2>3. 核心机制：延迟拆解</h2>
+<p>用 <code>net/http/httptrace.ClientTrace</code> 在网关发起上游请求处采集四个时间点：</p>
+<pre><code>ConnectDone           → 建连（含 TLS）
+WroteRequest          → 请求体写完上游（= 上传耗时）
+GotFirstResponseByte  → 上游响应头到达（= 上游 prefill 起点）</code></pre>
+<p>面板每行「首字」带分段条，hover 看明细：</p>
+<div class="card">
+<div class="bar"><i class="amber" style="width:10%"></i><i class="blue" style="width:90%"></i></div>
+<p style="font-size:13px;margin:6px 0 0"><span class="amber">■</span> 上传 692ms (9.5%) &nbsp; <span class="blue">■</span> 上游首 token 5874ms (81%) &nbsp; 建连 6ms</p>
+</div>
+
+<h2>4. 生产验收数据</h2>
+<div class="kpi">
+<div class="card"><div class="l">压缩比</div><div class="n good">0.6%</div><div class="l">2.25MB → 14KB</div></div>
+<div class="card"><div class="l">&gt;256KB 覆盖</div><div class="n good">100%</div><div class="l">256KB 阈值后</div></div>
+<div class="card"><div class="l">500 错误</div><div class="n good">0</div><div class="l">上线后</div></div>
+<div class="card"><div class="l">延迟拆解</div><div class="n">11/11</div><div class="l">日志覆盖</div></div>
+</div>
+<p>生产真实样本（566KB 请求）：<code>frt=4904ms</code> → 建连 154ms / <span class="amber">上传 623ms</span> / <span class="blue">上游 prefill 4835ms（83%）</span></p>
+
+<h2>5. 自我审查发现的 4 个真实缺陷（已修）</h2>
+<details><summary>1. 竞态：httptrace emit 锁外读取</summary><p><code>emit()</code> 在锁外读 <code>connectDone/wroteDone/firstByte</code>（锁内写、锁外读）。HTTP/2 下钩子跨 goroutine，构成 data race。改为同锁内快照再回调。</p></details>
+<details><summary>2. 尺寸：bodySize 对非可回放 body 返回 0</summary><p>透传 + reasoning_effort 路径返回 <code>*bytesReader</code>，不满足 ReplayableBody → <code>bodySize()=0</code> → 面板显示 0 B、压缩率算成 Infinity。改为压缩函数直接返回实测字节。</p></details>
+<details><summary>3. 精度：started_at 秒级截断</summary><p><code>.Unix()</code>（秒）导致 <code>elapsed_ms</code> 最多 999ms 误差。改 <code>UnixMilli()</code>。</p></details>
+<details><summary>4. 半实现：LivePhaseWaiting 永不驱动</summary><p>并发排队在中间件层，早于注册表注册，该状态生产永不出现。删除，排队数量改由 <code>concurrency.waiting</code> 暴露；同时接线 <code>streaming</code> 阶段。</p></details>
+
+<h2>6. 另一个问题：400 input[3].call_id</h2>
+<div class="card">
+<p><strong>归因：上游问题，非本网关。</strong></p>
+<p>客户端 chat 请求的 <code>tool_calls[].id</code> 为空 → 渠道 49 是 pass_through（原样转发）→ 上游（另一个 new-api 中转）内部做 chat→Responses 转换时，<code>function_call</code> item 缺 <code>call_id</code> → 上游 400。</p>
+<p>证据：直连上游（不经网关）用空 id 复现<strong>完全相同的 400</strong>；正常 id 经网关 200；近 1h <code>gpt-6-luna</code> 100 成功 / 0 错误。</p>
+</div>
+
+<h2>7. 测验（必须通过）</h2>
+<div class="quiz" id="quiz">
+
+<div class="q" data-correct="b">
+<div class="text">Q1. 生产大 prompt 首字延迟的主因是什么？</div>
+<label><input type="radio" name="q1" value="a"> A. 网关 CPU 处理大 prompt 太慢</label>
+<label><input type="radio" name="q1" value="b"> B. 上游 prefill（算力处理 prompt），占 80%+</label>
+<label><input type="radio" name="q1" value="c"> C. 5Mbps 上行带宽被打满</label>
+<label><input type="radio" name="q1" value="d"> D. 磁盘缓存写入慢</label>
+<div class="explain">实测：上游直连 800KB prompt 首 token 21.8s，而 2MB 上传只要 0.36s。瓶颈在上游算力。</div>
+</div>
+
+<div class="q" data-correct="c">
+<div class="text">Q2. 出站压缩能改善首字延迟的哪一部分？</div>
+<label><input type="radio" name="q2" value="a"> A. 上游 prefill</label>
+<label><input type="radio" name="q2" value="b"> B. 客户端→网关上传</label>
+<label><input type="radio" name="q2" value="c"> C. 网关→上游上传（省出口字节，缓解拥塞）</label>
+<label><input type="radio" name="q2" value="d"> D. 都不能改善</label>
+<div class="explain">压缩减少发往上游的字节，省上传时间并缓解出口拥塞；但无法减少上游处理 prompt 的时间。</div>
+</div>
+
+<div class="q" data-correct="a">
+<div class="text">Q3. 压缩阈值从 1MB 降到 256KB 的原因？</div>
+<label><input type="radio" name="q3" value="a"> A. 生产 300K-1MB 请求占 50%，此前全未压缩</label>
+<label><input type="radio" name="q3" value="b"> B. 压缩等级不够高</label>
+<label><input type="radio" name="q3" value="c"> C. 上游要求更大的 body</label>
+<label><input type="radio" name="q3" value="d"> D. 磁盘缓存需要更大阈值</label>
+<div class="explain">1MB 阈值下 300K-1MB 的请求完全没压缩——正是用户反馈「超过 300K 就慢」的区间。</div>
+</div>
+
+<div class="q" data-correct="d">
+<div class="text">Q4. 延迟拆解用哪个机制采集？</div>
+<label><input type="radio" name="q4" value="a"> A. 在 body 里插时间戳</label>
+<label><input type="radio" name="q4" value="b"> B. 客户端上报</label>
+<label><input type="radio" name="q4" value="c"> C. 上游响应头</label>
+<label><input type="radio" name="q4" value="d"> D. net/http/httptrace.ClientTrace</label>
+<div class="explain">httptrace 钩子采集 ConnectDone / WroteRequest / GotFirstResponseByte 三个时间点。</div>
+</div>
+
+<div class="q" data-correct="b">
+<div class="text">Q5. 400 input[3].call_id 是谁的问题？</div>
+<label><input type="radio" name="q5" value="a"> A. 我们的网关转换 bug</label>
+<label><input type="radio" name="q5" value="b"> B. 客户端发了空 tool_call id，上游自转 Responses 时拒绝</label>
+<label><input type="radio" name="q5" value="c"> C. 数据库损坏</label>
+<label><input type="radio" name="q5" value="d"> D. 压缩把 body 压坏了</label>
+<div class="explain">直连上游（不经网关）用空 id 复现完全相同的 400；渠道 49 是 pass_through 原样转发。</div>
+</div>
+
+<div class="q" data-correct="b">
+<div class="text">Q6. 自我审查发现的 httptrace 竞态是什么？</div>
+<label><input type="radio" name="q6" value="a"> A. 钩子被调用两次</label>
+<label><input type="radio" name="q6" value="b"> B. emit 在锁外读取锁内写入的变量（HTTP/2 跨 goroutine data race）</label>
+<label><input type="radio" name="q6" value="c"> C. mutex 死锁</label>
+<label><input type="radio" name="q6" value="d"> D. 没有竞态</label>
+<div class="explain">锁内写、锁外读不保证可见性；改为同锁内快照三段耗时再解锁回调。</div>
+</div>
+
+<div class="q" data-correct="c">
+<div class="text">Q7. 面板「延迟拆解条」中蓝色段代表？</div>
+<label><input type="radio" name="q7" value="a"> A. 建连耗时</label>
+<label><input type="radio" name="q7" value="b"> B. 上传耗时</label>
+<label><input type="radio" name="q7" value="c"> C. 上游首 token（prefill）耗时</label>
+<label><input type="radio" name="q7" value="d"> D. 计费耗时</label>
+<div class="explain">amber=上传，blue=上游首 token。蓝色段通常占大头，直接说明瓶颈。</div>
+</div>
+
+</div>
+<div id="score">已答 0 / 7 · 正确 0</div>
+
+<script>
+const qs=[...document.querySelectorAll('.q')]
+function update(){
+  let correct=0,answeredCount=0
+  for(const q of qs){
+    const sel=q.querySelector('input:checked')
+    if(!sel)continue
+    answeredCount++
+    const isRight=sel.value===q.dataset.correct
+    if(isRight)correct++
+    q.querySelectorAll('label').forEach(l=>{
+      l.classList.remove('right','wrong')
+      const inp=l.querySelector('input')
+      if(inp.checked) l.classList.add(isRight?'right':'wrong')
+      else if(inp.value===q.dataset.correct) l.classList.add('right')
+    })
+    q.querySelector('.explain').classList.add('show')
+  }
+  const allDone=answeredCount===qs.length
+  const el=document.getElementById('score')
+  el.textContent='已答 '+answeredCount+' / '+qs.length+' · 正确 '+correct+(allDone?(correct===qs.length?' ✅ 全部通过':' — 需全部答对'):'')
+  el.style.color=allDone?(correct===qs.length?'var(--good)':'var(--warn)'):'var(--fg)'
+}
+document.getElementById('quiz').addEventListener('change',update)
+</script>
+</div>
+</body>
+</html>
