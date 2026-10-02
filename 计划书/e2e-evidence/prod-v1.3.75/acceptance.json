@@ -1,0 +1,15 @@
+{
+  "version": "v1.3.75",
+  "deployed_at": "2026-10-02T20:48:01+08:00",
+  "feature": "fix i18n lazy-load t() translation + Setup wizard now Chinese for new visitors",
+  "sites": {
+    "main": {"domain": "freeapi.tingfengai.art", "method": "blue-green", "port": 3000, "check": "10/10=200"},
+    "second": {"domain": "japi.tingfengai.art", "method": "compose", "check": "10/10=200"}
+  },
+  "root_cause": "addResourceBundle passed the whole {translation:{...}} object; i18next expects the ns-direct keys -> keys stored as translation.translation.<key> -> t() missed -> fell back to English. All non-en locales were broken after the lazy-load change.",
+  "fix": "pass mod.default.translation (strip outer layer)",
+  "verified_local_browser": {
+    "en_browser_new_visitor": "Setup page fully Chinese (初始化 new-api-Max ...), htmlLang=zh-CN",
+    "explicit_en_user": "stays English (choice respected)"
+  }
+}
