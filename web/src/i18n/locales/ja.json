@@ -5348,6 +5348,7 @@
     "Upload to upstream": "上流へのアップロード",
     "Upstream first token": "上流の初回トークン",
     "upload {{upload}} · upstream {{upstream}}": "アップロード {{upload}} · 上流 {{upstream}}",
+    "Latency breakdown": "レイテンシ内訳",
     "Live Requests": "リアルタイムリクエスト",
     "Real-time request throughput, compression and latency.": "リアルタイムのスループット・圧縮・レイテンシ。",
     "Active requests": "実行中のリクエスト",

@@ -193,4 +193,58 @@ describe('buildRequestTimeline non-stream upstream inference', () => {
     expect(tl.phases.find((p) => p.key === 'upstream')?.status).toBe('failed')
   })
 
+
+  test("延迟拆解：有效计时写入 upstreamSplit", () => {
+    const src: TimelineSource = {
+      created_at: 1_700_000_000,
+      use_time: 8,
+      frt: 7250,
+      upstream_connect_ms: 6,
+      upstream_upload_ms: 692,
+      upstream_ttfb_ms: 5874,
+    }
+    const tl = buildRequestTimeline(src)
+    expect(tl.upstreamSplit).toEqual({
+      connectMs: 6,
+      uploadMs: 692,
+      ttfbMs: 5874,
+    })
+  })
+
+  test("延迟拆解：未采集（-1/缺省）时不产生 upstreamSplit", () => {
+    const missing = buildRequestTimeline({
+      created_at: 1,
+      use_time: 2,
+      frt: 500,
+    })
+    expect(missing.upstreamSplit).toBeUndefined()
+
+    const negative = buildRequestTimeline({
+      created_at: 1,
+      use_time: 2,
+      frt: 500,
+      upstream_upload_ms: -1,
+      upstream_ttfb_ms: -1,
+    })
+    expect(negative.upstreamSplit).toBeUndefined()
+  })
+
+  test("延迟拆解：JSON 导出包含 upstream_split", () => {
+    const src: TimelineSource = {
+      created_at: 1,
+      use_time: 8,
+      frt: 7250,
+      upstream_connect_ms: 6,
+      upstream_upload_ms: 692,
+      upstream_ttfb_ms: 5874,
+    }
+    const tl = buildRequestTimeline(src)
+    const json = JSON.parse(exportTimelineJson(src, tl))
+    expect(json.source.upstream_split).toEqual({
+      connect_ms: 6,
+      upload_ms: 692,
+      upstream_ttfb_ms: 5874,
+    })
+  })
+
 })

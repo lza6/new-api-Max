@@ -49,6 +49,34 @@ export interface RequestTimeline {
   failReason?: string
   /** 阶段列表（至少入站；老日志缺字段时只保留可推导节点） */
   phases: TimelinePhase[]
+  /** httptrace 延迟拆解（存在时）：上传 vs 上游首 token 的毫秒明细。 */
+  upstreamSplit?: {
+    connectMs: number
+    uploadMs: number
+    ttfbMs: number
+  }
+}
+
+/** 从 source 提取延迟拆解（全部字段有效且非负时返回）。 */
+function extractUpstreamSplit(
+  src: TimelineSource
+): RequestTimeline['upstreamSplit'] {
+  const connectMs = src.upstream_connect_ms
+  const uploadMs = src.upstream_upload_ms
+  const ttfbMs = src.upstream_ttfb_ms
+  if (
+    typeof uploadMs !== 'number' ||
+    typeof ttfbMs !== 'number' ||
+    uploadMs < 0 ||
+    ttfbMs < 0
+  ) {
+    return undefined
+  }
+  return {
+    connectMs: typeof connectMs === 'number' && connectMs >= 0 ? connectMs : 0,
+    uploadMs,
+    ttfbMs,
+  }
 }
 
 export interface TimelineSource {
@@ -75,6 +103,10 @@ export interface TimelineSource {
     elapsed_ms: number
     status?: string
   }>
+  /** httptrace 采集的延迟拆解（毫秒，-1/缺省=未采集）。用于区分上传 vs 上游 prefill。 */
+  upstream_connect_ms?: number | null
+  upstream_upload_ms?: number | null
+  upstream_ttfb_ms?: number | null
 }
 
 /** 从 consume log 构造请求时间线。老日志缺字段时优雅降级。 */
@@ -126,7 +158,7 @@ export function buildRequestTimeline(src: TimelineSource): RequestTimeline {
     if (phases.length === 0) {
       phases.push({ key: 'inbound', status: 'done', offsetMs: 0 })
     }
-    return { ok: !failed, failReason, phases }
+    return { ok: !failed, failReason, phases, upstreamSplit: extractUpstreamSplit(src) }
   }
 
   const totalMs = Math.max(0, Math.round((src.use_time || 0) * 1000))
@@ -215,6 +247,7 @@ export function buildRequestTimeline(src: TimelineSource): RequestTimeline {
     ok: !failed,
     failReason,
     phases,
+    upstreamSplit: extractUpstreamSplit(src),
   }
 }
 
@@ -240,6 +273,13 @@ export function exportTimelineJson(
         use_time_ms: Math.round((src.use_time || 0) * 1000),
         frt_ms: src.frt != null && src.frt > 0 ? Math.round(src.frt) : null,
         request_path: src.request_path ?? null,
+        upstream_split: timeline.upstreamSplit
+          ? {
+              connect_ms: timeline.upstreamSplit.connectMs,
+              upload_ms: timeline.upstreamSplit.uploadMs,
+              upstream_ttfb_ms: timeline.upstreamSplit.ttfbMs,
+            }
+          : null,
       },
     },
     null,

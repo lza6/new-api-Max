@@ -254,6 +254,11 @@ export interface LogOtherData {
   audio_ratio?: number
   audio_completion_ratio?: number
   frt?: number
+  // httptrace 延迟拆解（毫秒）：区分「网关→上游上传」与「上游首 token」。
+  // 由后端 appendUpstreamTiming 写入，未采集时缺省。
+  upstream_connect_ms?: number
+  upstream_upload_ms?: number
+  upstream_ttfb_ms?: number
   // Tiered (expression-based) billing fields, set by backend when
   // billing_mode === 'tiered_expr'. expr_b64 is the base64-encoded billing
   // expression; the matched tier and request-rule traces come from the actual

@@ -115,6 +115,9 @@ export function RequestTimelineCard(props: {
           <PhaseRow key={phase.key} phase={phase} />
         ))}
       </div>
+      {timeline.upstreamSplit ? (
+        <UpstreamSplitRow split={timeline.upstreamSplit} />
+      ) : null}
       <div className='mt-2 flex justify-end'>
         <Button
           type='button'
@@ -133,5 +136,55 @@ export function RequestTimelineCard(props: {
         </Button>
       </div>
     </DetailSection>
+  )
+}
+
+/** 延迟拆解行：上传 vs 上游首 token，带分段条，一眼看出瓶颈在哪段。 */
+function UpstreamSplitRow(props: {
+  split: NonNullable<RequestTimeline['upstreamSplit']>
+}) {
+  const { t } = useTranslation()
+  const { split } = props
+  const uploadMs = Math.max(0, split.uploadMs)
+  const ttfbMs = Math.max(0, split.ttfbMs)
+  const total = Math.max(1, uploadMs + ttfbMs)
+  const uploadPct = (uploadMs / total) * 100
+  return (
+    <div className='mt-2 space-y-1 rounded-md border border-dashed p-2'>
+      <div className='flex items-center justify-between text-xs'>
+        <span className='font-medium'>{t('Latency breakdown')}</span>
+        <span className='text-muted-foreground tabular-nums'>
+          {t('Connect')} {formatDurationMs(Math.max(0, split.connectMs))}
+        </span>
+      </div>
+      <div className='bg-muted flex h-2 w-full overflow-hidden rounded-full'>
+        <span
+          className='bg-amber-500'
+          style={{ width: `${uploadPct}%` }}
+          aria-hidden='true'
+        />
+        <span
+          className='bg-blue-500'
+          style={{ width: `${100 - uploadPct}%` }}
+          aria-hidden='true'
+        />
+      </div>
+      <div className='flex items-center justify-between text-[11px]'>
+        <span className='flex items-center gap-1.5'>
+          <span className='size-2 rounded-full bg-amber-500' aria-hidden='true' />
+          {t('Upload to upstream')}
+          <span className='text-muted-foreground tabular-nums'>
+            {formatDurationMs(uploadMs)}
+          </span>
+        </span>
+        <span className='flex items-center gap-1.5'>
+          <span className='size-2 rounded-full bg-blue-500' aria-hidden='true' />
+          {t('Upstream first token')}
+          <span className='text-muted-foreground tabular-nums'>
+            {formatDurationMs(ttfbMs)}
+          </span>
+        </span>
+      </div>
+    </div>
   )
 }

@@ -109,6 +109,7 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	// 前端 request-timeline 优先消费真实耗时，不再纯推测。数据全部来自
 	// StartTime/FirstResponseTime 真实时间戳；未设置时该字段省略（旧日志兼容）。
 	other.SetPublic("timeline_stages", buildTimelineStages(relayInfo))
+	appendUpstreamTiming(relayInfo, other)
 	if relayInfo.ReasoningEffort != "" {
 		other.SetPublic("reasoning_effort", relayInfo.ReasoningEffort)
 	}
@@ -131,6 +132,28 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	appendTrafficBytes(relayInfo, other)
 	appendStreamStatus(relayInfo, other)
 	return other
+}
+
+// appendUpstreamTiming 把 httptrace 采集的延迟拆解写入消费日志，供历史请求
+// 回看「上传耗时 vs 上游首 token 耗时」，定位瓶颈到底在网关→上游上传还是上游
+// prefill。字段名与实时请求面板一致（upstream_connect_ms / upstream_upload_ms /
+// upstream_ttfb_ms）。未采集（-1）时省略该字段（旧日志/非 relay 路径兼容）。
+func appendUpstreamTiming(relayInfo *relaycommon.RelayInfo, other *model.LogOther) {
+	if relayInfo == nil || other == nil {
+		return
+	}
+	if relayInfo.UpstreamConnectMs < 0 && relayInfo.UpstreamUploadMs < 0 && relayInfo.UpstreamTtfbMs < 0 {
+		return
+	}
+	if relayInfo.UpstreamConnectMs >= 0 {
+		other.SetPublic("upstream_connect_ms", relayInfo.UpstreamConnectMs)
+	}
+	if relayInfo.UpstreamUploadMs >= 0 {
+		other.SetPublic("upstream_upload_ms", relayInfo.UpstreamUploadMs)
+	}
+	if relayInfo.UpstreamTtfbMs >= 0 {
+		other.SetPublic("upstream_ttfb_ms", relayInfo.UpstreamTtfbMs)
+	}
 }
 
 func appendTrafficBytes(relayInfo *relaycommon.RelayInfo, other *model.LogOther) {

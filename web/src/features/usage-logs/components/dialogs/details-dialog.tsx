@@ -556,6 +556,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
     channel_affinity: other?.admin_info?.channel_affinity,
     stream_status: other?.stream_status,
     request_path: other?.request_path,
+    upstream_connect_ms: other?.upstream_connect_ms,
+    upstream_upload_ms: other?.upstream_upload_ms,
+    upstream_ttfb_ms: other?.upstream_ttfb_ms,
   })
   const timelineJson = exportTimelineJson(
     {
@@ -563,6 +566,9 @@ export function DetailsDialog(props: DetailsDialogProps) {
       use_time: props.log.use_time,
       frt: other?.frt,
       request_path: other?.request_path,
+      upstream_connect_ms: other?.upstream_connect_ms,
+      upstream_upload_ms: other?.upstream_upload_ms,
+      upstream_ttfb_ms: other?.upstream_ttfb_ms,
     },
     timeline
   )

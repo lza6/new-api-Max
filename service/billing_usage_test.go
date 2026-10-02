@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/lza6/new-api-Max/model"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -115,4 +116,39 @@ func TestAppendBillingExplainFixedPrice(t *testing.T) {
 	infs := explain["inferences"].([]map[string]any)
 	require.Len(t, infs, 1, "fixed-price 应有一条按请求计费推断")
 	assert.Equal(t, "pricing", infs[0]["kind"])
+}
+
+// 延迟拆解写入消费日志：有效计时写入三个字段，未采集（-1）时省略。
+func TestAppendUpstreamTiming(t *testing.T) {
+	// 有效计时：三段都写入。
+	other := model.NewLogOther()
+	info := &relaycommon.RelayInfo{
+		UpstreamConnectMs: 6,
+		UpstreamUploadMs:  692,
+		UpstreamTtfbMs:    5874,
+	}
+	appendUpstreamTiming(info, other)
+	snap := other.Snapshot()
+	assert.EqualValues(t, 6, snap["upstream_connect_ms"])
+	assert.EqualValues(t, 692, snap["upstream_upload_ms"])
+	assert.EqualValues(t, 5874, snap["upstream_ttfb_ms"])
+
+	// 未采集（-1）：不写任何字段（旧日志/非 relay 路径兼容）。
+	other2 := model.NewLogOther()
+	info2 := &relaycommon.RelayInfo{
+		UpstreamConnectMs: -1,
+		UpstreamUploadMs:  -1,
+		UpstreamTtfbMs:    -1,
+	}
+	appendUpstreamTiming(info2, other2)
+	snap2 := other2.Snapshot()
+	_, hasUpload := snap2["upstream_upload_ms"]
+	_, hasTtfb := snap2["upstream_ttfb_ms"]
+	assert.False(t, hasUpload, "未采集时不应写入 upstream_upload_ms")
+	assert.False(t, hasTtfb, "未采集时不应写入 upstream_ttfb_ms")
+
+	// nil info 不 panic。
+	other3 := model.NewLogOther()
+	appendUpstreamTiming(nil, other3)
+	assert.Empty(t, other3.Snapshot())
 }

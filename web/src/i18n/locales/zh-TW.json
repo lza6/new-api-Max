@@ -5348,6 +5348,7 @@
     "Upload to upstream": "上傳至上游",
     "Upstream first token": "上游首 token",
     "upload {{upload}} · upstream {{upstream}}": "上傳 {{upload}} · 上游 {{upstream}}",
+    "Latency breakdown": "延遲拆解",
     "Live Requests": "即時請求詳情",
     "Real-time request throughput, compression and latency.": "即時請求吞吐、壓縮與延遲。",
     "Active requests": "進行中請求",

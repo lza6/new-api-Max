@@ -5348,6 +5348,7 @@
     "Upload to upstream": "Upload to upstream",
     "Upstream first token": "Upstream first token",
     "upload {{upload}} · upstream {{upstream}}": "upload {{upload}} · upstream {{upstream}}",
+    "Latency breakdown": "Latency breakdown",
     "Live Requests": "Live Requests",
     "Real-time request throughput, compression and latency.": "Real-time request throughput, compression and latency.",
     "Active requests": "Active requests",

@@ -5348,6 +5348,7 @@
     "Upload to upstream": "上传至上游",
     "Upstream first token": "上游首 token",
     "upload {{upload}} · upstream {{upstream}}": "上传 {{upload}} · 上游 {{upstream}}",
+    "Latency breakdown": "延迟拆解",
     "Live Requests": "实时请求详情",
     "Real-time request throughput, compression and latency.": "实时请求吞吐、压缩与延迟。",
     "Active requests": "进行中请求",

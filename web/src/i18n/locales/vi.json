@@ -5348,6 +5348,7 @@
     "Upload to upstream": "Tải lên upstream",
     "Upstream first token": "Token đầu của upstream",
     "upload {{upload}} · upstream {{upstream}}": "tải lên {{upload}} · upstream {{upstream}}",
+    "Latency breakdown": "Phân tách độ trễ",
     "Live Requests": "Yêu cầu trực tiếp",
     "Real-time request throughput, compression and latency.": "Thông lượng, nén và độ trễ yêu cầu theo thời gian thực.",
     "Active requests": "Yêu cầu đang hoạt động",

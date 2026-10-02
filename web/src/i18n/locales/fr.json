@@ -5348,6 +5348,7 @@
     "Upload to upstream": "Envoi vers l’amont",
     "Upstream first token": "Premier token de l’amont",
     "upload {{upload}} · upstream {{upstream}}": "envoi {{upload}} · amont {{upstream}}",
+    "Latency breakdown": "Répartition de la latence",
     "Live Requests": "Requêtes en direct",
     "Real-time request throughput, compression and latency.": "Débit, compression et latence des requêtes en temps réel.",
     "Active requests": "Requêtes actives",

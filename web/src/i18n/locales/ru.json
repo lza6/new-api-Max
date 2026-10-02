@@ -5348,6 +5348,7 @@
     "Upload to upstream": "Загрузка на апстрим",
     "Upstream first token": "Первый токен апстрима",
     "upload {{upload}} · upstream {{upstream}}": "загрузка {{upload}} · апстрим {{upstream}}",
+    "Latency breakdown": "Разбивка задержки",
     "Live Requests": "Запросы в реальном времени",
     "Real-time request throughput, compression and latency.": "Пропускная способность, сжатие и задержка запросов в реальном времени.",
     "Active requests": "Активные запросы",
