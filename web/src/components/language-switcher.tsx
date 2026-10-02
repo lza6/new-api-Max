@@ -31,7 +31,7 @@ import {
   INTERFACE_LANGUAGE_OPTIONS,
   normalizeInterfaceLanguage,
 } from '@/i18n/languages'
-import { ensureLanguageLoaded } from '@/i18n/config'
+import { setLanguage } from '@/i18n/config'
 import { api } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
@@ -42,9 +42,8 @@ export function LanguageSwitcher() {
   const currentLanguage = normalizeInterfaceLanguage(i18n.language)
   const handleChangeLanguage = useCallback(
     async (code: string) => {
-      // 先确保语言包已加载（按需动态 import），再切换，避免切换后短暂显示 fallback。
-      await ensureLanguageLoaded(code)
-      await i18n.changeLanguage(code)
+      // setLanguage：加载语言包 + 持久化用户选择 + 切换。
+      await setLanguage(code)
       if (user) {
         try {
           await api.put('/api/user/self', { language: code })
@@ -53,7 +52,7 @@ export function LanguageSwitcher() {
         }
       }
     },
-    [i18n, user]
+    [user]
   )
 
   return (
