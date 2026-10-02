@@ -109,8 +109,8 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 // #root 初始含 index.html 的加载指示（app-boot-loader）；React 首次渲染会替换它。
 // 用替换而非 append：createRoot().render() 会接管 #root 的全部子节点。
 const root = ReactDOM.createRoot(rootElement)
-// 等语言包就绪再挂载：避免首屏（尤其 Setup 向导）用 fallback 英文渲染后闪切中文。
-// i18nReady 在 en（或加载失败）时立即 resolve，不拖慢首屏。
+// 等语言包就绪再挂载：避免首屏（尤其 Setup 向导）用 fallback 渲染后闪切当前语言。
+// 所有语言包（含 en）均为按需加载；加载失败时 i18nReady 也会 resolve，不永久阻塞首屏。
 void i18nReady.then(() => {
   root.render(
     <StrictMode>

@@ -20,15 +20,14 @@ import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
 import { convertDetectedLanguage } from './languages'
-// [性能] 只静态打包 en（fallback，任何语言缺失键时都要用）。其余 6 个语言包
-// 合计约 3.3MB，改为按需动态 import —— 首屏只加载当前语言，把入口 bundle 从
-// ~3.7MB 降到 ~0.5MB（跨境弱网下这是能否打开的关键）。切换语言时用
-// ensureLanguageLoaded() 先加载对应语言包再 changeLanguage。
-import en from './locales/en.json'
+// [性能] 所有语言包（含 fallback en）统一按需动态 import。en 不再静态打包：
+// 其键就是英文源串，某语言缺键时会自然回退为英文键文本，无需把整份 en 压进
+// 首屏 bundle。首屏只下载当前语言（实测各语言键数与 en 完全一致，6842/6842）。
+// 切换语言时用 ensureLanguageLoaded() 先加载对应语言包再 changeLanguage。
 
 /** 语言包懒加载器：每个语言一个动态 import（被拆成独立 chunk）。 */
 const localeLoaders: Record<string, () => Promise<{ default: unknown }>> = {
-  en: async () => ({ default: en }),
+  en: () => import('./locales/en.json'),
   zhCN: () => import('./locales/zh.json'),
   zhTW: () => import('./locales/zh-TW.json'),
   fr: () => import('./locales/fr.json'),
@@ -42,7 +41,7 @@ const LANGUAGE_STORAGE_KEY = 'i18nextLng'
 /** 默认语言：简体中文（新访客）。 */
 const DEFAULT_LANGUAGE = 'zhCN'
 
-const loadedLanguages = new Set<string>(['en'])
+const loadedLanguages = new Set<string>()
 const loadingPromises = new Map<string, Promise<void>>()
 
 /**
@@ -137,9 +136,7 @@ export async function setLanguage(code: string): Promise<void> {
   syncHtmlLang(code)
 }
 
-export const resources = {
-  en,
-} as const
+export const resources = {} as const
 
 // 初始语言：显式选择优先，否则默认简体中文。
 // 不使用 LanguageDetector 的浏览器语言检测——避免非中文浏览器被带到英文；
@@ -159,20 +156,16 @@ i18n.use(initReactI18next).init({
   },
 })
 
-// 初始语言非 en 时异步加载其语言包。
-// [关键] 加载完成后必须**无条件 changeLanguage**：i18n.language 初始就是
+// 初始语言语言包加载完成后必须**无条件 changeLanguage**：i18n.language 初始就是
 // initialLanguage（如 zhCN），但此时资源尚未加载，i18next 的 resolvedLanguage
-// 会降级到 fallback en；addResourceBundle 后需 changeLanguage 触发重新解析，
-// 才会真正切换到该语言。仅当 language !== initialLanguage 才切是错的。
+// 会降级到 fallback；addResourceBundle 后需 changeLanguage 触发重新解析，才会
+// 真正切换到该语言。仅当 language !== initialLanguage 才切是错的。
 //
 // i18nReady：语言就绪 promise。main.tsx 会 await 它再 render，确保首屏（含
-// Setup 向导页）用正确语言渲染，而不是先用 fallback en 渲染再闪切。
-export const i18nReady: Promise<void> =
-  initialLanguage === 'en'
-    ? Promise.resolve()
-    : ensureLanguageLoaded(initialLanguage).then(() =>
-        i18n.changeLanguage(initialLanguage).then(() => undefined)
-      )
+// Setup 向导页）用正确语言渲染，而不是先用 fallback 渲染再闪切。
+export const i18nReady: Promise<void> = ensureLanguageLoaded(
+  initialLanguage
+).then(() => i18n.changeLanguage(initialLanguage).then(() => undefined))
 
 // 首屏语言确定后同步 <html lang>（i18nReady 完成后即可；同步设置一次）。
 void i18nReady.then(() => syncHtmlLang(initialLanguage))

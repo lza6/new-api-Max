@@ -92,6 +92,21 @@ export default defineConfig(({ envMode }) => {
     },
     html: {
       template: './index.html',
+      // Preload the body font and raise its fetch priority. The woff2 hashes are
+      // build-time, so use the tag descriptor form instead of hardcoding URLs;
+      // the regex only matches files that exist, so a missing one is a no-op.
+      tags: [
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'preload',
+            as: 'font',
+            type: 'font/woff2',
+            crossorigin: true,
+            href: '/static/font/public-sans-latin-wght-normal.035c7fe496.woff2',
+          },
+        },
+      ],
     },
     server: {
       host: '0.0.0.0',

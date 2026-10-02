@@ -17,13 +17,36 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import DOMPurify from 'dompurify'
-import * as katex from 'katex'
 
 import 'katex/dist/katex.min.css'
 import { Marked, Renderer, type MarkedExtension, type Tokens } from 'marked'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 
 import { cn } from '@/lib/utils'
+
+// KaTeX is ~3 MB and only needed for content that actually contains math, so it
+// is loaded on demand instead of being pulled into the initial bundle. Until it
+// resolves, math is shown as escaped source and upgraded in place once ready.
+type KatexModule = typeof import('katex')
+let katexModule: KatexModule | null = null
+let katexLoadPromise: Promise<void> | null = null
+const katexListeners = new Set<() => void>()
+const MATH_PATTERN = /\$\$|\\\(|\\\[|^```(?:math|katex|latex)\b/m
+
+function ensureKatexLoaded(): void {
+  if (katexModule || katexLoadPromise) {return}
+  katexLoadPromise = import('katex')
+    .then((mod) => {
+      katexModule = mod
+      katexListeners.forEach((listener) => listener())
+    })
+    .catch(() => {
+      // Leave math as escaped source if KaTeX cannot load.
+    })
+    .finally(() => {
+      katexLoadPromise = null
+    })
+}
 
 interface MarkdownProps {
   breaks?: boolean
@@ -181,7 +204,13 @@ function normalizeMathSource(source: string): string {
 }
 
 function renderMath(source: string, displayMode: boolean): string {
-  return katex.renderToString(normalizeMathSource(source), {
+  const normalized = normalizeMathSource(source)
+  if (!katexModule) {
+    // KaTeX not loaded yet: show the raw source, escaped, until it arrives.
+    ensureKatexLoaded()
+    return `<code class="katex-pending">${escapeHtml(normalized)}</code>`
+  }
+  return katexModule.renderToString(normalized, {
     displayMode,
     output: 'htmlAndMathml',
     throwOnError: false,
@@ -745,9 +774,23 @@ function renderMarkdown(markdown: string, breaks = false): string {
 }
 
 export function Markdown(props: MarkdownProps) {
+  // Re-render once KaTeX finishes loading so its math replaces the escaped
+  // placeholder. Only content that actually contains math triggers the import.
+  const [, setKatexReady] = useState(() => Boolean(katexModule))
+  useEffect(() => {
+    if (!MATH_PATTERN.test(props.children)) {return}
+    if (katexModule) {return}
+    const listener = () => setKatexReady(true)
+    katexListeners.add(listener)
+    ensureKatexLoaded()
+    return () => {
+      katexListeners.delete(listener)
+    }
+  }, [props.children])
+
   const html = useMemo(
     () => renderMarkdown(props.children, props.breaks),
-    [props.breaks, props.children]
+    [props.breaks, props.children, katexModule]
   )
 
   return (
