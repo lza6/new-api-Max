@@ -1,0 +1,19 @@
+{
+  "version": "v1.3.73",
+  "deployed_at": "2026-10-02T17:48:19+08:00",
+  "deploy_method": "deploy-zero-downtime.sh (blue-green)",
+  "upstream_port": 3000,
+  "external_check": "15/15 = 200",
+  "errors_500": 0,
+  "memory_available_mb": 909,
+  "feature": "i18n locale bundles lazy-loaded (on-demand import)",
+  "bundle_before_after": {
+    "entry_index_js_raw": "4506KB -> 1321KB (-71%)",
+    "entry_index_js_gzip": "1284KB -> 324KB (-75%)",
+    "root_cause": "7 locale JSON files (~3.8MB) were statically bundled into the entry chunk",
+    "fix": "only en stays static (fallback); other 6 locales loaded via dynamic import() as separate chunks"
+  },
+  "production_entry_gzip_bytes": 324228,
+  "locale_chunks": ["zh-CN 319KB", "zh-TW 322KB", "ja 544KB (independent chunks)"],
+  "why": "cross-border weak networks could not download the 4.5MB entry -> React never booted -> blank page"
+}
