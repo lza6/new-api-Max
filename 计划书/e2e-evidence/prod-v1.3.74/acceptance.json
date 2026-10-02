@@ -1,0 +1,28 @@
+{
+  "version": "v1.3.74",
+  "deployed_at": "2026-10-02T19:30:48+08:00",
+  "feature": "default language = Simplified Chinese (zhCN) for new visitors",
+  "sites": {
+    "main": {
+      "domain": "freeapi.tingfengai.art",
+      "ip": "103.233.252.213",
+      "method": "deploy-zero-downtime.sh (blue-green)",
+      "upstream_port": 3001,
+      "external_check": "10/10 = 200",
+      "errors_500": 0
+    },
+    "second": {
+      "domain": "japi.tingfengai.art",
+      "ip": "103.110.80.198",
+      "method": "deploy.sh (docker compose recreate)",
+      "external_check": "10/10 = 200",
+      "container": "healthy"
+    }
+  },
+  "behavior": {
+    "new_visitor": "zhCN (Simplified Chinese)",
+    "explicit_choice": "respected (localStorage i18nextLng)",
+    "browser_language": "ignored (no longer forces English)"
+  },
+  "tests": "config-default-language 4/4 (new->zhCN / kept / zh-TW normalize / setLanguage persists)"
+}
