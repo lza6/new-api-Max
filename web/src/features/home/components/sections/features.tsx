@@ -180,13 +180,13 @@ export function Features(_props: FeaturesProps) {
   ]
 
   return (
-    <section className='relative z-10 px-6 py-24 md:py-32'>
+    <section className='relative z-10 px-6 py-28 md:py-36'>
       <div className='mx-auto max-w-6xl'>
         <AnimateInView className='mb-16 max-w-lg'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
+          <p className='text-muted-foreground/70 mb-4 text-[11px] font-medium tracking-[0.28em] uppercase'>
             {t('Core Features')}
           </p>
-          <h2 className='text-2xl leading-tight font-bold tracking-tight md:text-3xl'>
+          <h2 className='font-serif text-3xl leading-[1.18] tracking-tight md:text-[2.5rem]'>
             {t('Built for developers,')}
             <br />
             {t('designed for scale')}

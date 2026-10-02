@@ -1,0 +1,28 @@
+[
+  {
+    "name": "Hero 标题渲染",
+    "ok": true,
+    "detail": "Unified API Gateway for\nVast Range of AI Models"
+  },
+  {
+    "name": "请求流向区块可见",
+    "ok": true
+  },
+  {
+    "name": "流水线阶段 Client/Gateway 可见",
+    "ok": true
+  },
+  {
+    "name": "延迟拆解含 Upstream compute",
+    "ok": true
+  },
+  {
+    "name": "切到 Claude 后上游显示 Anthropic",
+    "ok": true
+  },
+  {
+    "name": "无控制台错误",
+    "ok": true,
+    "detail": ""
+  }
+]

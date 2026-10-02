@@ -50,13 +50,13 @@ export function HowItWorks() {
   ]
 
   return (
-    <section className='border-border/40 relative z-10 border-t px-6 py-24 md:py-32'>
+    <section className='border-border/40 relative z-10 border-t px-6 py-28 md:py-36'>
       <div className='mx-auto max-w-6xl'>
         <AnimateInView className='mb-16 text-center md:mb-20'>
-          <p className='text-muted-foreground mb-3 text-xs font-medium tracking-widest uppercase'>
+          <p className='text-muted-foreground/70 mb-4 text-[11px] font-medium tracking-[0.28em] uppercase'>
             {t('How It Works')}
           </p>
-          <h2 className='text-2xl font-bold tracking-tight md:text-3xl'>
+          <h2 className='font-serif text-3xl leading-[1.18] tracking-tight md:text-[2.5rem]'>
             {t('Three steps to get started')}
           </h2>
         </AnimateInView>

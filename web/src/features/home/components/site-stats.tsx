@@ -68,12 +68,14 @@ export function SiteStats() {
       {stats.map((s) => (
         <div
           key={s.label}
-          className='flex flex-col items-center gap-1 text-center'
+          className='flex flex-col items-center gap-1.5 text-center'
         >
-          <span className='text-2xl font-bold tracking-tight md:text-3xl'>
+          <span className='font-serif text-3xl font-medium tracking-tight tabular-nums md:text-4xl'>
             {s.value}
           </span>
-          <span className='text-muted-foreground text-xs'>{s.label}</span>
+          <span className='text-muted-foreground/70 text-[11px] tracking-wide'>
+            {s.label}
+          </span>
         </div>
       ))}
     </div>
