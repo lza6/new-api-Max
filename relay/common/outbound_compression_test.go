@@ -44,7 +44,7 @@ func TestMaybeCompressOutboundBody_Disabled(t *testing.T) {
 	require.NoError(t, err)
 	defer closer.Close()
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(false), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(false), body)
 	assert.False(t, compressed)
 	assert.Nil(t, outCloser)
 	assert.True(t, out == body, "disabled channel must return the original body unchanged")
@@ -60,7 +60,7 @@ func TestMaybeCompressOutboundBody_CompressesLargeJSON(t *testing.T) {
 	require.NoError(t, err)
 	defer closer.Close()
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
 	require.True(t, compressed)
 	require.NotNil(t, outCloser)
 	defer outCloser.Close()
@@ -89,7 +89,7 @@ func TestMaybeCompressOutboundBody_SkipsSmallBody(t *testing.T) {
 	require.NoError(t, err)
 	defer closer.Close()
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
 	assert.False(t, compressed)
 	assert.Nil(t, outCloser)
 	assert.True(t, out == body)
@@ -107,7 +107,7 @@ func TestMaybeCompressOutboundBody_IncompressibleStaysPlain(t *testing.T) {
 	require.NoError(t, err)
 	defer closer.Close()
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
 	assert.False(t, compressed, "incompressible body must stay plain")
 	assert.Nil(t, outCloser)
 	got, err := io.ReadAll(out)
@@ -126,7 +126,7 @@ func TestMaybeCompressOutboundBody_GlobalKillSwitch(t *testing.T) {
 	require.NoError(t, err)
 	defer closer.Close()
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
 	assert.False(t, compressed)
 	assert.Nil(t, outCloser)
 	assert.True(t, out == body)
@@ -137,7 +137,7 @@ func TestMaybeCompressOutboundBody_NonReplayableInput(t *testing.T) {
 	t.Parallel()
 	payload := []byte(`{"model":"m","messages":[{"role":"user","content":"` + strings.Repeat("hello world ", 200000) + `"}]}`)
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), bytes.NewReader(payload))
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), bytes.NewReader(payload))
 	require.True(t, compressed)
 	require.NotNil(t, outCloser)
 	defer outCloser.Close()
@@ -175,7 +175,7 @@ func TestOutboundCompression_EndToEndContract(t *testing.T) {
 	require.NoError(t, err)
 	defer closer.Close()
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
 	require.True(t, compressed)
 	require.NotNil(t, outCloser)
 	defer outCloser.Close()
@@ -213,7 +213,7 @@ func TestMaybeCompressOutboundBody_StorageFailureFallsBackToPlain(t *testing.T) 
 	})
 	defer common.SetDiskCacheConfig(prev)
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
 	require.NotNil(t, out, "must never return nil body")
 	assert.False(t, compressed, "storage failure must fall back to plain")
 	assert.Nil(t, outCloser)
@@ -228,7 +228,7 @@ func TestMaybeCompressOutboundBody_NonReplayableUncompressedReturnsReplayableRea
 	t.Parallel()
 	payload := []byte(`{"model":"m","messages":[{"role":"user","content":"hi"}]}`)
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), bytes.NewReader(payload))
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), bytes.NewReader(payload))
 	assert.False(t, compressed)
 	assert.Nil(t, outCloser)
 	got, err := io.ReadAll(out)
@@ -249,7 +249,7 @@ func TestMaybeCompressOutboundBody_300KBCompressedAtNewThreshold(t *testing.T) {
 	require.NoError(t, err)
 	defer closer.Close()
 
-	out, compressed, outCloser := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	out, compressed, outCloser, _, _ := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
 	require.NotNil(t, out)
 	if outCloser != nil {
 		defer outCloser.Close()
@@ -258,4 +258,38 @@ func TestMaybeCompressOutboundBody_300KBCompressedAtNewThreshold(t *testing.T) {
 	got, err := io.ReadAll(out)
 	require.NoError(t, err)
 	assert.Equal(t, payload, gzipDecompress(t, got))
+}
+
+// 尺寸契约：返回的 originalBytes/outBytes 必须准确反映压缩前后字节，
+// 非可回放 body 也要有正确尺寸（此前 bodySize 对非可回放返回 0 → 面板显示 0/Infinity）。
+func TestMaybeCompressOutboundBody_SizeContract(t *testing.T) {
+	t.Parallel()
+	payload := []byte(`{"model":"m","messages":[{"role":"user","content":"` + strings.Repeat("hello world ", 200000) + `"}]}`)
+
+	// 可回放输入：原始尺寸 = payload 长度，压缩后 < 原始。
+	body, closer, err := NewOutboundJSONBody(payload)
+	require.NoError(t, err)
+	defer closer.Close()
+	_, compressed, outCloser, orig, out := MaybeCompressOutboundBody(nil, compressionTestInfo(true), body)
+	if outCloser != nil {
+		defer outCloser.Close()
+	}
+	require.True(t, compressed)
+	assert.EqualValues(t, len(payload), orig, "可回放：原始尺寸准确")
+	assert.Less(t, out, orig, "压缩后更小")
+
+	// 非可回放输入（*bytes.Reader，模拟透传+reasoning_effort 路径）：尺寸也必须准确，
+	// 不能是 0。
+	_, compressed2, outCloser2, orig2, out2 := MaybeCompressOutboundBody(nil, compressionTestInfo(true), bytes.NewReader(payload))
+	if outCloser2 != nil {
+		defer outCloser2.Close()
+	}
+	require.True(t, compressed2)
+	assert.EqualValues(t, len(payload), orig2, "非可回放：原始尺寸也必须准确（非 0）")
+	assert.Less(t, out2, orig2)
+
+	// 渠道未开压缩：返回 -1（调用方据此跳过展示，不显示 0）。
+	_, _, _, orig3, out3 := MaybeCompressOutboundBody(nil, compressionTestInfo(false), bytes.NewReader(payload))
+	assert.EqualValues(t, -1, orig3)
+	assert.EqualValues(t, -1, out3)
 }

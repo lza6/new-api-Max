@@ -88,7 +88,6 @@ export type SystemInstanceDeleteResponse = {
 
 export type LiveRequestPhase =
   | 'received'
-  | 'waiting'
   | 'upstream'
   | 'streaming'
   | 'done'

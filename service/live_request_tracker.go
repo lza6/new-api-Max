@@ -23,14 +23,15 @@ const (
 	finishedRetentionSec = 60   // 最近完成保留时长（秒）
 )
 
-// LiveRequestPhase 请求所处阶段。
+// LiveRequestPhase 请求所处阶段。注意：全局并发排队发生在 relay 中间件层，
+// 早于本注册表注册（LiveBegin），故不设单请求 waiting 阶段；排队数量见
+// middleware.GetGlobalConcurrencyStats().Waiting（面板已展示 active/limit/waiting）。
 type LiveRequestPhase string
 
 const (
 	LivePhaseReceived  LiveRequestPhase = "received"   // 已接收，尚未选中渠道
-	LivePhaseWaiting   LiveRequestPhase = "waiting"    // 等待并发令牌/排队
 	LivePhaseUpstream  LiveRequestPhase = "upstream"   // 已发往上游，等待/接收响应
-	LivePhaseStreaming LiveRequestPhase = "streaming"  // 流式接收中
+	LivePhaseStreaming LiveRequestPhase = "streaming"  // 流式接收中（已收到首个有效 data 块）
 	LivePhaseDone      LiveRequestPhase = "done"       // 已完成
 	LivePhaseError     LiveRequestPhase = "error"      // 失败
 )
@@ -46,7 +47,7 @@ type LiveRequestEntry struct {
 	ChannelName string           `json:"channel_name"`
 	IsStream    bool             `json:"is_stream"`
 	Phase       LiveRequestPhase `json:"phase"`
-	StartedAt   int64            `json:"started_at"`   // unix 秒
+	StartedAt   int64            `json:"started_at"`   // unix 毫秒（避免 elapsed 被量化到整秒）
 	ElapsedMs   int64            `json:"elapsed_ms"`   // 快照时已耗时
 	RetryIndex  int              `json:"retry_index"`  // 第几次渠道尝试（0 起）
 
@@ -90,7 +91,7 @@ func LiveBegin(reqId string, entry LiveRequestEntry) {
 	entry.RequestId = reqId
 	entry.Phase = LivePhaseReceived
 	if entry.StartedAt == 0 {
-		entry.StartedAt = time.Now().Unix()
+		entry.StartedAt = time.Now().UnixMilli()
 	}
 	// 计时字段默认 -1（未采集），避免零值被当作「0ms」计入平均。
 	if entry.UpstreamConnectMs == 0 {
@@ -186,7 +187,7 @@ func LiveEnd(reqId string, statusCode int, errMsg string) {
 		}
 	}
 	e.FinishedAt = now.Unix()
-	e.ElapsedMs = now.Sub(time.Unix(e.StartedAt, 0)).Milliseconds()
+	e.ElapsedMs = now.UnixMilli() - e.StartedAt
 	e.StatusCode = statusCode
 	e.ErrorMsg = errMsg
 	if errMsg != "" || statusCode >= 400 {
@@ -241,7 +242,7 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 	// 进行中：复制并刷新 elapsed（不修改共享对象）。
 	for _, e := range liveRequests.active {
 		cp := *e
-		cp.ElapsedMs = now.Sub(time.Unix(e.StartedAt, 0)).Milliseconds()
+		cp.ElapsedMs = now.UnixMilli() - e.StartedAt
 		snap.Active = append(snap.Active, &cp)
 	}
 	sort.Slice(snap.Active, func(i, j int) bool {

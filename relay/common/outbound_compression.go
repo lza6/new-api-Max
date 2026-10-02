@@ -22,8 +22,10 @@ import (
 // （实测 >20MB → 200s+）。JSON 文本可压到 ~1%，显著缩短上传时间。
 //
 // 契约：
-//   - 返回 (body, compressed, closer)。compressed=true 时调用方必须在请求
-//     结束后 closer.Close()，并给上游请求设置 Content-Encoding: gzip。
+//   - 返回 (body, compressed, closer, originalBytes, outBytes)。compressed=true 时
+//     调用方必须在请求结束后 closer.Close()，并给上游请求设置 Content-Encoding: gzip。
+//   - originalBytes/outBytes 是**本函数实测**的请求体字节（压缩前/实际发往上游），
+//     供实时面板与日志展示；无法测得时为 -1（调用方据此跳过展示，避免显示 0/Infinity）。
 //   - fail-open 且**永不返回 nil body**：任何前置条件不满足、压缩失败、或压缩后
 //     不小于原文时，都回退为可用的明文 body（compressed=false，closer=nil）——
 //     绝不因压缩失败而拒绝请求或发出空 body。
@@ -31,15 +33,15 @@ import (
 //     ReplayableBody；明文回退是 *bytes.Reader（net/http 自动为其生成 GetBody）。
 //
 // 仅网关自行序列化的 JSON 请求体走此路径；multipart/表单/websocket 不涉及。
-func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) (io.Reader, bool, io.Closer) {
+func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) (io.Reader, bool, io.Closer, int64, int64) {
 	if body == nil || info == nil {
-		return body, false, nil
+		return body, false, nil, -1, -1
 	}
 	if !common.RelayRequestCompressionEnabled {
-		return body, false, nil
+		return body, false, nil, -1, -1
 	}
 	if info.ChannelMeta == nil || !info.ChannelSetting.RequestCompression {
-		return body, false, nil
+		return body, false, nil, -1, -1
 	}
 
 	threshold := int64(common.RelayRequestCompressionThresholdKB) << 10
@@ -49,29 +51,29 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 	if replayable, ok := body.(common.ReplayableBody); ok {
 		size := replayable.Size()
 		if threshold > 0 && size < threshold {
-			return body, false, nil
+			return body, false, nil, size, size
 		}
 		reader, err := replayable.NewReader()
 		if err != nil {
 			logCompressionWarn(c, fmt.Sprintf("request compression: cannot open replay reader, sending uncompressed: %v", err))
-			return body, false, nil
+			return body, false, nil, size, size
 		}
 		compressed, err := gzipBytes(reader)
 		_ = reader.Close()
 		if err != nil {
 			logCompressionWarn(c, fmt.Sprintf("request compression: gzip failed, sending uncompressed: %v", err))
-			return body, false, nil
+			return body, false, nil, size, size
 		}
 		if int64(len(compressed)) >= size {
 			// 压缩无收益（已压缩内容/极小 body）：保持明文。
-			return body, false, nil
+			return body, false, nil, size, size
 		}
 		compressedBody, closer, ok := storeCompressedBody(c, compressed, size)
 		if !ok {
 			// 存储失败：原 body 仍完整可用，原样转发。
-			return body, false, nil
+			return body, false, nil, size, size
 		}
-		return compressedBody, true, closer
+		return compressedBody, true, closer, size, int64(len(compressed))
 	}
 
 	// 非可回放 body：先整体读入内存。此类 body 本就在内存中（如透传重序列化后的
@@ -87,20 +89,21 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 	raw, err := io.ReadAll(io.LimitReader(body, limit))
 	if err != nil {
 		logCompressionWarn(c, fmt.Sprintf("request compression: cannot read body, sending uncompressed: %v", err))
-		return body, false, nil
+		return body, false, nil, -1, -1
 	}
-	if threshold > 0 && int64(len(raw)) < threshold {
-		return bytes.NewReader(raw), false, nil
+	originalLen := int64(len(raw))
+	if threshold > 0 && originalLen < threshold {
+		return bytes.NewReader(raw), false, nil, originalLen, originalLen
 	}
 	compressed, err := gzipBytes(bytes.NewReader(raw))
 	if err != nil || len(compressed) >= len(raw) {
-		return bytes.NewReader(raw), false, nil
+		return bytes.NewReader(raw), false, nil, originalLen, originalLen
 	}
-	compressedBody, closer, ok := storeCompressedBody(c, compressed, int64(len(raw)))
+	compressedBody, closer, ok := storeCompressedBody(c, compressed, originalLen)
 	if !ok {
-		return bytes.NewReader(raw), false, nil
+		return bytes.NewReader(raw), false, nil, originalLen, originalLen
 	}
-	return compressedBody, true, closer
+	return compressedBody, true, closer, originalLen, int64(len(compressed))
 }
 
 // storeCompressedBody 把压缩后的字节封装成可回放 body。返回 ok=false 表示

@@ -52,7 +52,6 @@ const SKELETON_KEYS = [
 
 const PHASE_STYLE: Record<LiveRequestPhase, string> = {
   received: 'bg-slate-100 text-slate-700 dark:bg-slate-500/15 dark:text-slate-300',
-  waiting: 'bg-amber-50 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
   upstream: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
   streaming: 'bg-cyan-50 text-cyan-700 dark:bg-cyan-500/15 dark:text-cyan-300',
   done: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
@@ -118,9 +117,10 @@ function CompressionHint(props: { entry: LiveRequestEntry }) {
   const { t } = useTranslation()
   const { entry } = props
   if (!entry.compressed) {
+    // 未压缩：显示原始字节；未采集（0）时显示占位，避免误读为「0 字节请求」。
     return (
       <span className='text-muted-foreground text-xs tabular-nums'>
-        {formatBytes(entry.original_bytes)}
+        {entry.original_bytes > 0 ? formatBytes(entry.original_bytes) : '—'}
       </span>
     )
   }
@@ -216,7 +216,6 @@ function RequestRow(props: { entry: LiveRequestEntry }) {
   const phaseLabel = t(
     {
       received: 'Received',
-      waiting: 'Waiting',
       upstream: 'Upstream',
       streaming: 'Streaming',
       done: 'Done',

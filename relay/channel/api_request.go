@@ -321,14 +321,6 @@ func applyHeaderOverrideToRequest(req *http.Request, headerOverride map[string]s
 	}
 }
 
-// bodySize 返回可回放请求体的字节数；不可回放时返回 0。
-func bodySize(body io.Reader) int64 {
-	if r, ok := body.(common2.ReplayableBody); ok {
-		return r.Size()
-	}
-	return 0
-}
-
 func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody io.Reader) (*http.Response, error) {
 	fullRequestURL, err := a.GetRequestURL(info)
 	if err != nil {
@@ -336,21 +328,16 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	}
 	logger.LogDebug(c, "fullRequestURL: %s", common.SanitizeURLForLog(fullRequestURL))
 	// [修复防御] 出站请求体压缩（渠道 opt-in）：大 JSON 请求体 gzip 后上传，
-	// 缩短 5Mbps 上行下的首字延迟（frt 与 request_bytes 单调正相关）。
-	// 返回 compressed=true 时必须在本次请求结束前 Close 存储，并设置
+	// 缩短上行带宽下的首字延迟。返回的 originalBytes/compressedBytes 是函数实测
+	// 的字节（-1 表示不可测），供实时面板/日志展示，避免调用方自行猜测。
+	// compressed=true 时必须在本次请求结束前 Close 存储，并设置
 	// Content-Encoding: gzip。fail-open：任何异常都退回明文，绝不拒绝请求。
-	originalSize := bodySize(requestBody)
-	requestBody, compressed, compressionCloser := common.MaybeCompressOutboundBody(c, info, requestBody)
+	requestBody, compressed, compressionCloser, originalBytes, compressedBytes := common.MaybeCompressOutboundBody(c, info, requestBody)
 	if compressionCloser != nil {
 		defer compressionCloser.Close()
 	}
-	if info != nil && info.RequestId != "" {
-		// 实时请求详情：记录请求体压缩前后字节（未压缩时 compressedBytes=originalSize）。
-		compressedSize := originalSize
-		if compressed {
-			compressedSize = bodySize(requestBody)
-		}
-		service.LiveSetCompression(info.RequestId, originalSize, compressedSize, compressed)
+	if info != nil && info.RequestId != "" && originalBytes >= 0 {
+		service.LiveSetCompression(info.RequestId, originalBytes, compressedBytes, compressed)
 	}
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {
@@ -630,17 +617,6 @@ func withUpstreamTimingTrace(ctx context.Context, info *common.RelayInfo, c *gin
 		}
 		return t.Sub(start).Milliseconds()
 	}
-	emit := func() {
-		connectMs := toMs(connectDone)
-		uploadMs := toMs(wroteDone)
-		ttfbMs := toMs(firstByte)
-		info.UpstreamConnectMs = connectMs
-		info.UpstreamUploadMs = uploadMs
-		info.UpstreamTtfbMs = ttfbMs
-		if info.OnUpstreamTiming != nil {
-			info.OnUpstreamTiming(connectMs, uploadMs, ttfbMs)
-		}
-	}
 	trace := &httptrace.ClientTrace{
 		ConnectDone: func(_, _ string, _ error) {
 			mu.Lock()
@@ -653,10 +629,23 @@ func withUpstreamTimingTrace(ctx context.Context, info *common.RelayInfo, c *gin
 			mu.Unlock()
 		},
 		GotFirstResponseByte: func() {
+			// [修复防御] 在**同一把锁内**完成「写入 firstByte + 快照三段」，
+			// 再解锁后回调：HTTP/2 下钩子可能在不同 goroutine 触发，此前
+			// emit() 在锁外读取 connectDone/wroteDone/firstByte 构成 data race
+			// （锁内写、锁外读，Go 内存模型不保证可见性）。
 			mu.Lock()
 			firstByte = time.Now()
+			connectMs := toMs(connectDone)
+			uploadMs := toMs(wroteDone)
+			ttfbMs := toMs(firstByte)
 			mu.Unlock()
-			emit()
+
+			info.UpstreamConnectMs = connectMs
+			info.UpstreamUploadMs = uploadMs
+			info.UpstreamTtfbMs = ttfbMs
+			if info.OnUpstreamTiming != nil {
+				info.OnUpstreamTiming(connectMs, uploadMs, ttfbMs)
+			}
 		},
 	}
 	return httptrace.WithClientTrace(ctx, trace)

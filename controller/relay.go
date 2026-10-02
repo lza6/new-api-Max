@@ -135,10 +135,14 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		Model:     relayInfo.OriginModelName,
 		Group:     relayInfo.UsingGroup,
 		IsStream:  relayInfo.IsStream,
-		StartedAt: relayInfo.StartTime.Unix(),
+		StartedAt: relayInfo.StartTime.UnixMilli(),
 	})
 	relayInfo.OnFirstResponse = func(firstResponseMs int64) {
 		service.LiveSetFirstResponse(relayInfo.RequestId, firstResponseMs)
+		// 流式请求收到首个有效 data 块 → 进入 streaming 阶段（前端有对应样式）。
+		if relayInfo.IsStream {
+			service.LiveSetPhase(relayInfo.RequestId, service.LivePhaseStreaming)
+		}
 	}
 	relayInfo.OnUpstreamTiming = func(connectMs, uploadMs, ttfbMs int64) {
 		service.LiveSetUpstreamTiming(relayInfo.RequestId, connectMs, uploadMs, ttfbMs)
