@@ -64,7 +64,12 @@ export async function ensureLanguageLoaded(code: string): Promise<void> {
   }
   const promise = loader()
     .then((mod) => {
-      i18n.addResourceBundle(lang, 'translation', mod.default, true, true)
+      // 语言 JSON 形如 { translation: { ...keys } }。addResourceBundle 的
+      // resources 参数是**某个 namespace 下的直接键值**，因此要剥掉外层
+      // translation 层；否则键会变成 translation.translation.<key> 而查不到。
+      const bundle = mod.default as { translation?: Record<string, unknown> }
+      const payload = bundle?.translation ?? (mod.default as Record<string, unknown>)
+      i18n.addResourceBundle(lang, 'translation', payload, true, true)
       loadedLanguages.add(lang)
     })
     .catch(() => {
@@ -107,6 +112,20 @@ export function persistLanguage(code: string): void {
   }
 }
 
+/** 内部语言码 → BCP-47（Intl/document.lang 用）。 */
+const BCP47_BY_CODE: Record<string, string> = {
+  zhCN: 'zh-CN',
+  zhTW: 'zh-TW',
+}
+
+/** 把 <html lang> 同步为当前语言（BCP-47），利于 a11y/SEO 与浏览器翻译提示。 */
+function syncHtmlLang(code: string): void {
+  if (typeof document === 'undefined') {
+    return
+  }
+  document.documentElement.lang = BCP47_BY_CODE[code] ?? (code || 'en')
+}
+
 /**
  * 切换语言：按需加载语言包 → 持久化用户选择 → 应用。所有切换入口都应调用它
  * （而不是裸 changeLanguage），以保证语言包已就绪且用户选择被记住。
@@ -115,6 +134,7 @@ export async function setLanguage(code: string): Promise<void> {
   await ensureLanguageLoaded(code)
   persistLanguage(code)
   await i18n.changeLanguage(code)
+  syncHtmlLang(code)
 }
 
 export const resources = {
@@ -139,14 +159,24 @@ i18n.use(initReactI18next).init({
   },
 })
 
-// 初始语言非 en 时异步加载其语言包（不阻塞首屏）。
+// 初始语言非 en 时异步加载其语言包。
 // [关键] 加载完成后必须**无条件 changeLanguage**：i18n.language 初始就是
 // initialLanguage（如 zhCN），但此时资源尚未加载，i18next 的 resolvedLanguage
 // 会降级到 fallback en；addResourceBundle 后需 changeLanguage 触发重新解析，
 // 才会真正切换到该语言。仅当 language !== initialLanguage 才切是错的。
-if (initialLanguage !== 'en') {
-  void ensureLanguageLoaded(initialLanguage).then(() => i18n.changeLanguage(initialLanguage))
-}
+//
+// i18nReady：语言就绪 promise。main.tsx 会 await 它再 render，确保首屏（含
+// Setup 向导页）用正确语言渲染，而不是先用 fallback en 渲染再闪切。
+export const i18nReady: Promise<void> =
+  initialLanguage === 'en'
+    ? Promise.resolve()
+    : ensureLanguageLoaded(initialLanguage).then(() =>
+        i18n.changeLanguage(initialLanguage).then(() => undefined)
+      )
+
+// 首屏语言确定后同步 <html lang>（i18nReady 完成后即可；同步设置一次）。
+void i18nReady.then(() => syncHtmlLang(initialLanguage))
 
 export default i18n
+
 
