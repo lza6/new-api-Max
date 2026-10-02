@@ -1,0 +1,22 @@
+{
+  "version": "v1.3.72",
+  "deployed_at": "2026-10-02T12:13:24+08:00",
+  "deploy_method": "deploy-zero-downtime.sh (blue-green)",
+  "upstream_port": 3001,
+  "external_check": "15/15 = 200",
+  "errors_500": 0,
+  "memory_available_mb": 939,
+  "content": "终局审计修复（9 处自我审查缺陷）+ HTML 变更报告 + 延迟诊断 SOP",
+  "fixes": [
+    "httptrace emit 锁外读写（HTTP/2 data race）",
+    "bodySize 非可回放 body 返回 0",
+    "started_at 秒级截断",
+    "LivePhaseWaiting 半实现移除",
+    "聚合计时无数据返回 -1",
+    "失败行显示 error_msg",
+    "压缩阈值 env 下界校验",
+    "去掉未用参数",
+    "⚡ aria-label"
+  ],
+  "live_requests_endpoint": "GET /api/system-info/live-requests (401 unauthenticated = OK)"
+}
