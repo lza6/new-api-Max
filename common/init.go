@@ -121,12 +121,18 @@ func InitEnv() {
 	RelayResponseHeaderTimeout = GetEnvOrDefault("RELAY_RESPONSE_HEADER_TIMEOUT", 1800)
 	RelayMaxIdleConns = GetEnvOrDefault("RELAY_MAX_IDLE_CONNS", 500)
 	RelayMaxIdleConnsPerHost = GetEnvOrDefault("RELAY_MAX_IDLE_CONNS_PER_HOST", 100)
-	// 出站请求体压缩：默认允许（渠道级 opt-in 才真正生效），阈值默认 1MB。
-	// 关键背景：生产 5Mbps 上行是首字延迟根因——网关把大请求体完整上传上游时，
-	// 出口带宽被打满，frt 与 request_bytes 单调正相关（>20MB → 200s+）。
-	// gzip 请求体（上游已验证接受）可把 JSON 文本压缩到 ~1%，显著缩短上传时间。
+	// 出站请求体压缩：默认允许（渠道级 opt-in 才真正生效），阈值默认 256KB。
+	// 关键背景：大 prompt 上传占用出口带宽、拖慢首字与并发小请求；gzip 请求体
+	// （上游已验证接受）可把 JSON 文本压到 ~1%。注意阈值不影响延迟上限（瓶颈在
+	// 上游 prefill），主要是省出口字节。
 	RelayRequestCompressionEnabled = GetEnvOrDefaultBool("RELAY_REQUEST_COMPRESSION_ENABLED", true)
 	RelayRequestCompressionThresholdKB = GetEnvOrDefault("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB", 256)
+	if RelayRequestCompressionThresholdKB <= 0 {
+		// 0/负数会让判定短路为「始终压缩」，连 tiny body 也压（配置 footgun）。
+		// 归一为默认 256KB 并告警，而不是静默接受一个危险值。
+		SysError(fmt.Sprintf("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB must be positive, using default 256: configured=%d", RelayRequestCompressionThresholdKB))
+		RelayRequestCompressionThresholdKB = 256
+	}
 	Relay429RetryDelayMs = GetEnvOrDefault("RELAY_429_RETRY_DELAY", 1000)
 	Relay429MaxRetries = GetEnvOrDefault("RELAY_429_MAX_RETRIES", 2)
 	LogFlushEnabled = os.Getenv("LOG_FLUSH_ENABLED") == "true"

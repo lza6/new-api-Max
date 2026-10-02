@@ -210,6 +210,41 @@ function FirstTokenCell(props: { entry: LiveRequestEntry }) {
   )
 }
 
+/** 阶段徽标：流式图标带 aria-label；失败行 hover 显示 status_code / error_msg。 */
+function PhaseBadge(props: { entry: LiveRequestEntry; label: string }) {
+  const { t } = useTranslation()
+  const { entry, label } = props
+  const badge = (
+    <Badge
+      variant='secondary'
+      className={cn('gap-1 px-1.5 text-[10px]', PHASE_STYLE[entry.phase])}
+    >
+      {entry.is_stream ? (
+        <span aria-label={t('Streaming')} role='img'>
+          ⚡
+        </span>
+      ) : null}
+      {label}
+    </Badge>
+  )
+  const errorDetail =
+    entry.error_msg || (entry.status_code ? `HTTP ${entry.status_code}` : '')
+  if (entry.phase !== 'error' || !errorDetail) {
+    return badge
+  }
+  return (
+    <TooltipProvider delay={100}>
+      <Tooltip>
+        <TooltipTrigger render={<span className='inline-flex'>{badge}</span>} />
+        <TooltipContent className='max-w-72 break-words'>
+          {entry.status_code ? `HTTP ${entry.status_code} · ` : ''}
+          {entry.error_msg || t('Failed')}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  )
+}
+
 function RequestRow(props: { entry: LiveRequestEntry }) {
   const { t } = useTranslation()
   const { entry } = props
@@ -242,10 +277,7 @@ function RequestRow(props: { entry: LiveRequestEntry }) {
         <CompressionHint entry={entry} />
       </div>
       <div className='min-w-0'>
-        <Badge variant='secondary' className={cn('gap-1 px-1.5 text-[10px]', PHASE_STYLE[entry.phase])}>
-          {entry.is_stream ? <span aria-hidden='true'>⚡</span> : null}
-          {phaseLabel}
-        </Badge>
+        <PhaseBadge entry={entry} label={phaseLabel} />
       </div>
       <div className='min-w-0'>
         <FirstTokenCell entry={entry} />

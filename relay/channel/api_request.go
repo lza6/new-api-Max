@@ -607,7 +607,7 @@ func resolveRelayTimeout(globalSeconds int, override *int) (seconds int, overrid
 //
 // 采用 mutex 保护共享时间点（钩子可能在不同 goroutine 触发）。仅在
 // info.OnUpstreamTiming 非 nil 时由调用方启用，未启用则零开销。
-func withUpstreamTimingTrace(ctx context.Context, info *common.RelayInfo, c *gin.Context) context.Context {
+func withUpstreamTimingTrace(ctx context.Context, info *common.RelayInfo) context.Context {
 	start := time.Now()
 	var mu sync.Mutex
 	var connectDone, wroteDone, firstByte time.Time
@@ -716,7 +716,7 @@ func doRequest(c *gin.Context, req *http.Request, info *common.RelayInfo) (*http
 	// 延迟拆解：用 httptrace 采集「建连/上传/首字节」三段耗时，供实时面板区分
 	// 「网关→上游上传」与「上游首 token」。仅在有回调时启用（零开销路径）。
 	if info != nil && info.OnUpstreamTiming != nil {
-		req = req.WithContext(withUpstreamTimingTrace(req.Context(), info, c))
+		req = req.WithContext(withUpstreamTimingTrace(req.Context(), info))
 	}
 
 	resp, err := relayClient.Do(req)
