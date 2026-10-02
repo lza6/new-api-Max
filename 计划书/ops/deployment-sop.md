@@ -1,38 +1,58 @@
-# 部署 / 回滚 SOP（new-api-Max · v1.3.59）
+# 部署 / 回滚 SOP（new-api-Max）
 
-> 更新：2026-09-29 · 版本基线 v1.3.59（HEAD 6a08f6f55）
-> 适用：fork 仓库 `lza6/new-api-Max`（origin main）· 服务器 `/opt/new-api`（Docker Compose 单机）
-> 生产：`https://freeapi.tingfengai.art` · 服务器 `103.233.252.213`（2C2G · 5Mbps · Ubuntu 20.04）
-> 架构：new-api（本地构建镜像）+ postgres:15 + redis（maxmemory 48mb）· Caddy 反代 + 自动 HTTPS
+> 更新：2026-10-02 · 覆盖双站
+> 适用：fork 仓库 `lza6/new-api-Max`（origin main）
+> **主站**：`https://freeapi.tingfengai.art` · `103.233.252.213`（2C2G · 5Mbps · Ubuntu 20.04）
+>   Caddy 在**宿主机**；new-api + postgres + redis 在 Docker
+> **副站**：`https://japi.tingfengai.art` · `103.110.80.198`（4C4G · CentOS 7）
+>   Caddy 在**容器内**（compose 管理）；new-api + postgres + redis 也在 Docker
+>
+> 两站**都支持零停机**（各自的脚本不同，机制差异见 §2）；`deploy.sh`（先停后起，5-15s 中断）仅在必要时用。
 
 ---
 
 ## 0. 铁律
 
-1. **发布默认用零停机脚本** `deploy-zero-downtime.sh`；`deploy.sh` 会先停后起（5-15s 中断），仅在必要时用。
+1. **发布默认用零停机脚本**；`deploy.sh` 会先停后起（5-15s 中断），仅在必要时用。
 2. **不做自动部署**：只有用户明确要求时才动生产。
-3. **镜像本地构建**：不再依赖 ghcr / watchtower（固定 tag 不会被 watchtower 更新，曾致「版本没变」误判）。
-4. **发布前先备份** compose；任何一步失败脚本自动回滚，旧容器全程在服务。
-5. 发版顺序：`VERSION` bump → 主题 commit → push main → `git push origin <tag>` → 服务器部署。
+3. **镜像本地构建**：不依赖 ghcr / watchtower。
+4. **发布前先备份** 配置；任一步失败脚本自动回滚，旧容器全程在服务。
+5. 发版顺序：`VERSION` bump → commit → push main → `git push origin <tag>` → 服务器部署。
 
 ---
 
-## 1. 标准发布（零停机，推荐）
+## 1. 标准发布（零停机，双站）
 
-```bash
-# 服务器上执行（需用户明确授权）
-cd /opt/new-api
-./deploy-zero-downtime.sh v1.3.60
-```
+| 站点 | 脚本 | 机制 |
+|---|---|---|
+| 主站 | `/opt/new-api/deploy-zero-downtime.sh <tag>` | 宿主 Caddy + **host 端口蓝绿**（3000/3001 交替） |
+| 副站 | `/opt/new-api/deploy-zero-downtime.sh <tag>` | 容器内 Caddy + **容器名蓝绿**（new-api-a/new-api-b 交替） |
+| 副站回滚 | `/opt/new-api/rollback-zero-downtime.sh <tag>` | 同副站蓝绿机制 |
 
-流程（脚本内自动，日志 `/tmp/deploy-zd-<tag>.log`）：
-1. 探测 Caddy 当前上游端口（3000 或 3001）→ 选**空闲**端口
-2. `git fetch --force origin +refs/tags/<tag>:refs/tags/<tag>` + `git checkout -f <tag>`（`/opt/new-api-src`）
-3. `docker build -t new-api:<tag> .`（约 2-4 分钟）
-4. `docker run` 新容器（临时名 `new-api-next`，`NODE_TYPE=slave`）
-5. 轮询 `http://127.0.0.1:<port>/api/status` 直到健康（≤90s）
-6. `sed` 改 Caddyfile 上游 + `caddy reload`（毫秒级）
+### 主站流程（脚本内自动）
+1. 探测 Caddy 当前上游**端口**（3000/3001）→ 选空闲端口
+2. `git fetch --force` tag + `checkout` 源码
+3. `docker build`（约 6-8 分钟）
+4. `docker run` 新容器（临时名 `new-api-next`，`NODE_TYPE=slave`，绑定空闲端口）
+5. 轮询 `http://127.0.0.1:<port>/api/status` 健康
+6. `sed` 改 **宿主** `/etc/caddy/Caddyfile` 上游端口 + `caddy reload`
 7. 外网自检 → 停旧容器 → `docker rename` 新容器为 `new-api`
+
+### 副站流程（脚本内自动）
+1. 读 `caddy/Caddyfile` 当前上游**容器名**（new-api-a / new-api-b）→ 目标是另一个
+2. 构建镜像 → `docker run` 新容器（目标名，`slave`、复用旧容器 env、同网络）
+3. 用当前容器（自带 wget）在**容器网络内**探测新容器健康
+4. `sed` 改 `caddy/Caddyfile` 上游容器名 + `docker exec caddy caddy reload`
+5. 外网自检 → **等待 12s 排空**（关键）→ 停旧容器
+
+> ⚠️ **副站架构关键约束（踩坑换来的，勿破）**：
+> - 副站 Caddy 的 Caddyfile 必须**目录挂载**（`./caddy:/etc/caddy:ro`），**不能单文件挂载**。
+>   单文件 `:ro` bind mount 绑定挂载时刻的 inode，宿主改文件容器**永远读不到** →
+>   `caddy reload` 永远加载旧配置 → 切流失败/删旧容器 502。
+> - 切换后**必须等待 ~12s 再删旧容器**：Caddy 与旧上游的 keep-alive 连接/健康检查器
+>   需时间排空，立即删会 502。
+> - 交替命名（a/b）**不要用 rename**：rename 切换名字有一瞬窗口。
+
 
 **前置检查**：可用内存 > 400MB（脚本自动判断，不足则 abort）。
 
