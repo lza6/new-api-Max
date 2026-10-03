@@ -31,7 +31,7 @@ import { readCachedStatus, statusQueryOptions } from '@/lib/status-query'
 import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
-import { i18nReady } from './i18n/config'
+import i18n, { i18nReady } from './i18n/config'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 
@@ -72,15 +72,22 @@ if (!rootElement) {
   try {
     if (typeof window === 'undefined' || typeof document === 'undefined') {return}
     const apply = (name: string) => {
-      document.title = name
+      // Compose "<system name> · <tagline>" so the browser tab and JS-rendered
+      // crawlers get a keyword-bearing title, while the admin-set brand name
+      // stays first. The tagline resolves via i18n (falls back to the key
+      // itself before the locale bundle loads).
+      const tagline = i18n.t('AI API Gateway')
+      const composed =
+        tagline && tagline !== 'AI API Gateway' ? `${name} · ${tagline}` : name
+      document.title = composed
       const metaTitle = document.querySelector(
         'meta[name="title"]'
       ) as HTMLMetaElement | null
-      if (metaTitle) {metaTitle.setAttribute('content', name)}
+      if (metaTitle) {metaTitle.setAttribute('content', composed)}
       // OG/Twitter title mirror the runtime system name for social previews.
       for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
         const el = document.querySelector(sel) as HTMLMetaElement | null
-        if (el) {el.setAttribute('content', name)}
+        if (el) {el.setAttribute('content', composed)}
       }
     }
     // Hydrate relative canonical/og:url/og:image into absolute URLs — crawlers
@@ -127,6 +134,29 @@ if (!rootElement) {
     /* empty */
   }
 })()
+// Once the active locale bundle resolves, re-apply the title so the SEO
+// tagline suffix uses the translated string. Runs unconditionally (the bundle
+// is guaranteed loaded here, so the EN value legitimately equals the key).
+void i18nReady.then(() => {
+  const cached = readCachedStatus()
+  if (!cached?.system_name) {return}
+  try {
+    const tagline = i18n.t('AI API Gateway')
+    if (!tagline) {return}
+    const composed = `${cached.system_name as string} · ${tagline}`
+    document.title = composed
+    const metaTitle = document.querySelector(
+      'meta[name="title"]'
+    ) as HTMLMetaElement | null
+    if (metaTitle) {metaTitle.setAttribute('content', composed)}
+    for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
+      const el = document.querySelector(sel) as HTMLMetaElement | null
+      if (el) {el.setAttribute('content', composed)}
+    }
+  } catch {
+    /* empty */
+  }
+})
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
