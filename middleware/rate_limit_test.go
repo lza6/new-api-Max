@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -262,8 +263,12 @@ func TestRequestModelNamePeekRestoresBody(t *testing.T) {
 
 func TestIsRateLimitExemptModel(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	prev := relay_setting.GetRelaySetting().UserRateLimitExemptModels
-	t.Cleanup(func() { relay_setting.GetRelaySetting().UserRateLimitExemptModels = prev })
+	prev := slices.Clone(relay_setting.GetRelaySetting().UserRateLimitExemptModels)
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) {
+			s.UserRateLimitExemptModels = prev
+		})
+	})
 
 	newCtx := func(body string) *gin.Context {
 		req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader(body))
@@ -274,11 +279,15 @@ func TestIsRateLimitExemptModel(t *testing.T) {
 	}
 
 	// 空清单：任何模型都不豁免，且不读体。
-	relay_setting.GetRelaySetting().UserRateLimitExemptModels = nil
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) {
+		s.UserRateLimitExemptModels = nil
+	})
 	assert.False(t, isRateLimitExemptModel(newCtx(`{"model":"google-translate"}`)))
 
 	// 命中豁免模型。
-	relay_setting.GetRelaySetting().UserRateLimitExemptModels = []string{"google-translate"}
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) {
+		s.UserRateLimitExemptModels = []string{"google-translate"}
+	})
 	assert.True(t, isRateLimitExemptModel(newCtx(`{"model":"google-translate"}`)))
 	assert.False(t, isRateLimitExemptModel(newCtx(`{"model":"deepseek-v4-flash"}`)))
 }

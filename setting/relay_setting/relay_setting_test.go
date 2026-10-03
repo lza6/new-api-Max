@@ -1,6 +1,7 @@
 package relay_setting
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,34 +9,38 @@ import (
 )
 
 func TestGetUserRateLimitTierDefaults(t *testing.T) {
-	// 恢复全局状态，避免污染其它用例。
-	prev := relaySetting
-	defer func() { relaySetting = prev }()
-	relaySetting = RelaySetting{
-		UserBaseConcurrencyLimit: DefaultUserBaseConcurrencyLimit,
-		UserBaseRpmLimit:         DefaultUserBaseRpmLimit,
-	}
+	// 恢复全局状态，避免污染其它用例。写入走 UpdateRelaySetting（快照发布）。
+	prev := *GetRelaySetting()
+	defer UpdateRelaySetting(func(s *RelaySetting) { *s = prev })
+	UpdateRelaySetting(func(s *RelaySetting) {
+		*s = RelaySetting{
+			UserBaseConcurrencyLimit: DefaultUserBaseConcurrencyLimit,
+			UserBaseRpmLimit:         DefaultUserBaseRpmLimit,
+		}
+	})
 	c, r := GetUserRateLimitTier(1, "default")
 	require.Equal(t, DefaultUserBaseConcurrencyLimit, c)
 	require.Equal(t, DefaultUserBaseRpmLimit, r)
 
 	// 显式关闭 → 不限。
 	enabled := false
-	relaySetting.UserBaseRateLimitEnabled = &enabled
+	UpdateRelaySetting(func(s *RelaySetting) { s.UserBaseRateLimitEnabled = &enabled })
 	c, r = GetUserRateLimitTier(1, "default")
 	require.Zero(t, c)
 	require.Zero(t, r)
 }
 
 func TestGetUserRateLimitTierOverrides(t *testing.T) {
-	prev := relaySetting
-	defer func() { relaySetting = prev }()
-	relaySetting = RelaySetting{
-		UserBaseConcurrencyLimit: 3,
-		UserBaseRpmLimit:         120,
-		GroupRateLimitOverrides:  map[string]RateLimitTier{"vip": {Concurrency: 10, Rpm: 600}},
-		UserRateLimitOverrides:   map[int]RateLimitTier{7: {Concurrency: 1, Rpm: 30}},
-	}
+	prev := *GetRelaySetting()
+	defer UpdateRelaySetting(func(s *RelaySetting) { *s = prev })
+	UpdateRelaySetting(func(s *RelaySetting) {
+		*s = RelaySetting{
+			UserBaseConcurrencyLimit: 3,
+			UserBaseRpmLimit:         120,
+			GroupRateLimitOverrides:  map[string]RateLimitTier{"vip": {Concurrency: 10, Rpm: 600}},
+			UserRateLimitOverrides:   map[int]RateLimitTier{7: {Concurrency: 1, Rpm: 30}},
+		}
+	})
 
 	// 用户覆盖优先。
 	c, r := GetUserRateLimitTier(7, "vip")
@@ -54,17 +59,19 @@ func TestGetUserRateLimitTierOverrides(t *testing.T) {
 
 	// 移除覆盖（0,0）。
 	SetUserRateLimitOverride(7, RateLimitTier{})
-	_, ok := relaySetting.UserRateLimitOverrides[7]
+	_, ok := GetRelaySetting().UserRateLimitOverrides[7]
 	require.False(t, ok)
 	SetGroupRateLimitOverride("vip", RateLimitTier{})
-	_, ok = relaySetting.GroupRateLimitOverrides["vip"]
+	_, ok = GetRelaySetting().GroupRateLimitOverrides["vip"]
 	require.False(t, ok)
 }
 
 func TestIsSubscriptionRequiredGroup(t *testing.T) {
-	prev := relaySetting
-	defer func() { relaySetting = prev }()
-	relaySetting = RelaySetting{SubscriptionRequiredGroups: []string{"subscriber", "vip"}}
+	prev := *GetRelaySetting()
+	defer UpdateRelaySetting(func(s *RelaySetting) { *s = prev })
+	UpdateRelaySetting(func(s *RelaySetting) {
+		*s = RelaySetting{SubscriptionRequiredGroups: []string{"subscriber", "vip"}}
+	})
 	require.True(t, IsSubscriptionRequiredGroup("subscriber"))
 	require.True(t, IsSubscriptionRequiredGroup("vip"))
 	require.False(t, IsSubscriptionRequiredGroup("default"))
@@ -72,20 +79,27 @@ func TestIsSubscriptionRequiredGroup(t *testing.T) {
 }
 
 func TestGetUserRateLimitExemptModelsDefaultEmpty(t *testing.T) {
-	prev := GetRelaySetting().UserRateLimitExemptModels
-	t.Cleanup(func() { GetRelaySetting().UserRateLimitExemptModels = prev })
-	GetRelaySetting().UserRateLimitExemptModels = nil
+	prev := slices.Clone(GetRelaySetting().UserRateLimitExemptModels)
+	t.Cleanup(func() {
+		UpdateRelaySetting(func(s *RelaySetting) { s.UserRateLimitExemptModels = prev })
+	})
+	UpdateRelaySetting(func(s *RelaySetting) { s.UserRateLimitExemptModels = nil })
 	assert.Empty(t, GetUserRateLimitExemptModels())
-	GetRelaySetting().UserRateLimitExemptModels = []string{"google-translate"}
+	UpdateRelaySetting(func(s *RelaySetting) {
+		s.UserRateLimitExemptModels = []string{"google-translate"}
+	})
 	assert.Equal(t, []string{"google-translate"}, GetUserRateLimitExemptModels())
 }
+
 func TestGetNonStreamFirstByteTimeout(t *testing.T) {
 	prev := GetRelaySetting().NonStreamFirstByteTimeout
-	t.Cleanup(func() { GetRelaySetting().NonStreamFirstByteTimeout = prev })
+	t.Cleanup(func() {
+		UpdateRelaySetting(func(s *RelaySetting) { s.NonStreamFirstByteTimeout = prev })
+	})
 	assert.Equal(t, DefaultNonStreamFirstByteTimeout, GetNonStreamFirstByteTimeout())
-	GetRelaySetting().NonStreamFirstByteTimeout = 0
+	UpdateRelaySetting(func(s *RelaySetting) { s.NonStreamFirstByteTimeout = 0 })
 	assert.Equal(t, 0, GetNonStreamFirstByteTimeout())
-	GetRelaySetting().NonStreamFirstByteTimeout = 60
+	UpdateRelaySetting(func(s *RelaySetting) { s.NonStreamFirstByteTimeout = 60 })
 	assert.Equal(t, 60, GetNonStreamFirstByteTimeout())
 }
 

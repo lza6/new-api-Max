@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -56,8 +57,11 @@ var (
 	pricingMap           []Pricing
 	vendorsList          []PricingVendor
 	supportedEndpointMap map[string]common.EndpointInfo
-	lastGetPricingTime   time.Time
-	updatePricingLock    sync.Mutex
+	// lastGetPricingUnixNano 上次刷新时间（UnixNano）。[修复防御] 4.2.5：原为
+	// time.Time，GetPricing 的快速路径在**锁外**读它、updatePricing 在锁内写它，
+	// 构成 data race（-race 实测报出）。改用原子 Int64，锁外读/锁内写均无竞争。
+	lastGetPricingUnixNano atomic.Int64
+	updatePricingLock      sync.Mutex
 
 	// 缓存映射：模型名 -> 启用分组 / 计费类型
 	modelEnableGroups     = make(map[string][]string)
@@ -65,21 +69,39 @@ var (
 	modelEnableGroupsLock = sync.RWMutex{}
 )
 
+// pricingCacheFresh 判断定价缓存是否仍在 TTL（1 分钟）内且非空。原子读时间戳，
+// 供 GetPricing 锁外快速路径使用。
+func pricingCacheFresh() bool {
+	last := lastGetPricingUnixNano.Load()
+	if last == 0 {
+		return false
+	}
+	return time.Since(time.Unix(0, last)) <= time.Minute
+}
+
 var (
 	modelSupportEndpointTypes = make(map[string][]constant.EndpointType)
 	modelSupportEndpointsLock = sync.RWMutex{}
 )
 
+// updatePricingCallCount 记录 updatePricing 的实际执行次数（4.2.5 单飞回归测试用：
+// 并发刷新定价时回源应仅发生一次）。生产路径只原子自增，零竞争。
+var updatePricingCallCount atomic.Int64
+
 func GetPricing() []Pricing {
-	if time.Since(lastGetPricingTime) > time.Minute*1 || len(pricingMap) == 0 {
+	if !pricingCacheFresh() || len(pricingMap) == 0 {
 		updatePricingLock.Lock()
-		defer updatePricingLock.Unlock()
 		// Double check after acquiring the lock
-		if time.Since(lastGetPricingTime) > time.Minute*1 || len(pricingMap) == 0 {
+		if !pricingCacheFresh() || len(pricingMap) == 0 {
 			modelSupportEndpointsLock.Lock()
 			defer modelSupportEndpointsLock.Unlock()
+			// [修复防御] 4.2.5：双检锁保证并发刷新时**只有一个 goroutine 回源**，
+			// 其余在锁上阻塞、释放后读到最新 pricingMap —— 即 singleflight 语义。
+			// 此处原子自增供回归测试断言「并发 N 请求回源仅 1 次」。
+			updatePricingCallCount.Add(1)
 			updatePricing()
 		}
+		updatePricingLock.Unlock()
 	}
 	return pricingMap
 }
@@ -90,12 +112,12 @@ func InvalidatePricingCache() {
 
 	pricingMap = nil
 	vendorsList = nil
-	lastGetPricingTime = time.Time{}
+	lastGetPricingUnixNano.Store(0)
 }
 
 // GetVendors 返回当前定价接口使用到的供应商信息
 func GetVendors() []PricingVendor {
-	if time.Since(lastGetPricingTime) > time.Minute*1 || len(pricingMap) == 0 {
+	if !pricingCacheFresh() || len(pricingMap) == 0 {
 		// 保证先刷新一次
 		GetPricing()
 	}
@@ -428,7 +450,7 @@ func updatePricing() {
 	}
 	modelEnableGroupsLock.Unlock()
 
-	lastGetPricingTime = time.Now()
+	lastGetPricingUnixNano.Store(time.Now().UnixNano())
 }
 
 // GetSupportedEndpointMap 返回全局端点到路径的映射

@@ -141,6 +141,14 @@ export type LiveRequestsData = {
   concurrency: LiveConcurrencyStats
   compression_enabled: boolean
   compression_threshold_kb: number
+  // 出站压缩累积统计（进程内，自进程启动累计）。
+  compression_total_count: number
+  compression_total_original_bytes: number
+  compression_total_compressed_bytes: number
+  compression_total_saved_bytes: number
+  // 4.2.4 中继 gopool worker 可观测。
+  relay_workers: number
+  relay_workers_max: number
 }
 
 export type LiveRequestsResponse = {

@@ -236,10 +236,10 @@ func TestMaybeCompressOutboundBody_NonReplayableUncompressedReturnsReplayableRea
 	assert.Equal(t, payload, got)
 }
 
-// 300KB 请求在 256KB 默认阈值下应被压缩（此前 1MB 阈值会跳过）。
+// 300KB 请求在 50KB 默认阈值下应被压缩（默认阈值已从 256KB 下调为 50KB）。
 func TestMaybeCompressOutboundBody_300KBCompressedAtNewThreshold(t *testing.T) {
 	// 不 t.Parallel：读取全局阈值默认值。
-	assert.Equal(t, 256, common.RelayRequestCompressionThresholdKB, "默认阈值应为 256KB")
+	assert.Equal(t, 50, common.RelayRequestCompressionThresholdKB, "默认阈值应为 50KB")
 
 	payload := []byte(`{"model":"m","messages":[{"role":"user","content":"` + strings.Repeat("hello world ", 25000) + `"}]}`)
 	require.Greater(t, len(payload), 256<<10)
@@ -254,7 +254,7 @@ func TestMaybeCompressOutboundBody_300KBCompressedAtNewThreshold(t *testing.T) {
 	if outCloser != nil {
 		defer outCloser.Close()
 	}
-	assert.True(t, compressed, "300KB 请求在 256KB 阈值下应被压缩")
+	assert.True(t, compressed, "300KB 请求在 50KB 阈值下应被压缩")
 	got, err := io.ReadAll(out)
 	require.NoError(t, err)
 	assert.Equal(t, payload, gzipDecompress(t, got))

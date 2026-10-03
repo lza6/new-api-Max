@@ -5,13 +5,60 @@ import (
 	"compress/gzip"
 	"fmt"
 	"io"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 
 	"github.com/gin-gonic/gin"
 )
+
+// 出站压缩累积统计（进程内原子计数，热路径零锁）。
+//
+// [功能] 管理员面板展示「累计压缩了多少字节 / 节省了多少带宽」。仅累加**成功
+// 压缩**的请求；未压缩/压缩无收益的请求不计。多实例各自独立（与既有进程内指标
+// 语义一致）。
+var (
+	compressionTotalOriginalBytes   atomic.Int64
+	compressionTotalCompressedBytes atomic.Int64
+	compressionTotalCount           atomic.Int64
+)
+
+// CompressionTotals 出站压缩累积统计快照。
+type CompressionTotals struct {
+	Count           int64 `json:"count"`            // 成功压缩的请求数
+	OriginalBytes   int64 `json:"original_bytes"`   // 压缩前字节合计
+	CompressedBytes int64 `json:"compressed_bytes"` // 压缩后字节合计
+	SavedBytes      int64 `json:"saved_bytes"`      // 节省字节 = 原始 - 压缩后
+}
+
+// RecordCompression 累加一次成功压缩（供实时面板/统计）。
+func RecordCompression(originalBytes, compressedBytes int64) {
+	if originalBytes <= 0 || compressedBytes < 0 {
+		return
+	}
+	compressionTotalOriginalBytes.Add(originalBytes)
+	compressionTotalCompressedBytes.Add(compressedBytes)
+	compressionTotalCount.Add(1)
+}
+
+// GetCompressionTotals 返回出站压缩累积统计快照。
+func GetCompressionTotals() CompressionTotals {
+	orig := compressionTotalOriginalBytes.Load()
+	comp := compressionTotalCompressedBytes.Load()
+	saved := orig - comp
+	if saved < 0 {
+		saved = 0
+	}
+	return CompressionTotals{
+		Count:           compressionTotalCount.Load(),
+		OriginalBytes:   orig,
+		CompressedBytes: comp,
+		SavedBytes:      saved,
+	}
+}
 
 // MaybeCompressOutboundBody gzip-compresses the outbound request body when the
 // channel opts in (ChannelSetting.RequestCompression) and the body is large
@@ -37,14 +84,17 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 	if body == nil || info == nil {
 		return body, false, nil, -1, -1
 	}
-	if !common.RelayRequestCompressionEnabled {
+	// 开关与阈值来源：管理员热更新配置（relay_setting，走不可变快照，无锁读）
+	// 优先；未配置时回退 env（common.RelayRequestCompression*）。env 仍作为
+	// 部署级 kill-switch，任一为关即不压缩。
+	if !common.RelayRequestCompressionEnabled || !relay_setting.GetRequestCompressionEnabled() {
 		return body, false, nil, -1, -1
 	}
 	if info.ChannelMeta == nil || !info.ChannelSetting.RequestCompression {
 		return body, false, nil, -1, -1
 	}
 
-	threshold := int64(common.RelayRequestCompressionThresholdKB) << 10
+	threshold := int64(relay_setting.GetRequestCompressionThresholdKB()) << 10
 
 	// 可回放 body：已知大小，可从独立 reader 流式压缩，原 body 保持可用以便
 	// 压缩无收益/失败时原样转发（不额外拷贝）。
@@ -119,6 +169,8 @@ func storeCompressedBody(c *gin.Context, compressed []byte, originalSize int64) 
 			"request compression: gzip %d -> %d bytes (%.1f%%), outbound Content-Encoding: gzip",
 			originalSize, storage.Size(), 100*float64(storage.Size())/float64(originalSize)))
 	}
+	// 累积统计：仅计成功压缩的请求（面板展示累计压缩字节与节省带宽）。
+	RecordCompression(originalSize, storage.Size())
 	return common.NewReplayableBodyReader(storage), storage, true
 }
 

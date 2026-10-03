@@ -307,7 +307,6 @@ function LiveRequestsContent(props: { data: LiveRequestsData }) {
   const { t } = useTranslation()
   const data = props.data
   const compressionRatioPct = Math.round((data.avg_compression_ratio || 0) * 100)
-  const savedBytes = Math.max(0, data.original_bytes_sum - data.compressed_bytes_sum)
 
   return (
     <div className='space-y-3'>
@@ -336,10 +335,10 @@ function LiveRequestsContent(props: { data: LiveRequestsData }) {
           label={t('Avg compression ratio')}
           value={data.compressed_count > 0 ? `${compressionRatioPct}%` : '—'}
           hint={
-            data.compressed_count > 0
+            data.compression_total_count > 0
               ? t('{{n}} compressed · saved {{saved}}', {
-                  n: data.compressed_count,
-                  saved: formatBytes(savedBytes),
+                  n: data.compression_total_count,
+                  saved: formatBytes(data.compression_total_saved_bytes),
                 })
               : t('No compressed requests yet')
           }

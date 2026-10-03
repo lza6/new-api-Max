@@ -10,6 +10,20 @@ import (
 	"github.com/lza6/new-api-Max/common"
 )
 
+// configWriteHook 由配置对象可选实现：updateConfigFromMap 在反射写入前/后调用。
+//
+// [修复防御] 4.2.2：ConfigManager.mutex 只保护 configs 注册表，不保护热更新写入；
+// 读侧（如 relay_setting 的 getter）也不经过该锁 —— 于是「热路径读 map」与
+// 「管理端保存/周期重载时就地写 struct/map」并发时构成 data race（Go 内存模型下
+// map 并发读写是未定义行为，可触发不可 recover 的 fatal 直接杀死进程）。
+//
+// 让配置对象自带写入钩子：实现者可在 BeforeWrite 里加写锁/快照主副本，在
+// AfterWrite 里发布新快照（Store 到 atomic.Pointer），使读侧走无锁不可变快照。
+type configWriteHook interface {
+	BeforeConfigWrite()
+	AfterConfigWrite()
+}
+
 // ConfigManager 统一管理所有配置
 type ConfigManager struct {
 	configs map[string]any
@@ -163,6 +177,15 @@ func configToMap(config any) (map[string]string, error) {
 
 // 辅助函数：从map更新配置对象
 func updateConfigFromMap(config any, configMap map[string]string) error {
+	// [修复防御] 4.2.2：写侧临界区。配置对象若实现 configWriteHook，则在其锁内
+	// 完成反射写入，并在写完后发布新快照（如 atomic.Pointer），使读侧走无锁
+	// 不可变快照 —— 消除「热路径读 map」与「热更新就地写 struct/map」的 data race
+	//（Go 内存模型下 map 并发读写为未定义行为，可触发不可 recover 的 fatal 杀进程）。
+	if hook, ok := config.(configWriteHook); ok {
+		hook.BeforeConfigWrite()
+		defer hook.AfterConfigWrite()
+	}
+
 	val := reflect.ValueOf(config)
 	if val.Kind() != reflect.Pointer {
 		return nil

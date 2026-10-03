@@ -298,8 +298,10 @@ func TestStreamScannerHandler_ClientCancelAbortsUpstreamAndReturns(t *testing.T)
 func TestStreamScannerHandler_ClientDisconnectBeforeFirstContentIsNotEmptyStream(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -347,8 +349,10 @@ func TestStreamScannerHandler_ClientDisconnectBeforeFirstContentIsNotEmptyStream
 func TestStreamScannerHandler_PingSentDuringSlowUpstream(t *testing.T) {
 	// T2-3：默认 fallover=on 会禁用 ping；本用例锁 off 路径。
 	oldFallover := relay_setting.GetRelaySetting().StreamFallover
-	relay_setting.GetRelaySetting().StreamFallover = false
-	t.Cleanup(func() { relay_setting.GetRelaySetting().StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = false })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	setting := operation_setting.GetGeneralSetting()
 	oldEnabled := setting.PingIntervalEnabled
@@ -643,8 +647,10 @@ func TestStreamScannerHandler_StreamStatus_ReplacesPreInitialized(t *testing.T) 
 func TestStreamScannerHandler_FalloverOnBuffersBodyBeforeFirstData(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	recorder := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(recorder)
@@ -698,8 +704,10 @@ func TestIsUsefulStreamData(t *testing.T) {
 func TestStreamScannerHandler_FalloverOnReasoningOnlyStream(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	body := "data: {\"choices\":[{\"delta\":{\"reasoning\":\"think hard\"}}]}\n" +
 		"data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"more thinking\"}}]}\n" +
@@ -723,8 +731,10 @@ func TestStreamScannerHandler_FalloverOnReasoningOnlyStream(t *testing.T) {
 func TestStreamScannerHandler_FalloverOnEmptyBody(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	body := "data: [DONE]\n"
 	c, resp, info := setupStreamTest(t, strings.NewReader(body))
@@ -740,8 +750,10 @@ func TestStreamScannerHandler_FalloverOnEmptyBody(t *testing.T) {
 func TestStreamScannerHandler_FalloverOffReasoningOnlyStream(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = false
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = false })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	body := "data: {\"choices\":[{\"delta\":{\"reasoning\":\"think hard\"}}]}\n" +
 		"data: {\"choices\":[{\"delta\":{\"reasoning_content\":\"more\"}}]}\n" +
@@ -760,8 +772,10 @@ func TestStreamScannerHandler_FalloverOffReasoningOnlyStream(t *testing.T) {
 func TestStreamScannerHandler_FalloverOnReasoningThenContent(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	body := "data: {\"choices\":[{\"delta\":{\"reasoning\":\"think\"}}]}\n" +
 		"data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n" +
@@ -793,11 +807,11 @@ func TestStreamScannerHandler_FalloverSwitchAfterEmptyShell(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
 	oldTimeout := rs.StreamFirstTokenTimeout
-	rs.StreamFallover = true
-	rs.StreamFirstTokenTimeout = 1 // 1s 首包超时，加速测试
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = 1 }) // 1s 首包超时，加速测试
 	t.Cleanup(func() {
-		rs.StreamFallover = oldFallover
-		rs.StreamFirstTokenTimeout = oldTimeout
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = oldTimeout })
 	})
 
 	recorder := httptest.NewRecorder()
@@ -844,8 +858,10 @@ func TestStreamScannerHandler_FalloverSwitchAfterEmptyShell(t *testing.T) {
 func BenchmarkStreamFalloverBufferedMemory(b *testing.B) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	b.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	b.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
@@ -883,11 +899,11 @@ func TestStreamScannerHandler_ReasoningRenewsFirstTokenTimeout(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
 	oldTimeout := rs.StreamFirstTokenTimeout
-	rs.StreamFallover = true
-	rs.StreamFirstTokenTimeout = 1 // 1s 首包超时，加速测试
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = 1 }) // 1s 首包超时，加速测试
 	t.Cleanup(func() {
-		rs.StreamFallover = oldFallover
-		rs.StreamFirstTokenTimeout = oldTimeout
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = oldTimeout })
 	})
 
 	// 渠道：reasoning 块持续 2.5s（> 1s 首包超时阈值）后才发 content。
@@ -929,11 +945,11 @@ func TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_PassthroughSlowFi
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
 	oldTimeout := rs.StreamFirstTokenTimeout
-	rs.StreamFallover = true
-	rs.StreamFirstTokenTimeout = 1 // 1s 首包超时，加速测试
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = 1 }) // 1s 首包超时，加速测试
 	t.Cleanup(func() {
-		rs.StreamFallover = oldFallover
-		rs.StreamFirstTokenTimeout = oldTimeout
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = oldTimeout })
 	})
 
 	pipeR, pipeW := io.Pipe()
@@ -971,8 +987,10 @@ func TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_PassthroughSlowFi
 func TestStreamScannerHandler_ChannelDisablesFirstTokenTimeout_EmptyBodyStillFails(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	body := "data: [DONE]\n"
 	c, resp, info := setupStreamTest(t, strings.NewReader(body))
@@ -993,11 +1011,11 @@ func TestStreamScannerHandler_NonContentChunksReleaseBufferAtDeadline(t *testing
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
 	oldTimeout := rs.StreamFirstTokenTimeout
-	rs.StreamFallover = true
-	rs.StreamFirstTokenTimeout = 1 // 1s 首包/缓冲持有上限，加速测试
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = 1 }) // 1s 首包/缓冲持有上限，加速测试
 	t.Cleanup(func() {
-		rs.StreamFallover = oldFallover
-		rs.StreamFirstTokenTimeout = oldTimeout
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFirstTokenTimeout = oldTimeout })
 	})
 
 	pipeR, pipeW := io.Pipe()
@@ -1037,8 +1055,10 @@ func TestStreamScannerHandler_NonContentChunksReleaseBufferAtDeadline(t *testing
 func TestStreamScannerHandler_StreamEndWithOnlyNonContentReleasesBuffer(t *testing.T) {
 	rs := relay_setting.GetRelaySetting()
 	oldFallover := rs.StreamFallover
-	rs.StreamFallover = true
-	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+	relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = true })
+	t.Cleanup(func() {
+		relay_setting.UpdateRelaySetting(func(s *relay_setting.RelaySetting) { s.StreamFallover = oldFallover })
+	})
 
 	body := "data: {\"choices\":[{\"delta\":{\"role\":\"assistant\"}}]}\n" +
 		"data: {\"choices\":[{\"delta\":{}}]}\n" +

@@ -18,7 +18,15 @@ For commercial licensing, please contact support@quantumnous.com
 */
 package relay_setting
 
-import "github.com/lza6/new-api-Max/setting/config"
+import (
+	"maps"
+	"slices"
+	"sync"
+	"sync/atomic"
+
+	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/setting/config"
+)
 
 // RelaySetting relay 层运行参数（热更新，注册名 "relay"）。
 type RelaySetting struct {
@@ -69,6 +77,15 @@ type RelaySetting struct {
 	// SubscriptionRequiredGroups 需订阅才能使用的分组清单：未订阅用户选择这些
 	// 分组（自动分组或手动指定）时被拒（403）。空 = 不启用该门禁。
 	SubscriptionRequiredGroups []string `json:"subscription_required_groups"`
+
+	// RequestCompressionEnabled 出站请求体压缩总开关（nil=默认开启，沿用 env
+	// RELAY_REQUEST_COMPRESSION_ENABLED）。置 false 时任何渠道都不压缩。管理员
+	// 在「请求限制 → 请求体压缩」中可热更新。
+	RequestCompressionEnabled *bool `json:"request_compression_enabled"`
+	// RequestCompressionThresholdKB 触发压缩的最小请求体（KB，默认 50）。请求体
+	// 小于该值时压缩收益不足以覆盖 CPU 开销，直接明文转发。管理员可热更新；
+	// <=0 时回退 env 默认（RELAY_REQUEST_COMPRESSION_THRESHOLD_KB）。
+	RequestCompressionThresholdKB int `json:"request_compression_threshold_kb"`
 }
 
 // RateLimitTier 限速档位（并发 + RPM）。
@@ -90,6 +107,11 @@ const (
 	DefaultNonStreamFirstByteTimeout    = 300 // 非流式首字节超时默认 300s（0=关闭）
 )
 
+// DefaultRequestCompressionThresholdKB 出站请求体压缩阈值默认值（50KB）。
+// 从 50KB 起压，覆盖更广的中大 prompt；管理员可在设置页用预设档位或自定义调整。
+// 与 common.DefaultRequestCompressionThresholdKB 同源（common 无依赖，避免循环）。
+const DefaultRequestCompressionThresholdKB = common.DefaultRequestCompressionThresholdKB
+
 var relaySetting = RelaySetting{
 	StreamFallover:            true,
 	StreamFirstTokenTimeout:   DefaultStreamFirstTokenTimeout,
@@ -98,12 +120,68 @@ var relaySetting = RelaySetting{
 	NonStreamFirstByteTimeout: DefaultNonStreamFirstByteTimeout,
 }
 
-func init() {
-	config.GlobalConfig.Register("relay", &relaySetting)
+// settingMu 保护 relaySetting（写入主副本）。所有写入（配置热更新反射写入、
+// Set* 方法）都必须持此锁，并在写完后调用 publishSettingSnapshotLocked 发布新快照。
+var settingMu sync.Mutex
+
+// relaySettingSnapshot 已发布的**不可变**配置快照。读侧只 Load() 后只读访问，
+// 永不触碰正被写入的主副本 —— 消除「热路径读 map」与「热更新就地写 struct/map」
+// 的 data race（4.2.2）。
+var relaySettingSnapshot atomic.Pointer[RelaySetting]
+
+// publishSettingSnapshotLocked 在**持有 settingMu** 的前提下，把 relaySetting 深拷贝
+// 为一份不可变快照并发布。map/slice/指针字段必须深拷贝，否则快照与主副本共享底层
+// 存储，读侧仍会与后续写入竞争（旧值被就地改写）。
+func publishSettingSnapshotLocked() {
+	snap := relaySetting // 值拷贝：标量字段独立
+	snap.UserRateLimitOverrides = maps.Clone(relaySetting.UserRateLimitOverrides)
+	snap.GroupRateLimitOverrides = maps.Clone(relaySetting.GroupRateLimitOverrides)
+	snap.UserRateLimitExemptModels = slices.Clone(relaySetting.UserRateLimitExemptModels)
+	snap.SubscriptionRequiredGroups = slices.Clone(relaySetting.SubscriptionRequiredGroups)
+	if relaySetting.UserBaseRateLimitEnabled != nil {
+		enabled := *relaySetting.UserBaseRateLimitEnabled
+		snap.UserBaseRateLimitEnabled = &enabled
+	}
+	relaySettingSnapshot.Store(&snap)
 }
 
-func GetRelaySetting() *RelaySetting {
+// loadSetting 返回当前已发布的不可变快照（无锁读）。初始化后快照必非 nil；
+// 极端早期（init 前）兜底返回主副本指针以保持旧行为。
+func loadSetting() *RelaySetting {
+	if s := relaySettingSnapshot.Load(); s != nil {
+		return s
+	}
 	return &relaySetting
+}
+
+// UpdateRelaySetting 在写锁内修改配置主副本并发布新快照（供运行时变更与测试使用）。
+// 读侧（各 getter）始终读快照，因此本函数返回后新值即对所有读者可见且无竞争。
+func UpdateRelaySetting(fn func(*RelaySetting)) {
+	settingMu.Lock()
+	defer settingMu.Unlock()
+	fn(&relaySetting)
+	publishSettingSnapshotLocked()
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook：配置热更新
+// （updateConfigFromMap 反射就地写 &relaySetting）期间持有写锁，写完后发布新快照。
+func (r *RelaySetting) BeforeConfigWrite() { settingMu.Lock() }
+func (r *RelaySetting) AfterConfigWrite() {
+	publishSettingSnapshotLocked()
+	settingMu.Unlock()
+}
+
+func init() {
+	config.GlobalConfig.Register("relay", &relaySetting)
+	// 发布初始快照，使所有 getter 从启动起就只读不可变数据。
+	settingMu.Lock()
+	publishSettingSnapshotLocked()
+	settingMu.Unlock()
+}
+
+// GetRelaySetting 返回当前配置的**不可变快照**。只读；修改请用 UpdateRelaySetting。
+func GetRelaySetting() *RelaySetting {
+	return loadSetting()
 }
 
 // GetStreamFirstTokenTimeout 返回首包超时（秒）；未配置时用默认 15。
@@ -158,6 +236,23 @@ func GetNonStreamFirstByteTimeout() int {
 	return DefaultNonStreamFirstByteTimeout
 }
 
+// GetRequestCompressionEnabled 返回出站请求体压缩是否启用（nil=默认 true）。
+func GetRequestCompressionEnabled() bool {
+	if s := GetRelaySetting(); s != nil && s.RequestCompressionEnabled != nil {
+		return *s.RequestCompressionEnabled
+	}
+	return true
+}
+
+// GetRequestCompressionThresholdKB 返回出站请求体压缩阈值（KB）。
+// 管理员配置 >0 时生效；否则回退 env 默认（common.RelayRequestCompressionThresholdKB）。
+func GetRequestCompressionThresholdKB() int {
+	if s := GetRelaySetting(); s != nil && s.RequestCompressionThresholdKB > 0 {
+		return s.RequestCompressionThresholdKB
+	}
+	return DefaultRequestCompressionThresholdKB
+}
+
 // GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：
 // 用户覆盖 > 分组覆盖 > 基础默认；返回 0 表示该项不限（沿用既有其它限流）。
 func GetUserRateLimitTier(userId int, group string) (concurrency, rpm int) {
@@ -190,29 +285,32 @@ func GetUserRateLimitTier(userId int, group string) (concurrency, rpm int) {
 }
 
 // SetUserRateLimitOverride 设置/移除用户限速覆盖（0,0=移除；其余值整体替换档位）。
+// 在写锁内改主副本并发布新快照，读侧无需加锁即可见。
 func SetUserRateLimitOverride(userId int, tier RateLimitTier) {
-	s := GetRelaySetting()
-	if s.UserRateLimitOverrides == nil {
-		s.UserRateLimitOverrides = make(map[int]RateLimitTier)
-	}
-	if tier.Concurrency <= 0 && tier.Rpm <= 0 {
-		delete(s.UserRateLimitOverrides, userId)
-		return
-	}
-	s.UserRateLimitOverrides[userId] = tier
+	UpdateRelaySetting(func(s *RelaySetting) {
+		if tier.Concurrency <= 0 && tier.Rpm <= 0 {
+			delete(s.UserRateLimitOverrides, userId)
+			return
+		}
+		if s.UserRateLimitOverrides == nil {
+			s.UserRateLimitOverrides = make(map[int]RateLimitTier)
+		}
+		s.UserRateLimitOverrides[userId] = tier
+	})
 }
 
 // SetGroupRateLimitOverride 设置/移除分组限速覆盖（0,0=移除）。
 func SetGroupRateLimitOverride(group string, tier RateLimitTier) {
-	s := GetRelaySetting()
-	if s.GroupRateLimitOverrides == nil {
-		s.GroupRateLimitOverrides = make(map[string]RateLimitTier)
-	}
-	if tier.Concurrency <= 0 && tier.Rpm <= 0 {
-		delete(s.GroupRateLimitOverrides, group)
-		return
-	}
-	s.GroupRateLimitOverrides[group] = tier
+	UpdateRelaySetting(func(s *RelaySetting) {
+		if tier.Concurrency <= 0 && tier.Rpm <= 0 {
+			delete(s.GroupRateLimitOverrides, group)
+			return
+		}
+		if s.GroupRateLimitOverrides == nil {
+			s.GroupRateLimitOverrides = make(map[string]RateLimitTier)
+		}
+		s.GroupRateLimitOverrides[group] = tier
+	})
 }
 
 // IsSubscriptionRequiredGroup 判断分组是否被标记为"需订阅才能使用"。

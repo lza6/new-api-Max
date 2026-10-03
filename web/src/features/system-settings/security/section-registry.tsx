@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { RateLimitSection } from '../request-limits/rate-limit-section'
+import { RequestCompressionSection } from '../request-limits/request-compression-section'
 import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
@@ -55,6 +56,19 @@ const SECURITY_SECTIONS = [
           limit: settings['relay.global_concurrency_limit'],
           queue: settings['relay.global_concurrency_queue'],
           waitTimeout: settings['relay.global_concurrency_wait_timeout'],
+        }}
+      />
+    ),
+  },
+  {
+    id: 'request-compression',
+    titleKey: 'Request Body Compression',
+    build: (settings: SecuritySettings) => (
+      <RequestCompressionSection
+        defaultValues={{
+          enabled: settings['relay.request_compression_enabled'] ?? true,
+          thresholdKb:
+            Number(settings['relay.request_compression_threshold_kb']) || 50,
         }}
       />
     ),

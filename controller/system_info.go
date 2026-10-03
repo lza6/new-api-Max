@@ -7,7 +7,9 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/middleware"
 	"github.com/lza6/new-api-Max/model"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
 
 	"github.com/gin-gonic/gin"
 )
@@ -67,11 +69,13 @@ func DeleteStaleSystemInstance(c *gin.Context) {
 }
 
 // GetLiveRequests 返回实时请求详情快照：进行中/最近完成请求、压缩率、平均首字，
-// 以及当前实时网络上下行（MB/s）与并发水位。供系统信息页「实时请求详情」面板展示。
+// 以及当前实时网络上下行（MB/s）、并发水位与出站压缩累积统计。
+// 供系统信息页「实时请求详情」面板展示。
 func GetLiveRequests(c *gin.Context) {
 	snap := service.GetLiveRequestsSnapshot()
 	inMBps, outMBps := service.GetNetworkThroughput()
 	conc := middleware.GetGlobalConcurrencyStats()
+	totals := relaycommon.GetCompressionTotals()
 
 	common.ApiSuccess(c, gin.H{
 		"active":                snap.Active,
@@ -87,7 +91,17 @@ func GetLiveRequests(c *gin.Context) {
 		"network_in_mbps":       inMBps,
 		"network_out_mbps":      outMBps,
 		"concurrency":           conc,
-		"compression_enabled":   common.RelayRequestCompressionEnabled,
-		"compression_threshold_kb": common.RelayRequestCompressionThresholdKB,
+		// 压缩开关/阈值来自管理员热更新配置（relay_setting）；env 作部署级兜底。
+		"compression_enabled":      common.RelayRequestCompressionEnabled && relay_setting.GetRequestCompressionEnabled(),
+		"compression_threshold_kb": relay_setting.GetRequestCompressionThresholdKB(),
+		// 出站压缩累积统计（进程内）：累计压缩的字节与节省的网络带宽。
+		"compression_total_count":            totals.Count,
+		"compression_total_original_bytes":   totals.OriginalBytes,
+		"compression_total_compressed_bytes": totals.CompressedBytes,
+		"compression_total_saved_bytes":      totals.SavedBytes,
+		// 4.2.4 中继 gopool worker 可观测：运行中 worker 数与上界（高并发后据此
+		// 确认 worker 数被上界约束）。
+		"relay_workers":     common.RelayWorkerCount(),
+		"relay_workers_max": common.RelayPoolMaxWorkers(),
 	})
 }

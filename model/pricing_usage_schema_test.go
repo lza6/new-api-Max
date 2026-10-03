@@ -3,7 +3,6 @@ package model
 import (
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/pkg/jsplugin"
@@ -55,7 +54,8 @@ func TestPricingCarriesTaskUsageSchemaAndRefreshesWithPluginGeneration(t *testin
 }`)
 	_, err = jsplugin.DefaultRegistry.Register(updatedSource, jsplugin.Options{})
 	require.NoError(t, err)
-	lastGetPricingTime = time.Now().Add(-2 * time.Minute)
+	// 强制下次 GetPricing 重新回源（原直写 lastGetPricingTime，改用统一的失效入口）。
+	InvalidatePricingCache()
 
 	refreshedPricing := pricingByModel(GetPricing())
 	require.Len(t, refreshedPricing["pricing-usage-model"].BillingUsageSchema, 2)

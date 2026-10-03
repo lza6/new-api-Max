@@ -111,3 +111,41 @@ func TestEventBusAsyncAndAutoID(t *testing.T) {
 	require.False(t, bus.PublishAsync(context.Background(), Event{ID: "async-same", Type: "async.type"}), "重复事件异步也应拒绝")
 	require.Eventually(t, func() bool { return calls.Load() == 2 }, time.Second, time.Millisecond)
 }
+
+// TestEventBusRememberedEventsBounded 4.2.3 回归：事件 bus 的幂等记录必须**有界**，
+// 长跑投递大量唯一事件后 events map 不得无界增长（旧实现只增不减 → 内存泄漏）。
+func TestEventBusRememberedEventsBounded(t *testing.T) {
+	bus := NewEventBus(0, time.Millisecond)
+	bus.Register("bounded.type", func(_ context.Context, _ Event) error { return nil })
+	bus.mu.Lock()
+	bus.maxEvents = 100 // 测试用较小窗口
+	bus.mu.Unlock()
+
+	for i := range 1000 {
+		require.NoError(t, bus.Publish(context.Background(), Event{
+			ID:   "bounded-" + itoaForTest(i),
+			Type: "bounded.type",
+		}))
+	}
+
+	bus.mu.RLock()
+	n := len(bus.events)
+	order := len(bus.order)
+	bus.mu.RUnlock()
+	assert.LessOrEqual(t, n, 100, "幂等记录数不得超过窗口上限（有界，防泄漏）")
+	assert.Equal(t, n, order, "events 与 order 长度必须一致")
+}
+
+func itoaForTest(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(buf[i:])
+}

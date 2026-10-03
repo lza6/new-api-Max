@@ -409,6 +409,9 @@ export type SecuritySettings = {
   'relay.user_base_concurrency_limit': number
   'relay.user_base_rpm_limit': number
   'relay.user_rate_limit_exempt_models': string
+  // 出站请求体压缩（relay 设置块，relay.* 前缀）
+  'relay.request_compression_enabled': boolean
+  'relay.request_compression_threshold_kb': number
 }
 
 export type UpstreamChannel = {

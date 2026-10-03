@@ -126,12 +126,12 @@ func InitEnv() {
 	// （上游已验证接受）可把 JSON 文本压到 ~1%。注意阈值不影响延迟上限（瓶颈在
 	// 上游 prefill），主要是省出口字节。
 	RelayRequestCompressionEnabled = GetEnvOrDefaultBool("RELAY_REQUEST_COMPRESSION_ENABLED", true)
-	RelayRequestCompressionThresholdKB = GetEnvOrDefault("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB", 256)
+	RelayRequestCompressionThresholdKB = GetEnvOrDefault("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB", DefaultRequestCompressionThresholdKB)
 	if RelayRequestCompressionThresholdKB <= 0 {
 		// 0/负数会让判定短路为「始终压缩」，连 tiny body 也压（配置 footgun）。
-		// 归一为默认 256KB 并告警，而不是静默接受一个危险值。
-		SysError(fmt.Sprintf("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB must be positive, using default 256: configured=%d", RelayRequestCompressionThresholdKB))
-		RelayRequestCompressionThresholdKB = 256
+		// 归一为默认值并告警，而不是静默接受一个危险值。
+		SysError(fmt.Sprintf("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB must be positive, using default %d: configured=%d", DefaultRequestCompressionThresholdKB, RelayRequestCompressionThresholdKB))
+		RelayRequestCompressionThresholdKB = DefaultRequestCompressionThresholdKB
 	}
 	Relay429RetryDelayMs = GetEnvOrDefault("RELAY_429_RETRY_DELAY", 1000)
 	Relay429MaxRetries = GetEnvOrDefault("RELAY_429_MAX_RETRIES", 2)

@@ -29,11 +29,11 @@ const (
 type LiveRequestPhase string
 
 const (
-	LivePhaseReceived  LiveRequestPhase = "received"   // 已接收，尚未选中渠道
-	LivePhaseUpstream  LiveRequestPhase = "upstream"   // 已发往上游，等待/接收响应
-	LivePhaseStreaming LiveRequestPhase = "streaming"  // 流式接收中（已收到首个有效 data 块）
-	LivePhaseDone      LiveRequestPhase = "done"       // 已完成
-	LivePhaseError     LiveRequestPhase = "error"      // 失败
+	LivePhaseReceived  LiveRequestPhase = "received"  // 已接收，尚未选中渠道
+	LivePhaseUpstream  LiveRequestPhase = "upstream"  // 已发往上游，等待/接收响应
+	LivePhaseStreaming LiveRequestPhase = "streaming" // 流式接收中（已收到首个有效 data 块）
+	LivePhaseDone      LiveRequestPhase = "done"      // 已完成
+	LivePhaseError     LiveRequestPhase = "error"     // 失败
 )
 
 // LiveRequestEntry 单个请求的实时快照。
@@ -47,9 +47,9 @@ type LiveRequestEntry struct {
 	ChannelName string           `json:"channel_name"`
 	IsStream    bool             `json:"is_stream"`
 	Phase       LiveRequestPhase `json:"phase"`
-	StartedAt   int64            `json:"started_at"`   // unix 毫秒（避免 elapsed 被量化到整秒）
-	ElapsedMs   int64            `json:"elapsed_ms"`   // 快照时已耗时
-	RetryIndex  int              `json:"retry_index"`  // 第几次渠道尝试（0 起）
+	StartedAt   int64            `json:"started_at"`  // unix 毫秒（避免 elapsed 被量化到整秒）
+	ElapsedMs   int64            `json:"elapsed_ms"`  // 快照时已耗时
+	RetryIndex  int              `json:"retry_index"` // 第几次渠道尝试（0 起）
 
 	// 请求体字节：OriginalBytes 是客户端原始大小；CompressedBytes 是压缩后发往
 	// 上游的大小（未压缩时为 0，Compressed=false）。压缩节省可据此计算。
@@ -182,7 +182,13 @@ func LiveEnd(reqId string, statusCode int, errMsg string) {
 	delete(liveRequests.active, reqId)
 	for i, id := range liveRequests.order {
 		if id == reqId {
-			liveRequests.order = append(liveRequests.order[:i], liveRequests.order[i+1:]...)
+			// [修复防御] 4.2.3：append 左移删除会令底层数组**尾部**残留对末元素的
+			// 引用（strings/指针），使该对象无法被 GC —— 经典 slice 泄漏。显式把
+			// 尾部槽位置空再截断。order 元素是 string（底层含指针），同属此风险。
+			last := len(liveRequests.order) - 1
+			copy(liveRequests.order[i:], liveRequests.order[i+1:])
+			liveRequests.order[last] = ""
+			liveRequests.order = liveRequests.order[:last]
 			break
 		}
 	}
@@ -215,9 +221,9 @@ type LiveRequestsSnapshot struct {
 	Active   []*LiveRequestEntry `json:"active"`
 	Finished []*LiveRequestEntry `json:"finished"`
 	// 聚合指标
-	ActiveCount      int     `json:"active_count"`
-	CompressedCount  int     `json:"compressed_count"`
-	OriginalBytesSum int64   `json:"original_bytes_sum"`
+	ActiveCount        int   `json:"active_count"`
+	CompressedCount    int   `json:"compressed_count"`
+	OriginalBytesSum   int64 `json:"original_bytes_sum"`
 	CompressedBytesSum int64 `json:"compressed_bytes_sum"`
 	// AvgCompressionRatio 压缩后/原始（仅统计已压缩请求；无数据时为 0）。
 	AvgCompressionRatio float64 `json:"avg_compression_ratio"`

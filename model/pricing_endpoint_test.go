@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/lza6/new-api-Max/common"
@@ -291,4 +292,36 @@ func TestCacheUpdateChannelSyncsAdvancedCustomConfig(t *testing.T) {
 	CacheUpdateChannel(channel)
 
 	assert.Nil(t, channel2advancedCustomConfig[401])
+}
+
+// TestGetPricingConcurrentRefillSingleton 4.2.5 契约：缓存未命中时并发多次
+// GetPricing 必须**只回源一次**（双检锁 singleflight 语义），其余并发者读到同一
+// 结果。防止后续改动把双检锁退化掉、造成冷启动并发回源放大（缓存击穿）。
+func TestGetPricingConcurrentRefillSingleton(t *testing.T) {
+	resetPricingEndpointTestTables(t)
+
+	insertPricingEndpointChannel(t, 501, constant.ChannelTypeOpenAI, dto.ChannelOtherSettings{})
+	insertPricingEndpointAbility(t, 501, "gpt-4o")
+
+	// 失效缓存并清零计数，制造「首次未命中 + 并发刷新」窗口。
+	InvalidatePricingCache()
+	updatePricingCallCount.Store(0)
+
+	const concurrency = 100
+	var wg sync.WaitGroup
+	results := make([][]Pricing, concurrency)
+	wg.Add(concurrency)
+	for i := range concurrency {
+		go func(idx int) {
+			defer wg.Done()
+			results[idx] = GetPricing()
+		}(i)
+	}
+	wg.Wait()
+
+	assert.Equal(t, int64(1), updatePricingCallCount.Load(),
+		"并发 %d 次 GetPricing 缓存未命中时应只回源一次（singleflight）", concurrency)
+	for i := range concurrency {
+		assert.NotEmpty(t, results[i], "每个并发调用都应读到非空定价结果")
+	}
 }

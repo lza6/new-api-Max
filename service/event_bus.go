@@ -85,8 +85,12 @@ type eventRecord struct {
 type EventBus struct {
 	mu       sync.RWMutex
 	handlers map[string]EventHandleFunc
-	events   map[string]*eventRecord // 幂等去重 + 状态跟踪
-	closed   bool
+	events   map[string]*eventRecord // 幂等去重 + 状态跟踪（有界，见 maxEvents）
+	// order 记录 events 的插入顺序（用于超限时淘汰最旧记录）。元素为 string，
+	// 淘汰时须把尾部槽位置空再截断，避免底层数组残留引用（同 4.2.3 slice 泄漏）。
+	order     []string
+	maxEvents int
+	closed    bool
 
 	maxRetries int
 	baseDelay  time.Duration
@@ -99,6 +103,12 @@ type EventBus struct {
 	DeadCount      int64
 	LastDispatchMs int64
 }
+
+// defaultMaxRememberedEvents 内存幂等窗口上限。[修复防御] 4.2.3：旧实现 events
+// map 只增不减（Publish 写入、finish 只改状态、从不 delete）——长生命周期单例
+// （如 paymentEventBus）会随唯一事件 ID 无界累积，构成内存泄漏。现按 FIFO 淘汰
+// 最旧记录，保留一个足够大的幂等窗口。
+const defaultMaxRememberedEvents = 10000
 
 // EventBusMetrics 事件总线观测快照（耗时/成功/失败/重试）。
 type EventBusMetrics struct {
@@ -121,8 +131,28 @@ func NewEventBus(maxRetries int, baseDelay time.Duration) *EventBus {
 	return &EventBus{
 		handlers:   make(map[string]EventHandleFunc),
 		events:     make(map[string]*eventRecord),
+		maxEvents:  defaultMaxRememberedEvents,
 		maxRetries: maxRetries,
 		baseDelay:  baseDelay,
+	}
+}
+
+// rememberEventLocked 在**持有 b.mu** 前提下登记一条事件的幂等记录，并按 FIFO
+// 淘汰最旧记录，保证 events 有界（4.2.3）。淘汰时清空 order 尾部槽位防 slice 泄漏。
+func (b *EventBus) rememberEventLocked(id string) {
+	b.events[id] = &eventRecord{state: EventStatePending}
+	b.order = append(b.order, id)
+	limit := b.maxEvents
+	if limit <= 0 {
+		limit = defaultMaxRememberedEvents
+	}
+	for len(b.events) > limit && len(b.order) > 0 {
+		oldest := b.order[0]
+		last := len(b.order) - 1
+		copy(b.order, b.order[1:])
+		b.order[last] = ""
+		b.order = b.order[:last]
+		delete(b.events, oldest)
 	}
 }
 
@@ -205,7 +235,7 @@ func (b *EventBus) Publish(ctx context.Context, ev Event) error {
 	}
 
 	b.mu.Lock()
-	b.events[ev.ID] = &eventRecord{state: EventStatePending}
+	b.rememberEventLocked(ev.ID)
 	b.mu.Unlock()
 	return b.dispatch(ctx, ev)
 }

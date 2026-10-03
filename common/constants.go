@@ -191,11 +191,16 @@ var RelayMaxIdleConnsPerHost int
 // 一致的默认值。
 var RelayRequestCompressionEnabled = true
 
-// RelayRequestCompressionThresholdKB 出站请求体压缩阈值（KB，默认 256=256KB）。
-// 请求体小于该值时压缩收益不足以覆盖 CPU 开销，直接明文转发。
-// 256KB 是实测权衡：生产 300K-1MB 请求占比约 50%、平均首字 7.5s，是用户可感知
-// 的延迟区间；256KB 的 BestSpeed 压缩仅约 44ms，远小于收益。
-var RelayRequestCompressionThresholdKB = 256
+// RelayRequestCompressionThresholdKB 出站请求体压缩阈值（KB，默认 50=50KB）。
+// 请求体小于该值时压缩收益不足以覆盖 CPU 开销，直接明文转发。默认从 50KB 起压，
+// 覆盖更广的中大 prompt；管理员可在设置页用预设档位或自定义调整（热更新）。
+// 本变量为 env 部署级默认值与兜底；运行时以 relay_setting 的管理员配置优先。
+var RelayRequestCompressionThresholdKB = DefaultRequestCompressionThresholdKB
+
+// DefaultRequestCompressionThresholdKB 出站请求体压缩阈值的默认值（KB）。
+// 定义在 common（无内部依赖）以避免 common→setting 的循环依赖；relay_setting
+// 引用同一常量，保证默认值单一来源。
+const DefaultRequestCompressionThresholdKB = 50
 
 // Relay429RetryDelayMs 429 有界退避等待毫秒数（默认 1000 = 1s）。
 var Relay429RetryDelayMs int
