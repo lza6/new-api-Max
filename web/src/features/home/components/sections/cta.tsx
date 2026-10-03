@@ -23,6 +23,8 @@ import { useTranslation } from 'react-i18next'
 import { AnimateInView } from '@/components/animate-in-view'
 import { Button } from '@/components/ui/button'
 
+import { Magnetic } from '../motion'
+
 interface CTAProps {
   className?: string
   isAuthenticated?: boolean
@@ -66,17 +68,21 @@ export function CTA(props: CTAProps) {
           )}
         </p>
         <div className='mt-8 flex items-center justify-center gap-3'>
-          <Button className='group rounded-lg' render={<Link to='/sign-up' />}>
-            {t('Get Started')}
-            <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
-          </Button>
-          <Button
-            variant='outline'
-            className='border-border/50 hover:border-border hover:bg-muted/50 rounded-lg'
-            render={<Link to='/pricing' />}
-          >
-            {t('View Pricing')}
-          </Button>
+          <Magnetic>
+            <Button className='group rounded-lg' render={<Link to='/sign-up' />}>
+              {t('Get Started')}
+              <ArrowRight className='ml-1 size-3.5 transition-transform duration-200 group-hover:translate-x-0.5' />
+            </Button>
+          </Magnetic>
+          <Magnetic strength={0.2}>
+            <Button
+              variant='outline'
+              className='border-border/50 hover:border-border hover:bg-muted/50 rounded-lg'
+              render={<Link to='/pricing' />}
+            >
+              {t('View Pricing')}
+            </Button>
+          </Magnetic>
         </div>
       </AnimateInView>
     </section>

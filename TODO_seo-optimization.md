@@ -81,11 +81,12 @@ License, or (at your option) any later version.
   - **Long-Tail**：`cherry studio 怎么填 api 地址`、`写代码用的 api 中转`
   - **Intent**：Transactional（工具页直接给答案 = 高转化）
 
-- [ ] **SEO-PLAN-1.4 [Keyword Cluster — 信息型 TOFU]**
+- [~] **SEO-PLAN-1.4 [Keyword Cluster — 信息型 TOFU]**
   - **Primary**：`什么是 AI API 网关`
   - **Secondary**：`API 网关原理`、`多模型路由`、`API 网关 vs 直连`
   - **Long-Tail**：`为什么需要用 api 网关`、`api 中转站安全吗`
   - **Intent**：Informational（投放 `/guide`）
+  - **部分落地（v1.3.82）**：首页新增可见 FAQ 区块已承接本簇的「什么是 AI API 网关 / 支持哪些模型 / 是否 OpenAI 兼容 / 如何计费 / 是否可自部署 / 可靠性与故障转移」，并配 `FAQPage` JSON-LD（见 SEO-ITEM-3.3）。完整信息型长文（`/guide`）仍待建。
 
 - [ ] **SEO-PLAN-2.1 [双站策略]**
   - 主站 `freeapi` = 主 SEO 阵地（收录 `/`、`/pricing`、`/rankings`、工具页）
@@ -159,10 +160,10 @@ License, or (at your option) any later version.
   - **Recommended Change**：注入 `SoftwareApplication`（applicationCategory=`DeveloperApplication`、offers 按 `/api/pricing` 动态或静态示例价格、aggregateRating 若有真实数据才加——**无数据不得伪造**）
   - **Rationale**：产品站可获得富结果；评分字段留空优于造假
 
-- [ ] **SEO-ITEM-3.3 [FAQPage]**
+- [x] **SEO-ITEM-3.3 [FAQPage]** — ✅ 已落地（v1.3.82）
   - **Element**：首页 FAQ 区块 + JSON-LD
-  - **Current State**：页面**无 FAQ 区块**
-  - **Recommended Change**：新增 5–6 条 FAQ（见 §4 内容大纲）并配 `FAQPage` schema
+  - **Current State（已实现）**：`web/src/features/home/components/sections/faq.tsx` 新增可见 FAQ 区块（6 条：What is an AI API gateway? / Which models and providers / OpenAI compatible / Billing / Self-host / Reliability & failover），并运行时注入 `FAQPage` JSON-LD（`id="landing-faq-jsonld"`），问答文案与 JSON-LD 同源（同一翻译字符串），随语言切换重发、卸载时移除。
+  - **验证**：`web/e2e-local/v1382-landing-verify.cjs` 断言 `@type=FAQPage`、`mainEntity.length=6` 且与可见问题一致；`src/features/home/components/sections/__tests__/faq.test.tsx` 覆盖渲染/结构数据/unmount 清理。
   - **Rationale**：抢「People Also Ask」位置，TOFU 增益
 
 - [ ] **SEO-ITEM-3.4 [BreadcrumbList]**

@@ -16,12 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export { CTA } from './sections/cta'
-export { FAQ } from './sections/faq'
-export { Features } from './sections/features'
-export { Hero } from './sections/hero'
-export { HowItWorks } from './sections/how-it-works'
-export { RequestFlow } from './sections/request-flow'
-export { Stats } from './sections/stats'
-export { WebglHero } from './sections/webgl-hero'
-export { Magnetic, Parallax, Reveal, SpotlightCard, TiltCard } from './motion'
+export { Magnetic, SpotlightCard } from './magnetic'
+export { Parallax } from './parallax'
+export { Reveal } from './reveal'
+export { TiltCard } from './tilt-card'

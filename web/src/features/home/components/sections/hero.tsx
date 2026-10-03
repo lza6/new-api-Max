@@ -18,14 +18,17 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
 import { ArrowRight, BookOpen } from 'lucide-react'
+import { motion, useReducedMotion } from 'motion/react'
 import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 import { useStatus } from '@/hooks/use-status'
 
-import { Hero3DShowcase } from './hero-3d-showcase'
+import { Magnetic, Parallax } from '../motion'
 
-import { lazy, Suspense } from 'react'
+import { WebglHero } from './webgl-hero'
+
+import { useMemo, lazy, Suspense } from 'react'
 
 const HeroTerminalDemo = lazy(() =>
   import('../hero-terminal-demo').then((m) => ({ default: m.HeroTerminalDemo }))
@@ -57,6 +60,49 @@ const MoreIcon = () => (
     <circle cx='18' cy='12' r='2' fill='currentColor' />
   </svg>
 )
+
+// Word-by-word rise for the hero headline. Splitting the translated phrase keeps
+// every locale intact (we animate words, not characters) and the wrapper layers
+// a stagger on top of the section's own entrance. No overflow mask is used, so
+// descenders in any script are never clipped. Reduced motion renders plain text.
+function HeroHeadline(props: { children: string; delay?: number }) {
+  const shouldReduce = useReducedMotion()
+  // Tokenise once, tagging each word with how many times it has already appeared
+  // so repeated words still get a stable, index-free key.
+  const tokens = useMemo(() => {
+    const seen = new Map<string, number>()
+    return props.children.split(' ').map((word) => {
+      const occurrence = seen.get(word) ?? 0
+      seen.set(word, occurrence + 1)
+      return { id: `${word}#${occurrence}`, word }
+    })
+  }, [props.children])
+
+  if (shouldReduce) {return props.children}
+  return (
+    <span className='inline'>
+      {tokens.map((token, i) => (
+        <span key={token.id}>
+          <motion.span
+            className='inline-block'
+            initial={{ y: '0.5em', opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{
+              duration: 0.6,
+              delay: (props.delay ?? 0) + i * 0.05,
+              ease: [0.16, 1, 0.3, 1],
+            }}
+          >
+            {token.word}
+          </motion.span>
+          {/* The separating space lives outside the inline-block spans; a trailing
+              space inside them would be collapsed and run the words together. */}
+          {i < tokens.length - 1 ? ' ' : ''}
+        </span>
+      ))}
+    </span>
+  )
+}
 
 export function Hero(props: HeroProps) {
   const { t } = useTranslation()
@@ -132,7 +178,9 @@ export function Hero(props: HeroProps) {
             className='landing-animate-fade-up font-serif text-[clamp(2.4rem,4.6vw,3.5rem)] leading-[1.12] font-medium tracking-[-0.02em]'
             style={{ animationDelay: '60ms' }}
           >
-            {t('Unified API Gateway for')}
+            <HeroHeadline delay={0.1}>
+              {t('Unified API Gateway for')}
+            </HeroHeadline>
             <br />
             <span className='bg-gradient-to-r from-amber-600 via-rose-400 to-violet-400 bg-clip-text text-transparent dark:from-amber-400 dark:via-rose-300 dark:to-violet-300'>
               {t('Vast Range of AI Models')}
@@ -153,31 +201,37 @@ export function Hero(props: HeroProps) {
           >
             {props.isAuthenticated ? (
               <>
-                <Button
-                  className='group h-11 rounded-lg px-5 text-sm font-medium'
-                  render={<Link to='/dashboard' />}
-                >
-                  {t('Go to Dashboard')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
+                <Magnetic>
+                  <Button
+                    className='group h-11 rounded-lg px-5 text-sm font-medium'
+                    render={<Link to='/dashboard' />}
+                  >
+                    {t('Go to Dashboard')}
+                    <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+                  </Button>
+                </Magnetic>
                 {renderDocsButton()}
               </>
             ) : (
               <>
-                <Button
-                  className='group h-11 rounded-lg px-5 text-sm font-medium'
-                  render={<Link to='/sign-up' />}
-                >
-                  {t('Get Started')}
-                  <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
-                </Button>
-                <Button
-                  variant='outline'
-                  className='border-border/50 hover:border-border hover:bg-muted/50 h-11 rounded-lg px-5 text-sm font-medium'
-                  render={<Link to='/pricing' />}
-                >
-                  {t('View Pricing')}
-                </Button>
+                <Magnetic>
+                  <Button
+                    className='group h-11 rounded-lg px-5 text-sm font-medium'
+                    render={<Link to='/sign-up' />}
+                  >
+                    {t('Get Started')}
+                    <ArrowRight className='ml-1.5 size-4 transition-transform duration-200 group-hover:translate-x-0.5' />
+                  </Button>
+                </Magnetic>
+                <Magnetic strength={0.2}>
+                  <Button
+                    variant='outline'
+                    className='border-border/50 hover:border-border hover:bg-muted/50 h-11 rounded-lg px-5 text-sm font-medium'
+                    render={<Link to='/pricing' />}
+                  >
+                    {t('View Pricing')}
+                  </Button>
+                </Magnetic>
                 {renderDocsButton()}
               </>
             )}
@@ -258,8 +312,11 @@ export function Hero(props: HeroProps) {
           <Suspense fallback={<div className='mt-8 h-64 w-full rounded-lg border bg-muted/40 lg:mt-0' />}>
             <HeroTerminalDemo className='mt-8 w-full lg:mt-0' />
           </Suspense>
-          {/* 3D 分层展示：纯 CSS perspective，尊重 prefers-reduced-motion */}
-          <Hero3DShowcase />
+          {/* WebGL "gateway core" when the device supports it, else the CSS
+              3D showcase. Both honour prefers-reduced-motion and are decorative. */}
+          <Parallax offset={34} className='flex w-full justify-center'>
+            <WebglHero className='flex w-full justify-center' />
+          </Parallax>
         </div>
       </div>
     </section>

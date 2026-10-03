@@ -30,6 +30,8 @@ import { useTranslation } from 'react-i18next'
 
 import { AnimateInView } from '@/components/animate-in-view'
 
+import { SpotlightCard, TiltCard } from '../motion'
+
 interface FeaturesProps {
   className?: string
 }
@@ -200,18 +202,22 @@ export function Features(_props: FeaturesProps) {
               key={f.id}
               delay={i * 100}
               animation='scale-in'
-              className={`bg-background group hover:bg-muted/20 p-7 transition-colors duration-300 md:p-8 ${f.span}`}
+              className={`group ${f.span}`}
             >
-              <div className='mb-3 flex items-center gap-3'>
-                <span className='border-border/40 bg-muted text-muted-foreground flex size-7 items-center justify-center rounded-md border text-[10px] font-semibold tabular-nums'>
-                  {f.num}
-                </span>
-                <h3 className='text-sm font-semibold'>{f.title}</h3>
-              </div>
-              <p className='text-muted-foreground text-sm leading-relaxed'>
-                {f.desc}
-              </p>
-              {f.visual}
+              {/* Cursor-following glow is clipped to the cell, so the shared
+                  hairline grid stays intact while each panel lights up on hover. */}
+              <SpotlightCard className='bg-background hover:bg-muted/20 h-full p-7 transition-colors duration-300 md:p-8'>
+                <div className='mb-3 flex items-center gap-3'>
+                  <span className='border-border/40 bg-muted text-muted-foreground flex size-7 items-center justify-center rounded-md border text-[10px] font-semibold tabular-nums'>
+                    {f.num}
+                  </span>
+                  <h3 className='text-sm font-semibold'>{f.title}</h3>
+                </div>
+                <p className='text-muted-foreground text-sm leading-relaxed'>
+                  {f.desc}
+                </p>
+                {f.visual}
+              </SpotlightCard>
             </AnimateInView>
           ))}
         </div>
@@ -219,19 +225,16 @@ export function Features(_props: FeaturesProps) {
         {/* Additional features row */}
         <div className='mt-12 grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
           {additionalFeatures.map((f, i) => (
-            <AnimateInView
-              key={f.title}
-              delay={i * 100}
-              animation='fade-up'
-              className='flex flex-col items-center text-center'
-            >
-              <div className='text-muted-foreground border-border/50 bg-muted/30 group-hover:text-foreground mb-3 flex size-12 items-center justify-center rounded-xl border transition-colors'>
-                {f.icon}
-              </div>
-              <h3 className='mb-1.5 text-sm font-semibold'>{f.title}</h3>
-              <p className='text-muted-foreground max-w-[200px] text-xs leading-relaxed'>
-                {f.desc}
-              </p>
+            <AnimateInView key={f.title} delay={i * 100} animation='fade-up'>
+              <TiltCard className='flex flex-col items-center text-center'>
+                <div className='text-muted-foreground border-border/50 bg-muted/30 group-hover:text-foreground mb-3 flex size-12 items-center justify-center rounded-xl border transition-colors'>
+                  {f.icon}
+                </div>
+                <h3 className='mb-1.5 text-sm font-semibold'>{f.title}</h3>
+                <p className='text-muted-foreground max-w-[200px] text-xs leading-relaxed'>
+                  {f.desc}
+                </p>
+              </TiltCard>
             </AnimateInView>
           ))}
         </div>
