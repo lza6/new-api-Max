@@ -6874,6 +6874,13 @@
     "Can I self-host the gateway?": "Can I self-host the gateway?",
     "Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.": "Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.",
     "How does it handle reliability and failover?": "How does it handle reliability and failover?",
-    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down."
+    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.",
+    "Compression time": "Compression time",
+    "Compression level": "Compression level",
+    "Fastest": "Fastest",
+    "Balanced": "Balanced",
+    "Smallest": "Smallest",
+    "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.",
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip."
   }
 }

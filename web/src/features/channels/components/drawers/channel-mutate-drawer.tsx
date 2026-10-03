@@ -4501,7 +4501,7 @@ export function ChannelMutateDrawer({
                                     </FormLabel>
                                     <FormDescription>
                                       {t(
-                                        'Gzip the upstream request body when it is large (>= 1MB). Only enable for upstreams that accept Content-Encoding: gzip.'
+                                        'Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.'
                                       )}
                                     </FormDescription>
                                   </div>

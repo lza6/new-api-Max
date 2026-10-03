@@ -493,6 +493,16 @@ func shouldRetry(c *gin.Context, openaiErr *types.NewAPIError, retryTimes int) b
 
 func processChannelError(c *gin.Context, channelError types.ChannelError, err *types.NewAPIError, relayInfo *relaycommon.RelayInfo) {
 	logger.LogError(c, fmt.Sprintf("channel error (channel #%d, status code: %d): %s", channelError.ChannelId, err.StatusCode, common.LocalLogPreview(err.Error())))
+	// [修复防御] 4.2.6：压缩失败熔断。渠道压缩默认开启；若上游不接受 gzip 请求体
+	// （常表现为 400/415/422），本渠道临时禁用压缩避免持续报错——仅在请求**确实用过
+	// 压缩**（RequestOriginalBytes>0）时触发，避免误伤普通 400。
+	if relayInfo != nil && relayInfo.RequestOriginalBytes > 0 {
+		switch err.StatusCode {
+		case http.StatusBadRequest, http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
+			relaycommon.TripChannelCompressionBreaker(channelError.ChannelId,
+				fmt.Sprintf("upstream returned %d for a compressed request body", err.StatusCode))
+		}
+	}
 	// B3-1/B3-3：唯一冷却决策点。开关 off 时 DecideCooldown 为 no-op，
 	// 行为与旧版完全一致；on 时按 B2-1 错误类冷却并记录健康分。
 	// 上游 Retry-After 头未在各 relay 格式保留，暂传 0（按类默认时长冷却）。

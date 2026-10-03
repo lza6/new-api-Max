@@ -6874,6 +6874,13 @@
     "Can I self-host the gateway?": "ゲートウェイを自前でホストできますか？",
     "Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.": "はい。ゲートウェイはセルフホスト可能でオープンソースです。プライマリデータベースは SQLite、MySQL、PostgreSQL に対応し、キャッシュとログには任意で Redis と ClickHouse を利用できます。キー、データ、デプロイはあなたが管理します。",
     "How does it handle reliability and failover?": "信頼性とフェイルオーバーはどのように処理しますか？",
-    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "チャネルのリアルタイム状態に基づき、最も健全な上流へリクエストを振り分けます。異常なチャネルは自動的にローテーションから除外され、負荷分散が設定したプロバイダー間でトラフィックを分散するため、単一の障害でサービスが停止することはありません。"
+    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "チャネルのリアルタイム状態に基づき、最も健全な上流へリクエストを振り分けます。異常なチャネルは自動的にローテーションから除外され、負荷分散が設定したプロバイダー間でトラフィックを分散するため、単一の障害でサービスが停止することはありません。",
+    "Compression time": "圧縮時間",
+    "Compression level": "圧縮レベル",
+    "Fastest": "最速",
+    "Balanced": "バランス",
+    "Smallest": "最小",
+    "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "レベルが高いほど圧縮率は良くなりますが CPU 消費が増えます。1 = 最速、9 = 最小、既定は 6 で両立します。",
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "グローバルしきい値（既定 50KB）を超えるリクエストボディを gzip 圧縮して上流へ送信します。既定で有効。この上流が Content-Encoding: gzip を拒否する場合のみ無効化してください。"
   }
 }

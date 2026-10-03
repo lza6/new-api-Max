@@ -6874,6 +6874,13 @@
     "Can I self-host the gateway?": "Tôi có thể tự lưu trữ cổng không?",
     "Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.": "Có. Cổng có thể tự lưu trữ và là mã nguồn mở, với SQLite, MySQL hoặc PostgreSQL cho cơ sở dữ liệu chính cùng Redis và ClickHouse tùy chọn cho bộ nhớ đệm và nhật ký. Bạn giữ quyền kiểm soát khóa, dữ liệu và triển khai của mình.",
     "How does it handle reliability and failover?": "Cổng xử lý độ tin cậy và chuyển đổi dự phòng như thế nào?",
-    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Yêu cầu được định tuyến tới thượng nguồn khỏe mạnh nhất dựa trên trạng thái kênh theo thời gian thực. Kênh lỗi được tự động loại khỏi vòng xoay, và cân bằng tải phân bổ lưu lượng giữa các nhà cung cấp bạn cấu hình để một sự cố đơn lẻ không làm sập dịch vụ."
+    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Yêu cầu được định tuyến tới thượng nguồn khỏe mạnh nhất dựa trên trạng thái kênh theo thời gian thực. Kênh lỗi được tự động loại khỏi vòng xoay, và cân bằng tải phân bổ lưu lượng giữa các nhà cung cấp bạn cấu hình để một sự cố đơn lẻ không làm sập dịch vụ.",
+    "Compression time": "Thời gian nén",
+    "Compression level": "Mức nén",
+    "Fastest": "Nhanh nhất",
+    "Balanced": "Cân bằng",
+    "Smallest": "Nhỏ nhất",
+    "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "Mức cao hơn nén tốt hơn nhưng tốn CPU hơn. 1 = nhanh nhất, 9 = nhỏ nhất. Mặc định 6 cân bằng cả hai.",
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Nén (gzip) nội dung yêu cầu vượt ngưỡng chung (mặc định 50KB). Bật mặc định; chỉ tắt nếu nguồn này từ chối Content-Encoding: gzip."
   }
 }

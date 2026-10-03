@@ -55,6 +55,7 @@ const defaultSecuritySettings: SecuritySettings = {
   'relay.user_rate_limit_exempt_models': '',
   'relay.request_compression_enabled': true,
   'relay.request_compression_threshold_kb': 50,
+  'relay.request_compression_level': 6,
 }
 
 export function SecuritySettings() {

@@ -109,6 +109,7 @@ export type LiveRequestEntry = {
   original_bytes: number
   compressed_bytes: number
   compressed: boolean
+  compression_ms: number
   first_response_ms: number
   upstream_connect_ms: number
   upstream_upload_ms: number
@@ -136,16 +137,19 @@ export type LiveRequestsData = {
   avg_first_response_ms: number
   avg_upload_ms: number
   avg_upstream_ttfb_ms: number
+  avg_compression_ms: number
   network_in_mbps: number
   network_out_mbps: number
   concurrency: LiveConcurrencyStats
   compression_enabled: boolean
   compression_threshold_kb: number
+  compression_level: number
   // 出站压缩累积统计（进程内，自进程启动累计）。
   compression_total_count: number
   compression_total_original_bytes: number
   compression_total_compressed_bytes: number
   compression_total_saved_bytes: number
+  compression_total_ms: number
   // 4.2.4 中继 gopool worker 可观测。
   relay_workers: number
   relay_workers_max: number

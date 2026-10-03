@@ -29,9 +29,11 @@ func gzipDecompress(t *testing.T, data []byte) []byte {
 }
 
 func compressionTestInfo(enabled bool) *RelayInfo {
+	// ChannelSetting.RequestCompression 为 *bool：nil=默认开启，false=显式关闭。
+	flag := enabled
 	return &RelayInfo{
 		ChannelMeta: &ChannelMeta{
-			ChannelSetting: dto.ChannelSettings{RequestCompression: enabled},
+			ChannelSetting: dto.ChannelSettings{RequestCompression: &flag},
 		},
 	}
 }

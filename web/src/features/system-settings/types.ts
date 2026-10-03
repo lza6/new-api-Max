@@ -412,6 +412,7 @@ export type SecuritySettings = {
   // 出站请求体压缩（relay 设置块，relay.* 前缀）
   'relay.request_compression_enabled': boolean
   'relay.request_compression_threshold_kb': number
+  'relay.request_compression_level': number
 }
 
 export type UpstreamChannel = {

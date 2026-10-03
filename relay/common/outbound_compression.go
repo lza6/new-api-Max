@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"sync/atomic"
+	"time"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
@@ -17,13 +18,14 @@ import (
 
 // 出站压缩累积统计（进程内原子计数，热路径零锁）。
 //
-// [功能] 管理员面板展示「累计压缩了多少字节 / 节省了多少带宽」。仅累加**成功
-// 压缩**的请求；未压缩/压缩无收益的请求不计。多实例各自独立（与既有进程内指标
+// [功能] 管理员面板展示「累计压缩了多少字节 / 节省了多少带宽 / 花了多少时间」。仅累加
+// **成功压缩**的请求；未压缩/压缩无收益的请求不计。多实例各自独立（与既有进程内指标
 // 语义一致）。
 var (
 	compressionTotalOriginalBytes   atomic.Int64
 	compressionTotalCompressedBytes atomic.Int64
 	compressionTotalCount           atomic.Int64
+	compressionTotalMs              atomic.Int64
 )
 
 // CompressionTotals 出站压缩累积统计快照。
@@ -32,16 +34,20 @@ type CompressionTotals struct {
 	OriginalBytes   int64 `json:"original_bytes"`   // 压缩前字节合计
 	CompressedBytes int64 `json:"compressed_bytes"` // 压缩后字节合计
 	SavedBytes      int64 `json:"saved_bytes"`      // 节省字节 = 原始 - 压缩后
+	TotalMs         int64 `json:"total_ms"`         // 压缩累计耗时（毫秒）
 }
 
 // RecordCompression 累加一次成功压缩（供实时面板/统计）。
-func RecordCompression(originalBytes, compressedBytes int64) {
+func RecordCompression(originalBytes, compressedBytes, compressMs int64) {
 	if originalBytes <= 0 || compressedBytes < 0 {
 		return
 	}
 	compressionTotalOriginalBytes.Add(originalBytes)
 	compressionTotalCompressedBytes.Add(compressedBytes)
 	compressionTotalCount.Add(1)
+	if compressMs > 0 {
+		compressionTotalMs.Add(compressMs)
+	}
 }
 
 // GetCompressionTotals 返回出站压缩累积统计快照。
@@ -57,6 +63,7 @@ func GetCompressionTotals() CompressionTotals {
 		OriginalBytes:   orig,
 		CompressedBytes: comp,
 		SavedBytes:      saved,
+		TotalMs:         compressionTotalMs.Load(),
 	}
 }
 
@@ -90,11 +97,12 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 	if !common.RelayRequestCompressionEnabled || !relay_setting.GetRequestCompressionEnabled() {
 		return body, false, nil, -1, -1
 	}
-	if info.ChannelMeta == nil || !info.ChannelSetting.RequestCompression {
+	if info.ChannelMeta == nil || !channelCompressionEnabled(info.ChannelId, info.ChannelSetting.RequestCompression) {
 		return body, false, nil, -1, -1
 	}
 
 	threshold := int64(relay_setting.GetRequestCompressionThresholdKB()) << 10
+	level := relay_setting.GetRequestCompressionLevel()
 
 	// 可回放 body：已知大小，可从独立 reader 流式压缩，原 body 保持可用以便
 	// 压缩无收益/失败时原样转发（不额外拷贝）。
@@ -108,7 +116,9 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 			logCompressionWarn(c, fmt.Sprintf("request compression: cannot open replay reader, sending uncompressed: %v", err))
 			return body, false, nil, size, size
 		}
-		compressed, err := gzipBytes(reader)
+		compStart := time.Now()
+		compressed, err := gzipBytes(reader, level)
+		compressMs := time.Since(compStart).Milliseconds()
 		_ = reader.Close()
 		if err != nil {
 			logCompressionWarn(c, fmt.Sprintf("request compression: gzip failed, sending uncompressed: %v", err))
@@ -118,7 +128,7 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 			// 压缩无收益（已压缩内容/极小 body）：保持明文。
 			return body, false, nil, size, size
 		}
-		compressedBody, closer, ok := storeCompressedBody(c, compressed, size)
+		compressedBody, closer, ok := storeCompressedBody(c, info, compressed, size, compressMs)
 		if !ok {
 			// 存储失败：原 body 仍完整可用，原样转发。
 			return body, false, nil, size, size
@@ -145,11 +155,13 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 	if threshold > 0 && originalLen < threshold {
 		return bytes.NewReader(raw), false, nil, originalLen, originalLen
 	}
-	compressed, err := gzipBytes(bytes.NewReader(raw))
+	compStart := time.Now()
+	compressed, err := gzipBytes(bytes.NewReader(raw), level)
+	compressMs := time.Since(compStart).Milliseconds()
 	if err != nil || len(compressed) >= len(raw) {
 		return bytes.NewReader(raw), false, nil, originalLen, originalLen
 	}
-	compressedBody, closer, ok := storeCompressedBody(c, compressed, originalLen)
+	compressedBody, closer, ok := storeCompressedBody(c, info, compressed, originalLen, compressMs)
 	if !ok {
 		return bytes.NewReader(raw), false, nil, originalLen, originalLen
 	}
@@ -158,19 +170,25 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 
 // storeCompressedBody 把压缩后的字节封装成可回放 body。返回 ok=false 表示
 // 存储不可用（调用方据此回退明文），此时 body 与 closer 均为 nil，不会泄漏。
-func storeCompressedBody(c *gin.Context, compressed []byte, originalSize int64) (io.Reader, io.Closer, bool) {
+// compressMs 为本次压缩耗时（毫秒），写入 RelayInfo 供面板/日志/AB 观测。
+func storeCompressedBody(c *gin.Context, info *RelayInfo, compressed []byte, originalSize, compressMs int64) (io.Reader, io.Closer, bool) {
 	storage, err := common.CreateBodyStorage(compressed)
 	if err != nil {
 		logCompressionWarn(c, fmt.Sprintf("request compression: cannot store compressed body, sending uncompressed: %v", err))
 		return nil, nil, false
 	}
+	if info != nil {
+		info.RequestCompressionMs = compressMs
+		info.RequestOriginalBytes = originalSize
+		info.RequestCompressedBytes = storage.Size()
+	}
 	if c != nil {
 		logger.LogInfo(c, fmt.Sprintf(
-			"request compression: gzip %d -> %d bytes (%.1f%%), outbound Content-Encoding: gzip",
-			originalSize, storage.Size(), 100*float64(storage.Size())/float64(originalSize)))
+			"request compression: gzip %d -> %d bytes (%.1f%%) in %dms, outbound Content-Encoding: gzip",
+			originalSize, storage.Size(), 100*float64(storage.Size())/float64(originalSize), compressMs))
 	}
 	// 累积统计：仅计成功压缩的请求（面板展示累计压缩字节与节省带宽）。
-	RecordCompression(originalSize, storage.Size())
+	RecordCompression(originalSize, storage.Size(), compressMs)
 	return common.NewReplayableBodyReader(storage), storage, true
 }
 
@@ -183,10 +201,16 @@ func logCompressionWarn(c *gin.Context, msg string) {
 	}
 }
 
-// gzipBytes 以 BestSpeed 级别压缩（首字延迟敏感，吞吐优先于压缩率）。
-func gzipBytes(r io.Reader) ([]byte, error) {
+// gzipBytes 以给定级别压缩。level 由 relay_setting.GetRequestCompressionLevel()
+// 提供（默认 DefaultCompression=6）。BestSpeed(1) 吞吐优先但压缩率低，Default(6)
+// 对可压内容显著更优（实测代码类 0.6%→0.3%），CPU 代价在 2C2G 上可接受（大 body
+// 压缩仅百 ms 级）。level 越界时回退 DefaultCompression。
+func gzipBytes(r io.Reader, level int) ([]byte, error) {
+	if level < gzip.HuffmanOnly || level > gzip.BestCompression {
+		level = gzip.DefaultCompression
+	}
 	var buf bytes.Buffer
-	zw, err := gzip.NewWriterLevel(&buf, gzip.BestSpeed)
+	zw, err := gzip.NewWriterLevel(&buf, level)
 	if err != nil {
 		return nil, err
 	}

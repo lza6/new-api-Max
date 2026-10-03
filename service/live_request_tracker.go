@@ -56,6 +56,9 @@ type LiveRequestEntry struct {
 	OriginalBytes   int64 `json:"original_bytes"`
 	CompressedBytes int64 `json:"compressed_bytes"`
 	Compressed      bool  `json:"compressed"`
+	// CompressionMs 本次压缩的**网关本地耗时**（毫秒，-1=未压缩）。用于区分
+	// 「压缩慢」与「上传/上游慢」，做 AB 观测。
+	CompressionMs int64 `json:"compression_ms"`
 
 	// 首字（流式）/上游响应时间（毫秒）；0 表示尚未收到上游响应。
 	FirstResponseMs int64 `json:"first_response_ms"`
@@ -103,6 +106,9 @@ func LiveBegin(reqId string, entry LiveRequestEntry) {
 	if entry.UpstreamTtfbMs == 0 {
 		entry.UpstreamTtfbMs = -1
 	}
+	if entry.CompressionMs == 0 {
+		entry.CompressionMs = -1
+	}
 	liveRequests.mu.Lock()
 	defer liveRequests.mu.Unlock()
 	if _, exists := liveRequests.active[reqId]; !exists {
@@ -144,11 +150,12 @@ func LiveSetPhase(reqId string, phase LiveRequestPhase) {
 	liveUpdate(reqId, func(e *LiveRequestEntry) { e.Phase = phase })
 }
 
-// LiveSetCompression 记录请求体压缩结果（原始字节 → 压缩后字节）。
-func LiveSetCompression(reqId string, originalBytes, compressedBytes int64, compressed bool) {
+// LiveSetCompression 记录请求体压缩结果（原始字节 → 压缩后字节 + 压缩本地耗时）。
+func LiveSetCompression(reqId string, originalBytes, compressedBytes, compressionMs int64, compressed bool) {
 	liveUpdate(reqId, func(e *LiveRequestEntry) {
 		e.OriginalBytes = originalBytes
 		e.CompressedBytes = compressedBytes
+		e.CompressionMs = compressionMs
 		e.Compressed = compressed
 	})
 }
@@ -234,6 +241,8 @@ type LiveRequestsSnapshot struct {
 	// 无数据时为 -1（未采集），调用方据此跳过展示，避免误显示「0ms」。
 	AvgUploadMs       int64 `json:"avg_upload_ms"`
 	AvgUpstreamTtfbMs int64 `json:"avg_upstream_ttfb_ms"`
+	// AvgCompressionMs 平均压缩本地耗时（毫秒，仅统计已压缩请求）；无数据为 -1。
+	AvgCompressionMs int64 `json:"avg_compression_ms"`
 }
 
 // GetLiveRequestsSnapshot 返回当前实时请求快照（含聚合）。
@@ -248,6 +257,7 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 		// 聚合计时默认 -1（未采集），避免前端把「无数据」误显示为「0ms」。
 		AvgUploadMs:       -1,
 		AvgUpstreamTtfbMs: -1,
+		AvgCompressionMs:  -1,
 	}
 	// 进行中：复制并刷新 elapsed（不修改共享对象）。
 	for _, e := range liveRequests.active {
@@ -269,11 +279,16 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 	var frtSum, frtCount int64
 	var uploadSum, uploadCount int64
 	var ttfbSum, ttfbCount int64
+	var compSum, compCount int64
 	accumulate := func(e *LiveRequestEntry) {
 		if e.Compressed && e.OriginalBytes > 0 {
 			snap.CompressedCount++
 			snap.OriginalBytesSum += e.OriginalBytes
 			snap.CompressedBytesSum += e.CompressedBytes
+			if e.CompressionMs >= 0 {
+				compSum += e.CompressionMs
+				compCount++
+			}
 		}
 		if e.FirstResponseMs > 0 {
 			frtSum += e.FirstResponseMs
@@ -305,6 +320,9 @@ func GetLiveRequestsSnapshot() LiveRequestsSnapshot {
 	}
 	if ttfbCount > 0 {
 		snap.AvgUpstreamTtfbMs = ttfbSum / ttfbCount
+	}
+	if compCount > 0 {
+		snap.AvgCompressionMs = compSum / compCount
 	}
 	return snap
 }

@@ -337,7 +337,7 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 		defer compressionCloser.Close()
 	}
 	if info != nil && info.RequestId != "" && originalBytes >= 0 {
-		service.LiveSetCompression(info.RequestId, originalBytes, compressedBytes, compressed)
+		service.LiveSetCompression(info.RequestId, originalBytes, compressedBytes, info.RequestCompressionMs, compressed)
 	}
 	req, err := http.NewRequest(c.Request.Method, fullRequestURL, requestBody)
 	if err != nil {

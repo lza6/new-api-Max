@@ -88,17 +88,20 @@ func GetLiveRequests(c *gin.Context) {
 		"avg_first_response_ms": snap.AvgFirstResponseMs,
 		"avg_upload_ms":         snap.AvgUploadMs,
 		"avg_upstream_ttfb_ms":  snap.AvgUpstreamTtfbMs,
+		"avg_compression_ms":    snap.AvgCompressionMs,
 		"network_in_mbps":       inMBps,
 		"network_out_mbps":      outMBps,
 		"concurrency":           conc,
-		// 压缩开关/阈值来自管理员热更新配置（relay_setting）；env 作部署级兜底。
+		// 压缩开关/阈值/级别来自管理员热更新配置（relay_setting）；env 作部署级兜底。
 		"compression_enabled":      common.RelayRequestCompressionEnabled && relay_setting.GetRequestCompressionEnabled(),
 		"compression_threshold_kb": relay_setting.GetRequestCompressionThresholdKB(),
-		// 出站压缩累积统计（进程内）：累计压缩的字节与节省的网络带宽。
+		"compression_level":        relay_setting.GetRequestCompressionLevel(),
+		// 出站压缩累积统计（进程内）：累计压缩的字节、节省带宽与压缩总耗时。
 		"compression_total_count":            totals.Count,
 		"compression_total_original_bytes":   totals.OriginalBytes,
 		"compression_total_compressed_bytes": totals.CompressedBytes,
 		"compression_total_saved_bytes":      totals.SavedBytes,
+		"compression_total_ms":               totals.TotalMs,
 		// 4.2.4 中继 gopool worker 可观测：运行中 worker 数与上界（高并发后据此
 		// 确认 worker 数被上界约束）。
 		"relay_workers":     common.RelayWorkerCount(),

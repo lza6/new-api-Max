@@ -86,6 +86,10 @@ type RelaySetting struct {
 	// 小于该值时压缩收益不足以覆盖 CPU 开销，直接明文转发。管理员可热更新；
 	// <=0 时回退 env 默认（RELAY_REQUEST_COMPRESSION_THRESHOLD_KB）。
 	RequestCompressionThresholdKB int `json:"request_compression_threshold_kb"`
+	// RequestCompressionLevel gzip 压缩级别（1=BestSpeed..9=BestCompression，
+	// 默认 6=Default）。级别越高压缩率越好但 CPU 越多。<=0 或超范围时用默认 6。
+	// 管理员可热更新（面板展示压缩率与压缩耗时供权衡）。
+	RequestCompressionLevel int `json:"request_compression_level"`
 }
 
 // RateLimitTier 限速档位（并发 + RPM）。
@@ -257,6 +261,20 @@ func GetRequestCompressionThresholdKB() int {
 		return s.RequestCompressionThresholdKB
 	}
 	return DefaultRequestCompressionThresholdKB
+}
+
+// DefaultRequestCompressionLevel gzip 压缩级别默认值（6=DefaultCompression）。
+// 6 在压缩率与 CPU 间平衡：对可压内容比 BestSpeed(1) 明显更优，大 body 压缩仍
+// 仅百 ms 级，适合 2C2G。范围为 gzip.HuffmanOnly(-2)..gzip.BestCompression(9)。
+const DefaultRequestCompressionLevel = 6
+
+// GetRequestCompressionLevel 返回 gzip 压缩级别。管理员配置在有效范围 [1,9] 内
+// 时生效；否则用默认 6。
+func GetRequestCompressionLevel() int {
+	if s := GetRelaySetting(); s != nil && s.RequestCompressionLevel >= 1 && s.RequestCompressionLevel <= 9 {
+		return s.RequestCompressionLevel
+	}
+	return DefaultRequestCompressionLevel
 }
 
 // GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：

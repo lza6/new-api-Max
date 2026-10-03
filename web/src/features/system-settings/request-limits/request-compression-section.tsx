@@ -59,6 +59,7 @@ const createSchema = () =>
       .int()
       .min(1, 'Must be at least 1 KB')
       .max(1024 * 1024, 'Too large'),
+    level: z.number().int().min(1).max(9),
   })
 
 type FormValues = z.infer<ReturnType<typeof createSchema>>
@@ -67,8 +68,16 @@ interface RequestCompressionSectionProps {
   defaultValues: {
     enabled: boolean
     thresholdKb: number
+    level: number
   }
 }
+
+// 压缩级别预设：1=最快（吞吐优先）、6=平衡（默认）、9=最小（压缩率优先）。
+const LEVEL_PRESETS = [
+  { value: 1, labelKey: 'Fastest' },
+  { value: 6, labelKey: 'Balanced' },
+  { value: 9, labelKey: 'Smallest' },
+] as const
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) {return '0 B'}
@@ -98,6 +107,7 @@ export function RequestCompressionSection({
     defaultValues: {
       enabled: defaultValues.enabled,
       thresholdKb: defaultValues.thresholdKb,
+      level: defaultValues.level,
     },
   })
 
@@ -105,10 +115,12 @@ export function RequestCompressionSection({
     form.reset({
       enabled: defaultValues.enabled,
       thresholdKb: defaultValues.thresholdKb,
+      level: defaultValues.level,
     })
-  }, [defaultValues.enabled, defaultValues.thresholdKb, form])
+  }, [defaultValues.enabled, defaultValues.thresholdKb, defaultValues.level, form])
 
   const thresholdValue = form.watch('thresholdKb')
+  const levelValue = form.watch('level')
 
   // 累积统计：复用系统信息实时接口（管理员可见），每 30s 刷新一次。
   const totalsQuery = useQuery({
@@ -130,6 +142,7 @@ export function RequestCompressionSection({
     const updates: Array<[string, string | number | boolean]> = [
       ['relay.request_compression_enabled', values.enabled],
       ['relay.request_compression_threshold_kb', values.thresholdKb],
+      ['relay.request_compression_level', values.level],
     ]
     for (const [key, value] of updates) {
       await updateOption.mutateAsync({ key, value })
@@ -242,6 +255,54 @@ export function RequestCompressionSection({
                       <span className='font-mono tabular-nums'>
                         {thresholdValue} KB
                       </span>
+                    </>
+                  ) : null}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='level'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Compression level')}</FormLabel>
+                <div className='flex flex-wrap items-center gap-2'>
+                  {LEVEL_PRESETS.map((preset) => (
+                    <Button
+                      key={preset.value}
+                      type='button'
+                      size='sm'
+                      variant={field.value === preset.value ? 'default' : 'outline'}
+                      onClick={() => field.onChange(preset.value)}
+                    >
+                      {t(preset.labelKey)} ({preset.value})
+                    </Button>
+                  ))}
+                </div>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={1}
+                    max={9}
+                    step={1}
+                    value={field.value}
+                    onChange={(e) =>
+                      field.onChange(Number.parseInt(e.target.value, 10) || 6)
+                    }
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.'
+                  )}
+                  {levelValue > 0 ? (
+                    <>
+                      {' '}
+                      {t('Current')}:{' '}
+                      <span className='font-mono tabular-nums'>{levelValue}</span>
                     </>
                   ) : null}
                 </FormDescription>

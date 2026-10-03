@@ -453,7 +453,7 @@ export const CHANNEL_FORM_DEFAULT_VALUES: ChannelFormValues = {
   http_protocol: HTTP_PROTOCOL_AUTO,
   http2_connection_shards: 1,
   pass_through_body_enabled: false,
-  request_compression: false,
+  request_compression: true,
   disable_stream_first_token_timeout: false,
   relay_timeout_seconds: undefined,
   system_prompt: '',
@@ -497,7 +497,7 @@ export function transformChannelToFormDefaults(
     http_protocol: HTTP_PROTOCOL_AUTO as 'auto' | 'http1',
     http2_connection_shards: 1,
     pass_through_body_enabled: false,
-    request_compression: false,
+    request_compression: true,
     disable_stream_first_token_timeout: false,
     relay_timeout_seconds: undefined,
     system_prompt: '',
@@ -519,7 +519,8 @@ export function transformChannelToFormDefaults(
         http_protocol: protocol,
         http2_connection_shards: protocol === HTTP_PROTOCOL_HTTP1 ? 1 : shards,
         pass_through_body_enabled: parsed.pass_through_body_enabled || false,
-        request_compression: parsed.request_compression || false,
+        // 缺省(true)：渠道压缩默认开启；显式 false 才关闭（与后端 *bool 语义一致）。
+        request_compression: parsed.request_compression ?? true,
         disable_stream_first_token_timeout:
           parsed.disable_stream_first_token_timeout || false,
         relay_timeout_seconds:
@@ -647,7 +648,8 @@ export function buildSettingJSON(formData: ChannelFormValues): string {
     thinking_to_content: formData.thinking_to_content || false,
     proxy: formData.proxy?.trim() || '',
     pass_through_body_enabled: formData.pass_through_body_enabled || false,
-    request_compression: formData.request_compression || false,
+    // 默认开启（缺省 true）；显式关闭才写 false。
+    request_compression: formData.request_compression ?? true,
     disable_stream_first_token_timeout:
       formData.disable_stream_first_token_timeout || false,
     system_prompt: formData.system_prompt || '',

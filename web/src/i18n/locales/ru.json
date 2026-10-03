@@ -6874,6 +6874,13 @@
     "Can I self-host the gateway?": "Могу ли я развернуть шлюз самостоятельно?",
     "Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.": "Да. Шлюз можно развернуть самостоятельно, он с открытым исходным кодом; в качестве основной базы данных поддерживаются SQLite, MySQL или PostgreSQL, а также опционально Redis и ClickHouse для кэша и журналов. Ключи, данные и развёртывание остаются под вашим контролем.",
     "How does it handle reliability and failover?": "Как обеспечивается надёжность и переключение при сбое?",
-    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Запросы направляются к наиболее работоспособному вышестоящему узлу по состоянию каналов в реальном времени. Неисправные каналы автоматически выводятся из ротации, а балансировка нагрузки распределяет трафик между настроенными провайдерами, чтобы единичный сбой не выводил сервис из строя."
+    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Запросы направляются к наиболее работоспособному вышестоящему узлу по состоянию каналов в реальном времени. Неисправные каналы автоматически выводятся из ротации, а балансировка нагрузки распределяет трафик между настроенными провайдерами, чтобы единичный сбой не выводил сервис из строя.",
+    "Compression time": "Время сжатия",
+    "Compression level": "Уровень сжатия",
+    "Fastest": "Самый быстрый",
+    "Balanced": "Сбалансированный",
+    "Smallest": "Самый маленький",
+    "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "Более высокие уровни сжимают лучше, но нагружают CPU. 1 = самый быстрый, 9 = самый маленький. По умолчанию 6 — баланс.",
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Сжимайте (gzip) тело запроса свыше глобального порога (по умолчанию 50 КБ). Включено по умолчанию; отключайте только если этот апстрим отвергает Content-Encoding: gzip."
   }
 }

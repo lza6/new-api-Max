@@ -6874,6 +6874,13 @@
     "Can I self-host the gateway?": "可以自行部署吗？",
     "Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.": "可以。网关支持自部署且开源，主数据库可用 SQLite、MySQL 或 PostgreSQL，缓存与日志可选 Redis 和 ClickHouse。密钥、数据与部署都由你掌控。",
     "How does it handle reliability and failover?": "如何保障可靠性与故障转移？",
-    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "请求会根据渠道实时状态路由到最健康的上游。异常渠道会被自动移出轮询，负载均衡在你配置的服务商之间分摊流量，单点故障不会导致服务中断。"
+    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "请求会根据渠道实时状态路由到最健康的上游。异常渠道会被自动移出轮询，负载均衡在你配置的服务商之间分摊流量，单点故障不会导致服务中断。",
+    "Compression time": "压缩耗时",
+    "Compression level": "压缩级别",
+    "Fastest": "最快",
+    "Balanced": "平衡",
+    "Smallest": "最小",
+    "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "级别越高压缩率越好但占用 CPU 越多。1 = 最快，9 = 体积最小，默认 6 兼顾两者。",
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "请求体超过全局阈值（默认 50KB）时用 gzip 压缩后发往上游。默认开启；仅当该上游拒绝 Content-Encoding: gzip 时关闭。"
   }
 }

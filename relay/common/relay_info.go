@@ -104,6 +104,13 @@ type RelayInfo struct {
 	// OnUpstreamTiming 上游计时回调（controller 注入，实时面板用）。nil 无副作用。
 	OnUpstreamTiming func(connectMs, uploadMs, ttfbMs int64)
 
+	// 出站压缩元数据（MaybeCompressOutboundBody 采集，供面板/日志/AB 观测）。
+	// RequestCompressionMs 是**网关本地压缩耗时**（不含上传），定位「压缩是否拖慢首字」；
+	// -1 表示未压缩（未达阈值/无收益/关闭）。OriginalBytes/CompressedBytes 为实测字节。
+	RequestCompressionMs   int64
+	RequestOriginalBytes   int64
+	RequestCompressedBytes int64
+
 	//SendLastReasoningResponse bool
 	IsStream               bool
 	IsGeminiBatchEmbedding bool

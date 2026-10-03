@@ -6874,6 +6874,13 @@
     "Can I self-host the gateway?": "Puis-je héberger la passerelle moi-même ?",
     "Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.": "Oui. La passerelle est auto-hébergeable et open source, avec SQLite, MySQL ou PostgreSQL pour la base principale et, en option, Redis et ClickHouse pour le cache et les journaux. Vous gardez le contrôle de vos clés, de vos données et de votre déploiement.",
     "How does it handle reliability and failover?": "Comment gère-t-elle la fiabilité et le basculement ?",
-    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Les requêtes sont acheminées vers l'amont le plus sain selon l'état des canaux en temps réel. Les canaux défaillants sont retirés automatiquement de la rotation, et l'équilibrage de charge répartit le trafic entre les fournisseurs que vous configurez, afin qu'une panne isolée ne vous mette pas hors service."
+    "Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.": "Les requêtes sont acheminées vers l'amont le plus sain selon l'état des canaux en temps réel. Les canaux défaillants sont retirés automatiquement de la rotation, et l'équilibrage de charge répartit le trafic entre les fournisseurs que vous configurez, afin qu'une panne isolée ne vous mette pas hors service.",
+    "Compression time": "Temps de compression",
+    "Compression level": "Niveau de compression",
+    "Fastest": "Le plus rapide",
+    "Balanced": "Équilibré",
+    "Smallest": "Le plus petit",
+    "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "Des niveaux plus élevés compriment mieux mais consomment plus de CPU. 1 = le plus rapide, 9 = le plus petit. Par défaut 6 équilibre les deux.",
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Compresse (gzip) le corps de requête au-delà du seuil global (50 Ko par défaut). Activé par défaut ; désactivez uniquement si cet amont refuse Content-Encoding: gzip."
   }
 }

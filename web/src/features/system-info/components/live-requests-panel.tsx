@@ -146,11 +146,20 @@ function CompressionHint(props: { entry: LiveRequestEntry }) {
             </span>
           }
         />
-        <TooltipContent>
-          {t('{{before}} → {{after}} (compressed)', {
-            before: formatBytes(entry.original_bytes),
-            after: formatBytes(entry.compressed_bytes),
-          })}
+        <TooltipContent className='max-w-64'>
+          <div className='space-y-1 text-xs'>
+            <div>
+              {t('{{before}} → {{after}} (compressed)', {
+                before: formatBytes(entry.original_bytes),
+                after: formatBytes(entry.compressed_bytes),
+              })}
+            </div>
+            {entry.compression_ms >= 0 ? (
+              <div className='text-muted-foreground'>
+                {t('Compression time')}: {formatDuration(entry.compression_ms)}
+              </div>
+            ) : null}
+          </div>
         </TooltipContent>
       </Tooltip>
     </TooltipProvider>
@@ -328,7 +337,11 @@ function LiveRequestsContent(props: { data: LiveRequestsData }) {
         <StatCard
           label={t('Compression')}
           value={data.compression_enabled ? t('On') : t('Off')}
-          hint={t('threshold ≥ {{kb}} KB', { kb: data.compression_threshold_kb })}
+          hint={
+            data.compression_enabled
+              ? `${t('threshold ≥ {{kb}} KB', { kb: data.compression_threshold_kb })} · L${data.compression_level}${data.avg_compression_ms >= 0 ? ` · ${formatDuration(data.avg_compression_ms)}` : ''}`
+              : t('threshold ≥ {{kb}} KB', { kb: data.compression_threshold_kb })
+          }
           tone={data.compression_enabled ? 'good' : 'default'}
         />
         <StatCard
