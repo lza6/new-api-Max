@@ -24,6 +24,18 @@ type configWriteHook interface {
 	AfterConfigWrite()
 }
 
+// configReadGuard 由配置对象可选实现：反射式读取主副本（configToMap，供
+// SaveToDB / ExportAllConfigs / ConfigToMap 使用）在读取期间持读锁，与
+// configWriteHook 的写锁互斥。
+//
+// [修复防御] 4.2.2（补）：getter 走原子快照后，仍有一条**读主副本**的路径 ——
+// ExportAllConfigs 仅持 ConfigManager.mutex.RLock（与 configWriteHook 的写锁
+// 不是同一把），会与热更新写入构成 race。故读主副本必须与写同一把 RWMutex 互斥。
+type configReadGuard interface {
+	LockConfigRead()
+	UnlockConfigRead()
+}
+
 // ConfigManager 统一管理所有配置
 type ConfigManager struct {
 	configs map[string]any
@@ -106,6 +118,13 @@ func (cm *ConfigManager) SaveToDB(updateFunc func(key, value string) error) erro
 // 辅助函数：将配置对象转换为map
 func configToMap(config any) (map[string]string, error) {
 	result := make(map[string]string)
+
+	// [修复防御] 4.2.2（补）：反射读取主副本期间持读锁，与热更新写入互斥，
+	// 避免 ExportAllConfigs/SaveToDB 读 map/slice 时与就地写竞争。
+	if guard, ok := config.(configReadGuard); ok {
+		guard.LockConfigRead()
+		defer guard.UnlockConfigRead()
+	}
 
 	val := reflect.ValueOf(config)
 	if val.Kind() == reflect.Pointer {

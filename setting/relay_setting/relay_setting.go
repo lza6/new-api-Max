@@ -120,9 +120,10 @@ var relaySetting = RelaySetting{
 	NonStreamFirstByteTimeout: DefaultNonStreamFirstByteTimeout,
 }
 
-// settingMu 保护 relaySetting（写入主副本）。所有写入（配置热更新反射写入、
-// Set* 方法）都必须持此锁，并在写完后调用 publishSettingSnapshotLocked 发布新快照。
-var settingMu sync.Mutex
+// settingMu 保护 relaySetting（主副本）。所有写入（配置热更新反射写入、Set* 方法）
+// 必须持写锁，并在写完后发布新快照。反射式读取主副本（ExportAllConfigs/SaveToDB）
+// 持读锁，与写入互斥 —— 后者不走快照，故必须与写同锁串行（4.2.2 补）。
+var settingMu sync.RWMutex
 
 // relaySettingSnapshot 已发布的**不可变**配置快照。读侧只 Load() 后只读访问，
 // 永不触碰正被写入的主副本 —— 消除「热路径读 map」与「热更新就地写 struct/map」
@@ -170,6 +171,11 @@ func (r *RelaySetting) AfterConfigWrite() {
 	publishSettingSnapshotLocked()
 	settingMu.Unlock()
 }
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard：反射式读取主副本
+// （configToMap，供 ExportAllConfigs/SaveToDB 使用）期间持读锁，与热更新写入互斥。
+func (r *RelaySetting) LockConfigRead()   { settingMu.RLock() }
+func (r *RelaySetting) UnlockConfigRead() { settingMu.RUnlock() }
 
 func init() {
 	config.GlobalConfig.Register("relay", &relaySetting)
