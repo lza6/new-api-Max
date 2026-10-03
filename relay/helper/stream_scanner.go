@@ -450,6 +450,20 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 
 streamFinished:
 
+	// [修复防御] 客户端断开不是上游故障，优先级高于其余结束原因：上游可能仍在
+	// prefill，客户端先取消（用户取消 / 切页 / 客户端超时 / 网络抖动）。此时主循环
+	// 走 ClientGone 分支，resp.Body 由 cleanup() 关闭，scanner 收到 **本地** 错误串
+	// "http2: response body closed"（Go 在 resp.Body.Close() 时生成，上游从不发送），
+	// 但缓冲尚未 commit 且零字节 —— 与「上游真的什么都没回」形态完全相同。
+	// 若不在此处拦截，会误判成 500「upstream stream empty」并对同渠道无意义重试
+	//（生产实测 49→49，上游侧无任何失败记录），用户误以为是上游错误。
+	// 以请求上下文的 cancel 为权威信号（EndReason 有 first-wins 竞态：scanner
+	// goroutine 可能先落 ScannerErr 覆盖 ClientGone）。客户端已无接收方，静默结束。
+	if c.Request != nil && c.Request.Context().Err() != nil {
+		logger.LogInfo(c, "stream ended: client disconnected, skip empty-stream failover")
+		return nil
+	}
+
 	if firstTokenTimedOut {
 		// [修复防御] 首包超时是「上游慢/无响应」而非「网关故障」：诚实映射 504
 		// Gateway Timeout，不再返回误导性的 500（生产「莫名 500」的另一真因）。

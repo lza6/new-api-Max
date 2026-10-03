@@ -287,6 +287,61 @@ func TestStreamScannerHandler_ClientCancelAbortsUpstreamAndReturns(t *testing.T)
 	assert.NotContains(t, body, "second")
 }
 
+// TestStreamScannerHandler_ClientDisconnectBeforeFirstContentIsNotEmptyStream
+// 回归：客户端在收到首个可识别 content **之前** 断开（首包缓冲尚未 commit、
+// 缓冲零字节）时，绝不能误判为「upstream stream empty」——上游可能只是还在
+// prefill，客户端先取消（用户取消 / 切页 / 客户端超时 / 网络抖动）。
+//
+// 生产现象：客户端断开 → cleanup() 关闭 resp.Body → scanner 收到本地错误串
+// "http2: response body closed" → 缓冲零字节 → 误报 500「upstream stream empty」
+// 并对同渠道无意义重试（49→49）。上游侧无任何失败记录，用户误以为上游出错。
+func TestStreamScannerHandler_ClientDisconnectBeforeFirstContentIsNotEmptyStream(t *testing.T) {
+	rs := relay_setting.GetRelaySetting()
+	oldFallover := rs.StreamFallover
+	rs.StreamFallover = true
+	t.Cleanup(func() { rs.StreamFallover = oldFallover })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	pr, pw := io.Pipe()
+	t.Cleanup(func() {
+		_ = pr.Close()
+		_ = pw.Close()
+	})
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil).WithContext(ctx)
+
+	resp := &http.Response{Body: pr}
+	info := &relaycommon.RelayInfo{
+		DisablePing: true,
+		ChannelMeta: &relaycommon.ChannelMeta{},
+	}
+
+	// 上游处于 prefill 阶段：只发 `: heartbeat` 注释行（非 data，scanner 直接跳过，
+	// 首包缓冲保持零字节）。客户端随后取消——这正是生产误判成空流的形态。
+	done := make(chan *types.NewAPIError, 1)
+	go func() {
+		done <- StreamScannerHandler(c, resp, info, func(data string, sr *StreamResult) {})
+	}()
+
+	_, err := fmt.Fprint(pw, ": heartbeat\n")
+	require.NoError(t, err)
+
+	// 等注释行被 scanner 消费后取消客户端。
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case fatalErr := <-done:
+		require.Nil(t, fatalErr, "客户端断开不得判为 upstream stream empty（上游可能仍在 prefill）")
+	case <-time.After(3 * time.Second):
+		t.Fatal("handler did not return after client disconnect")
+	}
+}
+
 // ---------- Ping tests ----------
 
 func TestStreamScannerHandler_PingSentDuringSlowUpstream(t *testing.T) {
