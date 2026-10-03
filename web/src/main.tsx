@@ -67,28 +67,37 @@ const rootElement = document.querySelector<HTMLElement>('#root')
 if (!rootElement) {
   throw new Error('Root element not found')
 }
+// Runtime SEO title. The brand name (from system config) and the translated
+// tagline arrive asynchronously from two independent sources (the status query
+// and the i18n bundle), in either order. So we keep the latest brand name in
+// module scope and re-run `applyBrandingTitle` whenever EITHER resolves — the
+// second event always produces the fully composed title.
+let seoBrandName: string | null = null
+function applyBrandingTitle() {
+  if (typeof document === 'undefined') {return}
+  const name = seoBrandName
+  const tagline = i18n.t('AI API Gateway')
+  const composed =
+    name && tagline ? `${name} · ${tagline}` : name || tagline || ''
+  if (!composed) {return}
+  document.title = composed
+  const metaTitle = document.querySelector(
+    'meta[name="title"]'
+  ) as HTMLMetaElement | null
+  if (metaTitle) {metaTitle.setAttribute('content', composed)}
+  for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
+    const el = document.querySelector(sel) as HTMLMetaElement | null
+    if (el) {el.setAttribute('content', composed)}
+  }
+}
+
 // Set document.title and favicon from cached status, then refresh from network
 ;(function initSystemBranding() {
   try {
     if (typeof window === 'undefined' || typeof document === 'undefined') {return}
     const apply = (name: string) => {
-      // Compose "<system name> · <tagline>" so the browser tab and JS-rendered
-      // crawlers get a keyword-bearing title, while the admin-set brand name
-      // stays first. The tagline resolves via i18n (falls back to the key
-      // itself before the locale bundle loads).
-      const tagline = i18n.t('AI API Gateway')
-      const composed =
-        tagline && tagline !== 'AI API Gateway' ? `${name} · ${tagline}` : name
-      document.title = composed
-      const metaTitle = document.querySelector(
-        'meta[name="title"]'
-      ) as HTMLMetaElement | null
-      if (metaTitle) {metaTitle.setAttribute('content', composed)}
-      // OG/Twitter title mirror the runtime system name for social previews.
-      for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
-        const el = document.querySelector(sel) as HTMLMetaElement | null
-        if (el) {el.setAttribute('content', composed)}
-      }
+      seoBrandName = name
+      applyBrandingTitle()
     }
     // Hydrate relative canonical/og:url/og:image into absolute URLs — crawlers
     // and social scrapers require absolute values, but the built HTML ships
@@ -134,28 +143,11 @@ if (!rootElement) {
     /* empty */
   }
 })()
-// Once the active locale bundle resolves, re-apply the title so the SEO
-// tagline suffix uses the translated string. Runs unconditionally (the bundle
-// is guaranteed loaded here, so the EN value legitimately equals the key).
+// Re-run once the locale bundle resolves so the tagline suffix uses the
+// translated string; if the brand name is not yet known this still stamps the
+// tagline, and the status `.then` above will compose the final title later.
 void i18nReady.then(() => {
-  const cached = readCachedStatus()
-  if (!cached?.system_name) {return}
-  try {
-    const tagline = i18n.t('AI API Gateway')
-    if (!tagline) {return}
-    const composed = `${cached.system_name as string} · ${tagline}`
-    document.title = composed
-    const metaTitle = document.querySelector(
-      'meta[name="title"]'
-    ) as HTMLMetaElement | null
-    if (metaTitle) {metaTitle.setAttribute('content', composed)}
-    for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
-      const el = document.querySelector(sel) as HTMLMetaElement | null
-      if (el) {el.setAttribute('content', composed)}
-    }
-  } catch {
-    /* empty */
-  }
+  applyBrandingTitle()
 })
 if ('serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
