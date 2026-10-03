@@ -304,19 +304,20 @@ export function Hero(props: HeroProps) {
           </div>
         </div>
 
-        {/* Right Column: 3D showcase (decorative) + live terminal demo */}
+        {/* Right Column: live terminal demo + 3D showcase */}
         <div
           className='landing-animate-fade-up flex w-full flex-col items-center gap-8 opacity-0 lg:col-span-6'
           style={{ animationDelay: '320ms' }}
         >
-          <Suspense fallback={<div className='mt-8 h-64 w-full rounded-lg border bg-muted/40 lg:mt-0' />}>
-            <HeroTerminalDemo className='mt-8 w-full lg:mt-0' />
-          </Suspense>
-          {/* WebGL "gateway core" when the device supports it, else the CSS
-              3D showcase. Both honour prefers-reduced-motion and are decorative. */}
+          {/* WebGL "gateway core" leads the column so the 3D visual is visible in
+              the first viewport; it falls back to the CSS 3D showcase when the
+              device has no WebGL or the user prefers reduced motion. */}
           <Parallax offset={34} className='flex w-full justify-center'>
             <WebglHero className='flex w-full justify-center' />
           </Parallax>
+          <Suspense fallback={<div className='mt-8 h-64 w-full rounded-lg border bg-muted/40 lg:mt-0' />}>
+            <HeroTerminalDemo className='w-full' />
+          </Suspense>
         </div>
       </div>
     </section>
