@@ -5,6 +5,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/lza6/new-api-Max/common"
 )
 
 // 订阅档位正向缓存（§4.1.1 热路径缓存 · 真实缺口定位）。
@@ -114,7 +116,8 @@ func StoreCachedActiveSubscriptions(userId int, summaries []SubscriptionSummary)
 	}
 	activeSubCache.m[userId] = cachedActiveSubscriptions{
 		summaries: append([]SubscriptionSummary(nil), summaries...),
-		expiresAt: time.Now().Add(ttl),
+		// 4.2.5：TTL 注入 ±10% 抖动，打散多条目/多实例的集中过期，避免回源尖峰。
+		expiresAt: time.Now().Add(common.JitterDuration(ttl, 0.1)),
 	}
 }
 

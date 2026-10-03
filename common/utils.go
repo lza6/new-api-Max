@@ -349,3 +349,29 @@ func BuildURL(base string, endpoint string) string {
 	}
 	return u.ResolveReference(ref).String()
 }
+
+// JitterDuration 给 TTL/间隔注入 ±ratio 的随机抖动，避免多实例/多条目在同一时刻
+// 集中过期（缓存雪崩）。ratio 取 [0,1]，例如 0.1 表示 ±10%。
+// 结果保证 >0（ratio>=1 时下限钳到 1；d<=0 直接返回 d）。
+//
+// [修复防御] 4.2.5：进程内缓存多实例各存一份，固定 TTL 会让同一批条目在相同
+// 秒级窗口集中失效、回源尖峰叠加。抖动把过期时刻打散，平滑回源压力。
+func JitterDuration(d time.Duration, ratio float64) time.Duration {
+	if d <= 0 {
+		return d
+	}
+	if ratio < 0 {
+		ratio = 0
+	}
+	if ratio > 1 {
+		ratio = 1
+	}
+	span := float64(d) * ratio
+	// 偏移量落在 [-span, +span]，四舍五入到纳秒。
+	offset := time.Duration((rand.Float64()*2 - 1) * span)
+	jittered := d + offset
+	if jittered <= 0 {
+		jittered = time.Nanosecond
+	}
+	return jittered
+}
