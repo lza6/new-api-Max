@@ -5,6 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
+	"time"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
@@ -215,6 +218,79 @@ func GetHomePageContent(c *gin.Context) {
 	homePageContent := common.OptionMap["HomePageContent"]
 	common.OptionMapRWMutex.RUnlock()
 	serveRevalidatedJSON(c, homePageContent)
+}
+
+// seoPublicPaths 列出可被搜索引擎收录的公开路由（不含登录后页面）。
+// 与 web/src/routes 下的公开路由保持一致；新增公开页时同步此表。
+var seoPublicPaths = []struct {
+	Path     string
+	Priority string
+}{
+	{"/", "1.0"},
+	{"/pricing", "0.9"},
+	{"/rankings", "0.7"},
+	{"/model-test", "0.6"},
+	{"/tool-setup", "0.6"},
+	{"/about", "0.5"},
+}
+
+// seoSiteBase 返回当前实例的站点根地址（无尾斜杠）。优先取系统设置的
+// ServerAddress——它按站点各自配置（主站/副站不同），因此同一份二进制在
+// 两台机器上会生成各自域名的 robots/sitemap，避免跨站指向。
+// 回退顺序：ServerAddress → FRONTEND_BASE_URL 环境变量 → 默认 localhost。
+func seoSiteBase() string {
+	base := strings.TrimSpace(system_setting.ServerAddress)
+	if base == "" {
+		base = strings.TrimSpace(os.Getenv("FRONTEND_BASE_URL"))
+	}
+	if base == "" {
+		base = "http://localhost:3000"
+	}
+	return strings.TrimRight(base, "/")
+}
+
+// GetRobotsTxt 动态生成 robots.txt：站点域名与 Disallow 规则随实例变化。
+// 由于前端静态资源经 NoRoute 提供、无显式文件路由，此处显式注册优先命中。
+func GetRobotsTxt(c *gin.Context) {
+	base := seoSiteBase()
+	body := "User-agent: *\n" +
+		"Allow: /\n" +
+		"Disallow: /dashboard\n" +
+		"Disallow: /console\n" +
+		"Disallow: /keys\n" +
+		"Disallow: /channels\n" +
+		"Disallow: /usage-logs\n" +
+		"Disallow: /wallet\n" +
+		"Disallow: /system-settings\n" +
+		"Disallow: /setup\n" +
+		"Disallow: /sign-in\n" +
+		"Disallow: /sign-up\n" +
+		"Disallow: /oauth\n" +
+		"Sitemap: " + base + "/sitemap.xml\n"
+	c.Header("Cache-Control", "public, max-age=3600")
+	c.Data(http.StatusOK, "text/plain; charset=utf-8", []byte(body))
+}
+
+// GetSitemapXml 动态生成 sitemap.xml，loc 前缀使用当前实例域名。
+func GetSitemapXml(c *gin.Context) {
+	base := seoSiteBase()
+	lastmod := time.Now().Format("2006-01-02")
+	var b strings.Builder
+	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
+	for _, p := range seoPublicPaths {
+		b.WriteString("  <url><loc>")
+		b.WriteString(base)
+		b.WriteString(p.Path)
+		b.WriteString("</loc><lastmod>")
+		b.WriteString(lastmod)
+		b.WriteString("</lastmod><priority>")
+		b.WriteString(p.Priority)
+		b.WriteString("</priority></url>\n")
+	}
+	b.WriteString("</urlset>\n")
+	c.Header("Cache-Control", "public, max-age=3600")
+	c.Data(http.StatusOK, "application/xml; charset=utf-8", []byte(b.String()))
 }
 
 func SendEmailVerification(c *gin.Context) {

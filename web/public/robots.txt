@@ -1,3 +1,14 @@
+# Served dynamically by the backend (controller.GetRobotsTxt) with the
+# instance's own domain. This file is overridden at request time and only
+# remains as a fallback when the frontend dist is hosted standalone.
 User-agent: *
 Allow: /
-Sitemap: https://freeapi.tingfengai.art/sitemap.xml
+Disallow: /dashboard
+Disallow: /keys
+Disallow: /channels
+Disallow: /usage-logs
+Disallow: /wallet
+Disallow: /system-settings
+Disallow: /setup
+Disallow: /sign-in
+Disallow: /sign-up

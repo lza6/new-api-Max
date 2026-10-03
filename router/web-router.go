@@ -23,6 +23,12 @@ type WebAssets struct {
 func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.HandlerFunc) {
 	frontendFS := common.EmbedFolder(assets.BuildFS, "web/dist")
 
+	// SEO：站点感知的 robots.txt / sitemap.xml。必须显式注册（前端静态资源
+	// 经下方 NoRoute 提供，无显式文件路由），否则会命中 embed 里写死主站域名的
+	// 旧文件，导致副站 sitemap 指向主站。
+	router.GET("/robots.txt", controller.GetRobotsTxt)
+	router.GET("/sitemap.xml", controller.GetSitemapXml)
+
 	router.NoRoute(
 		pluginDispatcher,
 		middleware.RouteTag("web"),

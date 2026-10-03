@@ -238,6 +238,33 @@ func GetSiteOverview(c *gin.Context) {
 			days = min(n, 3650)
 		}
 	}
+	// [fix-perf] 公开端点无认证，原实现每次请求都对 logs 表做 COUNT(*)+SUM(...)
+	// 全表聚合；生产实测 3.2-4.5s（67 万行 / 836MB），匿名爬虫可无限触发打满 DB。
+	// 该值是首页展示用的聚合量，非实时敏感，加 60s Redis 缓存根治重复全表扫描；
+	// 缓存值仅 4 个 int，无 OOM 风险。Redis 未启用时静默跳过。
+	cacheKey := "site_overview:" + strconv.Itoa(days)
+	if common.RedisEnabled {
+		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
+			var hit struct {
+				Days          int   `json:"days"`
+				TotalRequests int64 `json:"total_requests"`
+				TotalBytes    int64 `json:"total_bytes"`
+				TotalTokens   int64 `json:"total_tokens"`
+				TotalQuota    int64 `json:"total_quota"`
+			}
+			if common.Unmarshal([]byte(cached), &hit) == nil {
+				common.ApiSuccess(c, gin.H{
+					"days":             hit.Days,
+					"total_requests":   hit.TotalRequests,
+					"total_bytes":      hit.TotalBytes,
+					"total_bytes_text": common.FormatBytes(hit.TotalBytes),
+					"total_tokens":     hit.TotalTokens,
+					"total_quota":      hit.TotalQuota,
+				})
+				return
+			}
+		}
+	}
 	tx := model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeConsume)
 	if days > 0 {
 		tx = tx.Where("created_at >= ?", time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
@@ -256,6 +283,17 @@ func GetSiteOverview(c *gin.Context) {
 	).Scan(&agg).Error; err != nil {
 		common.ApiErrorMsg(c, "failed to query site overview: "+err.Error())
 		return
+	}
+	if common.RedisEnabled {
+		if raw, err := common.Marshal(gin.H{
+			"days":           days,
+			"total_requests": agg.TotalRequests,
+			"total_bytes":    agg.TotalBytes,
+			"total_tokens":   agg.TotalTokens,
+			"total_quota":    agg.TotalQuota,
+		}); err == nil {
+			_ = common.RedisSet(cacheKey, string(raw), time.Minute)
+		}
 	}
 	common.ApiSuccess(c, gin.H{
 		"days":             days,

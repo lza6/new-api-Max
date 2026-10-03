@@ -77,7 +77,34 @@ if (!rootElement) {
         'meta[name="title"]'
       ) as HTMLMetaElement | null
       if (metaTitle) {metaTitle.setAttribute('content', name)}
+      // OG/Twitter title mirror the runtime system name for social previews.
+      for (const sel of ['meta[property="og:title"]', 'meta[name="twitter:title"]']) {
+        const el = document.querySelector(sel) as HTMLMetaElement | null
+        if (el) {el.setAttribute('content', name)}
+      }
     }
+    // Hydrate relative canonical/og:url/og:image into absolute URLs — crawlers
+    // and social scrapers require absolute values, but the built HTML ships
+    // relative so the same artifact works on any host.
+    const absolutize = (value: string) => {
+      try {
+        return new URL(value, window.location.origin).href
+      } catch {
+        return value
+      }
+    }
+    const hydrateAbsoluteMeta = () => {
+      for (const [sel, attr] of [
+        ['link[rel="canonical"]', 'href'],
+        ['meta[property="og:url"]', 'content'],
+        ['meta[property="og:image"]', 'content'],
+      ] as const) {
+        const el = document.querySelector(sel)
+        const current = el?.getAttribute(attr)
+        if (el && current) {el.setAttribute(attr, absolutize(current))}
+      }
+    }
+    hydrateAbsoluteMeta()
     // Cache-first
     const cached = readCachedStatus()
     if (cached?.system_name) {apply(cached.system_name as string)}
