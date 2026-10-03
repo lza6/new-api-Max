@@ -134,7 +134,11 @@ func (g *globalConcurrencyGate) acquire(timeout time.Duration) (acquired bool, q
 			// 常规超时：把自己从队列移除（此时必仍在队列中；release 未选中本元素）。
 			for i, item := range g.fifo {
 				if item == w {
-					g.fifo = append(g.fifo[:i], g.fifo[i+1:]...)
+					last := len(g.fifo) - 1
+					copy(g.fifo[i:], g.fifo[i+1:])
+					// 清尾部槽位，避免底层数组残留对末元素的引用（slice 泄漏）。
+					g.fifo[last] = nil
+					g.fifo = g.fifo[:last]
 					g.waiting--
 					break
 				}
