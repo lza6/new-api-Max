@@ -6881,6 +6881,9 @@
     "Balanced": "Balanced",
     "Smallest": "Smallest",
     "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.",
-    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip."
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.",
+    "Large prompts are gzip-compressed before leaving the gateway, cutting upload bandwidth and first-token latency. On by default, with automatic fallback for upstreams that reject it.": "Large prompts are gzip-compressed before leaving the gateway, cutting upload bandwidth and first-token latency. On by default, with automatic fallback for upstreams that reject it.",
+    "code & text": "code & text",
+    "typical prompt": "typical prompt"
   }
 }

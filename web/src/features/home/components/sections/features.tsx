@@ -25,6 +25,7 @@ import {
   DollarSign,
   Users,
   HeartHandshake,
+  FileArchive,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
@@ -153,6 +154,42 @@ export function Features(_props: FeaturesProps) {
             <Code className='size-3.5 text-blue-500' />
             {t('Multi-protocol Compatible')}
           </div>
+        </div>
+      ),
+    },
+    {
+      id: 'compression',
+      num: '05',
+      title: t('Request Body Compression'),
+      desc: t(
+        'Large prompts are gzip-compressed before leaving the gateway, cutting upload bandwidth and first-token latency. On by default, with automatic fallback for upstreams that reject it.'
+      ),
+      span: 'md:col-span-3',
+      icon: <FileArchive className='size-4 text-cyan-400' />,
+      visual: (
+        <div className='mt-4 flex flex-col gap-2'>
+          {[
+            { before: '2.1 MB', after: '14 KB', ratio: '99.4%', noteKey: 'code & text' },
+            { before: '700 KB', after: '184 KB', ratio: '73.7%', noteKey: 'typical prompt' },
+          ].map((row) => (
+            <div key={row.before} className='flex items-center gap-3 text-xs'>
+              <span className='text-muted-foreground w-16 shrink-0 tabular-nums'>
+                {row.before}
+              </span>
+              <div className='bg-muted/40 relative h-1.5 flex-1 overflow-hidden rounded-full'>
+                <div
+                  className='absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500'
+                  style={{ width: `${100 - Number.parseFloat(row.ratio)}%` }}
+                />
+              </div>
+              <span className='w-16 shrink-0 text-right font-mono tabular-nums text-cyan-600 dark:text-cyan-400'>
+                {row.after}
+              </span>
+              <span className='text-muted-foreground/70 hidden w-24 shrink-0 text-right text-[10px] sm:block'>
+                {t(row.noteKey)}
+              </span>
+            </div>
+          ))}
         </div>
       ),
     },

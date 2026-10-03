@@ -6881,6 +6881,9 @@
     "Balanced": "Cân bằng",
     "Smallest": "Nhỏ nhất",
     "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "Mức cao hơn nén tốt hơn nhưng tốn CPU hơn. 1 = nhanh nhất, 9 = nhỏ nhất. Mặc định 6 cân bằng cả hai.",
-    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Nén (gzip) nội dung yêu cầu vượt ngưỡng chung (mặc định 50KB). Bật mặc định; chỉ tắt nếu nguồn này từ chối Content-Encoding: gzip."
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Nén (gzip) nội dung yêu cầu vượt ngưỡng chung (mặc định 50KB). Bật mặc định; chỉ tắt nếu nguồn này từ chối Content-Encoding: gzip.",
+    "Large prompts are gzip-compressed before leaving the gateway, cutting upload bandwidth and first-token latency. On by default, with automatic fallback for upstreams that reject it.": "Các prompt lớn được nén (gzip) trước khi rời cổng, giảm băng thông tải lên và độ trễ token đầu tiên. Bật mặc định, tự động dự phòng cho nguồn từ chối.",
+    "code & text": "mã & văn bản",
+    "typical prompt": "prompt điển hình"
   }
 }

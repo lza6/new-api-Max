@@ -6881,6 +6881,9 @@
     "Balanced": "Сбалансированный",
     "Smallest": "Самый маленький",
     "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "Более высокие уровни сжимают лучше, но нагружают CPU. 1 = самый быстрый, 9 = самый маленький. По умолчанию 6 — баланс.",
-    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Сжимайте (gzip) тело запроса свыше глобального порога (по умолчанию 50 КБ). Включено по умолчанию; отключайте только если этот апстрим отвергает Content-Encoding: gzip."
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "Сжимайте (gzip) тело запроса свыше глобального порога (по умолчанию 50 КБ). Включено по умолчанию; отключайте только если этот апстрим отвергает Content-Encoding: gzip.",
+    "Large prompts are gzip-compressed before leaving the gateway, cutting upload bandwidth and first-token latency. On by default, with automatic fallback for upstreams that reject it.": "Большие промпты сжимаются (gzip) перед выходом из шлюза, снижая полосу отдачи и задержку первого токена. Включено по умолчанию, с авто-откатом для апстримов, которые это отвергают.",
+    "code & text": "код и текст",
+    "typical prompt": "типичный промпт"
   }
 }

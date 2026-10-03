@@ -6881,6 +6881,9 @@
     "Balanced": "バランス",
     "Smallest": "最小",
     "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "レベルが高いほど圧縮率は良くなりますが CPU 消費が増えます。1 = 最速、9 = 最小、既定は 6 で両立します。",
-    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "グローバルしきい値（既定 50KB）を超えるリクエストボディを gzip 圧縮して上流へ送信します。既定で有効。この上流が Content-Encoding: gzip を拒否する場合のみ無効化してください。"
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "グローバルしきい値（既定 50KB）を超えるリクエストボディを gzip 圧縮して上流へ送信します。既定で有効。この上流が Content-Encoding: gzip を拒否する場合のみ無効化してください。",
+    "Large prompts are gzip-compressed before leaving the gateway, cutting upload bandwidth and first-token latency. On by default, with automatic fallback for upstreams that reject it.": "大きな prompt はゲートウェイを出る前に gzip 圧縮され、アップロード帯域と初回トークン遅延を削減します。既定で有効。拒否する上流には自動的にフォールバックします。",
+    "code & text": "コード/テキスト",
+    "typical prompt": "一般的な prompt"
   }
 }

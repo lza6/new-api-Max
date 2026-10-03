@@ -6881,6 +6881,9 @@
     "Balanced": "平衡",
     "Smallest": "最小",
     "Higher levels compress better but use more CPU. 1 = fastest, 9 = smallest. Default 6 balances both.": "级别越高压缩率越好但占用 CPU 越多。1 = 最快，9 = 体积最小，默认 6 兼顾两者。",
-    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "请求体超过全局阈值（默认 50KB）时用 gzip 压缩后发往上游。默认开启；仅当该上游拒绝 Content-Encoding: gzip 时关闭。"
+    "Gzip the upstream request body above the global threshold (default 50KB). On by default; turn off only if this upstream rejects Content-Encoding: gzip.": "请求体超过全局阈值（默认 50KB）时用 gzip 压缩后发往上游。默认开启；仅当该上游拒绝 Content-Encoding: gzip 时关闭。",
+    "Large prompts are gzip-compressed before leaving the gateway, cutting upload bandwidth and first-token latency. On by default, with automatic fallback for upstreams that reject it.": "较大的 prompt 在离开网关前先做 gzip 压缩，降低上传带宽占用与首字延迟。默认开启；上游不接受时自动回退无压缩。",
+    "code & text": "代码/文本",
+    "typical prompt": "典型 prompt"
   }
 }
