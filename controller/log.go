@@ -484,6 +484,17 @@ func GetModelBandwidthLeaderboard(c *gin.Context) {
 // 无用户维度、无敏感字段）。成功 = consume 计费日志数；总数 = consume + error。
 // GET /api/model/stats
 func GetModelStats(c *gin.Context) {
+	// §性能：站点级统计聚合约 6s（30 天 GROUP BY 扫数十万行）；结果级缓存 5 分钟，
+	// 后续请求秒回（模型广场卡片统计）。缓存键固定（站点级、无用户维度）。
+	modelStatsMu.Lock()
+	if modelStatsCache != nil && time.Now().Before(modelStatsCacheExpire) {
+		cached := modelStatsCache
+		modelStatsMu.Unlock()
+		common.ApiSuccess(c, gin.H{"stats": cached})
+		return
+	}
+	modelStatsMu.Unlock()
+
 	now := time.Now()
 	loc := now.Location()
 	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc).Unix()
@@ -552,7 +563,21 @@ func GetModelStats(c *gin.Context) {
 	}
 
 	common.ApiSuccess(c, gin.H{"stats": stats})
+
+	// 写入结果缓存（成功路径）。
+	modelStatsMu.Lock()
+	modelStatsCache = stats
+	modelStatsCacheExpire = time.Now().Add(modelStatsTTL)
+	modelStatsMu.Unlock()
 }
+
+var (
+	modelStatsMu          sync.Mutex
+	modelStatsCache       []service.ModelStat
+	modelStatsCacheExpire time.Time
+)
+
+const modelStatsTTL = 5 * time.Minute
 
 // modelCacheHitRateCache 进程内缓存（避免每次扫日志 other JSON）。
 var (
