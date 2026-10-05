@@ -6940,6 +6940,7 @@
     "Unable to load client data": "无法加载客户端数据",
     "No client data yet": "暂无客户端数据",
     "Avg cache hit rate": "平均缓存命中率",
-    "Cache hit": "缓存命中"
+    "Cache hit": "缓存命中",
+    "Top client": "主要客户端"
   }
 }

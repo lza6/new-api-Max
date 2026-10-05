@@ -145,6 +145,9 @@ export type ModelStat = {
   compression_ratio?: number
   // 近 30 天平均缓存命中率（0-1）；-1=无数据。
   cache_hit_rate?: number
+  // 最常用客户端与占比。
+  top_client?: string
+  top_client_share?: number
 }
 
 export type ModelStatsResponse = {

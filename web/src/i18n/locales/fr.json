@@ -6940,6 +6940,7 @@
     "Unable to load client data": "Impossible de charger les données clients",
     "No client data yet": "Aucune donnée client",
     "Avg cache hit rate": "Taux de cache moyen",
-    "Cache hit": "Cache"
+    "Cache hit": "Cache",
+    "Top client": "Client principal"
   }
 }

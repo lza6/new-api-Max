@@ -6940,6 +6940,7 @@
     "Unable to load client data": "クライアントデータを読み込めません",
     "No client data yet": "クライアントデータはまだありません",
     "Avg cache hit rate": "平均キャッシュヒット率",
-    "Cache hit": "キャッシュ"
+    "Cache hit": "キャッシュ",
+    "Top client": "主要クライアント"
   }
 }

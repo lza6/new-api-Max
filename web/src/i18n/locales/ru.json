@@ -6940,6 +6940,7 @@
     "Unable to load client data": "Не удалось загрузить данные клиентов",
     "No client data yet": "Пока нет данных клиентов",
     "Avg cache hit rate": "Средний кэш-хит",
-    "Cache hit": "Кэш"
+    "Cache hit": "Кэш",
+    "Top client": "Основной клиент"
   }
 }

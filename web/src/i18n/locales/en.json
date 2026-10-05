@@ -6940,6 +6940,7 @@
     "Unable to load client data": "Unable to load client data",
     "No client data yet": "No client data yet",
     "Avg cache hit rate": "Avg cache hit rate",
-    "Cache hit": "Cache hit"
+    "Cache hit": "Cache hit",
+    "Top client": "Top client"
   }
 }

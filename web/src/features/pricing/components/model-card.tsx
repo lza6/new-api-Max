@@ -408,6 +408,17 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                 </dd>
               </div>
             ) : null}
+            {props.stats.top_client ? (
+              <div className='col-span-full'>
+                <dt>{t('Top client')}</dt>
+                <dd className='text-foreground/85 font-mono font-semibold'>
+                  {props.stats.top_client}
+                  <span className='text-muted-foreground ml-1 font-normal'>
+                    {Math.round((props.stats.top_client_share ?? 0) * 100)}%
+                  </span>
+                </dd>
+              </div>
+            ) : null}
           </dl>
         ) : null}
       </CardContent>

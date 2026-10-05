@@ -553,12 +553,16 @@ func GetModelStats(c *gin.Context) {
 			}
 		}
 	}
-	cacheByName := modelCacheHitRates()
+	sampled := modelSampledMetricsCached()
 	for i := range stats {
-		if v, ok := cacheByName[stats[i].Model]; ok {
+		if v, ok := sampled.cacheHitRate[stats[i].Model]; ok {
 			stats[i].CacheHitRate = v
 		} else {
 			stats[i].CacheHitRate = -1
+		}
+		if c, ok := sampled.topClient[stats[i].Model]; ok {
+			stats[i].TopClient = c
+			stats[i].TopClientShare = sampled.topClientPct[stats[i].Model]
 		}
 	}
 
@@ -579,31 +583,35 @@ var (
 
 const modelStatsTTL = 5 * time.Minute
 
-// modelCacheHitRateCache 进程内缓存（避免每次扫日志 other JSON）。
+// modelSampledMetrics 单次采样得到的指标：缓存命中率 + 最常用客户端。
+type modelSampledMetrics struct {
+	cacheHitRate map[string]float64
+	topClient    map[string]string
+	topClientPct map[string]float64
+}
+
 var (
-	modelCacheHitRateMu          sync.Mutex
-	modelCacheHitRateCache       map[string]float64
-	modelCacheHitRateCacheExpire time.Time
-	modelCacheHitRateSeeded      bool
+	modelSampleMu          sync.Mutex
+	modelSampleCache       *modelSampledMetrics
+	modelSampleCacheExpire time.Time
+	modelSampleSeeded      bool
 )
 
-const modelCacheHitRateTTL = 5 * time.Minute
+const modelSampleTTL = 5 * time.Minute
 
-// modelCacheHitRateSampleSize 只取最近 N 条消费日志聚合缓存率。
-// 不全量扫描：61 万行 other JSON 全扫需 ~30s（且随日志增长更慢）；取最近 2000 条
-// 覆盖近期活跃模型的缓存命中率，秒级返回，对「模型广场展示」足够精确。
+// modelCacheHitRateSampleSize 只取最近 N 条消费日志聚合。
 const modelCacheHitRateSampleSize = 2000
 
-// modelCacheHitRates 从**最近 N 条** consume 日志的 other.cache_ratio 聚合每模型平均
-// 缓存命中率（走 idx_log_type_created_id 按 id 倒序取，不扫全表），结果进程内缓存 5 分钟。
-func modelCacheHitRates() map[string]float64 {
-	modelCacheHitRateMu.Lock()
-	if modelCacheHitRateSeeded && time.Now().Before(modelCacheHitRateCacheExpire) {
-		cached := modelCacheHitRateCache
-		modelCacheHitRateMu.Unlock()
-		return cached
+// modelSampledMetricsCached 单次扫描最近 N 条日志，聚合每模型「真实缓存命中率」
+// （cache_tokens/prompt_tokens）+「最常用客户端」占比。结果进程内缓存 5 分钟。
+func modelSampledMetricsCached() *modelSampledMetrics {
+	modelSampleMu.Lock()
+	if modelSampleSeeded && time.Now().Before(modelSampleCacheExpire) {
+		c := modelSampleCache
+		modelSampleMu.Unlock()
+		return c
 	}
-	modelCacheHitRateMu.Unlock()
+	modelSampleMu.Unlock()
 
 	type row struct {
 		ModelName    string
@@ -611,7 +619,6 @@ func modelCacheHitRates() map[string]float64 {
 		PromptTokens int
 	}
 	var rows []row
-	// 按 id 倒序取最近 N 条（id 单调递增，等价于最近 N 次请求），走主键/索引，极快。
 	if err := model.LOG_DB.Model(&model.Log{}).
 		Select("model_name", "other", "prompt_tokens").
 		Where("type = ?", model.LogTypeConsume).
@@ -620,44 +627,68 @@ func modelCacheHitRates() map[string]float64 {
 		Scan(&rows).Error; err != nil {
 		return nil
 	}
-	// 真实缓存命中率 = cache_tokens / prompt_tokens。
-	// 注意：日志 other.cache_ratio 是「缓存 token 的计费折扣倍率」（本站未配缓存折扣价时=0），
-	// **不是命中率**——命中率必须用 cache_tokens 除以该请求的输入 token 数。
-	sum := map[string]float64{}
-	cnt := map[string]int64{}
+	// 真实缓存命中率 = cache_tokens / prompt_tokens（metrics A）。
+	// 注：other.cache_ratio 是「缓存 token 计费折扣倍率」，本站未配缓存价时=0，**不是命中率**。
+	hitSum := map[string]float64{}
+	hitCnt := map[string]int64{}
+	// 最常用客户端（metrics B）。
+	clientCnt := map[string]map[string]int64{}
 	for _, r := range rows {
 		if r.Other == "" || r.ModelName == "" {
 			continue
 		}
 		var o struct {
-			CacheTokens int64 `json:"cache_tokens"`
+			CacheTokens int64  `json:"cache_tokens"`
+			Client      string `json:"client"`
 		}
 		if common.UnmarshalJsonStr(r.Other, &o) != nil {
 			continue
 		}
-		if r.PromptTokens <= 0 {
-			continue
+		if r.PromptTokens > 0 {
+			ratio := float64(o.CacheTokens) / float64(r.PromptTokens)
+			if ratio < 0 {
+				ratio = 0
+			} else if ratio > 1 {
+				ratio = 1
+			}
+			hitSum[r.ModelName] += ratio
+			hitCnt[r.ModelName]++
 		}
-		ratio := float64(o.CacheTokens) / float64(r.PromptTokens)
-		if ratio < 0 {
-			ratio = 0
-		}
-		if ratio > 1 {
-			ratio = 1
-		}
-		sum[r.ModelName] += ratio
-		cnt[r.ModelName]++
-	}
-	out := make(map[string]float64, len(sum))
-	for k, s := range sum {
-		if cnt[k] > 0 {
-			out[k] = s / float64(cnt[k])
+		if o.Client != "" {
+			if clientCnt[r.ModelName] == nil {
+				clientCnt[r.ModelName] = map[string]int64{}
+			}
+			clientCnt[r.ModelName][o.Client]++
 		}
 	}
-	modelCacheHitRateMu.Lock()
-	modelCacheHitRateCache = out
-	modelCacheHitRateCacheExpire = time.Now().Add(modelCacheHitRateTTL)
-	modelCacheHitRateSeeded = true
-	modelCacheHitRateMu.Unlock()
-	return out
+	m := &modelSampledMetrics{
+		cacheHitRate: map[string]float64{},
+		topClient:    map[string]string{},
+		topClientPct: map[string]float64{},
+	}
+	for k, s := range hitSum {
+		if hitCnt[k] > 0 {
+			m.cacheHitRate[k] = s / float64(hitCnt[k])
+		}
+	}
+	for model, cc := range clientCnt {
+		var top string
+		var topN, tot int64
+		for c, n := range cc {
+			tot += n
+			if n > topN {
+				topN, top = n, c
+			}
+		}
+		if top != "" && tot > 0 {
+			m.topClient[model] = top
+			m.topClientPct[model] = float64(topN) / float64(tot)
+		}
+	}
+	modelSampleMu.Lock()
+	modelSampleCache = m
+	modelSampleCacheExpire = time.Now().Add(modelSampleTTL)
+	modelSampleSeeded = true
+	modelSampleMu.Unlock()
+	return m
 }

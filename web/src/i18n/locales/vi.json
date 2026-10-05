@@ -6940,6 +6940,7 @@
     "Unable to load client data": "Không tải được dữ liệu client",
     "No client data yet": "Chưa có dữ liệu client",
     "Avg cache hit rate": "Tỷ lệ cache trung bình",
-    "Cache hit": "Cache"
+    "Cache hit": "Cache",
+    "Top client": "Client chính"
   }
 }

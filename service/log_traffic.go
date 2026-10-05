@@ -178,6 +178,9 @@ type ModelStat struct {
 	CompressionRatio float64 `json:"compression_ratio,omitempty"`
 	// §模型广场展示：近 30 天平均缓存命中率（0-1，-1=无数据）。
 	CacheHitRate float64 `json:"cache_hit_rate"`
+	// §模型广场展示：该模型最常用的客户端与占比（来自近期日志采样）。
+	TopClient      string  `json:"top_client,omitempty"`
+	TopClientShare float64 `json:"top_client_share,omitempty"`
 }
 
 // MergeModelStats 将四组（今日成功/今日失败/30天成功/30天失败）按模型名合并为
