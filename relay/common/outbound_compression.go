@@ -189,8 +189,16 @@ func storeCompressedBody(c *gin.Context, info *RelayInfo, compressed []byte, ori
 	}
 	// 累积统计：仅计成功压缩的请求（面板展示累计压缩字节与节省带宽）。
 	RecordCompression(originalSize, storage.Size(), compressMs)
+	// §按模型压缩统计（持久化）：经回调上报，避免 relay/common → model 依赖。
+	if ModelCompressionRecorder != nil && info != nil {
+		ModelCompressionRecorder(info.OriginModelName, originalSize, storage.Size())
+	}
 	return common.NewReplayableBodyReader(storage), storage, true
 }
+
+// ModelCompressionRecorder 由 service 层注册，按模型累积压缩统计（持久化）。
+// nil = 不启用（默认零行为）。
+var ModelCompressionRecorder func(modelName string, originalBytes, compressedBytes int64)
 
 // logCompressionWarn 容忍 nil gin.Context：生产总是传入真实 context，但测试
 // 或未来调用方可能传 nil，typed-nil 指针经 context.Context 接口后会让

@@ -140,6 +140,9 @@ func main() {
 	// 站内图床清理：每 5 分钟清理超过保留期的已完成任务产物/参考素材（仅 local 模式生效）。
 	service.StartTaskArtifactCleanup()
 
+	// 按模型压缩统计周期落库（重启不丢统计）。
+	service.StartModelCompressionStatFlush()
+
 	// Wire task polling adaptor factory (breaks service -> relay import cycle).
 	// Must run before the system task runner starts: the async_task_poll handler
 	// calls service.RunTaskPollingOnce, which needs this factory set.
@@ -250,6 +253,7 @@ func main() {
 	service.StopSubscriptionQuotaResetTask()
 	service.StopSystemInstanceReporter()
 	service.StopTaskArtifactCleanup()
+	service.StopModelCompressionStatFlush()
 	service.StopAuthArtifactCleanup()
 	service.StopTaskEventCleanup()
 	service.StopDiskCacheMaintenanceLoop()

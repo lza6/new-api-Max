@@ -122,6 +122,7 @@ func conformanceModels() []any {
 		&Checkin{}, &SubscriptionOrder{}, &UserSubscription{},
 		&SubscriptionPreConsumeRecord{}, &SubscriptionPlanGrant{}, &CustomOAuthProvider{},
 		&UserOAuthBinding{}, &PerfMetric{}, &SystemInstance{},
+		&ModelCompressionStat{},
 		&SystemTask{}, &SystemTaskLock{}, &CasbinRule{}, &AuthzRole{},
 		&BannedIP{}, &WebRequestLog{}, &SubscriptionPlan{}, &EventDelivery{},
 	}

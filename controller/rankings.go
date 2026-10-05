@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
 )
 
@@ -73,4 +74,52 @@ func GetRankingsBandwidth(c *gin.Context) {
 			"leaderboard": out,
 		},
 	})
+}
+
+// GetCompressionStats 返回按模型的出站压缩统计（次数/原始字节/压缩后/节省字节），
+// 持久化到 DB，重启不丢（§用户需求）。公开只读，供排行榜与模型广场展示。
+// GET /api/rankings/compression?limit=50
+func GetCompressionStats(c *gin.Context) {
+	limit := 50
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = min(n, 500)
+		}
+	}
+	rows, err := model.GetModelCompressionStats()
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to load compression stats")
+		return
+	}
+	if len(rows) > limit {
+		rows = rows[:limit]
+	}
+	type row struct {
+		ModelName       string  `json:"model_name"`
+		Count           int64   `json:"count"`
+		OriginalBytes   int64   `json:"original_bytes"`
+		CompressedBytes int64   `json:"compressed_bytes"`
+		SavedBytes      int64   `json:"saved_bytes"`
+		SavedGB         float64 `json:"saved_gb"`
+		SavedMB         float64 `json:"saved_mb"`
+		Ratio           float64 `json:"ratio"` // 压缩后/原始，越小越好
+	}
+	out := make([]row, 0, len(rows))
+	for _, r := range rows {
+		ratio := 0.0
+		if r.OriginalBytes > 0 {
+			ratio = float64(r.CompressedBytes) / float64(r.OriginalBytes)
+		}
+		out = append(out, row{
+			ModelName:       r.ModelName,
+			Count:           r.Count,
+			OriginalBytes:   r.OriginalBytes,
+			CompressedBytes: r.CompressedBytes,
+			SavedBytes:      r.SavedBytes,
+			SavedGB:         float64(r.SavedBytes) / (1024 * 1024 * 1024),
+			SavedMB:         float64(r.SavedBytes) / (1024 * 1024),
+			Ratio:           ratio,
+		})
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": out})
 }

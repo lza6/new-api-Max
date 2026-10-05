@@ -6924,6 +6924,16 @@
     "Sticky": "Sticky",
     "Suggestions": "Suggestions",
     "Delete this message?": "Delete this message?",
-    "This message will be permanently removed from the conversation.": "This message will be permanently removed from the conversation."
+    "This message will be permanently removed from the conversation.": "This message will be permanently removed from the conversation.",
+    "Compression Savings Leaderboard": "Compression Savings Leaderboard",
+    "Request-body gzip savings by model (persisted, survives restarts)": "Request-body gzip savings by model (persisted, survives restarts)",
+    "Unable to load compression data": "Unable to load compression data",
+    "No compression data yet": "No compression data yet",
+    "Compressed requests": "Compressed requests",
+    "{{n}} times": "{{n}} times",
+    "What is compression ratio & how does it work?": "What is compression ratio & how does it work?",
+    "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.",
+    "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).",
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress."
   }
 }

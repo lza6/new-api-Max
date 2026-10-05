@@ -6924,6 +6924,16 @@
     "Sticky": "Ghim",
     "Suggestions": "Gợi ý",
     "Delete this message?": "Xóa tin nhắn này?",
-    "This message will be permanently removed from the conversation.": "Tin nhắn này sẽ bị xóa vĩnh viễn khỏi cuộc trò chuyện."
+    "This message will be permanently removed from the conversation.": "Tin nhắn này sẽ bị xóa vĩnh viễn khỏi cuộc trò chuyện.",
+    "Compression Savings Leaderboard": "Bảng xếp hạng tiết kiệm nén",
+    "Request-body gzip savings by model (persisted, survives restarts)": "Tiết kiệm gzip theo mô hình (lưu trữ bền vững)",
+    "Unable to load compression data": "Không tải được dữ liệu nén",
+    "No compression data yet": "Chưa có dữ liệu nén",
+    "Compressed requests": "Yêu cầu đã nén",
+    "{{n}} times": "{{n}} lần",
+    "What is compression ratio & how does it work?": "Tỷ lệ nén là gì và hoạt động thế nào?",
+    "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "Tỷ lệ = kích thước nén ÷ kích thước gốc. 30% = prompt 2,1 MB chỉ gửi ~0,6 MB.",
+    "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "Công nghệ: gateway nén gzip phần thân yêu cầu (Content-Encoding: gzip), upstream tự giải nén. Cơ sở: RFC 1952 gzip (DEFLATE, RFC 1951).",
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Vì sao không tới 99%: gzip chỉ loại bỏ dư thừa. Văn bản/mã còn ~1%; ảnh Base64 gần giới hạn entropy Shannon."
   }
 }

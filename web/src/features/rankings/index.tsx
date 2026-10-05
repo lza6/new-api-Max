@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 import {
   BandwidthSection,
+  CompressionSection,
   MarketShareSection,
   ModelsSection,
   PulseSection,
@@ -80,6 +81,7 @@ export function Rankings() {
           period={period}
         />
         <BandwidthSection />
+        <CompressionSection />
         <MarketShareSection
           history={snapshot.vendor_share_history}
           rows={snapshot.vendors}

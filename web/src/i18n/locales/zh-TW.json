@@ -6924,6 +6924,16 @@
     "Sticky": "置頂",
     "Suggestions": "建議",
     "Delete this message?": "刪除這則訊息？",
-    "This message will be permanently removed from the conversation.": "該訊息將從對話中永久移除。"
+    "This message will be permanently removed from the conversation.": "該訊息將從對話中永久移除。",
+    "Compression Savings Leaderboard": "壓縮節省榜",
+    "Request-body gzip savings by model (persisted, survives restarts)": "按模型的請求體 gzip 節省（持久化，重啟不丟）",
+    "Unable to load compression data": "無法載入壓縮資料",
+    "No compression data yet": "暫無壓縮資料",
+    "Compressed requests": "已壓縮請求",
+    "{{n}} times": "{{n}} 次",
+    "What is compression ratio & how does it work?": "什麼是壓縮率？怎麼實現的？",
+    "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "壓縮率 = 壓縮後大小 ÷ 原始大小。30% 表示 2.1 MB 的 prompt 上傳時只送約 0.6 MB。",
+    "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "技術：閘道在上傳前對請求體做 gzip 壓縮（Content-Encoding: gzip），上游自動解壓。技術依據：RFC 1952 gzip（DEFLATE，RFC 1951）。",
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "為什麼到不了 99%：gzip 只能去冗餘。純文字/程式碼可壓到 ~1%；Base64 圖片與高熵資料已接近香農熵極限，幾乎壓不動。"
   }
 }

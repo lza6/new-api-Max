@@ -16,12 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export * from './bandwidth-section'
-export * from './entity-links'
-export * from './growth-text'
-export * from './market-share-section'
-export * from './model-leaderboard'
-export * from './models-section'
-export * from './pulse-section'
-export * from './rankings-hero'
-export * from './compression-section'
+import { useQuery } from '@tanstack/react-query'
+
+import { requireServerSuccess } from '@/lib/server-error-message'
+
+import { getCompressionStats } from '../api'
+
+export function useCompressionStats(limit = 50) {
+  return useQuery({
+    queryKey: ['rankings', 'compression', limit],
+    queryFn: async () =>
+      requireServerSuccess(await getCompressionStats(limit)).data,
+    staleTime: 5 * 60 * 1000,
+  })
+}

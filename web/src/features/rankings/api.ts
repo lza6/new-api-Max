@@ -45,3 +45,22 @@ export async function getRankings(
   const res = await api.get('/api/rankings', { params: { period } })
   return res.data
 }
+
+export interface CompressionStatRow {
+  model_name: string
+  count: number
+  original_bytes: number
+  compressed_bytes: number
+  saved_bytes: number
+  saved_gb: number
+  saved_mb: number
+  ratio: number
+}
+
+// 按模型出站压缩统计（持久化，重启不丢）。
+export async function getCompressionStats(
+  limit = 50
+): Promise<{ success: boolean; data: CompressionStatRow[] }> {
+  const res = await api.get('/api/rankings/compression', { params: { limit } })
+  return res.data
+}
