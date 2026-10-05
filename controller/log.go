@@ -581,19 +581,23 @@ func modelCacheHitRates() map[string]float64 {
 	modelCacheHitRateMu.Unlock()
 
 	type row struct {
-		ModelName string
-		Other     string
+		ModelName    string
+		Other        string
+		PromptTokens int
 	}
 	var rows []row
 	// 按 id 倒序取最近 N 条（id 单调递增，等价于最近 N 次请求），走主键/索引，极快。
 	if err := model.LOG_DB.Model(&model.Log{}).
-		Select("model_name", "other").
+		Select("model_name", "other", "prompt_tokens").
 		Where("type = ?", model.LogTypeConsume).
 		Order("id DESC").
 		Limit(modelCacheHitRateSampleSize).
 		Scan(&rows).Error; err != nil {
 		return nil
 	}
+	// 真实缓存命中率 = cache_tokens / prompt_tokens。
+	// 注意：日志 other.cache_ratio 是「缓存 token 的计费折扣倍率」（本站未配缓存折扣价时=0），
+	// **不是命中率**——命中率必须用 cache_tokens 除以该请求的输入 token 数。
 	sum := map[string]float64{}
 	cnt := map[string]int64{}
 	for _, r := range rows {
@@ -601,15 +605,22 @@ func modelCacheHitRates() map[string]float64 {
 			continue
 		}
 		var o struct {
-			CacheRatio float64 `json:"cache_ratio"`
+			CacheTokens int64 `json:"cache_tokens"`
 		}
 		if common.UnmarshalJsonStr(r.Other, &o) != nil {
 			continue
 		}
-		if o.CacheRatio < 0 {
+		if r.PromptTokens <= 0 {
 			continue
 		}
-		sum[r.ModelName] += o.CacheRatio
+		ratio := float64(o.CacheTokens) / float64(r.PromptTokens)
+		if ratio < 0 {
+			ratio = 0
+		}
+		if ratio > 1 {
+			ratio = 1
+		}
+		sum[r.ModelName] += ratio
 		cnt[r.ModelName]++
 	}
 	out := make(map[string]float64, len(sum))

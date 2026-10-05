@@ -80,12 +80,13 @@ func GetClientStats(windowDays int, modelLimit int) (*ClientStatsResult, error) 
 func aggregateClientStats(windowDays int, modelLimit int) (*ClientStatsResult, error) {
 	const sampleSize = 5000
 	type row struct {
-		ModelName string
-		Other     string
+		ModelName    string
+		Other        string
+		PromptTokens int
 	}
 	var rows []row
 	if err := model.LOG_DB.Model(&model.Log{}).
-		Select("model_name", "other").
+		Select("model_name", "other", "prompt_tokens").
 		Where("type = ?", model.LogTypeConsume).
 		Order("id DESC").
 		Limit(sampleSize).
@@ -97,22 +98,22 @@ func aggregateClientStats(windowDays int, modelLimit int) (*ClientStatsResult, e
 	perModel := map[string]map[string]int64{}
 	modelTotal := map[string]int64{}
 	var total int64
-	var cacheHits, cacheEligible int64
+	var cacheHitSum float64
+	var cacheEligible int64
 
 	for _, r := range rows {
 		client := "unknown"
-		var cacheRatio float64 = -1
+		var cacheTokens int64
 		if r.Other != "" {
 			var o struct {
-				Client     string  `json:"client"`
-				CacheRatio float64 `json:"cache_ratio"`
-				// cache_ratio 可能以 -1 表示未采集；用指针语义难以判断，这里仅当 >=0 计入
+				Client      string `json:"client"`
+				CacheTokens int64  `json:"cache_tokens"`
 			}
 			if common.UnmarshalJsonStr(r.Other, &o) == nil {
 				if o.Client != "" {
 					client = o.Client
 				}
-				cacheRatio = o.CacheRatio
+				cacheTokens = o.CacheTokens
 			}
 		}
 		overall[client]++
@@ -126,9 +127,16 @@ func aggregateClientStats(windowDays int, modelLimit int) (*ClientStatsResult, e
 		}
 		perModel[name][client]++
 		modelTotal[name]++
-		if cacheRatio >= 0 {
+		// 真实缓存命中率 = cache_tokens / prompt_tokens（非 other.cache_ratio，后者是折扣倍率）。
+		if r.PromptTokens > 0 {
+			ratio := float64(cacheTokens) / float64(r.PromptTokens)
+			if ratio < 0 {
+				ratio = 0
+			} else if ratio > 1 {
+				ratio = 1
+			}
+			cacheHitSum += ratio
 			cacheEligible++
-			cacheHits += int64(cacheRatio * 100)
 		}
 	}
 
@@ -138,7 +146,7 @@ func aggregateClientStats(windowDays int, modelLimit int) (*ClientStatsResult, e
 		Overall:    toClientUsage(overall, total),
 	}
 	if cacheEligible > 0 {
-		res.AvgCacheRate = float64(cacheHits) / float64(cacheEligible) / 100.0
+		res.AvgCacheRate = cacheHitSum / float64(cacheEligible)
 	}
 
 	// 按模型总量排序取 topN，各模型内客户端按 count 降序。
