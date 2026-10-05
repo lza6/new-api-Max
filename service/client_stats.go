@@ -74,10 +74,11 @@ func GetClientStats(windowDays int, modelLimit int) (*ClientStatsResult, error) 
 	return data, nil
 }
 
-// aggregateClientStats 扫描窗口内 consume 日志的 other，统计客户端与缓存率。
-// 只 select (model_name, other) 两列，按窗口限量由 SQL 时间过滤保证。
+// aggregateClientStats 扫描**最近 N 条** consume 日志的 other，统计客户端占比与缓存率。
+// 只 select (model_name, other) 两列，按 id 倒序取最近 N 条（走主键，极快），
+// 不做窗口全表扫描——占比快照用近期样本即可，精确历史统计走排行榜聚合。
 func aggregateClientStats(windowDays int, modelLimit int) (*ClientStatsResult, error) {
-	start := time.Now().Add(-time.Duration(windowDays) * 24 * time.Hour).Unix()
+	const sampleSize = 5000
 	type row struct {
 		ModelName string
 		Other     string
@@ -85,7 +86,9 @@ func aggregateClientStats(windowDays int, modelLimit int) (*ClientStatsResult, e
 	var rows []row
 	if err := model.LOG_DB.Model(&model.Log{}).
 		Select("model_name", "other").
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
+		Where("type = ?", model.LogTypeConsume).
+		Order("id DESC").
+		Limit(sampleSize).
 		Scan(&rows).Error; err != nil {
 		return nil, err
 	}

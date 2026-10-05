@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -541,7 +542,7 @@ func GetModelStats(c *gin.Context) {
 			}
 		}
 	}
-	cacheByName := modelCacheHitRates(start30d)
+	cacheByName := modelCacheHitRates()
 	for i := range stats {
 		if v, ok := cacheByName[stats[i].Model]; ok {
 			stats[i].CacheHitRate = v
@@ -553,24 +554,50 @@ func GetModelStats(c *gin.Context) {
 	common.ApiSuccess(c, gin.H{"stats": stats})
 }
 
-// modelCacheHitRates 从近 since 起的 consume 日志 other.cache_ratio 聚合每模型平均缓存命中率。
-// cache_ratio ∈ [0,1]；缺失（-1 或未采集）不计入。失败返回空 map（不阻断主统计）。
-func modelCacheHitRates(since int64) map[string]float64 {
+// modelCacheHitRateCache 进程内缓存（避免每次扫日志 other JSON）。
+var (
+	modelCacheHitRateMu          sync.Mutex
+	modelCacheHitRateCache       map[string]float64
+	modelCacheHitRateCacheExpire time.Time
+	modelCacheHitRateSeeded      bool
+)
+
+const modelCacheHitRateTTL = 5 * time.Minute
+
+// modelCacheHitRateSampleSize 只取最近 N 条消费日志聚合缓存率。
+// 不全量扫描：61 万行 other JSON 全扫需 ~30s（且随日志增长更慢）；取最近 2000 条
+// 覆盖近期活跃模型的缓存命中率，秒级返回，对「模型广场展示」足够精确。
+const modelCacheHitRateSampleSize = 2000
+
+// modelCacheHitRates 从**最近 N 条** consume 日志的 other.cache_ratio 聚合每模型平均
+// 缓存命中率（走 idx_log_type_created_id 按 id 倒序取，不扫全表），结果进程内缓存 5 分钟。
+func modelCacheHitRates() map[string]float64 {
+	modelCacheHitRateMu.Lock()
+	if modelCacheHitRateSeeded && time.Now().Before(modelCacheHitRateCacheExpire) {
+		cached := modelCacheHitRateCache
+		modelCacheHitRateMu.Unlock()
+		return cached
+	}
+	modelCacheHitRateMu.Unlock()
+
 	type row struct {
 		ModelName string
 		Other     string
 	}
 	var rows []row
+	// 按 id 倒序取最近 N 条（id 单调递增，等价于最近 N 次请求），走主键/索引，极快。
 	if err := model.LOG_DB.Model(&model.Log{}).
 		Select("model_name", "other").
-		Where("type = ? AND created_at >= ? AND model_name <> ''", model.LogTypeConsume, since).
+		Where("type = ?", model.LogTypeConsume).
+		Order("id DESC").
+		Limit(modelCacheHitRateSampleSize).
 		Scan(&rows).Error; err != nil {
 		return nil
 	}
 	sum := map[string]float64{}
 	cnt := map[string]int64{}
 	for _, r := range rows {
-		if r.Other == "" {
+		if r.Other == "" || r.ModelName == "" {
 			continue
 		}
 		var o struct {
@@ -591,5 +618,10 @@ func modelCacheHitRates(since int64) map[string]float64 {
 			out[k] = s / float64(cnt[k])
 		}
 	}
+	modelCacheHitRateMu.Lock()
+	modelCacheHitRateCache = out
+	modelCacheHitRateCacheExpire = time.Now().Add(modelCacheHitRateTTL)
+	modelCacheHitRateSeeded = true
+	modelCacheHitRateMu.Unlock()
 	return out
 }
