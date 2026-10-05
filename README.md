@@ -102,7 +102,7 @@
 3. 校验并生效：`caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy`
 4. 验证头：`curl -sI https://YOUR_DOMAIN/ | grep -iE "content-security-policy|strict-transport|x-frame"`
 
-**注意**：模板的 CSP 已包含 SPA 所需的 `'unsafe-inline'`（React hydration），**不含** `'unsafe-eval'`。若接入 GA/Umami，需在 `script-src`/`connect-src` 追加其域名后启用。参考 `~/.claude/rules/web/security.md`。
+**注意**：模板的 CSP 已包含 SPA 所需的 `'unsafe-inline'`（React hydration）与 `'unsafe-eval'`（前端依赖库运行时用到 `new Function`/`eval`，实测有 1 处 eval 违规），**不含**外部 CDN。若接入 GA/Umami，需在 `script-src`/`connect-src` 追加其域名后启用。参考 `~/.claude/rules/web/security.md`。
 
 ## 📝 Project Description
 
