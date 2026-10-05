@@ -6943,6 +6943,7 @@
     "Cache hit": "Cache",
     "Top client": "Client principal",
     "Max size to compress (MB)": "Taille max à compresser (Mo)",
-    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Les corps dépassant cette taille sont envoyés non compressés (protège le CPU). Défaut 20 Mo."
+    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Les corps dépassant cette taille sont envoyés non compressés (protège le CPU). Défaut 20 Mo.",
+    "Site Stats": "Stats du site"
   }
 }

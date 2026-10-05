@@ -6943,6 +6943,7 @@
     "Cache hit": "Cache",
     "Top client": "Client chính",
     "Max size to compress (MB)": "Kích thước tối đa để nén (MB)",
-    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Phần thân lớn hơn sẽ gửi không nén (bảo vệ CPU). Mặc định 20 MB."
+    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Phần thân lớn hơn sẽ gửi không nén (bảo vệ CPU). Mặc định 20 MB.",
+    "Site Stats": "Thống kê trang"
   }
 }

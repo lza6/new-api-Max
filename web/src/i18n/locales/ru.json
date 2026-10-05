@@ -6943,6 +6943,7 @@
     "Cache hit": "Кэш",
     "Top client": "Основной клиент",
     "Max size to compress (MB)": "Макс. размер для сжатия (МБ)",
-    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Тела больше этого отправляются несжатыми (защита CPU). По умолчанию 20 МБ."
+    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Тела больше этого отправляются несжатыми (защита CPU). По умолчанию 20 МБ.",
+    "Site Stats": "Статистика сайта"
   }
 }

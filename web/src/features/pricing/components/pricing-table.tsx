@@ -17,7 +17,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { Row, PaginationState } from '@tanstack/react-table'
-import { useState, useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -26,9 +27,11 @@ import {
   DataTableView,
   useDataTable,
 } from '@/components/data-table'
+import { requireServerSuccess } from '@/lib/server-error-message'
 
+import { getModelStats } from '../api'
 import { DEFAULT_PRICING_PAGE_SIZE, DEFAULT_TOKEN_UNIT } from '../constants'
-import type { PricingModel, TokenUnit } from '../types'
+import type { ModelStat, PricingModel, TokenUnit } from '../types'
 import { usePricingColumns } from './pricing-columns'
 
 export interface PricingTableProps {
@@ -60,12 +63,27 @@ export function PricingTable(props: PricingTableProps) {
     pageSize: DEFAULT_PRICING_PAGE_SIZE,
   })
 
+  const statsQuery = useQuery({
+    queryKey: ['model-stats'],
+    queryFn: async () => requireServerSuccess(await getModelStats()).data,
+    staleTime: 60 * 1000,
+    retry: false,
+  })
+  const statsMap = useMemo(() => {
+    const map = new Map<string, ModelStat>()
+    for (const stat of statsQuery.data?.stats ?? []) {
+      map.set(stat.model, stat)
+    }
+    return map
+  }, [statsQuery.data])
+
   const columns = usePricingColumns({
     tokenUnit,
     priceRate,
     usdExchangeRate,
     showRechargePrice,
     selectedGroup,
+    stats: statsMap,
   })
 
   const { table } = useDataTable({

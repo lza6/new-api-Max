@@ -29,7 +29,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { getLobeIcon } from '@/lib/lobe-icon'
 
 import { parseTags } from '../lib/filters'
-import type { PricingModel } from '../types'
+import type { ModelStat, PricingModel } from '../types'
 import { CachedPriceCell } from './cached-price-cell'
 import { ModelBillingModeBadge } from './model-billing-mode-badge'
 import { ModelPriceCell, type ModelPriceCellOptions } from './model-price-cell'
@@ -38,7 +38,10 @@ import { ModelPriceCell, type ModelPriceCellOptions } from './model-price-cell'
 // Pricing Table Columns
 // ----------------------------------------------------------------------------
 
-export type PricingColumnsOptions = ModelPriceCellOptions
+export type PricingColumnsOptions = ModelPriceCellOptions & {
+  // 每模型站点统计（压缩率/缓存命中率/主要客户端），键为模型名。
+  stats?: Map<string, ModelStat>
+}
 
 export function usePricingColumns(
   options: PricingColumnsOptions = {}
@@ -195,6 +198,47 @@ export function usePricingColumns(
             ))}
             tooltipClassName='max-w-[280px] p-2'
           />
+        )
+      },
+      size: 130,
+      enableSorting: false,
+    },
+
+    // Site stats column: compression ratio + cache hit + top client.
+    {
+      id: 'site_stats',
+      header: t('Site Stats'),
+      cell: ({ row }) => {
+        const s = options.stats?.get(row.original.model_name || '')
+        if (!s) {
+          return <span className='text-muted-foreground text-xs'>—</span>
+        }
+        const compPct =
+          s.compression_ratio && s.compression_ratio > 0
+            ? Math.round((1 - s.compression_ratio) * 100)
+            : null
+        const cachePct =
+          s.cache_hit_rate != null && s.cache_hit_rate >= 0
+            ? Math.round(s.cache_hit_rate * 100)
+            : null
+        return (
+          <div className='flex flex-col gap-0.5 text-xs leading-tight'>
+            {compPct != null ? (
+              <span className='text-cyan-600 dark:text-cyan-400 tabular-nums'>
+                {t('Compression')} -{compPct}%
+              </span>
+            ) : null}
+            {cachePct != null ? (
+              <span className='text-violet-600 dark:text-violet-400 tabular-nums'>
+                {t('Cache hit')} {cachePct}%
+              </span>
+            ) : null}
+            {s.top_client ? (
+              <span className='text-muted-foreground truncate'>
+                {s.top_client} {Math.round((s.top_client_share ?? 0) * 100)}%
+              </span>
+            ) : null}
+          </div>
         )
       },
       size: 130,
