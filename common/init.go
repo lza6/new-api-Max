@@ -69,6 +69,8 @@ func InitEnv() {
 	} else {
 		CryptoSecret = SessionSecret
 	}
+	// §B1-2 渠道密钥加密开关（默认关，零行为变化）。
+	ChannelKeyEncryptionEnabled = GetEnvOrDefaultBool("CHANNEL_KEY_ENCRYPTION", false)
 	if err := InitSessionCookieSettings(); err != nil {
 		log.Fatal(err)
 	}

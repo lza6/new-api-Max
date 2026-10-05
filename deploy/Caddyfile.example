@@ -1,0 +1,74 @@
+# Caddyfile 示例（生产安全头 + 反代 new-api）
+#
+# 这是**示例**，不是生产正在用的文件。生产 Caddy 在宿主机（如 /etc/caddy/Caddyfile）。
+# 应用步骤见 README 的「安全响应头（CSP）」章节。
+#
+# 替换：
+#   YOUR_DOMAIN        → 你的域名（如 freeapi.example.com）
+#   admin@example.com  → 你的 ACME 邮箱
+#   127.0.0.1:3000     → new-api 监听地址（蓝绿部署时可能是 3001）
+
+{
+    email admin@example.com
+    servers {
+        protocols h1 h2
+    }
+}
+
+YOUR_DOMAIN {
+    encode zstd gzip
+
+    # ── 安全响应头（OWASP Secure Headers）──────────────────────────────
+    header {
+        # HSTS：强制 HTTPS 一年，含子域。确认全站 HTTPS 后再开 preload。
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # 防 MIME 嗅探（配合下方 CSP 的 nosniff 语义）。
+        X-Content-Type-Options "nosniff"
+        # 防点击劫持（同源 iframe；如站点需被嵌入可放宽或改用 frame-ancestors）。
+        X-Frame-Options "DENY"
+        # 控制 Referer 泄露。
+        Referrer-Policy "strict-origin-when-cross-origin"
+        # 关闭无用强权限。
+        Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=()"
+        # 移除上游泄露的 Server 版本。
+        -Server
+
+        # ── CSP（内容安全策略）─────────────────────────────────────────
+        # 说明：new-api 前端为 SPA，构建产物在同源 /static 与 /assets 下，
+        # 字体/图标本地自托管；无外部 CDN 依赖。若要接 GA/Umami 分析脚本，
+        # 在 script-src/connect-src 追加其域名。
+        #
+        # 严格 nonce 化需要 Caddy 动态改写 HTML（较复杂，且 SPA 首屏 HTML 由
+        # 后端 go:embed 注入）。此处给「较严格但可用」的策略：script 仅同源 +
+        # 必要的 'unsafe-inline'（React 内联 hydration 需要），不用 'unsafe-eval'。
+        # 若你的部署有 GA/Umami，请在对应指令追加域名后启用。
+        Content-Security-Policy "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: https:; font-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'"
+    }
+
+    # 静态资源长缓存（哈希文件名，可 immutable）。
+    handle_path /assets/* {
+        header Cache-Control "public, max-age=31536000, immutable"
+        reverse_proxy 127.0.0.1:3000 {
+            health_uri /api/status
+            health_interval 2s
+            health_timeout 2s
+            health_fails 3
+            health_passes 2
+        }
+    }
+
+    reverse_proxy 127.0.0.1:3000 {
+        # 健康检查改用轻量 /healthz（比 /api/status 少读配置/DB）。
+        health_uri /healthz
+        health_interval 5s
+        health_timeout 3s
+        health_fails 3
+        health_passes 2
+        flush_interval -1
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {header.X-Forwarded-For}
+        transport http {
+            versions 1.1 2
+        }
+    }
+}

@@ -92,6 +92,18 @@
 - **服务探活**：`GET /healthz`（存活，进程活着即 200，极轻量）/ `GET /readyz`（就绪，主库+日志库可达才 200，否则 503）——供 K8s/Caddy/Docker 健康检查；推荐用 `/healthz` 替换较重的 `/api/status` 作健康检查
 - **报表安全**：CSV 导出防公式注入；参数非法返回 400；内部错误不泄漏到响应
 
+### 🔒 Security Headers (CSP) & Reverse Proxy
+
+仓库提供 `deploy/Caddyfile.example`——生产用的 **Caddy 反向代理 + 安全响应头**模板（HSTS / nosniff / X-Frame-Options / Referrer-Policy / Permissions-Policy + CSP）。
+
+**应用步骤（生产 Caddy 在宿主机，需管理员操作）**：
+1. 复制模板：`cp deploy/Caddyfile.example /etc/caddy/Caddyfile`
+2. 替换占位：`YOUR_DOMAIN`、`admin@example.com`、上游地址（`127.0.0.1:3000`，蓝绿部署时可能是 `3001`）。
+3. 校验并生效：`caddy validate --config /etc/caddy/Caddyfile && systemctl reload caddy`
+4. 验证头：`curl -sI https://YOUR_DOMAIN/ | grep -iE "content-security-policy|strict-transport|x-frame"`
+
+**注意**：模板的 CSP 已包含 SPA 所需的 `'unsafe-inline'`（React hydration），**不含** `'unsafe-eval'`。若接入 GA/Umami，需在 `script-src`/`connect-src` 追加其域名后启用。参考 `~/.claude/rules/web/security.md`。
+
 ## 📝 Project Description
 
 > [!IMPORTANT]
@@ -397,6 +409,7 @@ docker run --name new-api -d --restart always \
 | `TASK_ARTIFACT_RETENTION_SECONDS` | 产物/参考素材保留期（秒）：后台每 5 分钟清理「任务已完成且超过保留期」的目录 | `300` |
 | `DOMAIN_ROUTE_ENABLED` | 领域感知路由开关（默认关）。开启后请求头 `X-Route-Tag` 命中 `DOMAIN_ROUTE_MAP` 时可覆盖分组（仅限用户可用分组） | `false` |
 | `DOMAIN_ROUTE_MAP` | 领域路由映射（逗号分隔 `tag:group`），如 `medical:medical-group,legal:legal-group` | - |
+| `CHANNEL_KEY_ENCRYPTION` | 渠道密钥**加密存储**开关（AES-256-GCM，主密钥由 `CRYPTO_SECRET` 派生）。默认关；开启后**下次保存渠道即加密**、读取自动解密，旧明文 fail-open 兼容。**多节点须一致** | `false` |
 
 📖 **Complete configuration:** [Environment Variables Documentation](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables)
 

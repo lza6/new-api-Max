@@ -82,6 +82,12 @@ const serverErrorMessageKeys = {
   TELEGRAM_BIND_INTERNAL_ERROR: 'Telegram binding failed. Please try again.',
   CHANNEL_SINGLE_POINT_FAILURE:
     'Only one channel serves this model and it is currently unavailable. Consider adding another channel.',
+  INVALID_ACCESS_TOKEN:
+    'Your sign-in has expired. Please sign in again.',
+  INVALID_API_KEY:
+    'The API key is invalid or expired. Please rotate it or create a new one.',
+  ACCOUNT_BANNED:
+    'This account has been disabled. Please contact your administrator.',
 } as const
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -177,6 +183,10 @@ const FRIENDLY_ERROR_PATTERNS: Array<{ pattern: RegExp; messageKey: string }> = 
   { pattern: /504|gateway[_ ]?timeout|timed[_ ]?out|deadline/i, messageKey: 'The request timed out waiting for the upstream service. Please try again or switch to streaming.' },
   { pattern: /upstream|bad[_ ]?gateway|\b502\b|\b503\b/i, messageKey: 'The upstream service is temporarily unavailable. Please try again later.' },
   { pattern: /content[_ ]?(filter|policy)|safety|moderation|prompt[_ ]?block/i, messageKey: 'The content was blocked by a safety policy.' },
+  // B1-5：补齐 3 处盲区（token.invalid / access_token 失效 / 账号封禁）。
+  { pattern: /token[_ ]?\.?[_ ]?invalid|invalid[_ ]?token|token[_ ]?not[_ ]?found/i, messageKey: 'The API key is invalid or expired. Please rotate it or create a new one.' },
+  { pattern: /access[_ ]?token|invalid[_ ]?access[_ ]?token|auth[_ ]?token/i, messageKey: 'Your sign-in has expired. Please sign in again.' },
+  { pattern: /user[_ ]?(banned|disabled|blocked)|account[_ ]?(banned|disabled|suspended)|banned[_ ]?user|封禁|禁用/i, messageKey: 'This account has been disabled. Please contact your administrator.' },
 ]
 
 /**

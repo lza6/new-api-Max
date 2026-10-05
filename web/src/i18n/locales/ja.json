@@ -6944,6 +6944,9 @@
     "Top client": "主要クライアント",
     "Max size to compress (MB)": "圧縮する最大サイズ（MB）",
     "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "これを超える本文は非圧縮で送信（CPU 保護）。既定 20 MB。",
-    "Site Stats": "サイト統計"
+    "Site Stats": "サイト統計",
+    "Your sign-in has expired. Please sign in again.": "ログインの有効期限が切れました。再度ログインしてください。",
+    "The API key is invalid or expired. Please rotate it or create a new one.": "API キーが無効または期限切れです。ローテーションまたは新規作成してください。",
+    "This account has been disabled. Please contact your administrator.": "このアカウントは無効化されています。管理者にお問い合わせください。"
   }
 }

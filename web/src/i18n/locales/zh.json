@@ -6944,6 +6944,9 @@
     "Top client": "主要客户端",
     "Max size to compress (MB)": "触发压缩的最大体积（MB）",
     "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "超过该体积的请求体不压缩（保护 CPU）。默认 20 MB。",
-    "Site Stats": "站点统计"
+    "Site Stats": "站点统计",
+    "Your sign-in has expired. Please sign in again.": "登录已过期，请重新登录。",
+    "The API key is invalid or expired. Please rotate it or create a new one.": "API 密钥无效或已过期，请轮换或新建。",
+    "This account has been disabled. Please contact your administrator.": "该账号已被禁用，请联系管理员。"
   }
 }

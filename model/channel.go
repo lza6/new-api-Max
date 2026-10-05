@@ -180,6 +180,32 @@ func (c *ChannelInfo) Scan(value any) error {
 	return common.Unmarshal(jsonScanBytes(value), c)
 }
 
+// §B1-2 渠道密钥加密 GORM 钩子（默认关，开启才生效；明文/密文以 enc:v1: 前缀区分）。
+// 写入前加密（幂等），读取后解密（旧明文 fail-open）。
+func (channel *Channel) BeforeSave(_ *gorm.DB) error {
+	if channel == nil || !common.ChannelKeyEncryptionEnabled || channel.Key == "" {
+		return nil
+	}
+	enc, err := common.EncryptChannelKey(channel.Key)
+	if err != nil {
+		return err
+	}
+	channel.Key = enc
+	return nil
+}
+
+func (channel *Channel) AfterFind(_ *gorm.DB) error {
+	if channel == nil || !common.ChannelKeyEncryptionEnabled || channel.Key == "" {
+		return nil
+	}
+	dec, err := common.DecryptChannelKey(channel.Key)
+	if err != nil {
+		return err
+	}
+	channel.Key = dec
+	return nil
+}
+
 func (channel *Channel) GetKeys() []string {
 	if channel.Key == "" {
 		return []string{}
@@ -331,6 +357,7 @@ func GetChannelPollingIndex(info *ChannelInfo) int {
 // 因此：
 //   - 写「缓存权威对象」时持有 channelSyncLock 的写锁；
 //   - 非缓存模式直接写库（此时每个请求各自持有独立的 Channel 副本）。
+//
 // 调用方必须已持有该渠道的 GetChannelPollingLock，保证「读-改-写」序列原子。
 func SetChannelPollingIndex(channelID int, info *ChannelInfo, nextIndex int) {
 	if info == nil {

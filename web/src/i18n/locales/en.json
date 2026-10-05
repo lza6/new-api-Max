@@ -6944,6 +6944,9 @@
     "Top client": "Top client",
     "Max size to compress (MB)": "Max size to compress (MB)",
     "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.",
-    "Site Stats": "Site Stats"
+    "Site Stats": "Site Stats",
+    "Your sign-in has expired. Please sign in again.": "Your sign-in has expired. Please sign in again.",
+    "The API key is invalid or expired. Please rotate it or create a new one.": "The API key is invalid or expired. Please rotate it or create a new one.",
+    "This account has been disabled. Please contact your administrator.": "This account has been disabled. Please contact your administrator."
   }
 }

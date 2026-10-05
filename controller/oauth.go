@@ -323,8 +323,10 @@ func handleOAuthLogin(c *gin.Context, provider oauth.Provider, oauthUser *oauth.
 	}
 	user, err := findOrCreateOAuthUser(c, provider, oauthUser, payload.AffiliateCode)
 	if err != nil {
+		// B1-1 邮箱防枚举：OAuth 注册遇到「邮箱已被占用」时返回**中性错误**，
+		// 不确认该邮箱是否已注册（与其它 OAuth 失败不可区分）。
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
-			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+			common.ApiErrorI18n(c, i18n.MsgOAuthRegistrationFailed)
 			return
 		}
 		switch err.(type) {
@@ -333,7 +335,7 @@ func handleOAuthLogin(c *gin.Context, provider oauth.Provider, oauthUser *oauth.
 		case *OAuthRegistrationDisabledError:
 			common.ApiErrorI18n(c, i18n.MsgUserRegisterDisabled)
 		case *OAuthEmailAlreadyTakenError:
-			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+			common.ApiErrorI18n(c, i18n.MsgOAuthRegistrationFailed)
 		default:
 			writeSecurityOperationError(c, err)
 		}

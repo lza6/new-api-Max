@@ -397,6 +397,10 @@ func migrateDB() error {
 			return err
 		}
 	}
+	// §B1-2 渠道密钥加密迁移（开关关闭时为 no-op，零行为变化）。
+	if err := migrateChannelKeyEncryption(); err != nil {
+		common.SysError("channel key encryption migration failed: " + err.Error())
+	}
 	return nil
 }
 

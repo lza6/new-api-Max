@@ -6944,6 +6944,9 @@
     "Top client": "Client principal",
     "Max size to compress (MB)": "Taille max à compresser (Mo)",
     "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Les corps dépassant cette taille sont envoyés non compressés (protège le CPU). Défaut 20 Mo.",
-    "Site Stats": "Stats du site"
+    "Site Stats": "Stats du site",
+    "Your sign-in has expired. Please sign in again.": "Votre session a expiré. Veuillez vous reconnecter.",
+    "The API key is invalid or expired. Please rotate it or create a new one.": "La clé API est invalide ou expirée. Renouvelez-la ou créez-en une.",
+    "This account has been disabled. Please contact your administrator.": "Ce compte a été désactivé. Contactez votre administrateur."
   }
 }

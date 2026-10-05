@@ -22,6 +22,7 @@ import (
 
 	"github.com/lza6/new-api-Max/constant"
 
+	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
@@ -130,6 +131,26 @@ func loginMethodFromContext(c *gin.Context) string {
 	default:
 		return "unknown"
 	}
+}
+
+// sendEmailAlreadyRegisteredNotice 异步向「注册时邮箱已存在」的邮箱发送提醒，
+// 不改变 HTTP 响应（防枚举）。失败仅记日志。SMTP 未配置时静默跳过。
+func sendEmailAlreadyRegisteredNotice(email string) {
+	if email == "" {
+		return
+	}
+	gopool.Go(func() {
+		defer func() {
+			if r := recover(); r != nil {
+				common.SysLog("sendEmailAlreadyRegisteredNotice panic recovered")
+			}
+		}()
+		subject := fmt.Sprintf("%s 账号提醒", common.SystemName)
+		content := fmt.Sprintf("你正在使用本邮箱注册 %s，但该邮箱已存在账号。请直接登录；如需找回密码请使用「忘记密码」。", common.SystemName)
+		if err := common.SendEmail(subject, email, content); err != nil {
+			common.SysLog("failed to send already-registered notice: " + err.Error())
+		}
+	})
 }
 
 // recordLoginAudit 记录登录成功审计日志（对所有用户启用，仅记录成功，不记录失败）。
@@ -279,7 +300,9 @@ func Register(c *gin.Context) {
 		}
 		if err := model.EnsureEmailAvailable(user.Email, 0); err != nil {
 			if errors.Is(err, model.ErrEmailAlreadyTaken) {
-				common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+				// B1-1 邮箱防枚举：邮箱已注册 → 统一成功响应 + 异步通知，不泄露注册状态。
+				sendEmailAlreadyRegisteredNotice(user.Email)
+				c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 				return
 			}
 			common.ApiErrorI18n(c, i18n.MsgDatabaseError)
@@ -315,7 +338,11 @@ func Register(c *gin.Context) {
 	}
 	if err := cleanUser.Insert(inviterId); err != nil {
 		if errors.Is(err, model.ErrEmailAlreadyTaken) {
-			common.ApiErrorI18n(c, i18n.MsgUserEmailAlreadyTaken)
+			// B1-1 邮箱防枚举：邮箱已注册时**不返回可区分的错误**——返回与成功一致的
+			// 统一响应，改为异步向该邮箱发送「你已有账号」通知（OWASP ASVS V2.2.1）。
+			// 攻击者无法通过响应体/状态码判断某邮箱是否已注册。
+			sendEmailAlreadyRegisteredNotice(user.Email)
+			c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
 			return
 		}
 		common.ApiError(c, err)

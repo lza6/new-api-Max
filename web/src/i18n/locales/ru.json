@@ -6944,6 +6944,9 @@
     "Top client": "Основной клиент",
     "Max size to compress (MB)": "Макс. размер для сжатия (МБ)",
     "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Тела больше этого отправляются несжатыми (защита CPU). По умолчанию 20 МБ.",
-    "Site Stats": "Статистика сайта"
+    "Site Stats": "Статистика сайта",
+    "Your sign-in has expired. Please sign in again.": "Сессия истекла. Войдите снова.",
+    "The API key is invalid or expired. Please rotate it or create a new one.": "API-ключ недействителен или истёк. Обновите или создайте новый.",
+    "This account has been disabled. Please contact your administrator.": "Эта учётная запись отключена. Обратитесь к администратору."
   }
 }

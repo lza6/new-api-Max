@@ -6944,6 +6944,9 @@
     "Top client": "Client chính",
     "Max size to compress (MB)": "Kích thước tối đa để nén (MB)",
     "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Phần thân lớn hơn sẽ gửi không nén (bảo vệ CPU). Mặc định 20 MB.",
-    "Site Stats": "Thống kê trang"
+    "Site Stats": "Thống kê trang",
+    "Your sign-in has expired. Please sign in again.": "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.",
+    "The API key is invalid or expired. Please rotate it or create a new one.": "API key không hợp lệ hoặc hết hạn. Hãy xoay hoặc tạo mới.",
+    "This account has been disabled. Please contact your administrator.": "Tài khoản này đã bị vô hiệu hoá. Vui lòng liên hệ quản trị viên."
   }
 }
