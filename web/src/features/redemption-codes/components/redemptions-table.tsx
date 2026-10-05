@@ -81,7 +81,7 @@ export function RedemptionsTable() {
   const statusFilterValue = statusFilter[0] ?? ''
 
   // Fetch data with React Query
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: [
       'redemptions',
       pagination.pageIndex + 1,
@@ -163,6 +163,10 @@ export function RedemptionsTable() {
       columns={columns}
       isLoading={isLoading}
       isFetching={isFetching}
+      isError={isError}
+      errorTitle={t('Failed to load redemption codes')}
+      errorDescription={t('Please check your connection and try again.')}
+      onRetry={() => refetch()}
       emptyTitle={t('No Redemption Codes Found')}
       emptyDescription={t(
         'No redemption codes available. Create your first redemption code to get started.'
@@ -181,7 +185,14 @@ export function RedemptionsTable() {
           },
         ],
       }}
-      mobile={<RedemptionsMobileList table={table} isLoading={isLoading} />}
+      mobile={
+        <RedemptionsMobileList
+          table={table}
+          isLoading={isLoading}
+          isError={isError}
+          onRetry={() => refetch()}
+        />
+      }
       getRowClassName={(row, { isMobile }) => {
         if (!isDisabledRedemptionRow(row.original)) {return undefined}
         return isMobile ? DISABLED_ROW_MOBILE : DISABLED_ROW_DESKTOP

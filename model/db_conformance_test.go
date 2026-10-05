@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/stretchr/testify/assert"
@@ -174,6 +175,122 @@ func TestDBConformanceLogsIndexes(t *testing.T) {
 			}
 			assert.True(t, db.Migrator().HasIndex("task_events", "idx_task_events_created_at"),
 				"expected retention index on task_events (%s)", dialect.name)
+		})
+	}
+}
+
+// TestDBConformanceLogsTrafficIndexDropped proves the obsolete idx_logs_traffic
+// composite index is removed on every dialect: it is not recreated by
+// AutoMigrate, and the explicit drop migration removes an existing one
+// idempotently. The index (request_bytes,response_bytes) had no priority:1 and
+// serves no query (site traffic aggregates are predicate-free SUMs).
+func TestDBConformanceLogsTrafficIndexDropped(t *testing.T) {
+	for _, dialect := range conformanceDialects(t) {
+		t.Run(dialect.name, func(t *testing.T) {
+			db, _ := dialect.openDB(t)
+			require.NoError(t, db.AutoMigrate(&Log{}))
+			const tableName = "logs"
+			const indexName = "idx_logs_traffic"
+
+			// State-independent: persistent dialects may still carry the index
+			// from earlier runs; clear it so the assertions below are objective.
+			if db.Migrator().HasIndex(&Log{}, indexName) {
+				require.NoError(t, db.Migrator().DropIndex(&Log{}, indexName))
+			}
+
+			// A fresh model migration must not create the obsolete index.
+			assert.False(t, db.Migrator().HasIndex(tableName, indexName),
+				"AutoMigrate must not create the removed index (%s)", dialect.name)
+
+			// Simulate the legacy schema that still has it, then migrate.
+			require.NoError(t, db.Exec("CREATE INDEX "+indexName+" ON "+tableName+"(request_bytes, response_bytes)").Error)
+			require.True(t, db.Migrator().HasIndex(tableName, indexName))
+
+			require.NoError(t, migrateLogTrafficIndex(db))
+			assert.False(t, db.Migrator().HasIndex(tableName, indexName),
+				"obsolete traffic index must be dropped (%s)", dialect.name)
+
+			// Idempotent: a second run is a no-op and does not error.
+			require.NoError(t, migrateLogTrafficIndex(db))
+			assert.False(t, db.Migrator().HasIndex(tableName, indexName))
+
+			// Re-running the model migration must not resurrect the index.
+			require.NoError(t, db.AutoMigrate(&Log{}))
+			assert.False(t, db.Migrator().HasIndex(tableName, indexName),
+				"AutoMigrate must not recreate the removed index (%s)", dialect.name)
+		})
+	}
+}
+
+// TestDBConformanceUsageReport proves the usage/cost report aggregation works on
+// every dialect: per-dimension GROUP BY sums match, and the integer day-key
+// arithmetic (created_at + offset) - ((created_at + offset) % 86400) buckets
+// rows into the correct local calendar day on SQLite, MySQL and PostgreSQL
+// (MySQL's `/` is decimal division, so the report deliberately uses `%`).
+func TestDBConformanceUsageReport(t *testing.T) {
+	for _, dialect := range conformanceDialects(t) {
+		t.Run(dialect.name, func(t *testing.T) {
+			db, _ := dialect.openDB(t)
+			prevLogDB := LOG_DB
+			LOG_DB = db
+			t.Cleanup(func() { LOG_DB = prevLogDB })
+			require.NoError(t, db.AutoMigrate(&Log{}))
+			// State-independent: persistent dialects keep rows across runs, so
+			// clear the logs table before seeding to keep sums deterministic.
+			require.NoError(t, db.Where("1 = 1").Delete(&Log{}).Error)
+
+			y, m, d := time.Now().Date()
+			today := time.Date(y, m, d, 0, 0, 0, 0, time.Local).Unix()
+			yesterday := today - 86400
+
+			seed := []Log{
+				{UserId: 1, Type: LogTypeConsume, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 3600, PromptTokens: 100, CompletionTokens: 50, Quota: 7, RequestBytes: 1000, ResponseBytes: 2000},
+				{UserId: 1, Type: LogTypeConsume, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 7200, PromptTokens: 200, CompletionTokens: 10, Quota: 3, RequestBytes: 500, ResponseBytes: 500},
+				{UserId: 2, Type: LogTypeConsume, ModelName: "beta", ChannelId: 20, CreatedAt: today + 60, PromptTokens: 10, CompletionTokens: 5, Quota: 1, RequestBytes: 100, ResponseBytes: 100},
+				{UserId: 3, Type: LogTypeConsume, ModelName: "beta", ChannelId: 20, CreatedAt: yesterday + 3600, PromptTokens: 1, CompletionTokens: 1, Quota: 2, RequestBytes: 50, ResponseBytes: 50},
+				// A non-consume row must be excluded from the report.
+				{UserId: 4, Type: LogTypeTopup, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 100, Quota: 999},
+			}
+			require.NoError(t, db.Create(&seed).Error)
+
+			// By model: alpha (2 reqs, quota 10, tokens 360), beta (2 reqs, quota 3, tokens 17).
+			byModel, err := GetUsageReport(UsageReportGroupByModel, yesterday, 0)
+			require.NoError(t, err)
+			require.Len(t, byModel, 2)
+			models := map[string]UsageReportRow{}
+			for _, r := range byModel {
+				models[r.Key] = r
+			}
+			assert.EqualValues(t, 2, models["alpha"].Requests)
+			assert.EqualValues(t, 10, models["alpha"].Quota)
+			assert.EqualValues(t, 360, models["alpha"].TotalTokens)
+			assert.EqualValues(t, 4000, models["alpha"].TotalBytes)
+			assert.EqualValues(t, 2, models["beta"].Requests)
+			assert.EqualValues(t, 17, models["beta"].TotalTokens)
+			assert.EqualValues(t, 300, models["beta"].TotalBytes)
+
+			// By channel: 10 (2 reqs), 20 (2 reqs).
+			byChannel, err := GetUsageReport(UsageReportGroupByChannel, yesterday, 0)
+			require.NoError(t, err)
+			require.Len(t, byChannel, 2)
+
+			// By day: today (3 reqs) and yesterday (1 req) — day-key must bucket
+			// correctly across dialects.
+			byDay, err := GetUsageReport(UsageReportGroupByDay, yesterday, 0)
+			require.NoError(t, err)
+			require.Len(t, byDay, 2)
+			todayKey := time.Unix(today, 0).In(time.Local).Format("2006-01-02")
+			yesterdayKey := time.Unix(yesterday, 0).In(time.Local).Format("2006-01-02")
+			days := map[string]UsageReportRow{}
+			for _, r := range byDay {
+				days[r.Key] = r
+			}
+			assert.EqualValues(t, 3, days[todayKey].Requests, "today bucket (%s)", dialect.name)
+			assert.EqualValues(t, 1, days[yesterdayKey].Requests, "yesterday bucket (%s)", dialect.name)
+
+			// Invalid dimension is rejected without touching the DB.
+			_, err = GetUsageReport("bogus", yesterday, 0)
+			assert.Error(t, err)
 		})
 	}
 }

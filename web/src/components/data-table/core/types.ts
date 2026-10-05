@@ -39,6 +39,17 @@ export type DataTableRenderRowHelpers = {
 export type DataTableViewProps<TData> = {
   table: TanstackTable<TData>
   isLoading?: boolean
+  /**
+   * When true, the body renders a recoverable error state instead of an empty
+   * or data state. Set this from the owning query's `isError`; pair it with
+   * `onRetry` (typically `refetch`) so the user can recover without a reload.
+   * Without it a failed query silently renders as "no data" on every list page.
+   */
+  isError?: boolean
+  errorTitle?: string
+  errorDescription?: string
+  onRetry?: () => void
+  errorAction?: React.ReactNode
   rows?: Row<TData>[]
   emptyTitle?: string
   emptyDescription?: string

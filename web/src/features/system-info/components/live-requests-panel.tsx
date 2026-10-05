@@ -31,6 +31,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { useDocumentVisible } from '@/hooks/use-document-visible'
 import { cn } from '@/lib/utils'
 
 import { getLiveRequests } from '../api'
@@ -429,6 +430,7 @@ function LiveRequestsContent(props: { data: LiveRequestsData }) {
 
 export function LiveRequestsPanel() {
   const { t } = useTranslation()
+  const documentVisible = useDocumentVisible()
   const query = useQuery({
     queryKey: ['system-info', 'live-requests'],
     queryFn: async () => {
@@ -440,7 +442,10 @@ export function LiveRequestsPanel() {
     },
     staleTime: POLL_INTERVAL_MS,
     retry: false,
-    refetchInterval: POLL_INTERVAL_MS,
+    // Pause the 2s poll while the tab is hidden: otherwise an admin leaving
+    // this page open keeps hitting the API every 2 seconds forever.
+    enabled: documentVisible,
+    refetchInterval: documentVisible ? POLL_INTERVAL_MS : false,
   })
 
   const refreshing = query.isFetching && !query.isLoading

@@ -124,3 +124,61 @@ func setupRelayRouterTestDB(t *testing.T) {
 		}
 	})
 }
+
+// §端点适配：/v1/messages/count_tokens 重新启用（421 契约实测可用）。
+func TestRelayRouterRegistersClaudeTokenCountingEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	SetRelayRouter(engine)
+	for _, route := range engine.Routes() {
+		if route.Method == http.MethodPost && route.Path == "/v1/messages/count_tokens" {
+			return
+		}
+	}
+	t.Fatal("POST /v1/messages/count_tokens route is not registered")
+}
+
+// §端点适配：/v1/sub2api/billing 已注册。
+func TestRelayRouterRegistersSub2ApiBillingEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	SetRelayRouter(engine)
+	for _, route := range engine.Routes() {
+		if route.Method == http.MethodGet && route.Path == "/v1/sub2api/billing" {
+			return
+		}
+	}
+	t.Fatal("GET /v1/sub2api/billing route is not registered")
+}
+
+// §端点适配：/v1/responses/input_tokens 已注册（421 契约）。
+func TestRelayRouterRegistersResponsesInputTokensEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	SetRelayRouter(engine)
+	for _, route := range engine.Routes() {
+		if route.Method == http.MethodPost && route.Path == "/v1/responses/input_tokens" {
+			return
+		}
+	}
+	t.Fatal("POST /v1/responses/input_tokens route is not registered")
+}
+
+// §Health Checks：/healthz 与 /readyz 已注册（根级，无认证）。
+func TestRouterRegistersHealthProbes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	SetRouter(engine, WebAssets{})
+	found := map[string]bool{}
+	for _, route := range engine.Routes() {
+		if route.Method != http.MethodGet {
+			continue
+		}
+		if route.Path == "/healthz" || route.Path == "/readyz" {
+			found[route.Path] = true
+		}
+	}
+	if !found["/healthz"] || !found["/readyz"] {
+		t.Fatalf("health probes not registered: %v", found)
+	}
+}

@@ -215,9 +215,13 @@ func TestGetPreferredChannelByAffinity_RequestHeaderKeySource(t *testing.T) {
 
 	setting := operation_setting.GetChannelAffinitySetting()
 	originalRules := setting.Rules
-	setting.Rules = append([]operation_setting.ChannelAffinityRule{rule}, originalRules...)
+	operation_setting.UpdateChannelAffinitySetting(func(s *operation_setting.ChannelAffinitySetting) {
+		s.Rules = append([]operation_setting.ChannelAffinityRule{rule}, originalRules...)
+	})
 	t.Cleanup(func() {
-		setting.Rules = originalRules
+		operation_setting.UpdateChannelAffinitySetting(func(s *operation_setting.ChannelAffinitySetting) {
+			s.Rules = originalRules
+		})
 	})
 
 	rec := httptest.NewRecorder()

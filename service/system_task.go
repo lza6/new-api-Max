@@ -104,11 +104,12 @@ type LogCleanupResult struct {
 }
 
 var (
-	systemTaskRunnerOnce sync.Once
 	// systemTaskWakeup signals the runner to check for runnable tasks
 	// immediately instead of waiting for the idle poll. Buffered so a signal
 	// raised while the runner is busy is not lost and is handled on the next loop.
 	systemTaskWakeup = make(chan struct{}, 1)
+	// systemTaskRunner 管理 runner goroutine 生命周期，供优雅关闭停止。
+	systemTaskRunner backgroundLoop
 )
 
 // notifySystemTaskRunner wakes the runner without blocking. If a wakeup is
@@ -121,48 +122,59 @@ func notifySystemTaskRunner() {
 }
 
 func StartSystemTaskRunner() {
-	systemTaskRunnerOnce.Do(func() {
-		if !common.IsMasterNode {
-			return
+	if !common.IsMasterNode {
+		return
+	}
+	runnerID := fmt.Sprintf("%s-%s", common.NodeName, common.GetRandomString(8))
+	systemTaskRunner.start(func(ctx context.Context) {
+		logger.LogInfo(ctx, fmt.Sprintf("system task runner started: runner=%s idle_interval=%s", runnerID, systemTaskRunnerIdleInterval))
+
+		ticker := time.NewTicker(systemTaskRunnerIdleInterval)
+		defer ticker.Stop()
+
+		var lastScheduler time.Time
+		var lastStaleLockCleanup time.Time
+		runPass := func() {
+			// The scheduler/stale-lock pass is throttled independently of the
+			// claim pass: wakeups (e.g. a manual log cleanup) should claim
+			// immediately without re-running the scheduler every time.
+			now := time.Now()
+			if now.Sub(lastStaleLockCleanup) >= systemTaskStaleLockInterval {
+				lastStaleLockCleanup = now
+				if err := model.ExpireStaleSystemTaskLocks(common.GetTimestamp()); err != nil {
+					logger.LogWarn(ctx, fmt.Sprintf("system task stale lock cleanup failed: %v", err))
+				}
+			}
+			if now.Sub(lastScheduler) >= systemTaskSchedulerInterval {
+				lastScheduler = now
+				runSystemTaskScheduler()
+			}
+			runSystemTaskClaimPass(runnerID)
 		}
 
-		runnerID := fmt.Sprintf("%s-%s", common.NodeName, common.GetRandomString(8))
-		gopool.Go(func() {
-			logger.LogInfo(context.Background(), fmt.Sprintf("system task runner started: runner=%s idle_interval=%s", runnerID, systemTaskRunnerIdleInterval))
-
-			ticker := time.NewTicker(systemTaskRunnerIdleInterval)
-			defer ticker.Stop()
-
-			var lastScheduler time.Time
-			var lastStaleLockCleanup time.Time
-			runPass := func() {
-				// The scheduler/stale-lock pass is throttled independently of the
-				// claim pass: wakeups (e.g. a manual log cleanup) should claim
-				// immediately without re-running the scheduler every time.
-				now := time.Now()
-				if now.Sub(lastStaleLockCleanup) >= systemTaskStaleLockInterval {
-					lastStaleLockCleanup = now
-					if err := model.ExpireStaleSystemTaskLocks(common.GetTimestamp()); err != nil {
-						logger.LogWarn(context.Background(), fmt.Sprintf("system task stale lock cleanup failed: %v", err))
-					}
-				}
-				if now.Sub(lastScheduler) >= systemTaskSchedulerInterval {
-					lastScheduler = now
-					runSystemTaskScheduler()
-				}
-				runSystemTaskClaimPass(runnerID)
+		runPass()
+		for {
+			select {
+			case <-ctx.Done():
+				logger.LogInfo(ctx, fmt.Sprintf("system task runner stopped: runner=%s", runnerID))
+				return
+			case <-ticker.C:
+			case <-systemTaskWakeup:
 			}
-
+			// 取消信号可能与被唤醒的 claim 同时就绪（select 随机择一）；
+			// 显式复查，避免停机后仍多跑一轮写库的 pass。
+			if ctx.Err() != nil {
+				logger.LogInfo(ctx, fmt.Sprintf("system task runner stopped: runner=%s", runnerID))
+				return
+			}
 			runPass()
-			for {
-				select {
-				case <-ticker.C:
-				case <-systemTaskWakeup:
-				}
-				runPass()
-			}
-		})
+		}
 	})
+}
+
+// StopSystemTaskRunner 停止后台 system task runner 并等待其退出（供优雅关闭调用）。
+func StopSystemTaskRunner() {
+	systemTaskRunner.stop()
 }
 
 func StartLogCleanupTask(targetTimestamp int64) (*model.SystemTask, error) {

@@ -29,6 +29,8 @@ func SetTaskRouter(router *gin.Engine) {
 	taskContentRouter.Use(
 		middleware.RouteTag("relay"),
 		middleware.TokenOrTaskArtifactAccessAuth("key", "artifact_key"),
+		// 防盗刷：产物/参考素材下载限流（默认 10/min/IP），避免签名 URL 被批量拉取刷流量。
+		middleware.DownloadRateLimit(),
 	)
 	{
 		taskContentRouter.GET("/:key/artifacts/:artifact_key/content", controller.TaskArtifactContent)

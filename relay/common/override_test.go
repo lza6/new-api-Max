@@ -2127,9 +2127,13 @@ func TestRemoveDisabledFieldsSkipWhenChannelPassThroughEnabled(t *testing.T) {
 
 func TestRemoveDisabledFieldsSkipWhenGlobalPassThroughEnabled(t *testing.T) {
 	original := model_setting.GetGlobalSettings().PassThroughRequestEnabled
-	model_setting.GetGlobalSettings().PassThroughRequestEnabled = true
+	model_setting.UpdateGlobalSettings(func(settings *model_setting.GlobalSettings) {
+		settings.PassThroughRequestEnabled = true
+	})
 	t.Cleanup(func() {
-		model_setting.GetGlobalSettings().PassThroughRequestEnabled = original
+		model_setting.UpdateGlobalSettings(func(settings *model_setting.GlobalSettings) {
+			settings.PassThroughRequestEnabled = original
+		})
 	})
 
 	input := `{

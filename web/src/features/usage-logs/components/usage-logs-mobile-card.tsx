@@ -28,6 +28,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/error-state'
 import { cn } from '@/lib/utils'
 
 import { LOG_TYPE_ENUM } from '../constants'
@@ -46,6 +47,8 @@ const logTypeRowTint: Record<number, string> = {
 interface UsageLogsMobileListProps<TData> {
   table: Table<TData>
   isLoading?: boolean
+  isError?: boolean
+  onRetry?: () => void
   emptyTitle?: string
   emptyDescription?: string
   logCategory: LogCategory
@@ -239,6 +242,8 @@ function DrawingLogsCard<TData>({
 export function UsageLogsMobileList<TData>({
   table,
   isLoading = false,
+  isError = false,
+  onRetry,
   emptyTitle,
   emptyDescription,
   logCategory,
@@ -249,6 +254,17 @@ export function UsageLogsMobileList<TData>({
   const resolvedEmptyDescription =
     emptyDescription ??
     t('No usage logs available. Logs will appear here once API calls are made.')
+
+  if (isError) {
+    return (
+      <ErrorState
+        title={t('Failed to load logs')}
+        description={t('Please check your connection and try again.')}
+        onRetry={onRetry}
+        className='rounded-lg border'
+      />
+    )
+  }
 
   if (isLoading) {
     return <UsageLogsMobileSkeleton separate={logCategory === 'common'} />

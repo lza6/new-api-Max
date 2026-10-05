@@ -145,7 +145,7 @@ export function SubscriptionLogsTable() {
     [page, pageSize, filters]
   )
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: ['subscription-logs', params],
     queryFn: async () => {
       const result = await getSubscriptionLogs(params)
@@ -182,6 +182,10 @@ export function SubscriptionLogsTable() {
       columns={columns}
       isLoading={isLoading}
       isFetching={isFetching}
+      isError={isError}
+      errorTitle={t('Failed to load logs')}
+      errorDescription={t('Please check your connection and try again.')}
+      onRetry={() => refetch()}
       emptyTitle={t('No subscription records found')}
       emptyDescription={t(
         'Subscription purchases, redemptions and admin grants will appear here.'

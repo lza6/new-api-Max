@@ -18,12 +18,21 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQuery } from '@tanstack/react-query'
-import { ChevronDown, KeyRound, Settings2, WalletCards } from 'lucide-react'
+import { useNavigate } from '@tanstack/react-router'
+import {
+  ChevronDown,
+  Check,
+  KeyRound,
+  MessageSquare,
+  Settings2,
+  WalletCards,
+} from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm, type SubmitErrorHandler } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { CopyButton } from '@/components/copy-button'
 import { DateTimePicker } from '@/components/datetime-picker'
 import {
   SideDrawerSection,
@@ -103,12 +112,16 @@ export function ApiKeysMutateDrawer({
   currentRow,
 }: ApiKeyMutateDrawerProps) {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const isUpdate = !!currentRow
   const currentRowId = currentRow?.id
   const { triggerRefresh } = useApiKeys()
   const { status, loading: statusLoading } = useStatus()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  // Set when a create succeeds: the drawer switches from the form to a result
+  // step that shows the plaintext key(s) and a shortcut into the playground.
+  const [createdKeys, setCreatedKeys] = useState<string[]>([])
   const [initializedTarget, setInitializedTarget] = useState<string | null>(
     null
   )
@@ -205,6 +218,7 @@ export function ApiKeysMutateDrawer({
   useEffect(() => {
     if (!open) {
       setInitializedTarget(null)
+      setCreatedKeys([])
       return
     }
     if (
@@ -301,6 +315,7 @@ export function ApiKeysMutateDrawer({
         // Create mode - handle batch creation
         const count = data.tokenCount || 1
         let successCount = 0
+        const createdKeys: string[] = []
 
         for (let i = 0; i < count; i++) {
           const result = await createApiKey({
@@ -312,6 +327,10 @@ export function ApiKeysMutateDrawer({
           })
           if (result.success) {
             successCount++
+            // Backend responds with { id, key }; capture the plaintext so the
+            // result step can show it once instead of forcing a second reveal.
+            const key = result.data?.key
+            if (key) {createdKeys.push(`sk-${key}`)}
           } else {
             handleServerError(result, t(ERROR_MESSAGES.CREATE_FAILED))
             break
@@ -324,8 +343,14 @@ export function ApiKeysMutateDrawer({
               count: successCount,
             })
           )
-          onOpenChange(false)
           triggerRefresh()
+          if (createdKeys.length > 0) {
+            // Stay open on a result step: show the plaintext key(s) and hand
+            // the user straight into the playground for a first request.
+            setCreatedKeys(createdKeys)
+          } else {
+            onOpenChange(false)
+          }
         }
       }
     } catch (error) {
@@ -362,6 +387,27 @@ export function ApiKeysMutateDrawer({
     : t('Enter quota in {{currency}}', { currency: currencyLabel })
   const autoGroupsMode = form.watch('auto_groups_mode')
   const unlimitedQuota = form.watch('unlimited_quota')
+  const isShowingResult = createdKeys.length > 0
+
+  let sheetTitle: string
+  if (isShowingResult) {
+    sheetTitle = t('API key created')
+  } else if (isUpdate) {
+    sheetTitle = t('Update API Key')
+  } else {
+    sheetTitle = t('Create API Key')
+  }
+
+  let sheetDescription: string
+  if (isShowingResult) {
+    sheetDescription = t(
+      'Copy your key now — for security it is only shown once here.'
+    )
+  } else if (isUpdate) {
+    sheetDescription = t('Update the API key by providing necessary info.')
+  } else {
+    sheetDescription = t('Add a new API key by providing necessary info.')
+  }
 
   return (
     <Sheet
@@ -377,23 +423,45 @@ export function ApiKeysMutateDrawer({
         className={sideDrawerContentClassName('max-w-none sm:!max-w-[620px]')}
       >
         <SheetHeader className={sideDrawerHeaderClassName()}>
-          <SheetTitle>
-            {isUpdate ? t('Update API Key') : t('Create API Key')}
-          </SheetTitle>
-          <SheetDescription>
-            {isUpdate
-              ? t('Update the API key by providing necessary info.')
-              : t('Add a new API key by providing necessary info.')}
-          </SheetDescription>
+          <SheetTitle>{sheetTitle}</SheetTitle>
+          <SheetDescription>{sheetDescription}</SheetDescription>
         </SheetHeader>
-        <Form {...form}>
-          <form
-            id='api-key-form'
-            onSubmit={form.handleSubmit(onSubmit, onInvalid)}
-            aria-busy={!isFormInitialized}
-            inert={!isFormInitialized || isSubmitting ? true : undefined}
-            className={sideDrawerFormClassName('gap-5')}
-          >
+        {isShowingResult ? (
+          <div className={sideDrawerFormClassName('gap-5')}>
+            <SideDrawerSection>
+              <SideDrawerSectionHeader
+                title={t('Your new API key')}
+                description={t(
+                  'Store it somewhere safe. You can copy it or jump straight into the playground.'
+                )}
+                icon={<Check className='size-4' />}
+                iconTone='success'
+              />
+              <div className='border-border bg-muted/30 flex flex-col gap-3 rounded-md border p-3'>
+                {createdKeys.map((key) => (
+                  <div
+                    key={key}
+                    className='flex items-center gap-2'
+                    data-testid='created-key-row'
+                  >
+                    <code className='bg-background min-w-0 flex-1 truncate rounded px-2 py-1.5 font-mono text-xs'>
+                      {key}
+                    </code>
+                    <CopyButton value={key} aria-label={t('Copy API key')} />
+                  </div>
+                ))}
+              </div>
+            </SideDrawerSection>
+          </div>
+        ) : (
+          <Form {...form}>
+            <form
+              id='api-key-form'
+              onSubmit={form.handleSubmit(onSubmit, onInvalid)}
+              aria-busy={!isFormInitialized}
+              inert={!isFormInitialized || isSubmitting ? true : undefined}
+              className={sideDrawerFormClassName('gap-5')}
+            >
             <SideDrawerSection>
               <SideDrawerSectionHeader
                 title={t('Basic Information')}
@@ -837,20 +905,56 @@ export function ApiKeysMutateDrawer({
             </Collapsible>
           </form>
         </Form>
+        )}
         <SheetFooter className={sideDrawerFooterClassName()}>
-          <SheetClose
-            render={<Button variant='outline' className='w-full sm:w-auto' />}
-          >
-            {t('Close')}
-          </SheetClose>
-          <Button
-            type='button'
-            onClick={form.handleSubmit(onSubmit, onInvalid)}
-            disabled={!isFormInitialized || isSubmitting}
-            className='w-full sm:w-auto'
-          >
-            {isSubmitting ? t('Saving...') : t('Save changes')}
-          </Button>
+          {isShowingResult ? (
+            <>
+              <Button
+                variant='outline'
+                className='w-full sm:w-auto'
+                onClick={() => {
+                  onOpenChange(false)
+                  navigate({ to: '/keys' })
+                }}
+              >
+                {t('Go to API keys')}
+              </Button>
+              <Button
+                className='w-full sm:w-auto'
+                onClick={() => {
+                  onOpenChange(false)
+                  // Seed the playground with the key's first allowed model when
+                  // the user restricted models; otherwise let it fall back.
+                  const firstModel = form.getValues('model_limits')?.[0]
+                  navigate({
+                    to: '/playground',
+                    search: firstModel ? { model: firstModel } : {},
+                  })
+                }}
+              >
+                <MessageSquare className='mr-1.5 size-4' />
+                {t('Go to Playground')}
+              </Button>
+            </>
+          ) : (
+            <>
+              <SheetClose
+                render={
+                  <Button variant='outline' className='w-full sm:w-auto' />
+                }
+              >
+                {t('Close')}
+              </SheetClose>
+              <Button
+                type='button'
+                onClick={form.handleSubmit(onSubmit, onInvalid)}
+                disabled={!isFormInitialized || isSubmitting}
+                className='w-full sm:w-auto'
+              >
+                {isSubmitting ? t('Saving...') : t('Save changes')}
+              </Button>
+            </>
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

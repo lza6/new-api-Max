@@ -2,8 +2,12 @@ package model_setting
 
 import (
 	"fmt"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/setting/config"
@@ -36,18 +40,92 @@ var defaultClaudeSettings = ClaudeSettings{
 // 全局实例
 var claudeSettings = defaultClaudeSettings
 
+// claudeSettingsMu 保护 claudeSettings 主副本（HeadersSettings 为嵌套 map、
+// DefaultMaxTokens 为 map）。写入持写锁并在写完后发布新快照。
+var claudeSettingsMu sync.RWMutex
+
+// claudeSettingsSnapshot 已发布的不可变快照。中继热路径（WriteHeaders /
+// GetDefaultMaxTokens）只读快照，避免与 60s 周期热更新（反射就地写 map）竞争。
+var claudeSettingsSnapshot atomic.Pointer[ClaudeSettings]
+
+// cloneClaudeHeadersSettings 深拷贝嵌套 map（model -> header -> values）。
+// 内层 slice 也必须克隆，否则快照与主副本共享底层数组。
+func cloneClaudeHeadersSettings(src map[string]map[string][]string) map[string]map[string][]string {
+	if src == nil {
+		return nil
+	}
+	dst := make(map[string]map[string][]string, len(src))
+	for model, headers := range src {
+		if headers == nil {
+			dst[model] = nil
+			continue
+		}
+		clone := make(map[string][]string, len(headers))
+		for key, values := range headers {
+			clone[key] = slices.Clone(values)
+		}
+		dst[model] = clone
+	}
+	return dst
+}
+
+// publishClaudeSettingsSnapshotLocked 在持 claudeSettingsMu 前提下深拷贝主副本并发布。
+func publishClaudeSettingsSnapshotLocked() {
+	snap := claudeSettings
+	snap.HeadersSettings = cloneClaudeHeadersSettings(claudeSettings.HeadersSettings)
+	snap.DefaultMaxTokens = maps.Clone(claudeSettings.DefaultMaxTokens)
+	claudeSettingsSnapshot.Store(&snap)
+}
+
+// loadClaudeSettings 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadClaudeSettings() *ClaudeSettings {
+	if s := claudeSettingsSnapshot.Load(); s != nil {
+		return s
+	}
+	return &claudeSettings
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (c *ClaudeSettings) BeforeConfigWrite() { claudeSettingsMu.Lock() }
+func (c *ClaudeSettings) AfterConfigWrite() {
+	publishClaudeSettingsSnapshotLocked()
+	claudeSettingsMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (c *ClaudeSettings) LockConfigRead()   { claudeSettingsMu.RLock() }
+func (c *ClaudeSettings) UnlockConfigRead() { claudeSettingsMu.RUnlock() }
+
 func init() {
 	// 注册到全局配置管理器
 	config.GlobalConfig.Register("claude", &claudeSettings)
+	claudeSettingsMu.Lock()
+	publishClaudeSettingsSnapshotLocked()
+	claudeSettingsMu.Unlock()
 }
 
-// GetClaudeSettings 获取Claude配置
+// GetClaudeSettings 返回当前不可变快照。只读，勿直接改写返回对象。
 func GetClaudeSettings() *ClaudeSettings {
+	s := loadClaudeSettings()
 	// check default max tokens must have default key
-	if _, ok := claudeSettings.DefaultMaxTokens["default"]; !ok {
-		claudeSettings.DefaultMaxTokens["default"] = 8192
+	if _, ok := s.DefaultMaxTokens["default"]; !ok {
+		UpdateClaudeSettings(func(settings *ClaudeSettings) {
+			if settings.DefaultMaxTokens == nil {
+				settings.DefaultMaxTokens = make(map[string]int, 1)
+			}
+			settings.DefaultMaxTokens["default"] = 8192
+		})
+		return loadClaudeSettings()
 	}
-	return &claudeSettings
+	return s
+}
+
+// UpdateClaudeSettings 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateClaudeSettings(fn func(*ClaudeSettings)) {
+	claudeSettingsMu.Lock()
+	defer claudeSettingsMu.Unlock()
+	fn(&claudeSettings)
+	publishClaudeSettingsSnapshotLocked()
 }
 
 func (c *ClaudeSettings) WriteHeaders(originModel string, httpHeader *http.Header) {

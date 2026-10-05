@@ -1,7 +1,10 @@
 package operation_setting
 
 import (
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/setting/config"
 )
@@ -49,30 +52,80 @@ var webProtectionSetting = WebProtectionSetting{
 	WindowSeconds:             60,
 }
 
-func init() {
-	config.GlobalConfig.Register("web_protection", &webProtectionSetting)
+// webProtectionSettingMu 保护 webProtectionSetting 主副本（四个 []string）。
+var webProtectionSettingMu sync.RWMutex
+
+// webProtectionSettingSnapshot 已发布的不可变快照。Web 防护判定（每非 /v1 请求）
+// 只读快照，避免与周期热更新（反射就地写 slice）竞争。
+var webProtectionSettingSnapshot atomic.Pointer[WebProtectionSetting]
+
+// publishWebProtectionSettingSnapshotLocked 在持 webProtectionSettingMu 前提下深拷贝
+// 主副本并发布。
+func publishWebProtectionSettingSnapshotLocked() {
+	snap := webProtectionSetting
+	snap.AllowedPaths = slices.Clone(webProtectionSetting.AllowedPaths)
+	snap.BlockedPaths = slices.Clone(webProtectionSetting.BlockedPaths)
+	snap.UAAllowlist = slices.Clone(webProtectionSetting.UAAllowlist)
+	snap.IPAllowlist = slices.Clone(webProtectionSetting.IPAllowlist)
+	webProtectionSettingSnapshot.Store(&snap)
 }
 
-func GetWebProtectionSetting() *WebProtectionSetting {
+// loadWebProtectionSetting 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadWebProtectionSetting() *WebProtectionSetting {
+	if s := webProtectionSettingSnapshot.Load(); s != nil {
+		return s
+	}
 	return &webProtectionSetting
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (w *WebProtectionSetting) BeforeConfigWrite() { webProtectionSettingMu.Lock() }
+func (w *WebProtectionSetting) AfterConfigWrite() {
+	publishWebProtectionSettingSnapshotLocked()
+	webProtectionSettingMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (w *WebProtectionSetting) LockConfigRead()   { webProtectionSettingMu.RLock() }
+func (w *WebProtectionSetting) UnlockConfigRead() { webProtectionSettingMu.RUnlock() }
+
+func init() {
+	config.GlobalConfig.Register("web_protection", &webProtectionSetting)
+	webProtectionSettingMu.Lock()
+	publishWebProtectionSettingSnapshotLocked()
+	webProtectionSettingMu.Unlock()
+}
+
+// GetWebProtectionSetting 返回当前不可变快照。只读，勿直接改写返回对象。
+func GetWebProtectionSetting() *WebProtectionSetting {
+	return loadWebProtectionSetting()
+}
+
+// UpdateWebProtectionSetting 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateWebProtectionSetting(fn func(*WebProtectionSetting)) {
+	webProtectionSettingMu.Lock()
+	defer webProtectionSettingMu.Unlock()
+	fn(&webProtectionSetting)
+	publishWebProtectionSettingSnapshotLocked()
 }
 
 // IsWebProtectionEnabled Web 防刷总开关。
 func IsWebProtectionEnabled() bool {
-	return webProtectionSetting.Enabled
+	return loadWebProtectionSetting().Enabled
 }
 
 // GetWebProtectionLimit 返回（每秒允许数，突发容量，聚合窗口秒数），非法值回退默认。
 func GetWebProtectionLimit() (int, int, int64) {
-	perSec := webProtectionSetting.LimitPerSecond
+	s := loadWebProtectionSetting()
+	perSec := s.LimitPerSecond
 	if perSec <= 0 {
 		perSec = 10
 	}
-	burst := webProtectionSetting.Burst
+	burst := s.Burst
 	if burst < perSec {
 		burst = perSec
 	}
-	windowSec := webProtectionSetting.WindowSeconds
+	windowSec := s.WindowSeconds
 	if windowSec <= 0 {
 		windowSec = 60
 	}
@@ -81,45 +134,46 @@ func GetWebProtectionLimit() (int, int, int64) {
 
 // IsAutoBanEnabled 自动封禁开关。
 func IsAutoBanEnabled() bool {
-	return webProtectionSetting.AutoBan
+	return loadWebProtectionSetting().AutoBan
 }
 
 // GetAutoBanThreshold 窗口内 429 触发自动封禁的阈值（<=0 回退 20）。
 func GetAutoBanThreshold() int {
-	if webProtectionSetting.AutoBanThresholdPerMinute > 0 {
-		return webProtectionSetting.AutoBanThresholdPerMinute
+	if v := loadWebProtectionSetting().AutoBanThresholdPerMinute; v > 0 {
+		return v
 	}
 	return 20
 }
 
 // GetAutoBanMinutes 自动封禁时长（分钟，<=0 回退 1440）。
 func GetAutoBanMinutes() int64 {
-	if webProtectionSetting.AutoBanMinutes > 0 {
-		return webProtectionSetting.AutoBanMinutes
+	if v := loadWebProtectionSetting().AutoBanMinutes; v > 0 {
+		return v
 	}
 	return 1440
 }
 
 // IsWebLogEnabled Web 请求日志开关。
 func IsWebLogEnabled() bool {
-	return webProtectionSetting.LogEnabled
+	return loadWebProtectionSetting().LogEnabled
 }
 
 // GetWebProtectionPathPolicy 返回（允许路径, 拦截路径）策略。
 // 空白条目清洗后丢弃；空列表表示对应维度不启用（非法值回退空）。
 func GetWebProtectionPathPolicy() (allowed, blocked []string) {
-	return cleanStringList(webProtectionSetting.AllowedPaths), cleanStringList(webProtectionSetting.BlockedPaths)
+	s := loadWebProtectionSetting()
+	return cleanStringList(s.AllowedPaths), cleanStringList(s.BlockedPaths)
 }
 
 // GetWebProtectionUAAllowlist 返回 UA 白名单（子串匹配，大小写不敏感）。
 // 空列表表示不启用。
 func GetWebProtectionUAAllowlist() []string {
-	return cleanStringList(webProtectionSetting.UAAllowlist)
+	return cleanStringList(loadWebProtectionSetting().UAAllowlist)
 }
 
 // GetWebProtectionIPAllowlist 返回内部/信任来源 IP/CIDR 白名单（空=不启用）。
 func GetWebProtectionIPAllowlist() []string {
-	return cleanStringList(webProtectionSetting.IPAllowlist)
+	return cleanStringList(loadWebProtectionSetting().IPAllowlist)
 }
 
 func cleanStringList(items []string) []string {

@@ -23,16 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { DataTablePage, useDataTable } from '@/components/data-table'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { useMediaQuery } from '@/hooks'
 import { useTableUrlState } from '@/hooks/use-table-url-state'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -294,36 +285,24 @@ export function DeploymentsTable() {
         currentName={renameCurrentName}
       />
 
-      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('Confirm delete')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                'Are you sure you want to delete deployment "{{name}}"? This action cannot be undone.',
-                {
-                  name:
-                    deleteTarget?.container_name ||
-                    deleteTarget?.deployment_name ||
-                    deleteTarget?.id,
-                }
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>
-              {t('Cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              variant='destructive'
-            >
-              {isDeleting ? t('Deleting...') : t('Delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        destructive
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        title={t('Confirm delete')}
+        desc={t(
+          'Are you sure you want to delete deployment "{{name}}"? This action cannot be undone.',
+          {
+            name:
+              deleteTarget?.container_name ||
+              deleteTarget?.deployment_name ||
+              deleteTarget?.id,
+          }
+        )}
+        confirmText={isDeleting ? t('Deleting...') : t('Delete')}
+        isLoading={isDeleting}
+        handleConfirm={handleDelete}
+      />
     </>
   )
 }

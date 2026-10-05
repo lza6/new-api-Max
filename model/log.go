@@ -74,8 +74,11 @@ type Log struct {
 	IsStream         bool   `json:"is_stream"`
 	// RequestBytes/ResponseBytes 每请求流量字节（供站点权威统计/带宽排行直接 SUM，
 	// 避免全表扫 other JSON；旧行无值按 0 计入，不影响既有 other 口径）。
-	RequestBytes      int64  `json:"request_bytes" gorm:"bigint;default:0;index:idx_logs_traffic,priority:2"`
-	ResponseBytes     int64  `json:"response_bytes" gorm:"bigint;default:0;index:idx_logs_traffic,priority:3"`
+	// 注：不再挂 idx_logs_traffic——该复合索引（request_bytes,response_bytes）缺
+	// priority:1，且站点流量聚合无 WHERE 谓词、B-tree 完全不可用，只会增加每次日志
+	// INSERT 的索引维护开销。存量索引由 migrateLogTrafficIndex 删除。
+	RequestBytes      int64  `json:"request_bytes" gorm:"bigint;default:0"`
+	ResponseBytes     int64  `json:"response_bytes" gorm:"bigint;default:0"`
 	ChannelId         int    `json:"channel" gorm:"index"`
 	ChannelName       string `json:"channel_name" gorm:"->"`
 	TokenId           int    `json:"token_id" gorm:"default:0;index"`
@@ -217,13 +220,23 @@ func RecordLogWithAdminInfo(userId int, logType int, content string, adminInfo *
 // username 由调用方传入（登录流程已持有用户对象），避免额外的数据库查询。
 // content 为英文兜底文本（用于导出）；action+params 供前端本地化渲染。
 // other 包含 login_method、user_agent 等结构化信息。
-func RecordLoginLog(userId, actorRole int, username string, content string, ip string, action string, params map[string]any, other AuditOther, request ...*gin.Context) {
+//
+// success/status 如实反映登录结果（§4.11.3 失败登录审计）：成功为 (true, 200)，
+// 失败为 (false, 4xx)。失败原因写入 other 的 reason 字段（去敏，绝不含密码）。
+func RecordLoginLog(userId, actorRole int, username string, content string, ip string, action string, success bool, status int, params map[string]any, other AuditOther, request ...*gin.Context) {
 	other.Op = &AuditOperation{Action: action, Params: params}
 	var c *gin.Context
 	if len(request) > 0 {
 		c = request[0]
 	}
-	RecordAuditLog(c, AuditLog{UserId: userId, Username: username, ActorRole: actorRole, Category: AuditCategoryLogin, Action: action, Content: content, Ip: ip, Other: other, Success: true})
+	if status == 0 {
+		if success {
+			status = 200
+		} else {
+			status = 401
+		}
+	}
+	RecordAuditLog(c, AuditLog{UserId: userId, Username: username, ActorRole: actorRole, Category: AuditCategoryLogin, Action: action, Content: content, Ip: ip, Status: status, Success: success, Other: other})
 }
 
 // RecordOperationAuditLog writes new operation/security events to the audit table.

@@ -58,6 +58,7 @@ func Login(c *gin.Context) {
 	var loginRequest LoginRequest
 	err := common.DecodeJson(c.Request.Body, &loginRequest)
 	if err != nil {
+		recordLoginFailureAudit(c, "", nil, "invalid_params", http.StatusBadRequest)
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
@@ -65,16 +66,19 @@ func Login(c *gin.Context) {
 	password := loginRequest.Password
 	if common.PasswordLoginEncryptionEnabled {
 		if loginRequest.PasswordEncrypted == "" || loginRequest.EncryptionKeyID == "" {
+			recordLoginFailureAudit(c, username, nil, "invalid_params", http.StatusBadRequest)
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 			return
 		}
 		password, err = common.DecryptPassword(loginRequest.PasswordEncrypted, loginRequest.EncryptionKeyID)
 		if err != nil {
+			recordLoginFailureAudit(c, username, nil, "decrypt_failed", http.StatusUnauthorized)
 			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
 			return
 		}
 	}
 	if username == "" || password == "" {
+		recordLoginFailureAudit(c, username, nil, "invalid_params", http.StatusBadRequest)
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
@@ -87,10 +91,13 @@ func Login(c *gin.Context) {
 		switch {
 		case errors.Is(err, model.ErrDatabase):
 			common.SysLog(fmt.Sprintf("Login database error for user %s: %v", username, err))
+			recordLoginFailureAudit(c, username, nil, "database_error", http.StatusInternalServerError)
 			common.ApiErrorI18n(c, i18n.MsgDatabaseError)
 		case errors.Is(err, model.ErrUserEmptyCredentials):
+			recordLoginFailureAudit(c, username, nil, "invalid_params", http.StatusBadRequest)
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		default:
+			recordLoginFailureAudit(c, username, nil, "invalid_credentials", http.StatusUnauthorized)
 			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
 		}
 		return
@@ -140,7 +147,27 @@ func recordLoginAudit(user *model.User, c *gin.Context) {
 	if verifiedMethod := c.GetString("login_verification_method"); verifiedMethod != "" {
 		params["verification_method"] = verifiedMethod
 	}
-	model.RecordLoginLog(user.Id, user.Role, user.Username, content, ip, "login", params, extra, c)
+	model.RecordLoginLog(user.Id, user.Role, user.Username, content, ip, "login", true, 200, params, extra, c)
+}
+
+// recordLoginFailureAudit 记录一次失败登录尝试（§4.11.3，去敏，不含密码）。
+// 用户存在（密码错/被禁用）时把失败归属到真实 userId，便于按用户审计；
+// 用户不存在/参数非法时 userId=0，仅按用户名+IP 关联。
+func recordLoginFailureAudit(c *gin.Context, exposedUsername string, user *model.User, reason string, status int) {
+	method := loginMethodFromContext(c)
+	ip := c.ClientIP()
+	userId, role := 0, 0
+	username := exposedUsername
+	if user != nil && user.Id > 0 {
+		userId = user.Id
+		role = user.Role
+		if user.Username != "" {
+			username = user.Username
+		}
+	}
+	model.RecordLoginLog(userId, role, username, "", ip, "login", false, status,
+		map[string]any{"method": method, "reason": reason},
+		model.AuditOther{LoginMethod: method, UserAgent: c.Request.UserAgent()}, c)
 }
 
 // setupLogin evaluates the shared login policy after primary authentication.
@@ -161,11 +188,14 @@ func setupLogin(user *model.User, c *gin.Context) {
 
 func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin.Context) {
 	if user == nil || user.Id <= 0 || user.Status != common.UserStatusEnabled {
+		// §审查 C3：被禁用用户的登录尝试必须留审计（此前只返回 banned 文案，无记录）。
+		recordLoginFailureAudit(c, "", user, "user_disabled", http.StatusForbidden)
 		common.ApiErrorI18n(c, i18n.MsgAuthUserBanned)
 		return
 	}
 	currentUser, err := model.GetSelfUserById(user.Id)
 	if err != nil {
+		recordLoginFailureAudit(c, "", user, "user_load_failed", http.StatusInternalServerError)
 		common.ApiError(c, err)
 		return
 	}

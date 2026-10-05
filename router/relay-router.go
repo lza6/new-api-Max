@@ -53,6 +53,14 @@ func SetRelayRouter(router *gin.Engine) {
 		})
 	}
 
+	// §端点适配：/v1/sub2api/billing 查询当前密钥分组倍率与计费口径（421 契约）。
+	sub2apiBillingRouter := router.Group("/v1/sub2api")
+	sub2apiBillingRouter.Use(middleware.RouteTag("relay"))
+	sub2apiBillingRouter.Use(middleware.TokenAuth())
+	{
+		sub2apiBillingRouter.GET("/billing", controller.GetSub2ApiBilling)
+	}
+
 	geminiRouter := router.Group("/v1beta/models")
 	geminiRouter.Use(middleware.RouteTag("relay"))
 	geminiRouter.Use(middleware.TokenAuth())
@@ -101,8 +109,9 @@ func SetRelayRouter(router *gin.Engine) {
 		httpRouter.Use(middleware.Distribute())
 
 		// claude related routes
-		// TODO: /messages/count_tokens is disabled. The current controller.CountClaudeTokens
-		// httpRouter.POST("/messages/count_tokens", controller.CountClaudeTokens)
+		// §端点适配：/messages/count_tokens 重新启用（421 契约实测可用，返回 {"input_tokens":N}）。
+		// controller.CountClaudeTokens 早已实现并有单测；此前仅为临时禁用（commit 3a9f41ee8）。
+		httpRouter.POST("/messages/count_tokens", controller.CountClaudeTokens)
 		httpRouter.POST("/messages", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatClaude)
 		})
@@ -119,6 +128,8 @@ func SetRelayRouter(router *gin.Engine) {
 		httpRouter.POST("/responses/compact", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIResponsesCompaction)
 		})
+		// §端点适配：/v1/responses/input_tokens 预估 Responses 输入 token（421 契约）。
+		httpRouter.POST("/responses/input_tokens", controller.CountResponsesInputTokens)
 
 		// alpha search related routes (Codex standalone web search)
 		httpRouter.POST("/alpha/search", func(c *gin.Context) {

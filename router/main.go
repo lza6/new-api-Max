@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/controller"
 	"github.com/lza6/new-api-Max/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -20,6 +21,13 @@ func SetRouter(router *gin.Engine, assets WebAssets) {
 			c.String(http.StatusOK, common.RenderPrometheusMetrics())
 		})
 	}
+	// §Health Checks 服务探活（根级、无认证）：
+	//   GET /healthz 存活探针（liveness，进程活着即 200）
+	//   GET /readyz  就绪探针（readiness，主库+日志库可达才 200，否则 503）
+	// 供 K8s/Caddy/Docker 健康检查使用；Caddy 现用 /api/status（较重），可改用 /healthz。
+	router.GET("/healthz", controller.Healthz)
+	router.GET("/readyz", controller.Readyz)
+
 	SetApiRouter(router)
 	SetWebProtectionRouter(router)
 	SetWebhookRouter(router)

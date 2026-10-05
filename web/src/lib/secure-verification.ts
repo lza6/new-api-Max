@@ -65,6 +65,49 @@ export const authRequestOptions = {
   skipErrorHandler: true,
 }
 
+/**
+ * Server business code that means "a step-up proof is required" (or a supplied
+ * one was rejected). Shared by the token and channel key-disclosure flows so
+ * both can use the same compatible pattern: try without a proof first, and only
+ * prompt for verification when the server actually asks for it.
+ */
+const PROOF_REQUIRED_CODES = new Set([
+  'SECURITY_PROOF_REQUIRED',
+  'SECURITY_PROOF_EXPIRED',
+  'SECURITY_PROOF_INVALID',
+  'SECURITY_PROOF_CONSUMED',
+  'SECURITY_PROOF_CONTEXT_MISMATCH',
+  'SECURITY_PROOF_SCOPE_MISMATCH',
+  'SECURITY_PROOF_METHOD_MISMATCH',
+])
+
+/**
+ * Read the server business `code` from an error.
+ *
+ * Order matters: axios sets `error.code` to a transport constant
+ * (`ERR_BAD_REQUEST` / `ERR_BAD_RESPONSE`) for every 4xx/5xx, so the business
+ * code must be read from `response.data.code` first; the top-level `code` is
+ * only trusted when it is not an `ERR_*` transport prefix.
+ */
+export function readServerCode(error: unknown): string | null {
+  if (!error || typeof error !== 'object') {return null}
+  const record = error as Record<string, unknown>
+  const response = record.response as Record<string, unknown> | undefined
+  const data = response?.data as Record<string, unknown> | undefined
+  if (typeof data?.code === 'string' && data.code) {return data.code}
+  const direct = record.code
+  if (typeof direct === 'string' && direct && !direct.startsWith('ERR_')) {
+    return direct
+  }
+  return null
+}
+
+/** Whether an error is the server asking for a step-up proof. */
+export function isProofRequiredError(error: unknown): boolean {
+  const code = readServerCode(error)
+  return code != null && PROOF_REQUIRED_CODES.has(code)
+}
+
 export async function authResult<T>(
   request: Promise<{
     data: { success: boolean; message?: string; code?: string; data?: T }

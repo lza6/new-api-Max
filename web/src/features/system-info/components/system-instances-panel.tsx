@@ -60,6 +60,7 @@ import { formatTimestampRelative, formatTimestampToDate } from '@/lib/format'
 import { handleServerError } from '@/lib/handle-server-error'
 import { createServerError } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
+import { useDocumentVisible } from '@/hooks/use-document-visible'
 
 import {
   deleteStaleSystemInstance,
@@ -497,6 +498,7 @@ export function SystemInstancesPanel() {
   const [deleteTarget, setDeleteTarget] = useState<SystemInstance | null>(null)
   const [deleteAllConfirmOpen, setDeleteAllConfirmOpen] = useState(false)
   const [deletingNodeName, setDeletingNodeName] = useState<string | null>(null)
+  const documentVisible = useDocumentVisible()
   const instancesQuery = useQuery({
     queryKey: ['system-info', 'instances'],
     queryFn: async () => {
@@ -508,7 +510,8 @@ export function SystemInstancesPanel() {
     },
     staleTime: 30 * 1000,
     retry: false,
-    refetchInterval: INSTANCE_POLL_INTERVAL_MS,
+    enabled: documentVisible,
+    refetchInterval: documentVisible ? INSTANCE_POLL_INTERVAL_MS : false,
   })
 
   const instances = instancesQuery.data ?? []

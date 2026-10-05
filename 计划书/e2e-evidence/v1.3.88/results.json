@@ -1,0 +1,40 @@
+{
+  "results": [
+    {
+      "name": "index.html 含 viewport-fit=cover",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "公开页首个 Tab 焦点为 Skip to Main",
+      "ok": true,
+      "detail": "{\"tag\":\"A\",\"text\":\"Skip to Main\",\"href\":\"#content\"}"
+    },
+    {
+      "name": "Enter 后焦点落到 #content 目标",
+      "ok": true,
+      "detail": "{\"id\":\"content\",\"tag\":\"SPAN\"}"
+    },
+    {
+      "name": "公开页存在 #content 目标元素",
+      "ok": true,
+      "detail": "count=1"
+    },
+    {
+      "name": "登录页 Skip to Main 生效且有 #content",
+      "ok": true,
+      "detail": "contentCount=1 first={\"tag\":\"A\",\"text\":\"Skip to Main\",\"href\":\"#content\"}"
+    },
+    {
+      "name": "6 断点无横向溢出",
+      "ok": true,
+      "detail": "worst w=0 overflow=0px"
+    },
+    {
+      "name": "无控制台错误",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "consoleErrors": []
+}

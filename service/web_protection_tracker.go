@@ -187,7 +187,9 @@ func (t *webProtectionTracker) isIPBannedCached(ip string, now time.Time) bool {
 // 只计数——Web 防护仅防外部恶意攻击，内网自身流量（健康检查/管理端直连）不受影响。
 func isWebProtectionTrustedSource(ip string) bool {
 	parsed := net.ParseIP(ip)
-	if parsed != nil && common.IsPrivateIP(parsed) {
+	// §审查 C2：信任来源用 IsTrustedSourceIP（不含 CGNAT 100.64/10——运营商大内网/VPN
+	// 出口属外部来源，不可豁免限流/封禁）；IsPrivateIP 是 SSRF 语义，二者不可混用。
+	if parsed != nil && common.IsTrustedSourceIP(parsed) {
 		return true
 	}
 	for _, allow := range operation_setting.GetWebProtectionIPAllowlist() {

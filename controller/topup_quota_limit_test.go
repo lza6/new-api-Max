@@ -100,13 +100,17 @@ func enableTopUpForTest(t *testing.T) {
 	t.Helper()
 	ps := operation_setting.GetPaymentSetting()
 	oldCompliance, oldVersion, oldEnabled := ps.ComplianceConfirmed, ps.ComplianceTermsVersion, ps.TopUpEnabled
-	ps.ComplianceConfirmed = true
-	ps.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
-	ps.TopUpEnabled = true
+	operation_setting.UpdatePaymentSetting(func(paymentSetting *operation_setting.PaymentSetting) {
+		paymentSetting.ComplianceConfirmed = true
+		paymentSetting.ComplianceTermsVersion = operation_setting.CurrentComplianceTermsVersion
+		paymentSetting.TopUpEnabled = true
+	})
 	t.Cleanup(func() {
-		ps.ComplianceConfirmed = oldCompliance
-		ps.ComplianceTermsVersion = oldVersion
-		ps.TopUpEnabled = oldEnabled
+		operation_setting.UpdatePaymentSetting(func(paymentSetting *operation_setting.PaymentSetting) {
+			paymentSetting.ComplianceConfirmed = oldCompliance
+			paymentSetting.ComplianceTermsVersion = oldVersion
+			paymentSetting.TopUpEnabled = oldEnabled
+		})
 	})
 }
 

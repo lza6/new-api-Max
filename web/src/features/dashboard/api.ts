@@ -91,3 +91,58 @@ export async function getUptimeStatus() {
   )
   return res.data
 }
+
+// ----------------------------------------------------------------------------
+// Usage / cost report
+// ----------------------------------------------------------------------------
+
+export type UsageReportGroupBy = 'model' | 'channel' | 'day'
+
+export interface UsageReportRow {
+  key: string
+  requests: number
+  prompt_tokens: number
+  completion_tokens: number
+  total_tokens: number
+  quota: number
+  request_bytes: number
+  response_bytes: number
+  total_bytes: number
+}
+
+export interface UsageReportData {
+  group_by: UsageReportGroupBy
+  start: number
+  end: number
+  rows: UsageReportRow[]
+  totals: UsageReportRow
+  totals_mb: number
+  row_count: number
+}
+
+export async function getUsageReport(params: {
+  group_by: UsageReportGroupBy
+  start?: number
+  end?: number
+}) {
+  const res = await api.get<{
+    success: boolean
+    data?: UsageReportData
+    message?: string
+  }>('/api/log/report', { params })
+  return res.data
+}
+
+// exportUsageReportCsv fetches the CSV as a blob (authenticated) so the caller
+// can trigger a download without exposing the bearer token in a URL.
+export async function exportUsageReportCsv(params: {
+  group_by: UsageReportGroupBy
+  start?: number
+  end?: number
+}): Promise<Blob> {
+  const res = await api.get('/api/log/report/export', {
+    params,
+    responseType: 'blob',
+  })
+  return res.data as Blob
+}

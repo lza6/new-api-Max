@@ -149,3 +149,25 @@ func TestGetOpenAIVideoRouteRendersJimengTask(t *testing.T) {
 		})
 	}
 }
+
+// §端点适配：/v1/videos/generations 是 /v1/video/generations 的等价别名（提交+查询）。
+func TestVideoRouterRegistersVideosGenerationsAlias(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	SetVideoRouter(engine)
+	want := map[string]bool{
+		"POST /v1/videos/generations":         false,
+		"GET /v1/videos/generations/:task_id": false,
+	}
+	for _, route := range engine.Routes() {
+		key := route.Method + " " + route.Path
+		if _, ok := want[key]; ok {
+			want[key] = true
+		}
+	}
+	for k, found := range want {
+		if !found {
+			t.Fatalf("route %s is not registered", k)
+		}
+	}
+}

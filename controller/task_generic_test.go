@@ -60,10 +60,12 @@ func setupGenericTaskTest(t *testing.T) *model.Task {
 func allowPrivateTaskMediaTest(t *testing.T) {
 	t.Helper()
 	originalFetchSetting := *system_setting.GetFetchSetting()
-	system_setting.GetFetchSetting().EnableSSRFProtection = true
-	system_setting.GetFetchSetting().AllowPrivateIp = true
-	system_setting.GetFetchSetting().AllowedPorts = []string{"1-65535"}
-	t.Cleanup(func() { *system_setting.GetFetchSetting() = originalFetchSetting })
+	system_setting.UpdateFetchSetting(func(fetchSetting *system_setting.FetchSetting) {
+		fetchSetting.EnableSSRFProtection = true
+		fetchSetting.AllowPrivateIp = true
+		fetchSetting.AllowedPorts = []string{"1-65535"}
+	})
+	t.Cleanup(func() { system_setting.UpdateFetchSetting(func(fetchSetting *system_setting.FetchSetting) { *fetchSetting = originalFetchSetting }) })
 	service.InitHttpClient()
 }
 

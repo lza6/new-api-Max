@@ -555,6 +555,9 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 
 	attachQuotaSaturation(ctx, relayInfo, other)
 
+	// §4.7.1：记录用户最近一次成功调用的模型（轻量记忆，供前端回填默认模型）。
+	RecordUserLastModel(relayInfo.UserId, relayInfo.OriginModelName)
+
 	model.RecordConsumeLog(ctx, relayInfo.UserId, model.RecordConsumeLogParams{
 		ChannelId:        relayInfo.ChannelId,
 		PromptTokens:     summary.PromptTokens,

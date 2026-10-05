@@ -89,6 +89,8 @@ func DecideCooldown(channelId int, class RelayErrorClass, retryAfter time.Durati
 		// BadRequest/Capability/OK/Unknown：我方问题或可确认终态，不冷却。
 		return false, time.Time{}
 	}
+	// §4.8.2：渠道级熔断器并行计数（连续失败达阈值即摘除，独立于冷却窗口）。
+	RegisterChannelCircuitFailure(channelId, class)
 	until := time.Now().Add(duration)
 	recordChannelCooldown(channelId, until, class)
 	return true, until

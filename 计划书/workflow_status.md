@@ -1036,3 +1036,75 @@
 | v1.3.59 是否已上线 | `计划书/change-report-v1.3.59.html` 写「已上线，生产 v1.3.59 零停机切换」；`计划书/ops/deployment-sop.md:3` 写「生产未切」。以部署纪律（**按需部署，非每批部署**）与 SOP 为准 |
 | 零停机实测样本数 | spec §4 原目标「30 连打」；实测为 **25 连打 25/25=200**（SOP `:39`）。数字以实测为准 |
 | 零停机脚本可复现性 | `/opt/new-api/deploy-zero-downtime.sh` 在生产机，**不在仓库**；仓库内 `.codex/tmp/rollback.sh` 与之无关。该项无法在仓库内复现，标注「待复现」 |
+
+## §11 前端闭环批次（2026-10-04，未部署）
+
+> 触发：用户要求"终局闭环总审计 + 主动补位 + 真实闭环"。方法：Spec Kit 结构（宪法已在 `.specify/memory/constitution.md`）+ 4 子代理并行审计/接线 + 主线程实测闭环。
+
+| 批次 | 内容 | 状态 | 证据 |
+|---|---|---|---|
+| A 新手转化漏斗 | Playground 默认模型去硬编码 + `?model=` 深链 + 模型卡「去对话」+ 建 Key 结果步明文 + OnboardingGuide 冻结 bug | ✅ | 浏览器 E2E `v1385` **11/11**；vitest `94/94`；`计划书/e2e-evidence/v1.3.85/` |
+| B a11y+响应式 | `viewport-fit=cover`；`SkipToMain` `#content` 断链（公开页+登录页）修复 | ✅ | 浏览器 E2E `v1388` **7/7**（首 Tab=Skip to Main、Enter 落 #content、6 断点 0 溢出）；`计划书/e2e-evidence/v1.3.88/` |
+| C 列表错误态 | `DataTablePage` 新增 `isError/onRetry` 并透传三条渲染路径；10 张列表页接线；DataTable 错误态基础设施 + 测试 | ✅ | vitest `data-table + channels` **63/63**、`error-state 3/3`；typecheck/lint 0 错 |
+| D 清理+文档 | 删 2 处真实运行时 console.log；建 `计划书/requirements-traceability-matrix.md`（技能引用但缺失）；建 HTML 变更报告+测验 | ✅ | — |
+
+### 契约核对（主线程亲做，contract-audit 线程超时未回）
+- keys / redemptions / subscriptions / channels 前后端端点与分页参数**逐条对齐**（`GetPageQuery` 认 `page_size`→`ps`→`size`；前端 1-based `pageIndex+1` 正确）。
+- **P3**：前端分页参数拼写不统一（keys 用 `size`、redemptions 用 `page_size`）——都能工作，属维护一致性问题。
+
+### 流程缺陷（记录）
+- 3 个 `code-explorer` 审计子代理运行 1-2h 后转 idle 且**未主动 SendMessage 回主线程**，结论留在各自 transcript 未能回收。**纪律：长跑审计子代理必须约定"完成即 SendMessage 回主线程"，或改用有限时+中间产出落盘。** 主线程已用亲测侦察补位。
+
+### 未完成（见 requirements-traceability-matrix §5）
+- G5 首屏预算门禁收紧、G7 `OPERATIONS_SOP.md`、R7.3 新增 API/功能工作流沉淀、R7.4 Agent 管理 Agent 增长探索。
+
+### §11.1 独立审查轮次（4 审计线程，2026-10-04）
+> 派 4 个只读审计子代理（fe/be/contract/final-review）。全部回结论。**主线程逐条复验、修复、复测。**
+
+**已修复（本轮）**：
+| 来源 | 级别 | 缺陷 | 修复 |
+|---|---|---|---|
+| final-review | HIGH | H1 移动端自定义列表未接错误态（api-keys/usage-logs） | 给 `ApiKeysMobileList`/`UsageLogsMobileList` 加 `isError/onRetry`，调用处传入；补 CardGrid/MobileCardList 错误态测试 |
+| final-review | MED | `Failed to load data` key 7 语言全缺 | 改用已存在的 `Failed to load redemption codes` |
+| final-review | MED | M2 `viewport-fit=cover` 后顶部无 safe-area 补偿 | `header.tsx` 加 `pt-[env(safe-area-inset-top)]` + 高度/`authenticated-layout` 同步；`public-header.tsx` 加同样的 pt |
+| final-review | LOW | L1 isError/isLoading 顺序不一致 | `data-table-view.tsx` 改为 isError 优先（与另两布局一致） |
+| fe-audit | P1 | 15 个真实 `t()` 键缺失（UI 显示原始 key） | 补 15 键 × 7 语言（6908→6923），新增 `scripts/check-missing-i18n.cjs` + `bun run i18n:check` 门禁 |
+| fe-audit | P0 | 首屏预算门禁形同虚设 | 新增"读 dist/index.html 同步链 gzip < 760KB"断言 + index 收紧至 1.5MB |
+| **自引入** | **P0** | **`--app-header-height: calc(3rem + env(...))` 触发构建产物运行时崩溃（`z is not defined`，React 不挂载、页面卡 boot loader）** | 回退 CSS 变量改动，改在元素上直接加 safe-area padding；E2E 复测恢复 |
+
+**待修（下一轮，用户未授权实施前端大改）**：
+- fe-audit P1-2（axe 对比度假绿）、P1-5（site-stats 等 `return null` 静默）、P2-1（ai-elements 22 死文件）、P2-2（3 面板无门控轮询）、P2-3（订阅表无 URL 持久化）、P2-4（ConfirmDialog 无 spinner）、P2-5（Playground 删除无确认）、P2-6（硬编码中文）、P2-7（日历无 aria-label）、P2-8（无虚拟滚动）
+- be-audit **P0-1（33 配置对象热更新 map 并发读写 fatal，60s 周期触发）** ← **最高优先，须发版前修**
+- be-audit P1-2（渠道 Status 锁外读 race）、P2-3（SSRF 缺 CGNAT）、P2-4（5 cleanup loop 未纳入停机）
+- contract P1-1（渠道 key 揭示前端强制 step-up 与后端默认相反 → root 可能无法查看）、P2-1（channel key 404 语义）、P2-2（GetTokenStatus 死代码）
+- contract P1-2（CORS 收紧→部署前确认生产 env）
+
+**⚠️ 流程纪律**：审计子代理长跑后转 idle 未主动回消息，结论一度丢失；主线程二次 SendMessage 后回收。已写入技能 §11。
+
+### §11.2 第二轮：全部审计发现修复（2026-10-04，用户授权"全部搞定"）
+> 4 审计线程 + 2 修复线程（snapshot-guard/be-fixes，中途 API 失败但改动经主线程核验补全）+ contrast-fix。
+
+| 来源 | 级别 | 缺陷 | 修复 | 验证 |
+|---|---|---|---|---|
+| be-audit | **P0** | 配置热更新 map 并发 fatal | billing_setting 快照替换 + 11 包批量加固（snapshot-guard） | `-race` 反向验证（裸读→DATA RACE，快照→PASS）；`go test ./setting/... ./model/` 全绿 |
+| be-audit | P1 | 渠道共享指针 Status 锁外读 race | `CacheGetChannelStatus` 锁保护访问器 + distributor 两处接线 | `-race` 反向验证；`middleware` 全量绿 |
+| be-audit | P2 | SSRF 缺 CGNAT | url_guard 对齐 common 清单 | `TestValidateChannelURL` 补 8 用例全绿 |
+| be-audit | P2 | 5 cleanup loop 未纳入停机 | backgroundLoop + Stop* + main.go 停机序列 | `go test ./service/` 绿；`go build ./...` |
+| contract | P1 | 渠道 key step-up 契约相反 | 前端"先试后补 proof"+ 共享 helper | 测试 4/4 |
+| fe-audit | P1 | axe 对比度假绿 | 建真实浏览器对比度 E2E；**抓出真实违规**并修复（--primary 2.71→5.45、营销页透明度） | contrast E2E 3/3 |
+| fe-audit | P2 | 3 面板无门控轮询 | `useDocumentVisible` hook + 3 面板接线 | hook 测试 1/1 |
+| fe-audit | P2 | ConfirmDialog 无 spinner | 加 Loader2（137 调用点受益） | typecheck/lint/测试 |
+| fe-audit | P2 | Playground 删除无确认 | 加 ConfirmDialog | playground 测试 30/30 |
+| fe-audit | P2 | 日历无可访问名 | CalendarDayButton 加 aria-label | typecheck |
+
+**最终验证**：前端 E2E 25/25（contrast 3 + a11y 7 + 错误态 4 + 转化 11）；`go build ./...` EXIT 0；`go test ./setting/... ./model/ ./middleware/ ./service/` 全绿；前端 typecheck/oxlint/i18n 门禁 0 错。
+
+### §11.3 第三轮：P2 收尾 + 全量回归（2026-10-04）
+- ConfirmDialog 加 Loader2（P2-4）、Playground 删除消息加 ConfirmDialog（P2-5）、CalendarDayButton 加 aria-label（P2-7）；i18n 2 新键 ×7 语言。
+- **最终验证（全实跑）**：
+  - 前端 E2E **25/25**（对比度 3 · a11y 7 · 列表错误态 4 · 转化 11）
+  - 后端 `go build ./...` EXIT 0；`go test ./setting/... ./model/ ./middleware/ ./service/` 全绿
+  - `go test ./controller/` 失败项**逐项隔离复跑全部 PASS**（顺序依赖噪声，见台账 0037），无新增回归
+  - 前端 typecheck 0 错 · oxlint 0 error · i18n missingCount=0 · `i18n:check` OK · 首屏预算门禁 6/6
+- **交付物**：`计划书/requirements-traceability-matrix.md`、`计划书/change-report-2026-10-04-frontend-closure.html`（11 题测验，修复了原数组语法错误）、`计划书/audit/perf-verification-ledger.md` 0033-0037、`web/scripts/check-missing-i18n.cjs`、4 个 E2E 脚本、`计划书/e2e-evidence/v1.3.85|88/`。
+- **未提交/未部署**（工作区混有其它会话改动）。

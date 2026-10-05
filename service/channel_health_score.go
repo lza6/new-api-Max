@@ -95,6 +95,10 @@ func getHealthRing(channelId int) *channelHealthRing {
 // RecordChannelOutcome 渠道请求结果统一记录入口（成功/失败都走这里）。
 // latency 为本次上游调用耗时；失败时 class 为 B2-1 错误类，成功传 ErrClassOK。
 func RecordChannelOutcome(channelId int, success bool, latency time.Duration, class RelayErrorClass) {
+	// §4.8.2：成功即关闭/复位熔断器（开关 off 时为 no-op）。
+	if success {
+		RegisterChannelCircuitSuccess(channelId)
+	}
 	r := getHealthRing(channelId)
 	channelHealthMu.Lock()
 	defer channelHealthMu.Unlock()
@@ -148,10 +152,16 @@ type ChannelHealthSnapshot struct {
 
 // init 注册健康分路由回调（T2-2）：model 层 FilterChannelHealth 过滤时
 // 通过该回调读取快照；无样本渠道 fail-open（不剔除新渠道）。
+// §4.8.2：同时接入渠道熔断器——Open 中的渠道以 coolingDown=true 剔除
+// （复用既有健康过滤点，零额外路由改动）。
 func init() {
 	model.ChannelHealthProbe = func(channelID int) (float64, bool, bool) {
 		snap := GetChannelHealthSnapshot(channelID)
-		return snap.Score, snap.CoolingDown, snap.SampleCount > 0
+		cooling := snap.CoolingDown
+		if !cooling && !ChannelCircuitAllows(channelID) {
+			cooling = true
+		}
+		return snap.Score, cooling, snap.SampleCount > 0
 	}
 }
 

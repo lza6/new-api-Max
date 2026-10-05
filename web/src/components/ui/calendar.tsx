@@ -230,10 +230,18 @@ function CalendarDayButton({
     if (modifiers.focused) {ref.current?.focus()}
   }, [modifiers.focused])
 
+  const dayLabel = day.date.toLocaleDateString(locale?.code, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
   return (
     <Button
       variant='ghost'
       size='icon'
+      aria-label={dayLabel}
       data-day={day.date.toLocaleDateString(locale?.code)}
       data-selected-single={
         modifiers.selected &&

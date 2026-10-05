@@ -39,6 +39,12 @@ import { ModelCard } from '../components/model-card'
 import { ModelCardGrid } from '../components/model-card-grid'
 import type { PricingModel } from '../types'
 
+const { navigate } = vi.hoisted(() => ({ navigate: vi.fn() }))
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@tanstack/react-router')>()),
+  useNavigate: () => navigate,
+}))
+
 function pricingModel(overrides: Partial<PricingModel> = {}): PricingModel {
   return {
     id: 1,
@@ -78,6 +84,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   queryClient.clear()
+  navigate.mockReset()
   useSystemConfigStore
     .getState()
     .setConfig({ currency: { ...DEFAULT_CURRENCY_CONFIG } })
@@ -134,6 +141,19 @@ describe('model cards', () => {
     expect(onClick).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: 'Details' }))
     expect(onClick).toHaveBeenCalledOnce()
+  })
+
+  it('links straight into the playground seeded with the model', async () => {
+    const user = userEvent.setup()
+    const model = pricingModel({ model_name: 'deepseek-v4.1-flash' })
+    render(<ModelCard model={model} onClick={vi.fn()} />)
+
+    await user.click(screen.getByRole('button', { name: 'Chat' }))
+
+    expect(navigate).toHaveBeenCalledWith({
+      to: '/playground',
+      search: { model: 'deepseek-v4.1-flash' },
+    })
   })
 
   it('retains a neutral health strip and missing values when metrics are unavailable', () => {

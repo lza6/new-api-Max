@@ -37,15 +37,26 @@ func webProtectionTestCtx(path string) *gin.Context {
 	return c
 }
 
+// useWebProtectionSettings 在写锁内修改 Web 防护配置并发布快照，结束后恢复原值。
+// 快照发布后再修改返回对象不会生效，故所有写入必须经此辅助。
+func useWebProtectionSettings(t *testing.T, mutate func(*operation_setting.WebProtectionSetting)) {
+	t.Helper()
+	original := *operation_setting.GetWebProtectionSetting()
+	t.Cleanup(func() {
+		operation_setting.UpdateWebProtectionSetting(func(settings *operation_setting.WebProtectionSetting) {
+			*settings = original
+		})
+	})
+	operation_setting.UpdateWebProtectionSetting(mutate)
+}
+
 // TestWebProtectionInFlightCounter T3：在线请求计数 Begin+1 / End-1，原子返回一致。
 func TestWebProtectionInFlightCounter(t *testing.T) {
-	settings := operation_setting.GetWebProtectionSetting()
-	prev := *settings
-	t.Cleanup(func() { *settings = prev })
 	webProtectionTestDB(t)
-
-	settings.Enabled = true
-	settings.AutoBan = false
+	useWebProtectionSettings(t, func(settings *operation_setting.WebProtectionSetting) {
+		settings.Enabled = true
+		settings.AutoBan = false
+	})
 
 	base := GetWebProtectionInFlight()
 	c := webProtectionTestCtx("/dashboard")
@@ -57,14 +68,13 @@ func TestWebProtectionInFlightCounter(t *testing.T) {
 
 // TestWebProtectionInFlightRejectedNotCounted T3：被策略拒绝的请求不进入计数。
 func TestWebProtectionInFlightRejectedNotCounted(t *testing.T) {
-	settings := operation_setting.GetWebProtectionSetting()
-	prev := *settings
-	t.Cleanup(func() { *settings = prev })
 	webProtectionTestDB(t)
-	settings.Enabled = true
-	settings.BlockedPaths = []string{"/admin"}
-	settings.AllowedPaths, settings.UAAllowlist = nil, nil
-	settings.AutoBan = false
+	useWebProtectionSettings(t, func(settings *operation_setting.WebProtectionSetting) {
+		settings.Enabled = true
+		settings.BlockedPaths = []string{"/admin"}
+		settings.AllowedPaths, settings.UAAllowlist = nil, nil
+		settings.AutoBan = false
+	})
 
 	base := GetWebProtectionInFlight()
 	c := webProtectionTestCtx("/admin/users")
@@ -77,11 +87,10 @@ func TestWebProtectionInFlightRejectedNotCounted(t *testing.T) {
 
 // TestWebProtectionInFlightDisabledPassThrough T3：防护关闭时直通且不计数。
 func TestWebProtectionInFlightDisabledPassThrough(t *testing.T) {
-	settings := operation_setting.GetWebProtectionSetting()
-	prev := *settings
-	t.Cleanup(func() { *settings = prev })
 	webProtectionTestDB(t)
-	settings.Enabled = false
+	useWebProtectionSettings(t, func(settings *operation_setting.WebProtectionSetting) {
+		settings.Enabled = false
+	})
 
 	base := GetWebProtectionInFlight()
 	c := webProtectionTestCtx("/dashboard")
@@ -91,12 +100,11 @@ func TestWebProtectionInFlightDisabledPassThrough(t *testing.T) {
 
 // TestWebProtectionInFlightMidRequestDisable T3：Begin 后中途关闭防护，End 仍回减不泄漏。
 func TestWebProtectionInFlightMidRequestDisable(t *testing.T) {
-	settings := operation_setting.GetWebProtectionSetting()
-	prev := *settings
-	t.Cleanup(func() { *settings = prev })
 	webProtectionTestDB(t)
-	settings.Enabled = true
-	settings.AutoBan = false
+	useWebProtectionSettings(t, func(settings *operation_setting.WebProtectionSetting) {
+		settings.Enabled = true
+		settings.AutoBan = false
+	})
 
 	base := GetWebProtectionInFlight()
 	c := webProtectionTestCtx("/dashboard")
@@ -104,7 +112,9 @@ func TestWebProtectionInFlightMidRequestDisable(t *testing.T) {
 	assert.Equal(t, base+1, GetWebProtectionInFlight())
 
 	// 请求进行中关闭防护，End 必须仍回减。
-	settings.Enabled = false
+	operation_setting.UpdateWebProtectionSetting(func(settings *operation_setting.WebProtectionSetting) {
+		settings.Enabled = false
+	})
 	TrackWebRequestEnd(c, http.StatusOK)
 	assert.Equal(t, base, GetWebProtectionInFlight())
 }
@@ -122,17 +132,15 @@ func webProtectionTestCtxIP(remoteIP, requestPath string) *gin.Context {
 // 来源完全豁免限流与自动封禁（只计数）——Web 防护只防外部恶意攻击，
 // 内网自身流量（Caddy 健康检查 172.18.0.1）绝不能被误封。
 func TestWebProtectionTrustedSourceBypassesLocalIPs(t *testing.T) {
-	settings := operation_setting.GetWebProtectionSetting()
-	prev := *settings
-	t.Cleanup(func() { *settings = prev })
 	webProtectionTestDB(t)
-
-	settings.Enabled = true
-	settings.AutoBan = true            // 自动封禁开启，确保内部来源仍不被封
-	settings.LimitPerSecond = 1        // 极低速率：外部来源必被限流
-	settings.Burst = 1
-	settings.AutoBanThresholdPerMinute = 1
-	settings.AutoBanMinutes = 60
+	useWebProtectionSettings(t, func(settings *operation_setting.WebProtectionSetting) {
+		settings.Enabled = true
+		settings.AutoBan = true     // 自动封禁开启，确保内部来源仍不被封
+		settings.LimitPerSecond = 1 // 极低速率：外部来源必被限流
+		settings.Burst = 1
+		settings.AutoBanThresholdPerMinute = 1
+		settings.AutoBanMinutes = 60
+	})
 
 	for _, ip := range []string{"172.18.0.1", "127.0.0.1", "10.0.0.5", "192.168.1.10"} {
 		// 连打 5 发远超 burst=1：内部来源必须全部放行
@@ -148,20 +156,30 @@ func TestWebProtectionTrustedSourceBypassesLocalIPs(t *testing.T) {
 	assert.Zero(t, count, "trusted internal IPs must never be auto-banned")
 }
 
+// TestWebProtectionCGNATIsNotTrustedSource §审查 C2：CGNAT 100.64.0.0/10 是运营商大内网/
+// VPN 出口，属外部来源——修复 IsPrivateIP 加 CGNAT 后，绝不能连带把 CGNAT 当信任来源
+// 豁免限流/封禁（信任来源用 IsTrustedSourceIP，不含 CGNAT）。
+func TestWebProtectionCGNATIsNotTrustedSource(t *testing.T) {
+	assert.False(t, isWebProtectionTrustedSource("100.64.0.1"), "CGNAT must not be a trusted source")
+	assert.False(t, isWebProtectionTrustedSource("100.127.255.255"), "CGNAT must not be a trusted source")
+	// 回归：真正的内部来源仍被信任。
+	assert.True(t, isWebProtectionTrustedSource("172.18.0.1"))
+	assert.True(t, isWebProtectionTrustedSource("10.0.0.5"))
+	assert.True(t, isWebProtectionTrustedSource("127.0.0.1"))
+}
+
 // TestWebProtectionExternalIPStillRateLimitedAndBanned 回归：外部来源保持原有
 // 防御——超限触发 429 + 自动封禁，防御能力不因内部豁免而削弱。
 func TestWebProtectionExternalIPStillRateLimitedAndBanned(t *testing.T) {
-	settings := operation_setting.GetWebProtectionSetting()
-	prev := *settings
-	t.Cleanup(func() { *settings = prev })
 	webProtectionTestDB(t)
-
-	settings.Enabled = true
-	settings.AutoBan = true
-	settings.LimitPerSecond = 1
-	settings.Burst = 1
-	settings.AutoBanThresholdPerMinute = 2
-	settings.AutoBanMinutes = 60
+	useWebProtectionSettings(t, func(settings *operation_setting.WebProtectionSetting) {
+		settings.Enabled = true
+		settings.AutoBan = true
+		settings.LimitPerSecond = 1
+		settings.Burst = 1
+		settings.AutoBanThresholdPerMinute = 2
+		settings.AutoBanMinutes = 60
+	})
 
 	external := "203.0.113.9"
 	rejected := 0

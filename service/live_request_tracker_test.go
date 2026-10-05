@@ -14,12 +14,12 @@ func TestLiveRequestTracker_LifecycleAndAggregation(t *testing.T) {
 	// 两个进行中请求，其中一个已压缩并有首字。
 	LiveBegin("req-1", LiveRequestEntry{UserId: 1, Model: "m", IsStream: true, StartedAt: 100})
 	LiveSetChannel("req-1", 49, "ch49", 0)
-	LiveSetCompression("req-1", 2_000_000, 20_000, true)
+	LiveSetCompression("req-1", 2_000_000, 20_000, 300, true)
 	LiveSetFirstResponse("req-1", 500)
 
 	LiveBegin("req-2", LiveRequestEntry{UserId: 2, Model: "m", IsStream: false, StartedAt: 100})
 	LiveSetChannel("req-2", 50, "ch50", 0)
-	LiveSetCompression("req-2", 300_000, 300_000, false)
+	LiveSetCompression("req-2", 300_000, 300_000, -1, false)
 
 	snap := GetLiveRequestsSnapshot()
 	require.Equal(t, 2, snap.ActiveCount)
@@ -58,7 +58,7 @@ func TestLiveRequestTracker_UnknownIdIsNoop(t *testing.T) {
 
 	// 对不存在的请求做更新/结束不应 panic。
 	LiveSetChannel("nope", 1, "x", 0)
-	LiveSetCompression("nope", 1, 2, true)
+	LiveSetCompression("nope", 1, 2, -1, true)
 	LiveSetFirstResponse("nope", 1)
 	LiveEnd("nope", 200, "")
 	assert.Equal(t, 0, GetLiveRequestsSnapshot().ActiveCount)
@@ -69,7 +69,7 @@ func TestLiveRequestTracker_UncompressedNotCountedInRatio(t *testing.T) {
 	defer ResetLiveRequestsForTest()
 
 	LiveBegin("r", LiveRequestEntry{Model: "m"})
-	LiveSetCompression("r", 500_000, 500_000, false) // 未压缩
+	LiveSetCompression("r", 500_000, 500_000, -1, false) // 未压缩
 	snap := GetLiveRequestsSnapshot()
 	assert.Equal(t, 0, snap.CompressedCount)
 	assert.EqualValues(t, 0, snap.AvgCompressionRatio, "未压缩请求不参与压缩率统计")

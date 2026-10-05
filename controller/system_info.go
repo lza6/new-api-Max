@@ -108,3 +108,12 @@ func GetLiveRequests(c *gin.Context) {
 		"relay_workers_max": common.RelayPoolMaxWorkers(),
 	})
 }
+
+// GetMediaProviders 返回统一的媒体 Provider 能力目录（§4.6.1，只读）。
+// 供管理端展示「谁支持文生视频/图生视频/图像生成/TTS/ASR」，便于运维与新增上游接入。
+func GetMediaProviders(c *gin.Context) {
+	c.JSON(http.StatusOK, gin.H{
+		"success":   true,
+		"providers": service.AllMediaProviders(),
+	})
+}

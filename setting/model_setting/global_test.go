@@ -12,18 +12,22 @@ import (
 func TestShouldPreserveThinkingSuffixExactAndRegex(t *testing.T) {
 	settings := GetGlobalSettings()
 	original := append([]string(nil), settings.ThinkingModelBlacklist...)
-	t.Cleanup(func() { settings.ThinkingModelBlacklist = original })
+	t.Cleanup(func() {
+		UpdateGlobalSettings(func(s *GlobalSettings) { s.ThinkingModelBlacklist = original })
+	})
 
 	assert.True(t, ShouldPreserveThinkingSuffix("kimi-k2-thinking"))
 	assert.True(t, ShouldPreserveThinkingSuffix("moonshotai/kimi-k2-thinking"))
 	assert.False(t, ShouldPreserveThinkingSuffix("m@sha256:abc"))
 
-	settings.ThinkingModelBlacklist = []string{
-		"kimi-k2-thinking",
-		"re:[",
-		"re:",
-		"re:.*@sha256:.*",
-	}
+	UpdateGlobalSettings(func(s *GlobalSettings) {
+		s.ThinkingModelBlacklist = []string{
+			"kimi-k2-thinking",
+			"re:[",
+			"re:",
+			"re:.*@sha256:.*",
+		}
+	})
 
 	var logged bytes.Buffer
 	previous := gin.DefaultErrorWriter
@@ -37,7 +41,9 @@ func TestShouldPreserveThinkingSuffixExactAndRegex(t *testing.T) {
 	require.Contains(t, logged.String(), `invalid thinking_model_blacklist regex "re:["`)
 	require.Contains(t, logged.String(), `invalid thinking_model_blacklist regex "re:"`)
 
-	settings.ThinkingModelBlacklist = []string{"re:^beta@"}
+	UpdateGlobalSettings(func(s *GlobalSettings) {
+		s.ThinkingModelBlacklist = []string{"re:^beta@"}
+	})
 	assert.False(t, ShouldPreserveThinkingSuffix("m@sha256:abc"))
 	assert.True(t, ShouldPreserveThinkingSuffix("beta@sha256:abc"))
 	assert.False(t, ShouldPreserveThinkingSuffix("alpha@sha256:abc"))

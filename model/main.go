@@ -430,7 +430,29 @@ func migrateLOGDB() error {
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		return migrateClickHouseLogDB()
 	}
-	return LOG_DB.AutoMigrate(&Log{})
+	if err := LOG_DB.AutoMigrate(&Log{}); err != nil {
+		return err
+	}
+	return migrateLogTrafficIndex(LOG_DB)
+}
+
+// migrateLogTrafficIndex 删除废弃的 idx_logs_traffic 复合索引（(request_bytes,response_bytes)）。
+// 该索引缺 priority:1 且对站点流量聚合（无 WHERE 谓词的 SUM）零收益，只增加每次日志
+// INSERT 的索引维护。AutoMigrate 不会删除标签中移除的索引，存量库需显式 DropIndex；
+// 索引不存在（新库或已删）时跳过。幂等；删除失败仅记录并返回错误，不静默。
+func migrateLogTrafficIndex(db *gorm.DB) error {
+	if db == nil || !db.Migrator().HasTable(&Log{}) {
+		return nil
+	}
+	if !db.Migrator().HasIndex(&Log{}, "idx_logs_traffic") {
+		return nil
+	}
+	if err := db.Migrator().DropIndex(&Log{}, "idx_logs_traffic"); err != nil {
+		common.SysError("failed to drop obsolete index idx_logs_traffic: " + err.Error())
+		return err
+	}
+	common.SysLog("dropped obsolete index idx_logs_traffic on logs")
+	return nil
 }
 
 func migrateClickHouseLogDB() error {

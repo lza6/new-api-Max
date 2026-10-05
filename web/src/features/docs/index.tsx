@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useSiteModel } from '@/hooks/use-site-model'
 import { useStatus } from '@/hooks/use-status'
 import { Link } from '@tanstack/react-router'
 
@@ -47,6 +48,7 @@ function CodeBlock(props: { label: string; code: string }) {
 export function Docs() {
   const { t } = useTranslation()
   const { status } = useStatus()
+  const siteModel = useSiteModel()
 
   const baseUrl = useMemo(() => {
     const apiInfo = status?.api_info as Array<{ url?: string }> | undefined
@@ -61,7 +63,7 @@ export function Docs() {
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer <YOUR_API_KEY>" \\
   -d '{
-    "model": "deepseek-v4-flash",
+    "model": "${siteModel}",
     "messages": [{"role": "user", "content": "你好"}]
   }'`
 

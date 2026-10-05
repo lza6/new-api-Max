@@ -1,0 +1,54 @@
+[
+  {
+    "name": "Hero 标题渲染（逐词入场未破文本）",
+    "ok": true,
+    "detail": "Unified API Gateway for Vast Range of AI Models"
+  },
+  {
+    "name": "Hero 视觉区非空（WebGL 或 CSS 回退）",
+    "ok": true,
+    "detail": "canvas=true fallback=true"
+  },
+  {
+    "name": "FAQ 区块可见",
+    "ok": true
+  },
+  {
+    "name": "FAQ 展开后答案可见",
+    "ok": true
+  },
+  {
+    "name": "FAQPage JSON-LD 注入",
+    "ok": true,
+    "detail": "@type=FAQPage count=6"
+  },
+  {
+    "name": "JSON-LD 问题数与可见 FAQ 一致(6)",
+    "ok": true,
+    "detail": 6
+  },
+  {
+    "name": "无横向溢出",
+    "ok": true,
+    "detail": "scroll=1440 client=1440"
+  },
+  {
+    "name": "无控制台错误",
+    "ok": true,
+    "detail": ""
+  },
+  {
+    "name": "reduced-motion 不启用 WebGL canvas",
+    "ok": true,
+    "detail": "canvas=0"
+  },
+  {
+    "name": "reduced-motion 回退 CSS 展示非空",
+    "ok": true
+  },
+  {
+    "name": "移动端无横向溢出",
+    "ok": true,
+    "detail": "scroll=390 client=390"
+  }
+]

@@ -22,9 +22,13 @@ import "github.com/lza6/new-api-Max/setting/config"
 
 // LoginRateLimitSetting 登录接口专属限流（热更新，注册名 "login_rate_limit"）。
 // 与全局 CriticalRateLimit（影响重置密码/OAuth 等全部敏感端点）解耦：
-// 管理员可在后台单独开关登录限流，默认关闭（登录不限流）。
+// 管理员可在后台单独开关登录限流。
+//
+// §4.11.3 安全基线：默认 **开启**（OWASP Authentication Cheat Sheet —
+// Resistance to Brute Force）。此前默认关闭使暴力破解在生产默认配置下无速率限制。
+// 管理员仍可显式关闭（有意的运维选择），但安全默认必须是开。
 type LoginRateLimitSetting struct {
-	// Enabled 登录限流开关，默认关闭。
+	// Enabled 登录限流开关，默认开启。
 	Enabled bool `json:"enabled"`
 	// Duration 限流窗口（秒），默认 1200（20 分钟，对齐全局 Critical 默认）。
 	Duration int64 `json:"duration"`
@@ -33,7 +37,7 @@ type LoginRateLimitSetting struct {
 }
 
 var loginRateLimitSetting = LoginRateLimitSetting{
-	Enabled:  false,
+	Enabled:  true,
 	Duration: 1200,
 	Num:      20,
 }
@@ -46,7 +50,7 @@ func GetLoginRateLimitSetting() *LoginRateLimitSetting {
 	return &loginRateLimitSetting
 }
 
-// IsLoginRateLimitEnabled 登录限流是否开启（默认关闭）。
+// IsLoginRateLimitEnabled 登录限流是否开启（默认开启，§4.11.3 安全基线）。
 func IsLoginRateLimitEnabled() bool {
 	return loginRateLimitSetting.Enabled
 }

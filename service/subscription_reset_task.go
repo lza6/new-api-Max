@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"fmt"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -11,8 +10,6 @@ import (
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/relaykit/dto"
-
-	"github.com/bytedance/gopkg/util/gopool"
 )
 
 const (
@@ -22,27 +19,37 @@ const (
 )
 
 var (
-	subscriptionResetOnce    sync.Once
 	subscriptionResetRunning atomic.Bool
 	subscriptionCleanupLast  atomic.Int64
+	// subscriptionResetTask 管理订阅过期/重置 loop 生命周期，供优雅关闭停止。
+	subscriptionResetTask backgroundLoop
 )
 
 func StartSubscriptionQuotaResetTask() {
-	subscriptionResetOnce.Do(func() {
-		if !common.IsMasterNode {
-			return
-		}
-		gopool.Go(func() {
-			logger.LogInfo(context.Background(), fmt.Sprintf("subscription quota reset task started: tick=%s", subscriptionResetTickInterval))
-			ticker := time.NewTicker(subscriptionResetTickInterval)
-			defer ticker.Stop()
+	if !common.IsMasterNode {
+		return
+	}
+	subscriptionResetTask.start(func(ctx context.Context) {
+		logger.LogInfo(ctx, fmt.Sprintf("subscription quota reset task started: tick=%s", subscriptionResetTickInterval))
+		ticker := time.NewTicker(subscriptionResetTickInterval)
+		defer ticker.Stop()
 
-			runSubscriptionQuotaResetOnce()
-			for range ticker.C {
+		runSubscriptionQuotaResetOnce()
+		for {
+			select {
+			case <-ctx.Done():
+				logger.LogInfo(ctx, "subscription quota reset task stopped")
+				return
+			case <-ticker.C:
 				runSubscriptionQuotaResetOnce()
 			}
-		})
+		}
 	})
+}
+
+// StopSubscriptionQuotaResetTask 停止订阅过期/重置后台任务并等待其退出（供优雅关闭调用）。
+func StopSubscriptionQuotaResetTask() {
+	subscriptionResetTask.stop()
 }
 
 func runSubscriptionQuotaResetOnce() {

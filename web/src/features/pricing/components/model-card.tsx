@@ -17,7 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useNavigate } from '@tanstack/react-router'
-import { ChevronRight, FlaskConical } from 'lucide-react'
+import { ChevronRight, FlaskConical, MessageSquare } from 'lucide-react'
 import { memo, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -411,6 +411,20 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             {t('Model test')}
           </Button>
         ) : null}
+        <Button
+          variant='outline'
+          size='sm'
+          className='text-foreground/80 hover:text-foreground gap-1.5 self-start rounded-full border-transparent bg-foreground/5 py-0.5 text-xs shadow-none backdrop-blur hover:bg-foreground/10 active:scale-[0.98]'
+          onClick={() =>
+            navigate({
+              to: '/playground',
+              search: { model: props.model.model_name },
+            })
+          }
+        >
+          <MessageSquare aria-hidden className='size-3.5' />
+          {t('Chat')}
+        </Button>
         <ModelPerfBadge
           perf={props.perf}
           className='border-border/60 border-t pt-2'

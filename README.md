@@ -71,6 +71,27 @@
 - 部署/回滚/验收/E2E 复现：见 `计划书/ops/deployment-sop.md`、`计划书/workflow_status.md`、`计划书/audit/final-audit-v1.3.46.md`
 - 常用改动请先读 `.claude/skills/new-api-add-feature/SKILL.md`（项目可复用开发工作流技能）
 
+### 生产安全加固与报表（007 批次，2026-10-04，**未部署**）
+- **登录暴力破解防护**：登录限流默认开启（`login_rate_limit.enabled` 默认 true）；**失败登录写审计**（`audit_logs`，`success=false` + `status` + `reason`，去敏不含密码）——OWASP 反暴力破解基线
+- **私网判定一致**：`common.IsPrivateIP` 补齐 CGNAT `100.64.0.0/10`、link-local、保留段，与 SSRF 判定同集
+- **用量/成本报表**：`GET /api/log/report?group_by=model|channel|day&start=&end=`（管理员）+ `/api/log/report/export` CSV 流式导出；dashboard 新增「Usage Report」section
+- **CORS 合规**：`CORS_ALLOWED_ORIGINS` 白名单，消除 `*` + credentials 非法组合，默认仅同源
+- **故障隔离**：渠道级熔断器（连续失败摘除 + 半开探测），`CHANNEL_CIRCUIT_BREAKER` 开关
+- **优雅关闭**：后台 loop 与批量额度更新纳入 SIGTERM 停机序列，不丢账
+- **索引治理**：删除无收益的 `idx_logs_traffic`（聚合无谓词，仅增写放大）
+- **站内图床（本地磁盘产物存储）**：`TASK_ARTIFACT_STORE_MODE=local` 启用；存生成产物与参考素材；
+  **防盗刷**（HMAC 签名 capability URL + 下载限流 10/min + `attachment`/`nosniff` + 防目录穿越）；
+  **每 5 分钟自动清理**已完成任务超过保留期的素材（`TASK_ARTIFACT_RETENTION_SECONDS`，默认 300s）
+- 规范：`.specify/specs/007-prod-safety-audit-report/`（spec/plan/tasks）
+- **排障**：`ERR_CONNECTION_RESET` 见 `计划书/ops/connection-reset-sop.md`（大陆直连香港源站 IP:443 被 RST，非服务器故障）
+- **领域感知路由（4.8.1，默认关）**：`DOMAIN_ROUTE_ENABLED` + `DOMAIN_ROUTE_MAP=tag:group,...`；请求头 `X-Route-Tag` 命中白名单即覆盖分组（**不越权**：仅限用户可用分组）
+- **轻量用户记忆（4.7.1）**：记录用户最近使用模型（`UserSetting.last_used_model`，JSON 列无需迁移），供前端回填默认模型
+- **媒体能力注册表（4.6.1）**：`GET /api/system-info/media-providers` 返回媒体能力目录（文生视频/图生视频/图像生成/TTS/ASR × 渠道）
+- **端点适配（421 契约）**：`/v1/videos/generations` 等价别名（提交+查询）、`/v1/messages/count_tokens` 重新启用（返回 `{"input_tokens":N}`）、`/v1/sub2api/billing` 查询密钥分组倍率与计费口径
+- **可观测性**：`GET /api/system-info/channel-health`（RootAuth）返回每渠道健康分 + 熔断状态（closed/open/half_open + 连续失败数）
+- **服务探活**：`GET /healthz`（存活，进程活着即 200，极轻量）/ `GET /readyz`（就绪，主库+日志库可达才 200，否则 503）——供 K8s/Caddy/Docker 健康检查；推荐用 `/healthz` 替换较重的 `/api/status` 作健康检查
+- **报表安全**：CSV 导出防公式注入；参数非法返回 400；内部错误不泄漏到响应
+
 ## 📝 Project Description
 
 > [!IMPORTANT]
@@ -366,6 +387,16 @@ docker run --name new-api -d --restart always \
 | `PYROSCOPE_MUTEX_RATE` | Pyroscope mutex sampling rate | `5` |
 | `PYROSCOPE_BLOCK_RATE` | Pyroscope block sampling rate | `5` |
 | `HOSTNAME` | Hostname tag for Pyroscope | `new-api` |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated exact Origins allowed to make cross-origin browser requests (credentials enabled). Unset/blank = same-origin only (no CORS headers). Wildcard is never combined with credentials (spec-invalid) | - |
+| `CHANNEL_CIRCUIT_BREAKER` | Enable per-channel circuit breaker (`on`/`true`): a channel is tripped after `CHANNEL_CIRCUIT_FAILURE_THRESHOLD` consecutive upstream failures and re-probed after the open window. Off = zero behavior change | `false` |
+| `CHANNEL_CIRCUIT_FAILURE_THRESHOLD` | Consecutive upstream failures (auth/rate-limit/5xx/timeout) before a channel is tripped | `5` |
+| `CHANNEL_CIRCUIT_OPEN_SECONDS` | Circuit-open window in seconds before a half-open probe is allowed | `120` |
+| `TASK_ARTIFACT_STORE_MODE` | 站内图床模式：`upstream`（默认，产物走上游代理，零变化）/ `local`（本地磁盘存储生成产物与参考素材） | `upstream` |
+| `TASK_ARTIFACT_STORE_DIR` | 本地图床根目录（`local` 模式）；默认 `<工作目录>/data/task-artifacts` | - |
+| `TASK_ARTIFACT_MAX_FILE_MB` | 本地图单单文件上限（MB），超限拒绝落盘 | `64` |
+| `TASK_ARTIFACT_RETENTION_SECONDS` | 产物/参考素材保留期（秒）：后台每 5 分钟清理「任务已完成且超过保留期」的目录 | `300` |
+| `DOMAIN_ROUTE_ENABLED` | 领域感知路由开关（默认关）。开启后请求头 `X-Route-Tag` 命中 `DOMAIN_ROUTE_MAP` 时可覆盖分组（仅限用户可用分组） | `false` |
+| `DOMAIN_ROUTE_MAP` | 领域路由映射（逗号分隔 `tag:group`），如 `medical:medical-group,legal:legal-group` | - |
 
 📖 **Complete configuration:** [Environment Variables Documentation](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables)
 

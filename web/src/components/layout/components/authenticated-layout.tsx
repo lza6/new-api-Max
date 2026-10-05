@@ -46,9 +46,11 @@ export function AuthenticatedLayout(props: AuthenticatedLayoutProps) {
             <SidebarInset
               className={cn(
                 '@container/content',
-                'h-[calc(100svh-var(--app-header-height,0px))]',
+                // Subtract the header (content height + top safe-area) so the
+                // content pane never overflows by the notch inset.
+                'h-[calc(100svh-var(--app-header-height,0px)-env(safe-area-inset-top))]',
                 'min-h-0 overflow-hidden',
-                'peer-data-[variant=inset]:h-[calc(100svh-var(--app-header-height,0px)-(var(--spacing)*4))]'
+                'peer-data-[variant=inset]:h-[calc(100svh-var(--app-header-height,0px)-env(safe-area-inset-top)-(var(--spacing)*4))]'
               )}
             >
               <div className='flex h-full min-h-0 flex-col'>

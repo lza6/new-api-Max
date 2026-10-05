@@ -1,7 +1,10 @@
 package operation_setting
 
 import (
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/setting/config"
 )
@@ -31,31 +34,77 @@ const (
 
 var webhookSetting = WebhookSetting{Enabled: false}
 
-func init() {
-	config.GlobalConfig.Register("webhook", &webhookSetting)
+// webhookSettingMu 保护 webhookSetting 主副本（Events 为 slice）。
+var webhookSettingMu sync.RWMutex
+
+// webhookSettingSnapshot 已发布的不可变快照。事件通知判定走快照，避免与周期
+// 热更新（反射就地写 slice）或管理端替换竞争。
+var webhookSettingSnapshot atomic.Pointer[WebhookSetting]
+
+// publishWebhookSettingSnapshotLocked 在持 webhookSettingMu 前提下深拷贝主副本并发布。
+func publishWebhookSettingSnapshotLocked() {
+	snap := webhookSetting
+	snap.Events = slices.Clone(webhookSetting.Events)
+	webhookSettingSnapshot.Store(&snap)
 }
 
-func GetWebhookSetting() *WebhookSetting {
+// loadWebhookSetting 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadWebhookSetting() *WebhookSetting {
+	if s := webhookSettingSnapshot.Load(); s != nil {
+		return s
+	}
 	return &webhookSetting
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (w *WebhookSetting) BeforeConfigWrite() { webhookSettingMu.Lock() }
+func (w *WebhookSetting) AfterConfigWrite() {
+	publishWebhookSettingSnapshotLocked()
+	webhookSettingMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (w *WebhookSetting) LockConfigRead()   { webhookSettingMu.RLock() }
+func (w *WebhookSetting) UnlockConfigRead() { webhookSettingMu.RUnlock() }
+
+func init() {
+	config.GlobalConfig.Register("webhook", &webhookSetting)
+	webhookSettingMu.Lock()
+	publishWebhookSettingSnapshotLocked()
+	webhookSettingMu.Unlock()
+}
+
+// GetWebhookSetting 返回当前不可变快照。只读，勿直接改写返回对象。
+func GetWebhookSetting() *WebhookSetting {
+	return loadWebhookSetting()
 }
 
 // SnapshotWebhookSetting 返回当前配置的深拷贝，用于「副本组装→校验→提交」，
 // 避免控制层校验失败时污染运行时配置。
 func SnapshotWebhookSetting() WebhookSetting {
-	s := webhookSetting
-	s.Events = append([]string(nil), webhookSetting.Events...)
-	return s
+	return *loadWebhookSetting()
 }
 
 // ReplaceWebhookSetting 用已校验的副本原子替换运行时配置（Events 深拷贝）。
 func ReplaceWebhookSetting(s WebhookSetting) {
-	s.Events = append([]string(nil), s.Events...)
+	webhookSettingMu.Lock()
+	defer webhookSettingMu.Unlock()
+	s.Events = slices.Clone(s.Events)
 	webhookSetting = s
+	publishWebhookSettingSnapshotLocked()
+}
+
+// UpdateWebhookSetting 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateWebhookSetting(fn func(*WebhookSetting)) {
+	webhookSettingMu.Lock()
+	defer webhookSettingMu.Unlock()
+	fn(&webhookSetting)
+	publishWebhookSettingSnapshotLocked()
 }
 
 // IsWebhookEventSubscribed 事件类型是否在订阅白名单内（空白条目丢弃）。
 func IsWebhookEventSubscribed(eventType string) bool {
-	for _, it := range strings.FieldsFunc(strings.Join(webhookSetting.Events, " "), func(r rune) bool {
+	for _, it := range strings.FieldsFunc(strings.Join(loadWebhookSetting().Events, " "), func(r rune) bool {
 		return r == ' ' || r == ',' || r == '\n' || r == '\t'
 	}) {
 		if strings.TrimSpace(it) == eventType {

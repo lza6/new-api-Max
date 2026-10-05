@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -10,20 +11,33 @@ import (
 
 const authArtifactCleanupInterval = time.Hour
 
+var authArtifactCleanupLoop backgroundLoop
+
 // StartAuthArtifactCleanup removes expired dashboard Sessions and old
 // one-time authentication flows. Only the master instance performs cleanup.
 func StartAuthArtifactCleanup() {
 	if !common.IsMasterNode {
 		return
 	}
-	go func() {
+	authArtifactCleanupLoop.start(func(ctx context.Context) {
 		cleanupAuthArtifacts()
 		ticker := time.NewTicker(authArtifactCleanupInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			cleanupAuthArtifacts()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cleanupAuthArtifacts()
+			}
 		}
-	}()
+	})
+}
+
+// StopAuthArtifactCleanup stops the cleanup loop and waits for it to exit
+// (called from the graceful-shutdown sequence before HTTP shutdown).
+func StopAuthArtifactCleanup() {
+	authArtifactCleanupLoop.stop()
 }
 
 func cleanupAuthArtifacts() {

@@ -21,6 +21,7 @@ import { Database } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { DISABLED_ROW_MOBILE } from '@/components/data-table'
+import { ErrorState } from '@/components/error-state'
 import { MaskedValueDisplay } from '@/components/masked-value-display'
 import { StatusBadge } from '@/components/status-badge'
 import {
@@ -73,11 +74,24 @@ function RedemptionsMobileSkeleton() {
 interface RedemptionsMobileListProps {
   table: TanstackTable<Redemption>
   isLoading: boolean
+  isError?: boolean
+  onRetry?: () => void
 }
 
 export function RedemptionsMobileList(props: RedemptionsMobileListProps) {
   const { t } = useTranslation()
   const rows = props.table.getRowModel().rows
+
+  if (props.isError) {
+    return (
+      <ErrorState
+        title={t('Failed to load redemption codes')}
+        description={t('Please check your connection and try again.')}
+        onRetry={props.onRetry}
+        className='rounded-lg border'
+      />
+    )
+  }
 
   if (props.isLoading) {return <RedemptionsMobileSkeleton />}
 

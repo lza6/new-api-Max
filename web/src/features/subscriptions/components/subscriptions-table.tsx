@@ -32,7 +32,7 @@ export function SubscriptionsTable() {
   const columns = useSubscriptionsColumns()
   const { refreshTrigger } = useSubscriptions()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin-subscription-plans', refreshTrigger],
     queryFn: async () => {
       const result = requireServerSuccess(await getAdminPlans())
@@ -55,6 +55,10 @@ export function SubscriptionsTable() {
       table={table}
       columns={columns}
       isLoading={isLoading}
+      isError={isError}
+      errorTitle={t('Failed to load subscription plans')}
+      errorDescription={t('Please check your connection and try again.')}
+      onRetry={() => refetch()}
       emptyTitle={t('No subscription plans yet')}
       emptyDescription={t(
         'Click "Create Plan" to create your first subscription plan'

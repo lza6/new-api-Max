@@ -25,6 +25,7 @@ func TestGPT6AstraBuiltinBilling(t *testing.T) {
 	savedOptions := common.OptionMap
 	t.Cleanup(func() {
 		*settings, common.OptionMap = saved, savedOptions
+		billing_setting.PublishBillingSettingSnapshot()
 		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(savedRatios))
 		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(savedPrices))
 	})
@@ -100,6 +101,9 @@ func TestGPT6AstraBuiltinBilling(t *testing.T) {
 			if tc.expr != "" {
 				settings.BillingExpr["gpt-6-astra"] = tc.expr
 			}
+			// Direct master mutation bypasses the config write hook; republish so
+			// getters (which read the immutable snapshot) observe this case.
+			billing_setting.PublishBillingSettingSnapshot()
 			require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(tc.ratios))
 			require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(tc.prices))
 			assert.Equal(t, tc.wantMode, billing_setting.GetBillingMode("gpt-6-astra"))

@@ -46,6 +46,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from '@/components/ui/empty'
+import { ErrorState } from '@/components/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
@@ -68,6 +69,10 @@ export type DataTableCardHelpers = {
 export interface DataTableCardGridProps<TData> {
   table: Table<TData>
   isLoading?: boolean
+  isError?: boolean
+  errorTitle?: string
+  errorDescription?: string
+  onRetry?: () => void
   emptyTitle?: string
   emptyDescription?: string
   emptyIcon?: React.ReactNode
@@ -146,6 +151,17 @@ export function DataTableCardGrid<TData>(props: DataTableCardGridProps<TData>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [visibleColumns]
   )
+
+  if (props.isError) {
+    return (
+      <ErrorState
+        title={props.errorTitle}
+        description={props.errorDescription}
+        onRetry={props.onRetry}
+        className='rounded-lg border'
+      />
+    )
+  }
 
   if (props.isLoading) {
     return (

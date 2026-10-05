@@ -170,6 +170,47 @@ func TestBatchUpdateAccumulatorSaturatesOverflow(t *testing.T) {
 	batchUpdateLocks[BatchUpdateTypeUserQuota].Unlock()
 }
 
+// TestFlushBatchUpdatePersistsPendingDeltas 验证停机排空：入队但未到周期落库的
+// 额度增量，经 FlushBatchUpdate 后必须已进 DB（4.2.6 优雅退出不丢账）。
+func TestFlushBatchUpdatePersistsPendingDeltas(t *testing.T) {
+	truncateTables(t)
+	resetBatchUpdateTestState(t)
+	common.BatchUpdateEnabled = true
+
+	user := createReserveTestUser(t, 100)
+	require.NoError(t, DecreaseUserQuota(user.Id, 30, false))
+	assert.Equal(t, 100, getUserQuotaFromDB(t, user.Id), "delta is queued, not yet flushed")
+
+	token := createReserveTestToken(t, 80)
+	require.NoError(t, IncreaseTokenQuota(token.Id, token.Key, 25))
+	assert.Equal(t, 80, getTokenFromDB(t, token.Id).RemainQuota, "token delta is queued")
+
+	FlushBatchUpdate()
+
+	assert.Equal(t, 70, getUserQuotaFromDB(t, user.Id), "user quota delta must be flushed")
+	reloaded := getTokenFromDB(t, token.Id)
+	assert.Equal(t, 105, reloaded.RemainQuota, "token quota delta must be flushed")
+	assert.Equal(t, -25, reloaded.UsedQuota)
+}
+
+// TestStopBatchUpdaterFlushesAndIsRestartable 验证停机入口：StopBatchUpdater
+// 排空存量增量并把 worker 生命周期复位，未启动时调用为 no-op。
+func TestStopBatchUpdaterFlushesAndIsRestartable(t *testing.T) {
+	truncateTables(t)
+	resetBatchUpdateTestState(t)
+
+	// 未启动时调用不应 panic，也不应消费数据。
+	StopBatchUpdater()
+
+	common.BatchUpdateEnabled = true
+	user := createReserveTestUser(t, 50)
+	require.NoError(t, DecreaseUserQuota(user.Id, 20, false))
+	assert.Equal(t, 50, getUserQuotaFromDB(t, user.Id))
+
+	StopBatchUpdater()
+	assert.Equal(t, 30, getUserQuotaFromDB(t, user.Id), "StopBatchUpdater must flush pending deltas")
+}
+
 func TestReserveFallsBackToDatabaseWhenRedisIsUnavailable(t *testing.T) {
 	truncateTables(t)
 	resetBatchUpdateTestState(t)

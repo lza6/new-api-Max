@@ -20,6 +20,7 @@ import { createFileRoute } from "@tanstack/react-router"
 import { useTranslation } from "react-i18next"
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useSiteModel } from "@/hooks/use-site-model"
 import {
   getModelTestMeta,
   MODEL_TEST_META,
@@ -32,13 +33,15 @@ export const Route = createFileRoute("/model-test")({
   component: ModelTestPage,
 })
 
+// 已发布「效果测试」的注册表键（效果测试资产按此登记，非站点当前模型）。
 const DEFAULT_MODEL = "deepseek-v4-flash"
 
 function ModelTestPage() {
   const { t } = useTranslation()
   const { model } = Route.useSearch()
+  const siteModel = useSiteModel()
   const meta = getModelTestMeta(model) ?? MODEL_TEST_META[DEFAULT_MODEL]
-  const displayModel = model || DEFAULT_MODEL
+  const displayModel = model || siteModel
   const hasMeta = Boolean(getModelTestMeta(model))
   return (
     <div className="mx-auto w-full max-w-5xl space-y-4 p-4 sm:p-6">

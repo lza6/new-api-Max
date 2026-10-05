@@ -1170,3 +1170,32 @@ func shouldRetryTaskRelay(c *gin.Context, channelId int, taskErr *taskdto.TaskEr
 	}
 	return true
 }
+
+// CountResponsesInputTokens 预估 Responses 请求的输入 token（§端点适配，421 契约：
+// POST /v1/responses/input_tokens）。复用 responses 校验器 + 通用 token 计数。
+func CountResponsesInputTokens(c *gin.Context) {
+	request, err := helper.GetAndValidateResponsesRequest(c)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"type": "error",
+			"error": gin.H{
+				"type":    "invalid_request_error",
+				"message": common.MessageWithRequestId(err.Error(), c.GetString(common.RequestIdKey)),
+			},
+		})
+		return
+	}
+	info := relaycommon.GenRelayInfoResponses(c, request)
+	inputTokens, err := service.CountRequestToken(c, request.GetTokenCountMeta(), info)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"type": "error",
+			"error": gin.H{
+				"type":    "api_error",
+				"message": common.MessageWithRequestId(err.Error(), c.GetString(common.RequestIdKey)),
+			},
+		})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"input_tokens": inputTokens})
+}

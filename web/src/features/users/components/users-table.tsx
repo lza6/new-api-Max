@@ -120,7 +120,7 @@ export function UsersTable() {
   }
 
   // Fetch data with React Query
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: [
       'users',
       pagination.pageIndex + 1,
@@ -208,6 +208,10 @@ export function UsersTable() {
       columns={columns}
       isLoading={isLoading}
       isFetching={isFetching}
+      isError={isError}
+      errorTitle={t('Failed to load users')}
+      errorDescription={t('Please check your connection and try again.')}
+      onRetry={() => refetch()}
       emptyTitle={t('No Users Found')}
       emptyDescription={t(
         'No users available. Try adjusting your search or filters.'

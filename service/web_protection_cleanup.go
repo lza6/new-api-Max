@@ -20,6 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -29,6 +30,8 @@ import (
 // webProtectionCleanupInterval 自动清理周期：过期封禁与超期日志（保留 7 天）。
 const webProtectionCleanupInterval = time.Hour
 
+var webProtectionMaintenanceLoop backgroundLoop
+
 // StartWebProtectionMaintenanceLoop 定时执行 Web 防护维护（B1-3）。
 // 复用 RunWebProtectionMaintenance（flush 未落库日志 + 清理过期封禁 + 超期日志）。
 // 仅主节点执行，多节点去重；幂等，失败仅告警。
@@ -36,16 +39,27 @@ func StartWebProtectionMaintenanceLoop() {
 	if !common.IsMasterNode {
 		return
 	}
-	go func() {
+	webProtectionMaintenanceLoop.start(func(ctx context.Context) {
 		_ = RunWebProtectionMaintenance()
 		ticker := time.NewTicker(webProtectionCleanupInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			if err := RunWebProtectionMaintenance(); err != nil {
-				common.SysError("web protection maintenance error: " + err.Error())
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := RunWebProtectionMaintenance(); err != nil {
+					common.SysError("web protection maintenance error: " + err.Error())
+				}
+				// 周期清理渠道轮询锁缓存，防止 long-run 增删渠道时内存无限增长。
+				model.CleanupChannelPollingLocks()
 			}
-			// 周期清理渠道轮询锁缓存，防止 long-run 增删渠道时内存无限增长。
-			model.CleanupChannelPollingLocks()
 		}
-	}()
+	})
+}
+
+// StopWebProtectionMaintenanceLoop stops the maintenance loop and waits for it
+// to exit (called from the graceful-shutdown sequence).
+func StopWebProtectionMaintenanceLoop() {
+	webProtectionMaintenanceLoop.stop()
 }

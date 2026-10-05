@@ -429,3 +429,74 @@
      耗时同理，只宜作下界证据，不宜作严格上界。
   ③ **回退一个已实施的修复前，必须先确认失败签名**——是目标缺陷、还是别的 flaky 测试。
      我本轮就因未核对签名而误回退，被审查者纠正。
+
+## 记录 0033 · 前端 a11y 修复 + 响应式基线（2026-10-04）
+- **G1 `viewport-fit=cover` 缺失**（`web/index.html`）：未设时 iOS 刘海/圆角机 `env(safe-area-inset-*)` 恒为 0，safe-area 使用全部失效。
+  修复：`<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">`。
+- **G2 `SkipToMain` 指向不存在的 `#content`（WCAG 2.4.1 绕过块）**：
+  - `web/src/components/layout/components/main.tsx`：`<main>` 加 `id='content'` + `tabIndex={-1}`。
+  - `web/src/components/layout/components/public-layout.tsx`：`showMainContainer` 分支 `<main id='content'>`；
+    非容器分支（首页/定价/关于/排行走 full-bleed）加零高度哨兵 `<span id='content' className='sr-only' tabIndex={-1}>`，不破坏布局。
+  - `web/src/features/auth/auth-layout.tsx`：登录/注册页原来**完全没有** SkipToMain 也没有 `#content` → 补 `SkipToMain` + 主内容 `<main id='content'>`。认证页是键盘用户首触点，此前断链。
+  - `PublicLayout` 加 `<SkipToMain />`（此前仅 authenticated-layout 有）。
+- **已验证 PASS（真实浏览器）**：`node web/e2e-local/v1388-a11y-responsive.cjs` = **7/7**：
+  ① index.html 含 viewport-fit=cover；② 公开页首 Tab 焦点 = `Skip to Main`（href=#content）；
+  ③ Enter 后 `document.activeElement.id === 'content'`；④ 公开页存在 #content；⑤ 登录页 Skip to Main 生效且 #content 存在；
+  ⑥ 6 断点（320/375/768/1024/1440/1920）横向溢出 = 0；⑦ 无控制台错误。证据 `计划书/e2e-evidence/v1.3.88/`。
+- **踩坑（E2E 时序，非产品缺陷）**：首页为重客户端页面，`networkidle` 后 SPA hydration 仍可能未挂 SkipToMain →
+  Tab 落 body。E2E 必须先 `locator('a[href="#content"]').waitFor('attached')` 再 Tab，否则假红。
+- **未部署、未提交**（工作区混有其它会话改动）。
+
+## 记录 0034 · 前端闭环批次 + 4 审计线程（2026-10-04）
+- **本批已修并验证**：Phase 1 转化（E2E 11/11）、a11y+响应式（E2E 7/7）、DataTable 错误态（E2E 4/4 + vitest 6/6）、首屏预算门禁（bundle-budget 6/6）、15 个缺失 i18n 键（7 语言 missingCount=0）。
+- **⚠️ 自引入 P0（已修，重要教训）**：把 `--app-header-height` 从 `3rem` 改为 `calc(3rem + env(safe-area-inset-top, 0px))` 后，**构建产物运行时崩溃**（`ReferenceError: z is not defined`，React 不挂载，页面永久停在 `#app-boot-loader`）。**根因**：该 CSS 变量被 `sidebar.tsx` 的 `top-[var(--app-header-height,0px)]` 与 `authenticated-layout` 的 `calc(100svh - var(...))` 作为 Tailwind arbitrary value 消费；在变量值里嵌 `env()`+`calc()` 使 Tailwind 4 生成的 CSS 与运行时变量求值冲突，触发入口 chunk 崩。
+  **纪律**：**不要在 Tailwind arbitrary value 消费的 CSS 变量里嵌 `env()`/`calc()`**；safe-area 直接用元素类（`pt-[env(safe-area-inset-top)]`）。
+  **验证方法**：`git stash push -- <files>` 隔离改动 → 重建 → `pageerror` 探针；确认崩溃源后恢复。此隔离法也用于任何"怀疑改动引起运行时崩溃"的场景。
+- **审计线程流程缺陷**：4 个只读审计子代理（fe/be/contract/final-review）长跑 1-2h 后转 idle，**未主动 SendMessage 回主线程**，结论一度丢失；二次索取后回收。纪律已写入 `.claude/skills/new-api-add-feature/SKILL.md §11`：审计子代理契约必须含"完成即回消息"或"结论落盘"。
+- **未修的审计发现**：be-audit P0（配置热更新 map 并发 fatal，60s 周期）、contract P1（渠道 key step-up 契约相反）、fe-audit P1-2/P1-5 等，详见 `计划书/workflow_status.md §11.1` 与 `requirements-traceability-matrix.md §6`。
+
+## 记录 0035 · 后端并发/安全修复批次（2026-10-04，未部署）
+- **P0 配置热更新 map 并发 fatal（be-audit）**：`billing_setting`（`BillingMode`/`BillingExpr` 裸 map，计费热路径每请求读）；修复=快照替换（`atomic.Pointer` + `sync.RWMutex` + `BeforeConfigWrite/AfterConfigWrite` + `LockConfigRead/UnlockConfigRead`）。**反向验证**：loadXxx 改回裸主副本 + hook 空 → `TestBillingSettingConcurrentReadWriteSnapshot` FAIL(DATA RACE)；恢复→PASS。
+- **同类风险批量加固（snapshot-guard 线程，11 包）**：payment_setting、model_setting/{claude,gemini,global,qwen}、channel_affinity_setting、tool_price_setting（改用 atomic 索引重建）、webhook_setting、web_protection_setting、task_pricing_setting、fetch_setting。其中 `group_ratio_setting` 早已用 `types.RWMap`（安全）、`relay_setting` 已做。
+  - **踩坑（重要）**：`billing_setting`/`task_pricing_setting` 的既有测试用 `config.GlobalConfig.Get(...)` 拿主副本后 `*settings = ...` 直写 → getter 读快照看不见。修复：加 `PublishBillingSettingSnapshot()` / 用 `UpdateTaskPricingSetting()` 在写后发布；测试同步更新。
+  - **验证**：`go test ./setting/... ./model/ -count=1` **全绿**；`go test -race ./setting/{billing,operation,task_pricing}_setting` + `./model -run TestCacheGetChannelStatus` 全绿。
+- **P1 渠道共享指针 Status 锁外读 race（be-audit）**：新增 `model.CacheGetChannelStatus(id) (int,bool)`（读锁内返回值副本）；`middleware/distributor.go` 两处热路径改走它。**反向验证**：读改回 `CacheGetChannel(...).Status` → `TestCacheGetChannelStatusRaceWithUpdate` FAIL(DATA RACE)；恢复→PASS。
+- **P2 SSRF 黑名单缺 CGNAT**：`service/url_guard.go` 的 `ssrfBlockedCIDRs` 对齐 `common/ssrf_protection.go`（补 100.64.0.0/10 等 IANA 特殊段）。**踩坑**：`::ffff:0:0/96` 经 `net.ParseCIDR` 折叠为 `0.0.0.0/0` → 误拦全部公网 IP；已移除并加注释禁用该条目。测试 `TestValidateChannelURL` 补 CGNAT 等 8 用例。
+- **P2 5 个 cleanup loop 未纳入优雅关闭**：`service/{auth_cleanup,disk_cache_maintenance,task_event_cleanup,web_protection_cleanup}.go` 改用 `backgroundLoop` + 新增 `Stop*`，接入 `main.go` 停机序列（在 HTTP Shutdown 前）。
+- **contract P1 渠道 key step-up 契约相反**：前端 `use-channel-key-disclosure.ts` 改为「先不带 proof 试，命中 `SECURITY_PROOF_*` 再弹验证重试」（与 token 侧一致）；共享 helper 提到 `lib/secure-verification.ts`（`isProofRequiredError`/`readServerCode`）；`getChannelKey` proof 改可选；测试重写（4/4，含默认免验证 + 强制回退两条）。
+- **contract P2 channel key 404 语义**：**评估后回退**——既有 `TestSecurityEnrollmentMissingTargetsAreBusinessErrors` 明确约定管理端缺失资源=业务错误（200+success:false），token 侧 404 是因用户面防枚举，诉求不同；保留既有契约。
+
+## 记录 0036 · 前端对比度真实验证 + 后台轮询门控（2026-10-04，未部署）
+- **真实对比度缺陷（fe-audit P1-2 的"假绿"被揭穿）**：jsdom 下 axe 的 color-contrast 落 `incomplete`（无法判定），vitest 断言 violations=[] 是假绿。新增真实浏览器门禁 `web/e2e-local/v1388-contrast.cjs`（注入 axe-core，只跑 color-contrast 规则）→ **抓出真实违规**：
+  - 主色按钮白字 on `--primary`（浅色 `oklch(0.692...)`）= **2.71**（需 4.5）
+  - 营销首页 `text-muted-foreground/70` = 3.16、`/40` = 1.81、`/45` = 1.98、`.mt-3` = 2.61
+- **修复**：`--primary` 浅色压到 `oklch(0.52 0.12 243.716)`（同色相、降 L、收 chroma 避免 sRGB 越界；注释说明 4.5 余量需覆盖 hero 入场 opacity 波动的 ~0.5 折扣）；营销页 `/70` 改 `text-muted-foreground`（token 本体浅色对比度充足）。
+- **已验证**：`node e2e-local/v1388-contrast.cjs` **3/3 全绿**（home/pricing/sign-in 零违规）；回归 `v1388-a11y 7/7`、`v1385-phase1 11/11`；`vitest system-info+hooks+channels/hooks 21/21`；typecheck/oxlint 0 错。
+- **P2 后台轮询门控（fe-audit P2-2，抗高并发相关）**：新增 `hooks/use-document-visible.ts`（`useSyncExternalStore` 监听 visibilitychange）；3 个实时面板（live-requests 2s / instances 30s / tasks 8s）加 `enabled: documentVisible` + `refetchInterval: documentVisible ? X : false` → 标签页隐藏时停止轮询（此前管理员切后台仍持续打 API）。测试 `hooks/__tests__/document-visible.test.ts` 1/1。
+
+## 记录 0037 · 后端修复批次全量回归基线（2026-10-04）
+- `go build ./...` **EXIT 0**；`go test ./setting/... ./model/ ./middleware/ ./service/` 全绿。
+- `go test ./controller/ -count=1` 全量：**失败项全部命中既有噪声清单**（顺序依赖/环境），逐项隔离复跑 **PASS**，无新增失败：
+  - `TestAuditDatabaseMatrix`（Windows 文件锁）、`TestSessionLimitDoesNotRecordRejectedLoginAsSuccessful`、`TestKlingNativeRouteSubmitPollSettleAndQuery`（SSRF/环境）
+  - `TestGetSiteOverviewAggregatesConsumeLogs`、`TestSiteSubscriptionStatsAggregates`、`TestAdminSetUserSubscriptionTierInvalidatesCache`（**隔离跑 PASS / 全量 FAIL = 顺序依赖**）
+- **纪律**：判 controller 回归前，先对失败项逐个隔离复跑；命中「隔离 PASS、全量 FAIL」= 顺序依赖噪声，非本批回归。新增此 3 项到噪声清单（前两项 ledger 已有，第三项 `TestGetSiteOverviewAggregatesConsumeLogs` 新增）。
+
+## 记录 0038 · 对比度修复深一层根因 + footer（2026-10-04）
+- **深根因（反直觉，重要）**：hero 的 sign-up 按钮在 `--primary` L=0.55 时**仍间歇失败**（axe 实测 ratio 4.30），抓祖先链发现父级 `.landing-animate-fade-up` 入场动画尾部**opacity≈0.9896~0.999**，把前景色与背景色一起稀释 → 4.80 掉到 4.30。8 轮复现 6 轮失败。
+  **纪律**：主导航/CTA 上的对比度余量必须 >4.5 **并覆盖入场动画的透明度稀释（约 -0.5）**，否则门禁会随动画相位抖动（假绿/假红）。故 `--primary` 取 L=0.52（静态 5.45），8/8 轮稳定。
+- **footer 一并修正**（fe-audit P2-6 同源）：`footer.tsx` 的 `/40`/`/45`/`/60` → `text-muted-foreground` 本体（1.81/1.98/2.61 → 5.97）。`/85` 经 sRGB 合成实测仅 4.25 仍不达标，故用本体。
+- **门禁**：`v1388-contrast.cjs` 3/3 ×3 连跑；`v1388-a11y 7/7`；`v1385-phase1 11/11`；改动文件 typecheck 0 错 / oxlint 0 error。
+- **`--primary` 浅色最终值**：`oklch(0.52 0.12 243.716)`（色相不变；chroma 0.141→0.12 因 L=0.55 时 0.141 出 sRGB 色域，gamut 映射不确定）。
+
+## 记录 0039 · P3 清理批次（2026-10-04）
+- **GetTokenStatus 死代码删除**（`controller/token.go`）：全仓零引用（无路由挂载、无测试、无前端消费）——前端用的 `/api/user/token/status` 是**另一个** `GetAccessTokenStatus`（access_token.go），完全不同。`go build ./controller/` + `go vet` 0 错。
+- **ai-elements 死文件删除（22 个，3718 行级）**：knip `--include files` + 逐文件双引号风格精确引用扫描（`ai-elements/<name>'` 与 `"` 两种）+ 动态 import 扫描 + 内部互引分析（`canvas→controls` 死码簇、`plan→shimmer`/`tool→code-block` 引用在用文件不影响）→ 确认 22 文件零引用后删除。保留在用 9 个（code-block/conversation/loader/message/prompt-input/reasoning/response/shimmer/sources）+ response-renderer 辅助族。删除后：typecheck 仅既有噪声（chat-presets-item/nav-group/account-bindings）、`bun run build` EXIT 0、knip unused-files 中 ai-elements 清零、`vitest ai-elements+playground 31/31`。
+- **订阅表 URL 持久化：核实后不适用**（fe-audit P2-3）：`subscriptions-table.tsx` 仅 70 行，无列筛选/无分页/无排序状态（`getAdminPlans()` 全量返回、客户端小表），**没有可持久化的 URL 状态**。强接 `useTableUrlState` 属推测性抽象（YAGNI）。审计该项对订阅表为误报。
+- **虚拟滚动：核实后暂缓**（fe-audit P2-8）：usage-logs 默认 pageSize=100（移动 20）、有界渲染；接入 `@tanstack/react-virtual` 是有回归风险的重构，P3 收益不足以冒险。记录为可选增强。
+- **新发现（未动，待用户裁决）**：knip 另列 11 个零引用死文件（`layout/components/{glow,logo,mockup,navbar,section}.tsx`、`home/components/{connection-line,feature-item,gateway-card,hero-buttons,scrolling-icons,stat-item}.tsx`——疑似首页改版遗留；`icon-card` 有 1 处引用保留）。超出本次清单，未擅自删除。
+
+## 记录 0040 · 对比度门禁 flaky 修复（2026-10-04）
+- **现象**：`v1388-contrast.cjs` 偶发 2/3（某页 1 次违规、隔离复跑又全绿）。
+- **根因**：门禁用 `waitForTimeout(1200)` 固定等待；hero 的 `.landing-animate-fade-up` 入场动画（0.6s + 最多 ~1s stagger delay）尾部 opacity≈0.99 会稀释对比度（同 0038 记录的深根因），固定等待落在动画中途即假红。
+- **修复（在测试侧，非产品）**：改为 `waitForFunction(() => document.getAnimations().every(a => a.playState !== 'running'))` 等待动画收敛 + 400ms 稳定，再跑 axe。**连跑 3 次全 3/3**。
+- **纪律**：对比度/视觉类 E2E 不得用固定 sleep 等动画；用 `document.getAnimations()` 轮询动画结束态。

@@ -21,18 +21,8 @@ import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { StatusBadge } from '@/components/status-badge'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -218,51 +208,31 @@ export function PasskeyCard({ loading: pageLoading }: PasskeyCardProps) {
 
             {enabled && (
               <div className='flex flex-col gap-3 border-t pt-6 sm:flex-row xl:flex-col 2xl:flex-row'>
-                <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
-                  <AlertDialogTrigger
-                    render={
-                      <Button
-                        variant='destructive'
-                        className='flex-1'
-                        disabled={removing}
-                      />
-                    }
-                  >
-                    {removing ? (
-                      <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-                    ) : (
-                      <AlertTriangle className='mr-2 h-4 w-4' />
-                    )}
-                    {t('Remove Passkey')}
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>
-                        {t('Remove Passkey?')}
-                      </AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {t(
-                          'Removing Passkey will require you to sign in with your password next time. You can re-register anytime.'
-                        )}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel disabled={removing}>
-                        {t('Cancel')}
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        variant='destructive'
-                        disabled={removing}
-                        onClick={(event) => {
-                          event.preventDefault()
-                          handleRemove()
-                        }}
-                      >
-                        {t('Remove')}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                <Button
+                  variant='destructive'
+                  className='flex-1'
+                  disabled={removing}
+                  onClick={() => setConfirmOpen(true)}
+                >
+                  {removing ? (
+                    <Loader2 className='mr-2 h-4 w-4 animate-spin' />
+                  ) : (
+                    <AlertTriangle className='mr-2 h-4 w-4' />
+                  )}
+                  {t('Remove Passkey')}
+                </Button>
+                <ConfirmDialog
+                  destructive
+                  open={confirmOpen}
+                  onOpenChange={setConfirmOpen}
+                  title={t('Remove Passkey?')}
+                  desc={t(
+                    'Removing Passkey will require you to sign in with your password next time. You can re-register anytime.'
+                  )}
+                  confirmText={t('Remove')}
+                  isLoading={removing}
+                  handleConfirm={() => void handleRemove()}
+                />
               </div>
             )}
 

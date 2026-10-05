@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -12,8 +11,6 @@ import (
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
-
-	"github.com/bytedance/gopkg/util/gopool"
 )
 
 const (
@@ -24,8 +21,9 @@ const (
 )
 
 var (
-	codexCredentialRefreshOnce    sync.Once
 	codexCredentialRefreshRunning atomic.Bool
+	// codexCredentialRefreshTask 管理 Codex 凭据自动刷新 loop 生命周期，供优雅关闭停止。
+	codexCredentialRefreshTask backgroundLoop
 )
 
 func shouldAutoRefreshCodexChannelStatus(status int) bool {
@@ -33,23 +31,31 @@ func shouldAutoRefreshCodexChannelStatus(status int) bool {
 }
 
 func StartCodexCredentialAutoRefreshTask() {
-	codexCredentialRefreshOnce.Do(func() {
-		if !common.IsMasterNode {
-			return
-		}
+	if !common.IsMasterNode {
+		return
+	}
+	codexCredentialRefreshTask.start(func(ctx context.Context) {
+		logger.LogInfo(ctx, fmt.Sprintf("codex credential auto-refresh task started: tick=%s threshold=%s", codexCredentialRefreshTickInterval, codexCredentialRefreshThreshold))
 
-		gopool.Go(func() {
-			logger.LogInfo(context.Background(), fmt.Sprintf("codex credential auto-refresh task started: tick=%s threshold=%s", codexCredentialRefreshTickInterval, codexCredentialRefreshThreshold))
+		ticker := time.NewTicker(codexCredentialRefreshTickInterval)
+		defer ticker.Stop()
 
-			ticker := time.NewTicker(codexCredentialRefreshTickInterval)
-			defer ticker.Stop()
-
-			runCodexCredentialAutoRefreshOnce()
-			for range ticker.C {
+		runCodexCredentialAutoRefreshOnce()
+		for {
+			select {
+			case <-ctx.Done():
+				logger.LogInfo(ctx, "codex credential auto-refresh task stopped")
+				return
+			case <-ticker.C:
 				runCodexCredentialAutoRefreshOnce()
 			}
-		})
+		}
 	})
+}
+
+// StopCodexCredentialAutoRefreshTask 停止 Codex 凭据自动刷新后台任务并等待其退出（供优雅关闭调用）。
+func StopCodexCredentialAutoRefreshTask() {
+	codexCredentialRefreshTask.stop()
 }
 
 func runCodexCredentialAutoRefreshOnce() {

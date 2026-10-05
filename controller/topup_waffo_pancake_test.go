@@ -38,16 +38,20 @@ func TestGetWaffoPancakePayMoney(t *testing.T) {
 	t.Cleanup(func() {
 		setting.WaffoPancakeUnitPrice = originalUnitPrice
 		operation_setting.GetGeneralSetting().QuotaDisplayType = originalQuotaDisplayType
-		operation_setting.GetPaymentSetting().AmountDiscount = originalDiscounts
+		operation_setting.UpdatePaymentSetting(func(paymentSetting *operation_setting.PaymentSetting) {
+			paymentSetting.AmountDiscount = originalDiscounts
+		})
 		require.NoError(t, common.UpdateTopupGroupRatioByJSONString(originalTopupGroupRatio))
 	})
 
 	setting.WaffoPancakeUnitPrice = 2.5
-	operation_setting.GetPaymentSetting().AmountDiscount = map[int]float64{
-		10:                           0.8,
-		int(common.QuotaPerUnit * 3): 0.5,
-		20:                           0,
-	}
+	operation_setting.UpdatePaymentSetting(func(paymentSetting *operation_setting.PaymentSetting) {
+		paymentSetting.AmountDiscount = map[int]float64{
+			10:                           0.8,
+			int(common.QuotaPerUnit * 3): 0.5,
+			20:                           0,
+		}
+	})
 	require.NoError(t, common.UpdateTopupGroupRatioByJSONString(`{"default":1,"vip":1.2}`))
 
 	testCases := []struct {

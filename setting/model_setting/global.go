@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/setting/config"
@@ -68,13 +69,68 @@ var defaultOpenaiSettings = GlobalSettings{
 // 全局实例
 var globalSettings = defaultOpenaiSettings
 
+// globalSettingsMu 保护 globalSettings 主副本（两个 []string + 嵌套策略的 slice）。
+var globalSettingsMu sync.RWMutex
+
+// globalSettingsSnapshot 已发布的不可变快照。中继热路径（透传判定 / 思考后缀 /
+// effort 后缀）只读快照，避免与周期热更新（反射就地写 slice）竞争。
+var globalSettingsSnapshot atomic.Pointer[GlobalSettings]
+
+// cloneChatCompletionsToResponsesPolicy 深拷贝策略内的两个 slice。
+func cloneChatCompletionsToResponsesPolicy(policy ChatCompletionsToResponsesPolicy) ChatCompletionsToResponsesPolicy {
+	policy.ChannelIDs = slices.Clone(policy.ChannelIDs)
+	policy.ChannelTypes = slices.Clone(policy.ChannelTypes)
+	policy.ModelPatterns = slices.Clone(policy.ModelPatterns)
+	return policy
+}
+
+// publishGlobalSettingsSnapshotLocked 在持 globalSettingsMu 前提下深拷贝主副本并发布。
+func publishGlobalSettingsSnapshotLocked() {
+	snap := globalSettings
+	snap.ThinkingModelBlacklist = slices.Clone(globalSettings.ThinkingModelBlacklist)
+	snap.EffortTailModelIDs = slices.Clone(globalSettings.EffortTailModelIDs)
+	snap.ChatCompletionsToResponsesPolicy = cloneChatCompletionsToResponsesPolicy(globalSettings.ChatCompletionsToResponsesPolicy)
+	globalSettingsSnapshot.Store(&snap)
+}
+
+// loadGlobalSettings 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadGlobalSettings() *GlobalSettings {
+	if s := globalSettingsSnapshot.Load(); s != nil {
+		return s
+	}
+	return &globalSettings
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (g *GlobalSettings) BeforeConfigWrite() { globalSettingsMu.Lock() }
+func (g *GlobalSettings) AfterConfigWrite() {
+	publishGlobalSettingsSnapshotLocked()
+	globalSettingsMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (g *GlobalSettings) LockConfigRead()   { globalSettingsMu.RLock() }
+func (g *GlobalSettings) UnlockConfigRead() { globalSettingsMu.RUnlock() }
+
 func init() {
 	// 注册到全局配置管理器
 	config.GlobalConfig.Register("global", &globalSettings)
+	globalSettingsMu.Lock()
+	publishGlobalSettingsSnapshotLocked()
+	globalSettingsMu.Unlock()
 }
 
+// GetGlobalSettings 返回当前不可变快照。只读，勿直接改写返回对象。
 func GetGlobalSettings() *GlobalSettings {
-	return &globalSettings
+	return loadGlobalSettings()
+}
+
+// UpdateGlobalSettings 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateGlobalSettings(fn func(*GlobalSettings)) {
+	globalSettingsMu.Lock()
+	defer globalSettingsMu.Unlock()
+	fn(&globalSettings)
+	publishGlobalSettingsSnapshotLocked()
 }
 
 const thinkingBlacklistRegexPrefix = "re:"
@@ -95,7 +151,7 @@ func thinkingBlacklistSourceKey(entries []string) string {
 }
 
 func compiledThinkingBlacklist() ([]string, []*regexp.Regexp) {
-	entries := globalSettings.ThinkingModelBlacklist
+	entries := loadGlobalSettings().ThinkingModelBlacklist
 	key := thinkingBlacklistSourceKey(entries)
 
 	thinkingBlacklistMu.RLock()
@@ -174,7 +230,7 @@ func ShouldPreserveEffortTail(modelName string) bool {
 		bare = target[slash+1:]
 	}
 
-	for _, entry := range globalSettings.EffortTailModelIDs {
+	for _, entry := range loadGlobalSettings().EffortTailModelIDs {
 		entry = strings.TrimSpace(entry)
 		if entry == "" {
 			continue

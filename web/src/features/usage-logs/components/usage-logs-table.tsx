@@ -125,7 +125,7 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
     ],
   })
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, refetch } = useQuery({
     queryKey: [
       'logs',
       logCategory,
@@ -194,6 +194,10 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
       columns={columns as ColumnDef<Record<string, unknown>>[]}
       isLoading={isLoadingData}
       isFetching={isFetching}
+      isError={isError}
+      errorTitle={t('Failed to load logs')}
+      errorDescription={t('Please check your connection and try again.')}
+      onRetry={() => refetch()}
       emptyTitle={t('No Logs Found')}
       emptyDescription={t(
         'No usage logs available. Logs will appear here once API calls are made.'
@@ -207,6 +211,8 @@ export function UsageLogsTable({ logCategory }: UsageLogsTableProps) {
         <UsageLogsMobileList
           table={table}
           isLoading={isLoadingData}
+          isError={isError}
+          onRetry={() => refetch()}
           logCategory={logCategory}
         />
       }

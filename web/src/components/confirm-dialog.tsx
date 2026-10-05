@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { Loader2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -79,6 +80,9 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
             onClick={handleConfirm}
             disabled={disabled || isLoading}
           >
+            {isLoading && (
+              <Loader2 className='mr-1.5 size-4 animate-spin' aria-hidden='true' />
+            )}
             {confirmText ?? t('Continue')}
           </Button>
         </AlertDialogFooter>

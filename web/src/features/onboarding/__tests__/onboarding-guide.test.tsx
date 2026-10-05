@@ -16,7 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
@@ -49,6 +50,26 @@ vi.mock('@tanstack/react-router', () => ({
   ),
 }))
 
+// The guide reads progress from the API-keys count; stub it so a fresh account
+// has no keys and every step renders as incomplete.
+vi.mock('@/features/keys/api', () => ({
+  getApiKeys: vi.fn(async () => ({
+    success: true,
+    data: { items: [], total: 0, page: 1, page_size: 1 },
+  })),
+}))
+
+function renderGuide() {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <OnboardingGuide />
+    </QueryClientProvider>
+  )
+}
+
 const originalAuth = useAuthStore.getState().auth
 
 beforeEach(() => {
@@ -68,11 +89,11 @@ afterEach(() => {
 
 describe('onboarding guide (B2-3)', () => {
   test('walks through the three first-run steps with Next', () => {
-    render(<OnboardingGuide />)
+    renderGuide()
 
     expect(screen.getByTestId('onboarding-guide')).toBeInTheDocument()
     expect(screen.getByText('Create an API Token')).toBeInTheDocument()
-    expect(screen.getByText('Step 1 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Setup progress: 0/3')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Go to API keys/ })).toHaveAttribute(
       'href',
       '/keys'
@@ -80,14 +101,14 @@ describe('onboarding guide (B2-3)', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.getByText('Browse the model plaza')).toBeInTheDocument()
-    expect(screen.getByText('Step 2 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Setup progress: 0/3')).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: /Go to model plaza/ })
     ).toHaveAttribute('href', '/pricing')
 
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     expect(screen.getByText('Make your first request')).toBeInTheDocument()
-    expect(screen.getByText('Step 3 of 3')).toBeInTheDocument()
+    expect(screen.getByText('Setup progress: 0/3')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: /Open playground/ })).toHaveAttribute(
       'href',
       '/playground'
@@ -95,19 +116,19 @@ describe('onboarding guide (B2-3)', () => {
   })
 
   test('close button dismisses and persists per account', () => {
-    const { unmount } = render(<OnboardingGuide />)
+    const { unmount } = renderGuide()
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss onboarding' }))
 
     expect(screen.queryByTestId('onboarding-guide')).not.toBeInTheDocument()
     expect(localStorage.getItem(getOnboardingStorageKey(7))).toBe('1')
 
     unmount()
-    render(<OnboardingGuide />)
+    renderGuide()
     expect(screen.queryByTestId('onboarding-guide')).not.toBeInTheDocument()
   })
 
   test('skip dismisses and persists per account', () => {
-    render(<OnboardingGuide />)
+    renderGuide()
     fireEvent.click(screen.getByRole('button', { name: 'Skip for now' }))
 
     expect(screen.queryByTestId('onboarding-guide')).not.toBeInTheDocument()
@@ -116,25 +137,25 @@ describe('onboarding guide (B2-3)', () => {
 
   test('already-dismissed account never sees the guide', () => {
     localStorage.setItem(getOnboardingStorageKey(7), '1')
-    render(<OnboardingGuide />)
+    renderGuide()
     expect(screen.queryByTestId('onboarding-guide')).not.toBeInTheDocument()
   })
 
   test('dismissal is isolated between accounts', () => {
     localStorage.setItem(getOnboardingStorageKey(7), '1')
-    render(<OnboardingGuide />)
+    renderGuide()
     expect(screen.queryByTestId('onboarding-guide')).not.toBeInTheDocument()
 
     useAuthStore.setState({
       auth: { ...originalAuth, user: { id: 8, username: 'other', role: ROLE.USER } },
     })
     cleanup()
-    render(<OnboardingGuide />)
+    renderGuide()
     expect(screen.getByTestId('onboarding-guide')).toBeInTheDocument()
   })
 
   test('back returns to the previous step and never leaves step 1', () => {
-    render(<OnboardingGuide />)
+    renderGuide()
     const back = screen.getByRole('button', { name: 'Back' })
     expect(back).toBeDisabled()
 
@@ -144,12 +165,30 @@ describe('onboarding guide (B2-3)', () => {
   })
 
   test('finishes on the last step by dismissing', () => {
-    render(<OnboardingGuide />)
+    renderGuide()
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Next' }))
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
 
     expect(screen.queryByTestId('onboarding-guide')).not.toBeInTheDocument()
     expect(localStorage.getItem(getOnboardingStorageKey(7))).toBe('1')
+  })
+
+  // Regression: the guide's dismissed flag was frozen from a useState
+  // initializer reading `user === null` at first mount, so on a real login
+  // redirect (user arrives one render later) the guide never showed until a
+  // manual refresh. It must appear as soon as the user identity is available.
+  test('appears when the user arrives after the first render', () => {
+    useAuthStore.setState({ auth: { ...originalAuth, user: null } })
+    renderGuide()
+    expect(screen.queryByTestId('onboarding-guide')).not.toBeInTheDocument()
+
+    act(() => {
+      useAuthStore.setState({
+        auth: { ...originalAuth, user: { id: 7, username: 'newbie', role: ROLE.USER } },
+      })
+    })
+
+    expect(screen.getByTestId('onboarding-guide')).toBeInTheDocument()
   })
 })

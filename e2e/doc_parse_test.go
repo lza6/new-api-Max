@@ -133,10 +133,12 @@ func TestDocumentPluginRunsGenericBatchArtifactChain(t *testing.T) {
 	require.Len(t, query.Artifacts, 2)
 
 	originalFetch := *system_setting.GetFetchSetting()
-	system_setting.GetFetchSetting().EnableSSRFProtection = true
-	system_setting.GetFetchSetting().AllowPrivateIp = true
-	system_setting.GetFetchSetting().AllowedPorts = []string{"1-65535"}
-	t.Cleanup(func() { *system_setting.GetFetchSetting() = originalFetch })
+	system_setting.UpdateFetchSetting(func(fetchSetting *system_setting.FetchSetting) {
+		fetchSetting.EnableSSRFProtection = true
+		fetchSetting.AllowPrivateIp = true
+		fetchSetting.AllowedPorts = []string{"1-65535"}
+	})
+	t.Cleanup(func() { system_setting.UpdateFetchSetting(func(fetchSetting *system_setting.FetchSetting) { *fetchSetting = originalFetch }) })
 	contentRecorder := httptest.NewRecorder()
 	contentContext, _ := gin.CreateTestContext(contentRecorder)
 	contentContext.Set("id", 7)

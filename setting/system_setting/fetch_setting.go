@@ -1,6 +1,12 @@
 package system_setting
 
-import "github.com/lza6/new-api-Max/setting/config"
+import (
+	"slices"
+	"sync"
+	"sync/atomic"
+
+	"github.com/lza6/new-api-Max/setting/config"
+)
 
 type FetchSetting struct {
 	EnableSSRFProtection   bool     `json:"enable_ssrf_protection"` // 是否启用SSRF防护
@@ -24,11 +30,58 @@ var defaultFetchSetting = FetchSetting{
 	ApplyIPFilterForDomain: true,
 }
 
+// fetchSettingMu 保护 defaultFetchSetting 主副本（三个 []string）。
+var fetchSettingMu sync.RWMutex
+
+// fetchSettingSnapshot 已发布的不可变快照。SSRF 防护判定（每次外部 fetch）只读快照，
+// 避免与周期热更新（反射就地写 slice）竞争。
+var fetchSettingSnapshot atomic.Pointer[FetchSetting]
+
+// publishFetchSettingSnapshotLocked 在持 fetchSettingMu 前提下深拷贝主副本并发布。
+func publishFetchSettingSnapshotLocked() {
+	snap := defaultFetchSetting
+	snap.DomainList = slices.Clone(defaultFetchSetting.DomainList)
+	snap.IpList = slices.Clone(defaultFetchSetting.IpList)
+	snap.AllowedPorts = slices.Clone(defaultFetchSetting.AllowedPorts)
+	fetchSettingSnapshot.Store(&snap)
+}
+
+// loadFetchSetting 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadFetchSetting() *FetchSetting {
+	if s := fetchSettingSnapshot.Load(); s != nil {
+		return s
+	}
+	return &defaultFetchSetting
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (f *FetchSetting) BeforeConfigWrite() { fetchSettingMu.Lock() }
+func (f *FetchSetting) AfterConfigWrite() {
+	publishFetchSettingSnapshotLocked()
+	fetchSettingMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (f *FetchSetting) LockConfigRead()   { fetchSettingMu.RLock() }
+func (f *FetchSetting) UnlockConfigRead() { fetchSettingMu.RUnlock() }
+
 func init() {
 	// 注册到全局配置管理器
 	config.GlobalConfig.Register("fetch_setting", &defaultFetchSetting)
+	fetchSettingMu.Lock()
+	publishFetchSettingSnapshotLocked()
+	fetchSettingMu.Unlock()
 }
 
+// GetFetchSetting 返回当前不可变快照。只读，勿直接改写返回对象。
 func GetFetchSetting() *FetchSetting {
-	return &defaultFetchSetting
+	return loadFetchSetting()
+}
+
+// UpdateFetchSetting 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateFetchSetting(fn func(*FetchSetting)) {
+	fetchSettingMu.Lock()
+	defer fetchSettingMu.Unlock()
+	fn(&defaultFetchSetting)
+	publishFetchSettingSnapshotLocked()
 }

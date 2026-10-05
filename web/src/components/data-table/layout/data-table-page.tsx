@@ -88,6 +88,15 @@ export type DataTablePageProps<TData> = {
   isLoading?: boolean
 
   /**
+   * Query failed — renders a retryable {@link ErrorState} instead of an empty
+   * list. Wire this to the owning query's `isError` and pair with `onRetry`.
+   */
+  isError?: boolean
+  errorTitle?: string
+  errorDescription?: string
+  onRetry?: () => void
+
+  /**
    * Refetch / background loading — dims the table without removing rows.
    */
   isFetching?: boolean
@@ -434,6 +443,10 @@ function renderMobile<TData>(
         <DataTableView
           table={props.table}
           isLoading={props.isLoading}
+          isError={props.isError}
+          errorTitle={props.errorTitle}
+          errorDescription={props.errorDescription}
+          onRetry={props.onRetry}
           emptyTitle={props.emptyTitle}
           emptyDescription={props.emptyDescription}
           emptyIcon={props.emptyIcon}
@@ -462,6 +475,10 @@ function renderMobile<TData>(
         <DataTableCardGrid
           table={props.table}
           isLoading={props.isLoading}
+          isError={props.isError}
+          errorTitle={props.errorTitle}
+          errorDescription={props.errorDescription}
+          onRetry={props.onRetry}
           emptyTitle={props.emptyTitle}
           emptyDescription={props.emptyDescription}
           emptyIcon={props.emptyIcon}
@@ -478,6 +495,10 @@ function renderMobile<TData>(
           enableRowSelection={props.mobileProps?.enableRowSelection}
           table={props.table}
           isLoading={props.isLoading}
+          isError={props.isError}
+          errorTitle={props.errorTitle}
+          errorDescription={props.errorDescription}
+          onRetry={props.onRetry}
           emptyTitle={props.emptyTitle}
           emptyDescription={props.emptyDescription}
           getRowKey={props.mobileProps?.getRowKey}
@@ -515,6 +536,10 @@ function renderDesktop<TData>(
         <DataTableCardGrid
           table={props.table}
           isLoading={props.isLoading}
+          isError={props.isError}
+          errorTitle={props.errorTitle}
+          errorDescription={props.errorDescription}
+          onRetry={props.onRetry}
           emptyTitle={props.emptyTitle}
           emptyDescription={props.emptyDescription}
           emptyIcon={props.emptyIcon}
@@ -533,6 +558,10 @@ function renderDesktop<TData>(
     <DataTableView
       table={props.table}
       isLoading={props.isLoading}
+      isError={props.isError}
+      errorTitle={props.errorTitle}
+      errorDescription={props.errorDescription}
+      onRetry={props.onRetry}
       emptyTitle={props.emptyTitle}
       emptyDescription={props.emptyDescription}
       emptyIcon={props.emptyIcon}

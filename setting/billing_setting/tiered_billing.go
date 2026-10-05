@@ -5,6 +5,8 @@ import (
 	"maps"
 	"math"
 	"sort"
+	"sync"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/pkg/billingexpr"
@@ -36,8 +38,78 @@ var billingSetting = BillingSetting{
 	BillingExpr: make(map[string]string),
 }
 
+// billingSettingMu guards the mutable master copy. All writes (config hot
+// update via the reflection write hook, or Set* helpers) hold the write lock
+// and publish a fresh immutable snapshot afterwards.
+var billingSettingMu sync.RWMutex
+
+// billingSettingSnapshot is the published immutable snapshot. Hot-path readers
+// (GetBillingMode/GetBillingExpr, called per request) only Load() it and read —
+// never the master copy being written — which removes the data race between the
+// 60s periodic option reload (reflection in-place map write) and per-request
+// reads (Go map concurrent read/write is UB and can fatal the process).
+var billingSettingSnapshot atomic.Pointer[BillingSetting]
+
+// publishBillingSnapshotLocked deep-copies the master into an immutable
+// snapshot. The map fields must be cloned, or the snapshot and master would
+// share backing storage and the next write would race readers again.
+func publishBillingSnapshotLocked() {
+	snap := BillingSetting{
+		BillingMode: maps.Clone(billingSetting.BillingMode),
+		BillingExpr: maps.Clone(billingSetting.BillingExpr),
+	}
+	billingSettingSnapshot.Store(&snap)
+}
+
+// loadBillingSetting returns the current immutable snapshot (lock-free). Falls
+// back to the master pointer before the first snapshot is published.
+func loadBillingSetting() *BillingSetting {
+	if s := billingSettingSnapshot.Load(); s != nil {
+		return s
+	}
+	return &billingSetting
+}
+
+// UpdateBillingSetting mutates the master copy under the write lock and
+// publishes a fresh snapshot. Readers always see a consistent snapshot.
+func UpdateBillingSetting(fn func(*BillingSetting)) {
+	billingSettingMu.Lock()
+	defer billingSettingMu.Unlock()
+	fn(&billingSetting)
+	publishBillingSnapshotLocked()
+}
+
+// PublishBillingSettingSnapshot republishes the snapshot from the current master
+// copy. Call it after writing the master object directly (e.g. tests that obtain
+// it via config.GlobalConfig.Get and mutate fields in place) so readers observe
+// the change; normal runtime writes go through the config write hook or
+// UpdateBillingSetting and do not need this.
+func PublishBillingSettingSnapshot() {
+	billingSettingMu.Lock()
+	defer billingSettingMu.Unlock()
+	publishBillingSnapshotLocked()
+}
+
+// BeforeConfigWrite / AfterConfigWrite implement config.configWriteHook: hold
+// the write lock during the reflective hot-update write into &billingSetting,
+// then publish the new snapshot.
+func (b *BillingSetting) BeforeConfigWrite() { billingSettingMu.Lock() }
+func (b *BillingSetting) AfterConfigWrite() {
+	publishBillingSnapshotLocked()
+	billingSettingMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead implement config.configReadGuard: the
+// reflective master read (ExportAllConfigs/SaveToDB) holds the read lock so it
+// is mutually exclusive with the hot-update write.
+func (b *BillingSetting) LockConfigRead()   { billingSettingMu.RLock() }
+func (b *BillingSetting) UnlockConfigRead() { billingSettingMu.RUnlock() }
+
 func init() {
 	config.GlobalConfig.Register("billing_setting", &billingSetting)
+	billingSettingMu.Lock()
+	publishBillingSnapshotLocked()
+	billingSettingMu.Unlock()
 }
 
 // ---------------------------------------------------------------------------
@@ -45,7 +117,8 @@ func init() {
 // ---------------------------------------------------------------------------
 
 func GetBillingMode(model string) string {
-	if mode, ok := billingSetting.BillingMode[model]; ok {
+	setting := loadBillingSetting()
+	if mode, ok := setting.BillingMode[model]; ok {
 		return mode
 	}
 	if _, ok := builtinBillingExpr[model]; ok {
@@ -63,7 +136,8 @@ func GetBillingMode(model string) string {
 }
 
 func GetBillingExpr(model string) (string, bool) {
-	if expr, ok := billingSetting.BillingExpr[model]; ok {
+	setting := loadBillingSetting()
+	if expr, ok := setting.BillingExpr[model]; ok {
 		return expr, true
 	}
 	if GetBillingMode(model) == BillingModeTieredExpr {
@@ -83,7 +157,7 @@ func GetBuiltinBillingExprCopy() map[string]string {
 }
 
 func GetBillingModeCopy() map[string]string {
-	modes := lo.Assign(billingSetting.BillingMode)
+	modes := lo.Assign(loadBillingSetting().BillingMode)
 	for model := range builtinBillingExpr {
 		if _, configured := modes[model]; !configured && GetBillingMode(model) == BillingModeTieredExpr {
 			modes[model] = BillingModeTieredExpr
@@ -93,7 +167,7 @@ func GetBillingModeCopy() map[string]string {
 }
 
 func GetBillingExprCopy() map[string]string {
-	expressions := lo.Assign(billingSetting.BillingExpr)
+	expressions := lo.Assign(loadBillingSetting().BillingExpr)
 	for model := range builtinBillingExpr {
 		if _, configured := expressions[model]; configured {
 			continue

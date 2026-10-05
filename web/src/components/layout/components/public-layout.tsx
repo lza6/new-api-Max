@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import type { TopNavLink } from '../types'
 import { PublicHeader, type PublicHeaderProps } from './public-header'
+import { SkipToMain } from '@/components/skip-to-main'
 
 type PublicLayoutProps = {
   children: React.ReactNode
@@ -35,6 +36,7 @@ type PublicLayoutProps = {
 export function PublicLayout(props: PublicLayoutProps) {
   return (
     <div className='bg-background text-foreground relative min-h-svh overflow-x-clip'>
+      <SkipToMain />
       <PublicHeader
         navContent={props.navContent}
         navLinks={props.navLinks}
@@ -47,11 +49,21 @@ export function PublicLayout(props: PublicLayoutProps) {
       />
 
       {props.showMainContainer !== false ? (
-        <main className='container px-4 py-6 pt-20 md:px-4'>
+        <main
+          id='content'
+          tabIndex={-1}
+          className='container px-4 py-6 pt-20 md:px-4'
+        >
           {props.children}
         </main>
       ) : (
-        props.children
+        // Pages that own their full-bleed layout (home/pricing/about/…) still
+        // need a skip target, or the WCAG 2.4.1 bypass link is dead here. The
+        // anchor is a zero-height focusable sentinel so it never affects layout.
+        <>
+          <span id='content' tabIndex={-1} className='sr-only' />
+          {props.children}
+        </>
       )}
     </div>
   )

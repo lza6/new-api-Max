@@ -1,0 +1,55 @@
+{
+  "results": [
+    {
+      "name": "登录后首屏引导卡当次出现（无需刷新）",
+      "ok": true
+    },
+    {
+      "name": "引导卡显示真实进度 0/3",
+      "ok": true,
+      "detail": "Get started in 3 steps Setup progress: 0/3 Create an API Tok"
+    },
+    {
+      "name": "建 Key 后抽屉停在结果步并展示明文",
+      "ok": true,
+      "detail": "sk-e2e-plaintext-key-abc123"
+    },
+    {
+      "name": "结果步有复制按钮",
+      "ok": true
+    },
+    {
+      "name": "结果步有「前往对话」按钮",
+      "ok": true
+    },
+    {
+      "name": "结果步跳转到 Playground",
+      "ok": true
+    },
+    {
+      "name": "模型卡出现「Chat（去对话）」按钮",
+      "ok": true
+    },
+    {
+      "name": "点击 Chat 跳转 /playground?model=<name>",
+      "ok": true,
+      "detail": "url=http://127.0.0.1:4176/playground?model=deepseek-v4.1-flash"
+    },
+    {
+      "name": "Playground 接受 ?model= 深链并选中该模型",
+      "ok": true,
+      "detail": "deepseek-v4.1-flash default"
+    },
+    {
+      "name": "无横向溢出",
+      "ok": true,
+      "detail": "overflowPx=0"
+    },
+    {
+      "name": "无控制台错误",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "consoleErrors": []
+}

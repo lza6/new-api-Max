@@ -15,20 +15,33 @@ const taskEventCleanupInterval = time.Hour
 // 0 或负数表示不清理，避免破坏需要长期事件流的部署）。
 var taskEventRetentionDays = common.GetEnvOrDefault("TASK_EVENT_RETENTION_DAYS", 7)
 
+var taskEventCleanupLoop backgroundLoop
+
 // StartTaskEventCleanup 周期清理过期任务事件，仅主节点执行（多实例防重复）。
 // 与 B4-1 SSE 断线续传兼容：续传只依赖最近事件，保留窗口内的事件足够。
 func StartTaskEventCleanup() {
 	if !common.IsMasterNode || taskEventRetentionDays <= 0 {
 		return
 	}
-	go func() {
+	taskEventCleanupLoop.start(func(ctx context.Context) {
 		cleanupOldTaskEvents()
 		ticker := time.NewTicker(taskEventCleanupInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			cleanupOldTaskEvents()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				cleanupOldTaskEvents()
+			}
 		}
-	}()
+	})
+}
+
+// StopTaskEventCleanup stops the cleanup loop and waits for it to exit
+// (called from the graceful-shutdown sequence).
+func StopTaskEventCleanup() {
+	taskEventCleanupLoop.stop()
 }
 
 func cleanupOldTaskEvents() {

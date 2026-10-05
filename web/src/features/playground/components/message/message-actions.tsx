@@ -26,9 +26,11 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -86,6 +88,7 @@ export function MessageActions({
   const { t } = useTranslation()
   const { copiedText, copyToClipboard } = useCopyToClipboard()
   const { guardAction } = useMessageActionGuard(isGenerating)
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false)
 
   const { content, hasContent, isAssistant, isLoading, isUser } =
     getMessageActionState(message)
@@ -103,7 +106,13 @@ export function MessageActions({
   const handleRegenerate = guardAction(() => onRegenerate?.(message))
   const handleToggleSource = () => onToggleSource?.(message)
   const handleEdit = guardAction(() => onEdit?.(message))
-  const handleDelete = guardAction(() => onDelete?.(message))
+  // Deleting a turn is destructive and unrecoverable, so gate it behind a
+  // confirm — matching the "clear conversation" flow which already confirms.
+  const handleDelete = guardAction(() => setDeleteConfirmOpen(true))
+  const confirmDelete = () => {
+    setDeleteConfirmOpen(false)
+    onDelete?.(message)
+  }
 
   const visibilityClass = getMessageActionsVisibilityClass(alwaysVisible)
   const actions: MessageActionItem[] = []
@@ -216,6 +225,17 @@ export function MessageActions({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      <ConfirmDialog
+        cancelBtnText={t('Cancel')}
+        confirmText={t('Delete')}
+        desc={t('This message will be permanently removed from the conversation.')}
+        destructive
+        handleConfirm={confirmDelete}
+        onOpenChange={setDeleteConfirmOpen}
+        open={deleteConfirmOpen}
+        title={t('Delete this message?')}
+      />
     </>
   )
 }

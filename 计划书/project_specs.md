@@ -18,7 +18,7 @@
 | P2 | T9 前端体积 | ✅ E1 基线；❌ E2/E3 待办（specs Phase E 未勾选） | bundle-size.md 记录 0002/0003（基线 59,352 kB JS） |
 | P2 | T10 数据库 | ✅ 三库矩阵真实通过（0002 + 本次 0010 复验） | ledger 0002/0010；MySQL 9.6.0 + PG 16.14 本机实例 |
 | P2 | T11 部署 SOP | ✅ SOP v1.3.28 已更新（含 blue-green 衔接） | 计划书/ops/deployment-sop.md |
-| P2 | T12 i18n/合规 | ✅ G1 术语表；✅ G3 合规 checklist | ops/ai-compliance-checklist.md |
+| P2 | T12 i18n/合规 | ✅ G1 术语表；✅ G3 合规 AI 标识（写入 tool-setup/docs，见 docs/translation-glossary.md） | docs/translation-glossary.md；docs/t8-security-asvs-deepdive.md（安全项闭环台账） |
 | P2 | T13 知识沉淀 | ✅ project_specs/db_structure/README 恢复；audit 两篇新增 | 本轮批量 |
 | P2 | T14 旧产物清理 | ⛔ 需用户授权 | 见下一步改进指南 T14 |
 | P2 | T15 未来方向 | ✅ 模型同步 dry-run 已落地；任务品类扩展已立项（待上游凭证） | ops/t15-task-cards.md |

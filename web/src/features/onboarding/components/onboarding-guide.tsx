@@ -17,8 +17,9 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Link } from '@tanstack/react-router'
-import { ArrowRight, X } from 'lucide-react'
-import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { ArrowRight, Check, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { Button, buttonVariants } from '@/components/ui/button'
@@ -31,7 +32,9 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
+import { getApiKeys } from '@/features/keys/api'
 import { cn } from '@/lib/utils'
+import { requireServerSuccess } from '@/lib/server-error-message'
 import { useAuthStore } from '@/stores/auth-store'
 
 import { dismissOnboarding, isOnboardingDismissed } from '../lib/storage'
@@ -41,6 +44,7 @@ interface OnboardingStep {
   description: string
   cta: string
   to: string
+  completed: boolean
 }
 
 /**
@@ -51,55 +55,105 @@ interface OnboardingStep {
  * keyboard accessible. Existing Card/Button components are reused as-is.
  */
 export function OnboardingGuide() {
-  const { t } = useTranslation()
   const user = useAuthStore((state) => state.auth.user)
-  const [dismissed, setDismissed] = useState(() =>
-    user ? isOnboardingDismissed(user.id) : true
-  )
-  const [stepIndex, setStepIndex] = useState(0)
+  const [dismissed, setDismissed] = useState(true)
+
+  // `user` starts null and is filled in after the auth/session query settles.
+  // Reading localStorage only in a useState initializer froze the decision at
+  // `user === null` → dismissed=true, so the guide only appeared after a
+  // refresh. Recompute whenever the user identity becomes available.
+  useEffect(() => {
+    if (!user) {
+      setDismissed(true)
+      return
+    }
+    setDismissed(isOnboardingDismissed(user.id))
+  }, [user])
 
   if (!user || dismissed) {
     return null
   }
 
-  const steps: OnboardingStep[] = [
-    {
-      title: t('Create an API Token'),
-      description: t(
-        'Generate a key to call models from your own code or tools.'
-      ),
-      cta: t('Go to API keys'),
-      to: '/keys',
+  return (
+    <GuideCard
+      requestCount={Number(user.request_count ?? 0)}
+      quota={Number(user.quota ?? 0)}
+      usedQuota={Number(user.used_quota ?? 0)}
+      onDismiss={() => {
+        dismissOnboarding(user.id)
+        setDismissed(true)
+      }}
+    />
+  )
+}
+
+interface GuideCardProps {
+  requestCount: number
+  quota: number
+  usedQuota: number
+  onDismiss: () => void
+}
+
+/**
+ * Guide body. Split out so the per-account dismissal check and the async
+ * progress query can run without re-running the identity effect above.
+ */
+function GuideCard(props: GuideCardProps) {
+  const { t } = useTranslation()
+  const [stepIndex, setStepIndex] = useState(0)
+
+  // Progress source: same endpoints the dashboard setup panel uses.
+  const apiKeysQuery = useQuery({
+    queryKey: ['onboarding', 'api-keys'],
+    queryFn: async () => {
+      const result = requireServerSuccess(await getApiKeys({ p: 1, size: 1 }))
+      return result.success ? (result.data?.total ?? 0) : 0
     },
-    {
-      title: t('Browse the model plaza'),
-      description: t('See which models are available and how pricing works.'),
-      cta: t('Go to model plaza'),
-      to: '/pricing',
-    },
-    {
-      title: t('Make your first request'),
-      description: t('Open the playground and send your first message.'),
-      cta: t('Open playground'),
-      to: '/playground',
-    },
-  ]
+    staleTime: 60 * 1000,
+  })
+
+  const steps: OnboardingStep[] = useMemo(
+    () => [
+      {
+        title: t('Create an API Token'),
+        description: t(
+          'Generate a key to call models from your own code or tools.'
+        ),
+        cta: t('Go to API keys'),
+        to: '/keys',
+        completed: (apiKeysQuery.data ?? 0) > 0,
+      },
+      {
+        title: t('Browse the model plaza'),
+        description: t(
+          'See which models are available and how pricing works.'
+        ),
+        cta: t('Go to model plaza'),
+        to: '/pricing',
+        completed: props.quota > 0 || props.usedQuota > 0,
+      },
+      {
+        title: t('Make your first request'),
+        description: t('Open the playground and send your first message.'),
+        cta: t('Open playground'),
+        to: '/playground',
+        completed: props.requestCount > 0,
+      },
+    ],
+    [apiKeysQuery.data, props.quota, props.requestCount, props.usedQuota, t]
+  )
 
   const current = steps[stepIndex]
   const isLastStep = stepIndex === steps.length - 1
-
-  const handleDismiss = () => {
-    dismissOnboarding(user.id)
-    setDismissed(true)
-  }
+  const completedCount = steps.filter((step) => step.completed).length
 
   return (
     <Card size='sm' className='mx-3 mt-3 sm:mx-4 sm:mt-4' data-testid='onboarding-guide'>
       <CardHeader>
         <CardTitle>{t('Get started in 3 steps')}</CardTitle>
         <CardDescription>
-          {t('Step {{current}} of {{total}}', {
-            current: stepIndex + 1,
+          {t('Setup progress: {{completed}}/{{total}}', {
+            completed: completedCount,
             total: steps.length,
           })}
         </CardDescription>
@@ -108,14 +162,22 @@ export function OnboardingGuide() {
             variant='ghost'
             size='icon-sm'
             aria-label={t('Dismiss onboarding')}
-            onClick={handleDismiss}
+            onClick={props.onDismiss}
           >
             <X className='h-4 w-4' />
           </Button>
         </CardAction>
       </CardHeader>
       <CardContent className='space-y-2'>
-        <h3 className='text-sm font-medium'>{current.title}</h3>
+        <h3 className='flex items-center gap-1.5 text-sm font-medium'>
+          {current.completed ? (
+            <Check
+              aria-hidden
+              className='text-success size-4 shrink-0'
+            />
+          ) : null}
+          {current.title}
+        </h3>
         <p className='text-muted-foreground text-sm'>{current.description}</p>
         <Link
           to={current.to}
@@ -129,7 +191,7 @@ export function OnboardingGuide() {
         </Link>
       </CardContent>
       <CardFooter className='justify-between'>
-        <Button variant='ghost' size='sm' onClick={handleDismiss}>
+        <Button variant='ghost' size='sm' onClick={props.onDismiss}>
           {t('Skip for now')}
         </Button>
         <div className='flex items-center gap-2'>
@@ -142,7 +204,7 @@ export function OnboardingGuide() {
             {t('Back')}
           </Button>
           {isLastStep ? (
-            <Button size='sm' onClick={handleDismiss}>
+            <Button size='sm' onClick={props.onDismiss}>
               {t('Done')}
             </Button>
           ) : (

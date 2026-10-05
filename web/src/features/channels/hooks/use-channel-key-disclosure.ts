@@ -22,7 +22,10 @@ import { toast } from 'sonner'
 
 import { useSecureVerification } from '@/features/auth/secure-verification'
 import { handleServerError } from '@/lib/handle-server-error'
-import { AuthOperationError } from '@/lib/secure-verification'
+import {
+  AuthOperationError,
+  isProofRequiredError,
+} from '@/lib/secure-verification'
 import { createServerError } from '@/lib/server-error-message'
 
 import { getChannelKey } from '../api'
@@ -57,22 +60,30 @@ export function useChannelKeyDisclosure(
     const current = new AbortController()
     operation.current = current
     try {
-      const proof = await requestVerification({
-        scope: 'channel.key.read',
-        context: { channel_id: channelId },
-        title: t('Verify to view channel key'),
-        description: t(
-          'Use Passkey or 2FA to confirm your identity before revealing this channel key.'
-        ),
-      })
-      if (!proof || operation.current !== current) {return}
-      setIsChannelKeyLoading(true)
-      const res = await getChannelKey(
-        channelId,
-        proof.proof_token,
-        current.signal
-      )
+      let res: Awaited<ReturnType<typeof getChannelKey>>
+      try {
+        // Try without a proof first: the site default
+        // (require_verification_to_read_channel_key=false) does not require
+        // step-up, and AdminAuth + RootAuth already gate this path. Prompting
+        // unconditionally would trap a root admin without 2FA/Passkey, who then
+        // could never view a channel key.
+        res = await getChannelKey(channelId, '', current.signal)
+      } catch (error) {
+        if (!isProofRequiredError(error)) {throw error}
+        // Site still enforces step-up: prompt and retry once with the proof.
+        const proof = await requestVerification({
+          scope: 'channel.key.read',
+          context: { channel_id: channelId },
+          title: t('Verify to view channel key'),
+          description: t(
+            'Use Passkey or 2FA to confirm your identity before revealing this channel key.'
+          ),
+        })
+        if (!proof || operation.current !== current) {return}
+        res = await getChannelKey(channelId, proof.proof_token, current.signal)
+      }
       if (operation.current !== current) {return}
+      setIsChannelKeyLoading(true)
       if (!res.success) {
         throw createServerError(res, t('Failed to fetch channel key'))
       }

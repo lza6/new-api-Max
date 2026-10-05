@@ -6,6 +6,7 @@ import (
 	"io"
 	"maps"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -708,6 +709,15 @@ func notifyTaskSettled(ctx context.Context, task *model.Task) {
 //
 // 表达式求值失败会保留预扣额度，因此也视为已接管，避免错误全退。
 func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor, task *model.Task, taskResult *relaycommon.TaskInfo) bool {
+	// §4.6.2 产物质检闸门：成功任务在结算前校验「产物可用性」——声明 SUCCESS 但产物
+	// URL 缺失/非法（不可下载）时，视为产物不完整，**保留预扣额度不按成功结算**，
+	// 避免「上游报成功但用户拿不到产物却扣费」。失败任务由调用方全额退款，不在此拦。
+	// 校验保守（只拦明确非法/缺失），任何无法判定为非法的情况一律放行（fail-open），
+	// 避免误伤合法但形态特殊的上游产物 URL。
+	if task.Status == model.TaskStatusSuccess && !taskArtifactLooksUsable(task, taskResult) {
+		logger.LogWarn(ctx, fmt.Sprintf("任务 %s 声明成功但产物质检未通过（产物 URL 缺失或非法），保留预扣待确认", task.TaskID))
+		return false
+	}
 	if bc := task.PrivateData.BillingContext; bc != nil && bc.TieredSnapshot != nil {
 		// 用量表达式结算只适用于成功任务；失败任务由调用方全额退款。
 		if task.Status == model.TaskStatusFailure {
@@ -746,6 +756,45 @@ func settleTaskBillingOnComplete(ctx context.Context, adaptor TaskPollingAdaptor
 	}
 	if tokens > 0 {
 		return RecalculateTaskQuotaByTokens(ctx, task, tokens)
+	}
+	return false
+}
+
+// taskArtifactLooksUsable 是「产物质检闸门」的判定（§4.6.2）：成功任务的产物是否
+// 可下载。保守 fail-open——只有当存在一个「既非空又不是合法 http(s)/站内路径」的
+// 产物 URL 时才判为不可用；完全无法判定时放行，避免误伤形态特殊的上游。
+func taskArtifactLooksUsable(task *model.Task, taskResult *relaycommon.TaskInfo) bool {
+	// 收集候选产物 URL：任务结果 URL / 结算回调携带的 URL。
+	candidates := []string{}
+	if task != nil {
+		if u := task.GetResultURL(); u != "" {
+			candidates = append(candidates, u)
+		}
+	}
+	if taskResult != nil {
+		if taskResult.Url != "" {
+			candidates = append(candidates, taskResult.Url)
+		}
+		if taskResult.RemoteUrl != "" {
+			candidates = append(candidates, taskResult.RemoteUrl)
+		}
+	}
+	if len(candidates) == 0 {
+		// 无任何产物 URL：可能是纯文本/无产物类任务，无法判定 → 放行（fail-open）。
+		return true
+	}
+	for _, raw := range candidates {
+		raw = strings.TrimSpace(raw)
+		if raw == "" {
+			continue
+		}
+		// 站内相对路径（/v1/...）或绝对 http(s) URL 视为可用。
+		if strings.HasPrefix(raw, "/") {
+			return true
+		}
+		if u, err := url.Parse(raw); err == nil && u.Host != "" && (u.Scheme == "http" || u.Scheme == "https") {
+			return true
+		}
 	}
 	return false
 }

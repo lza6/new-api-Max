@@ -2,7 +2,10 @@ package model_setting
 
 import (
 	"fmt"
+	"maps"
 	"slices"
+	"sync"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/setting/config"
@@ -57,19 +60,65 @@ var defaultGeminiSettings = GeminiSettings{
 // 全局实例
 var geminiSettings = defaultGeminiSettings
 
+// geminiSettingsMu 保护 geminiSettings 主副本（两个 map + 一个 slice）。
+var geminiSettingsMu sync.RWMutex
+
+// geminiSettingsSnapshot 已发布的不可变快照。中继热路径（安全阈值/版本/图像模型
+// 判定）只读快照，避免与周期热更新（反射就地写 map/slice）竞争。
+var geminiSettingsSnapshot atomic.Pointer[GeminiSettings]
+
+// publishGeminiSettingsSnapshotLocked 在持 geminiSettingsMu 前提下深拷贝主副本并发布。
+func publishGeminiSettingsSnapshotLocked() {
+	snap := geminiSettings
+	snap.SafetySettings = maps.Clone(geminiSettings.SafetySettings)
+	snap.VersionSettings = maps.Clone(geminiSettings.VersionSettings)
+	snap.SupportedImagineModels = slices.Clone(geminiSettings.SupportedImagineModels)
+	geminiSettingsSnapshot.Store(&snap)
+}
+
+// loadGeminiSettings 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadGeminiSettings() *GeminiSettings {
+	if s := geminiSettingsSnapshot.Load(); s != nil {
+		return s
+	}
+	return &geminiSettings
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (g *GeminiSettings) BeforeConfigWrite() { geminiSettingsMu.Lock() }
+func (g *GeminiSettings) AfterConfigWrite() {
+	publishGeminiSettingsSnapshotLocked()
+	geminiSettingsMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (g *GeminiSettings) LockConfigRead()   { geminiSettingsMu.RLock() }
+func (g *GeminiSettings) UnlockConfigRead() { geminiSettingsMu.RUnlock() }
+
 func init() {
 	// 注册到全局配置管理器
 	config.GlobalConfig.Register("gemini", &geminiSettings)
+	geminiSettingsMu.Lock()
+	publishGeminiSettingsSnapshotLocked()
+	geminiSettingsMu.Unlock()
 }
 
-// GetGeminiSettings 获取Gemini配置
+// GetGeminiSettings 返回当前不可变快照。只读，勿直接改写返回对象。
 func GetGeminiSettings() *GeminiSettings {
-	return &geminiSettings
+	return loadGeminiSettings()
+}
+
+// UpdateGeminiSettings 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateGeminiSettings(fn func(*GeminiSettings)) {
+	geminiSettingsMu.Lock()
+	defer geminiSettingsMu.Unlock()
+	fn(&geminiSettings)
+	publishGeminiSettingsSnapshotLocked()
 }
 
 // GetGeminiSafetySetting 获取安全设置
 func GetGeminiSafetySetting(key string) string {
-	settings := geminiSettings.SafetySettings
+	settings := loadGeminiSettings().SafetySettings
 	if value := settings[key]; value != "" {
 		return value
 	}
@@ -102,12 +151,13 @@ func ValidateGeminiSafetySettings(value string) error {
 
 // GetGeminiVersionSetting 获取版本设置
 func GetGeminiVersionSetting(key string) string {
-	if value, ok := geminiSettings.VersionSettings[key]; ok {
+	settings := loadGeminiSettings().VersionSettings
+	if value, ok := settings[key]; ok {
 		return value
 	}
-	return geminiSettings.VersionSettings["default"]
+	return settings["default"]
 }
 
 func IsGeminiModelSupportImagine(model string) bool {
-	return slices.Contains(geminiSettings.SupportedImagineModels, model)
+	return slices.Contains(loadGeminiSettings().SupportedImagineModels, model)
 }

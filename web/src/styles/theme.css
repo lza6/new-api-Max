@@ -118,7 +118,15 @@ For commercial licensing, please contact support@quantumnous.com
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.692 0.141 243.716);
+  /* Light-mode primary is intentionally darker than the dark-mode sibling so
+   * white `--primary-foreground` text clears WCAG AA (4.5:1) on primary
+   * surfaces (buttons, badges). At L=0.692 the ratio was only 2.71:1. L=0.52 at
+   * the same hue yields ~5.45:1 static, which also survives the ~0.99 opacity
+   * dip of the hero's `.landing-animate-fade-up` entrance (that dip alone
+   * shaves ~0.5 off the ratio, so a 4.5 margin is not enough). Chroma is 0.12
+   * to stay inside the sRGB gamut — 0.141 at this lightness is out of gamut
+   * and would render via non-deterministic browser gamut mapping. */
+  --primary: oklch(0.52 0.12 243.716);
   --primary-foreground: oklch(1 0 0);
   --secondary: oklch(0.95 0 0);
   --secondary-foreground: oklch(0.42 0.16 250);

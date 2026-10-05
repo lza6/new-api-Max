@@ -21,7 +21,7 @@ import {
 } from './hooks'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 
-export function Playground() {
+export function Playground({ initialModel }: { initialModel?: string }) {
   const {
     config,
     parameterEnabled,
@@ -35,7 +35,7 @@ export function Playground() {
     updateConfig,
     updateParameterEnabled,
     clearMessages,
-  } = usePlaygroundState()
+  } = usePlaygroundState(initialModel)
 
   const { sendChat, stopGeneration, isGenerating } = useChatHandler({
     config,

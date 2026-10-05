@@ -424,6 +424,9 @@ func GetChannelKey(c *gin.Context) {
 	// 获取渠道信息（包含密钥）
 	channel, err := model.GetChannelById(channelId, true)
 	if errors.Is(err, gorm.ErrRecordNotFound) {
+		// 管理端（RootAuth）路由，枚举面有限；沿用既有「业务错误」契约
+		//（200 + success:false），与 TestSecurityEnrollmentMissingTargetsAreBusinessErrors
+		// 一致。token 侧改 404 是因为它是用户面、按归属校验，防枚举诉求不同。
 		common.ApiErrorI18n(c, i18n.MsgChannelNotExists)
 		return
 	}

@@ -3,9 +3,11 @@ package operation_setting
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 	"strings"
+	"sync"
 	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/common"
@@ -60,6 +62,24 @@ type ToolPriceSetting struct {
 var toolPriceSetting = ToolPriceSetting{
 	Prices: make(map[string]float64),
 }
+
+// toolPriceSettingMu 保护 toolPriceSetting 主副本（Prices 为 map）。所有写入
+// （配置热更新反射写入、LoadToolPricesFromJSONString、Set/Delete 测试辅助）持写锁。
+var toolPriceSettingMu sync.RWMutex
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook：热更新反射就地
+// 写入期间持写锁；写完后先释放锁再重建索引（RebuildToolPriceIndex 自身持读锁，
+// 不能在写锁内调用，RWMutex 不可重入）。
+func (t *ToolPriceSetting) BeforeConfigWrite() { toolPriceSettingMu.Lock() }
+func (t *ToolPriceSetting) AfterConfigWrite() {
+	toolPriceSettingMu.Unlock()
+	RebuildToolPriceIndex()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard：反射式读取主副本
+// （ExportAllConfigs/SaveToDB）持读锁，与热更新写入互斥。
+func (t *ToolPriceSetting) LockConfigRead()   { toolPriceSettingMu.RLock() }
+func (t *ToolPriceSetting) UnlockConfigRead() { toolPriceSettingMu.RUnlock() }
 
 func init() {
 	config.GlobalConfig.Register("tool_price_setting", &toolPriceSetting)
@@ -140,16 +160,22 @@ func LoadToolPricesFromJSONString(value string) {
 		common.SysError("加载工具价格失败，将使用硬编码兜底: " + err.Error())
 		prices = make(map[string]float64)
 	}
+	toolPriceSettingMu.Lock()
 	toolPriceSetting.Prices = prices
+	toolPriceSettingMu.Unlock()
 	RebuildToolPriceIndex()
 }
 
 // RebuildToolPriceIndex rebuilds the lookup index from the current config.
 // Called on init and after config updates. Not on the billing hot path.
 func RebuildToolPriceIndex() {
-	merged := make(map[string]float64, 9+len(toolPriceSetting.Prices))
+	toolPriceSettingMu.RLock()
+	prices := maps.Clone(toolPriceSetting.Prices)
+	toolPriceSettingMu.RUnlock()
+
+	merged := make(map[string]float64, 9+len(prices))
 	seedHardcodedToolPrices(merged)
-	for k, v := range toolPriceSetting.Prices {
+	for k, v := range prices {
 		if !isValidToolPrice(v) {
 			continue
 		}
@@ -220,16 +246,20 @@ func GetToolPrice(toolName string) float64 {
 
 // SetToolPriceForTest injects a tool price and rebuilds the lookup index. Tests only.
 func SetToolPriceForTest(name string, price float64) {
+	toolPriceSettingMu.Lock()
 	if toolPriceSetting.Prices == nil {
 		toolPriceSetting.Prices = make(map[string]float64)
 	}
 	toolPriceSetting.Prices[name] = price
+	toolPriceSettingMu.Unlock()
 	RebuildToolPriceIndex()
 }
 
 // DeleteToolPriceForTest removes an injected tool price and rebuilds the index. Tests only.
 func DeleteToolPriceForTest(name string) {
+	toolPriceSettingMu.Lock()
 	delete(toolPriceSetting.Prices, name)
+	toolPriceSettingMu.Unlock()
 	RebuildToolPriceIndex()
 }
 

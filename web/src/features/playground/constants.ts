@@ -44,8 +44,12 @@ export const API_ENDPOINTS = {
 export const DEFAULT_GROUP = 'default' as const
 
 // Default configuration
+// `model` intentionally starts empty: the site's on-sale models are not known
+// until `/api/user/models` resolves, and a hardcoded id (previously 'gpt-4o')
+// does not match most deployments. `getModelFallback` fills in the first
+// available model once the list loads, and a `?model=` deep link overrides it.
 export const DEFAULT_CONFIG: PlaygroundConfig = {
-  model: 'gpt-4o',
+  model: '',
   group: DEFAULT_GROUP,
   temperature: 0.7,
   top_p: 1,

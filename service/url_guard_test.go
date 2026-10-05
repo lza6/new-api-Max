@@ -94,6 +94,16 @@ func TestValidateChannelURL(t *testing.T) {
 		{name: "literal 192.168 rejected", rawURL: "http://192.168.1.1/v1", wantError: true},
 		{name: "literal metadata rejected", rawURL: "http://169.254.169.254/latest/meta-data", wantError: true},
 		{name: "literal 0.x rejected", rawURL: "http://0.0.0.0/v1", wantError: true},
+		// CGNAT + IANA special-purpose (must match common/ssrf_protection.go)
+		{name: "literal CGNAT rejected", rawURL: "http://100.64.0.1/v1", wantError: true},
+		{name: "literal CGNAT upper rejected", rawURL: "http://100.127.255.255/v1", wantError: true},
+		{name: "literal 192.0.0.0/24 rejected", rawURL: "http://192.0.0.1/v1", wantError: true},
+		{name: "literal TEST-NET-1 rejected", rawURL: "http://192.0.2.5/v1", wantError: true},
+		{name: "literal benchmarking rejected", rawURL: "http://198.18.0.1/v1", wantError: true},
+		{name: "literal TEST-NET-2 rejected", rawURL: "http://198.51.100.7/v1", wantError: true},
+		{name: "literal TEST-NET-3 rejected", rawURL: "http://203.0.113.9/v1", wantError: true},
+		{name: "literal multicast rejected", rawURL: "http://224.0.0.1/v1", wantError: true},
+		{name: "literal reserved 240 rejected", rawURL: "http://240.0.0.1/v1", wantError: true},
 		// 字面 IPv6
 		{name: "literal ipv6 loopback rejected", rawURL: "http://[::1]:3000", wantError: true},
 		{name: "literal ipv6 ULA rejected", rawURL: "http://[fc00::1]/v1", wantError: true},

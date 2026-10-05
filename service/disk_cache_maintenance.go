@@ -20,6 +20,7 @@ For commercial licensing, please contact support@quantumnous.com
 package service
 
 import (
+	"context"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
@@ -34,21 +35,34 @@ const diskCacheCleanupInterval = 30 * time.Minute
 // 的缓存文件视为残留并删除。
 const diskCacheStaleAge = 30 * time.Minute
 
+var diskCacheMaintenanceLoop backgroundLoop
+
 // StartDiskCacheMaintenanceLoop 周期性维护磁盘缓存：先按容量上限淘汰最旧文件，
 // 再清理超龄残留。仅主节点执行，多节点去重；幂等，失败仅告警。
 func StartDiskCacheMaintenanceLoop() {
 	if !common.IsMasterNode {
 		return
 	}
-	go func() {
+	diskCacheMaintenanceLoop.start(func(ctx context.Context) {
 		// 启动时清理一次历史残留（与 main.go 的启动清理互为补充）。
 		runDiskCacheMaintenance()
 		ticker := time.NewTicker(diskCacheCleanupInterval)
 		defer ticker.Stop()
-		for range ticker.C {
-			runDiskCacheMaintenance()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				runDiskCacheMaintenance()
+			}
 		}
-	}()
+	})
+}
+
+// StopDiskCacheMaintenanceLoop stops the maintenance loop and waits for it to
+// exit (called from the graceful-shutdown sequence).
+func StopDiskCacheMaintenanceLoop() {
+	diskCacheMaintenanceLoop.stop()
 }
 
 func runDiskCacheMaintenance() {

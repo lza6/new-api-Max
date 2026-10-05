@@ -1,0 +1,39 @@
+{
+  "base": "https://japi.tingfengai.art:8443",
+  "results": [
+    {
+      "n": "标题含品牌+关键词后缀",
+      "ok": true,
+      "d": "听风API副站 · AI API Gateway"
+    },
+    {
+      "n": "Hero 标题渲染",
+      "ok": true,
+      "d": "Unified API Gateway for Vast Range of AI Models"
+    },
+    {
+      "n": "FAQ 区块可见",
+      "ok": true
+    },
+    {
+      "n": "FAQPage JSON-LD 注入",
+      "ok": true,
+      "d": "count=6"
+    },
+    {
+      "n": "Hero 视觉区非空（WebGL 或 CSS）",
+      "ok": true,
+      "d": "canvas=0 fallback=1"
+    },
+    {
+      "n": "无横向溢出",
+      "ok": true,
+      "d": "scroll=1440 client=1440"
+    },
+    {
+      "n": "无控制台错误",
+      "ok": true,
+      "d": ""
+    }
+  ]
+}

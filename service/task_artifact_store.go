@@ -50,14 +50,23 @@ func (disabledArtifactStore) Serve(*gin.Context, *model.Task, *StoredArtifactRef
 	return ErrTaskArtifactStoreDisabled
 }
 
-var taskArtifactStore TaskArtifactStore = &disabledArtifactStore{}
+var taskArtifactStore TaskArtifactStore = buildTaskArtifactStore()
 
 func init() {
 	_ = system_setting.LoadTaskArtifactStoreConfig()
 }
 
-// GetTaskArtifactStore returns the process-wide artifact storage backend. This
-// release always returns the disabled implementation.
+// GetTaskArtifactStore returns the process-wide artifact storage backend.
+// 默认（mode != local）为 disabled（既有 upstream 代理行为，零变化）；
+// TASK_ARTIFACT_STORE_MODE=local 时为站内磁盘图床。
 func GetTaskArtifactStore() TaskArtifactStore {
 	return taskArtifactStore
+}
+
+// LocalArtifactStore 暴露本地图床的具体类型（供清理/持久化调用）；非 local 模式返回 nil。
+func LocalArtifactStore() *localArtifactStore {
+	if s, ok := taskArtifactStore.(*localArtifactStore); ok {
+		return s
+	}
+	return nil
 }

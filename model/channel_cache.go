@@ -279,6 +279,30 @@ func CacheGetChannelInfo(id int) (*ChannelInfo, error) {
 	return &c.ChannelInfo, nil
 }
 
+// CacheGetChannelStatus 在 channelSyncLock 读锁内读取渠道状态。
+//
+// [fix-race] 该函数存在的原因：内存缓存模式下 CacheGetChannel 直接返回缓存里的
+// *Channel 共享指针，锁在返回前即释放；调用方在锁外读共享指针的 .Status，而
+// CacheUpdateChannelStatus 在写锁内就地写同一字段，二者无 happens-before →
+// 数据竞争（-race 可复现）。读状态的调用方必须走本函数（读锁内完成读取并返回值
+// 副本），不得直接解引用 CacheGetChannel 返回值的 .Status。
+func CacheGetChannelStatus(id int) (int, bool) {
+	if !common.MemoryCacheEnabled {
+		ch, err := GetChannelById(id, true)
+		if err != nil {
+			return 0, false
+		}
+		return ch.Status, true
+	}
+	channelSyncLock.RLock()
+	defer channelSyncLock.RUnlock()
+	c, ok := channelsIDM[id]
+	if !ok {
+		return 0, false
+	}
+	return c.Status, true
+}
+
 func CacheUpdateChannelStatus(id int, status int) {
 	if !common.MemoryCacheEnabled {
 		return

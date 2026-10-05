@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { Row, Table as TanstackTable } from '@tanstack/react-table'
 import * as React from 'react'
 
+import { ErrorState } from '@/components/error-state'
 import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 
@@ -261,6 +262,26 @@ function renderTableBodyContent<TData>(
   colSpan: number,
   getColumnClassName: DataTableColumnClassName
 ) {
+  // A failed query must not masquerade as an empty list: surface a retryable
+  // error state first (checked before loading/empty so error wins, matching
+  // DataTableCardGrid/MobileCardList). While a refetch after an error is in
+  // flight this keeps the error state visible instead of flashing a skeleton.
+  if (props.isError) {
+    return (
+      <TableRow>
+        <TableCell colSpan={colSpan} className='p-0'>
+          <ErrorState
+            title={props.errorTitle}
+            description={props.errorDescription}
+            onRetry={props.onRetry}
+            action={props.errorAction}
+            className='min-h-[240px]'
+          />
+        </TableCell>
+      </TableRow>
+    )
+  }
+
   if (props.isLoading) {
     return (
       <TableSkeleton

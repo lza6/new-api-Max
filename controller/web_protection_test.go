@@ -166,10 +166,12 @@ func TestWebProtectionPathAndUAPolicy(t *testing.T) {
 	prevBlocked := settings.BlockedPaths
 	prevUA := settings.UAAllowlist
 	t.Cleanup(func() {
-		settings.Enabled = prevEnabled
-		settings.AllowedPaths = prevAllowed
-		settings.BlockedPaths = prevBlocked
-		settings.UAAllowlist = prevUA
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.Enabled = prevEnabled
+			s.AllowedPaths = prevAllowed
+			s.BlockedPaths = prevBlocked
+			s.UAAllowlist = prevUA
+		})
 	})
 
 	newRouter := func() *gin.Engine {
@@ -193,16 +195,20 @@ func TestWebProtectionPathAndUAPolicy(t *testing.T) {
 	}
 
 	t.Run("empty config allows all", func(t *testing.T) {
-		settings.Enabled = true
-		settings.AllowedPaths, settings.BlockedPaths, settings.UAAllowlist = nil, nil, nil
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.Enabled = true
+			s.AllowedPaths, s.BlockedPaths, s.UAAllowlist = nil, nil, nil
+		})
 		assert.Equal(t, http.StatusOK, do(newRouter(), "/dashboard", "anything/1.0").Code)
 		assert.Equal(t, http.StatusOK, do(newRouter(), "/admin/users", "anything/1.0").Code)
 	})
 
 	t.Run("blocked path rejected", func(t *testing.T) {
-		settings.Enabled = true
-		settings.BlockedPaths = []string{"/admin"}
-		settings.AllowedPaths, settings.UAAllowlist = nil, nil
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.Enabled = true
+			s.BlockedPaths = []string{"/admin"}
+			s.AllowedPaths, s.UAAllowlist = nil, nil
+		})
 		w := do(newRouter(), "/admin/users", "anything/1.0")
 		assert.Equal(t, http.StatusTooManyRequests, w.Code)
 		assert.Equal(t, "60", w.Header().Get("Retry-After"))
@@ -211,9 +217,11 @@ func TestWebProtectionPathAndUAPolicy(t *testing.T) {
 	})
 
 	t.Run("allowed path mismatch rejected", func(t *testing.T) {
-		settings.Enabled = true
-		settings.AllowedPaths = []string{"/dashboard"}
-		settings.BlockedPaths, settings.UAAllowlist = nil, nil
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.Enabled = true
+			s.AllowedPaths = []string{"/dashboard"}
+			s.BlockedPaths, s.UAAllowlist = nil, nil
+		})
 		assert.Equal(t, http.StatusOK, do(newRouter(), "/dashboard", "anything/1.0").Code)
 		w := do(newRouter(), "/admin/users", "anything/1.0")
 		assert.Equal(t, http.StatusTooManyRequests, w.Code)
@@ -221,17 +229,21 @@ func TestWebProtectionPathAndUAPolicy(t *testing.T) {
 	})
 
 	t.Run("allowed path glob", func(t *testing.T) {
-		settings.Enabled = true
-		settings.AllowedPaths = []string{"/assets/*"}
-		settings.BlockedPaths, settings.UAAllowlist = nil, nil
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.Enabled = true
+			s.AllowedPaths = []string{"/assets/*"}
+			s.BlockedPaths, s.UAAllowlist = nil, nil
+		})
 		assert.Equal(t, http.StatusOK, do(newRouter(), "/assets/app.js", "anything/1.0").Code)
 		assert.Equal(t, http.StatusTooManyRequests, do(newRouter(), "/dashboard", "anything/1.0").Code)
 	})
 
 	t.Run("ua allowlist", func(t *testing.T) {
-		settings.Enabled = true
-		settings.UAAllowlist = []string{"Mozilla"}
-		settings.AllowedPaths, settings.BlockedPaths = nil, nil
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.Enabled = true
+			s.UAAllowlist = []string{"Mozilla"}
+			s.AllowedPaths, s.BlockedPaths = nil, nil
+		})
 		assert.Equal(t, http.StatusOK, do(newRouter(), "/dashboard", "mozilla/5.0 test").Code)
 		w := do(newRouter(), "/dashboard", "curl/8.1")
 		assert.Equal(t, http.StatusTooManyRequests, w.Code)
@@ -239,9 +251,11 @@ func TestWebProtectionPathAndUAPolicy(t *testing.T) {
 	})
 
 	t.Run("disabled protection is pass-through", func(t *testing.T) {
-		settings.Enabled = false
-		settings.BlockedPaths = []string{"/admin"}
-		settings.UAAllowlist = []string{"Mozilla"}
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.Enabled = false
+			s.BlockedPaths = []string{"/admin"}
+			s.UAAllowlist = []string{"Mozilla"}
+		})
 		assert.Equal(t, http.StatusOK, do(newRouter(), "/admin/users", "curl/8.1").Code)
 	})
 }
@@ -251,17 +265,23 @@ func TestWebProtectionPathAndUAGettersSanitize(t *testing.T) {
 	settings := operation_setting.GetWebProtectionSetting()
 	prevAllowed, prevBlocked, prevUA := settings.AllowedPaths, settings.BlockedPaths, settings.UAAllowlist
 	t.Cleanup(func() {
-		settings.AllowedPaths, settings.BlockedPaths, settings.UAAllowlist = prevAllowed, prevBlocked, prevUA
+		operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+			s.AllowedPaths, s.BlockedPaths, s.UAAllowlist = prevAllowed, prevBlocked, prevUA
+		})
 	})
-	settings.AllowedPaths = []string{"/a", " ", "\t/b"}
-	settings.BlockedPaths = []string{"", "/c"}
-	settings.UAAllowlist = []string{"Mozilla", ""}
+	operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+		s.AllowedPaths = []string{"/a", " ", "\t/b"}
+		s.BlockedPaths = []string{"", "/c"}
+		s.UAAllowlist = []string{"Mozilla", ""}
+	})
 	allowed, blocked := operation_setting.GetWebProtectionPathPolicy()
 	assert.Equal(t, []string{"/a", "/b"}, allowed)
 	assert.Equal(t, []string{"/c"}, blocked)
 	assert.Equal(t, []string{"Mozilla"}, operation_setting.GetWebProtectionUAAllowlist())
 
-	settings.AllowedPaths, settings.BlockedPaths, settings.UAAllowlist = nil, nil, nil
+	operation_setting.UpdateWebProtectionSetting(func(s *operation_setting.WebProtectionSetting) {
+		s.AllowedPaths, s.BlockedPaths, s.UAAllowlist = nil, nil, nil
+	})
 	allowed, blocked = operation_setting.GetWebProtectionPathPolicy()
 	assert.Nil(t, allowed)
 	assert.Nil(t, blocked)

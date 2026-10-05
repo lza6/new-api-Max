@@ -277,4 +277,85 @@ describe('API keys mutate drawer Auto group integration', () => {
     await waitFor(() => expect(createdPayloads).toHaveLength(1))
     expect(createdPayloads[0]?.auto_groups).toEqual(['vip'])
   })
+
+  test('shows the created key plaintext in a result step instead of closing', async () => {
+    // A create that returns a key must keep the drawer open on the result
+    // step: the plaintext is shown once with a copy button, and the user is
+    // offered a shortcut into the playground.
+    apiClient.get = async (url) => {
+      switch (url) {
+        case '/api/status':
+          return { data: { data: { default_use_auto_group: false } } }
+        case '/api/user/models':
+          return { data: { success: true, data: [] } }
+        case '/api/user/self/groups':
+          return {
+            data: {
+              success: true,
+              data: { default: { desc: 'Standard access', ratio: 1 } },
+            },
+          }
+        case '/api/token/auto-groups':
+          return { data: { success: true, data: { groups: [], max_count: 3 } } }
+        default:
+          throw new Error(`Unexpected GET ${url}`)
+      }
+    }
+    apiClient.post = async (url) => {
+      expect(url).toBe('/api/token/')
+      return { data: { success: true, data: { id: 1, key: 'abc123' } } }
+    }
+
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    })
+    const freshAt = Date.now() + 60_000
+    queryClient.setQueryData(
+      ['status'],
+      { default_use_auto_group: false },
+      { updatedAt: freshAt }
+    )
+    queryClient.setQueryData(
+      ['user-models'],
+      { success: true, data: [] },
+      { updatedAt: freshAt }
+    )
+    queryClient.setQueryData(
+      ['user-groups'],
+      {
+        success: true,
+        data: { default: { desc: 'Standard access', ratio: 1 } },
+      },
+      { updatedAt: freshAt }
+    )
+    queryClient.setQueryData(
+      ['token-auto-groups'],
+      { success: true, data: { groups: [], max_count: 3 } },
+      { updatedAt: freshAt }
+    )
+    renderedDrawer = { queryClient }
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <I18nextProvider i18n={i18n}>
+          <ApiKeysProvider>
+            <ApiKeysMutateDrawer open onOpenChange={() => undefined} />
+          </ApiKeysProvider>
+        </I18nextProvider>
+      </QueryClientProvider>
+    )
+    await waitFor(() => expect(findButton('Save changes', false)).toBeEnabled())
+
+    changeInput(getControlByLabel('Name'), 'first-key')
+    fireEvent.click(findButton('Save changes', true))
+
+    await waitFor(() =>
+      expect(screen.getByTestId('created-key-row')).toHaveTextContent(
+        'sk-abc123'
+      )
+    )
+    // The form's save button is replaced by the result-step actions.
+    expect(findButton('Save changes', false)).toBe(null)
+    expect(findButton('Go to Playground', true)).toBeTruthy()
+  })
 })

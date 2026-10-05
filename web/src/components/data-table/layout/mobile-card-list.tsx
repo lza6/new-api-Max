@@ -39,6 +39,7 @@ For commercial licensing, please contact support@quantumnous.com
 import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
+import { ErrorState } from '@/components/error-state'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
   Empty,
@@ -57,6 +58,10 @@ interface MobileCardListProps<TData> {
   table: Table<TData>
   enableRowSelection?: boolean
   isLoading?: boolean
+  isError?: boolean
+  errorTitle?: string
+  errorDescription?: string
+  onRetry?: () => void
   emptyTitle?: string
   emptyDescription?: string
   getRowKey?: (row: Row<TData>) => string | number
@@ -120,6 +125,10 @@ export function MobileCardList<TData>(props: MobileCardListProps<TData>) {
     table,
     enableRowSelection = false,
     isLoading = false,
+    isError = false,
+    errorTitle,
+    errorDescription,
+    onRetry,
     emptyTitle,
     emptyDescription,
     getRowKey,
@@ -136,6 +145,17 @@ export function MobileCardList<TData>(props: MobileCardListProps<TData>) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [visibleColumns]
   )
+
+  if (isError) {
+    return (
+      <ErrorState
+        title={errorTitle}
+        description={errorDescription}
+        onRetry={onRetry}
+        className='rounded-lg border'
+      />
+    )
+  }
 
   if (isLoading) {
     return hasCompactMeta ? <ListSkeleton /> : <FallbackListSkeleton />

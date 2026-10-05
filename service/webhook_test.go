@@ -138,9 +138,15 @@ func TestNotifyWebhooksDispatchesSubscribedEventWithDedup(t *testing.T) {
 }
 
 func TestWebhookEventSubscriptionParsing(t *testing.T) {
-	operation_setting.GetWebhookSetting().Events = []string{"epay.topup.success, epay.subscription.success", "task.settled"}
+	original := *operation_setting.GetWebhookSetting()
+	t.Cleanup(func() { operation_setting.ReplaceWebhookSetting(original) })
+	operation_setting.UpdateWebhookSetting(func(setting *operation_setting.WebhookSetting) {
+		setting.Events = []string{"epay.topup.success, epay.subscription.success", "task.settled"}
+	})
 	assert.True(t, operation_setting.IsWebhookEventSubscribed("epay.topup.success"))
 	assert.True(t, operation_setting.IsWebhookEventSubscribed("task.settled"))
 	assert.False(t, operation_setting.IsWebhookEventSubscribed("unknown.event"))
-	operation_setting.GetWebhookSetting().Events = nil
+	operation_setting.UpdateWebhookSetting(func(setting *operation_setting.WebhookSetting) {
+		setting.Events = nil
+	})
 }

@@ -41,12 +41,18 @@ const MESSAGE_SAVE_DEBOUNCE_MS = 500
 
 /**
  * Main state management hook for playground
+ *
+ * `initialModel` (from a `?model=` deep link) seeds the model selection so a
+ * link from the model plaza opens the playground already pointed at that model.
+ * If the seeded id is not among the site's available models, the existing
+ * `getModelFallback` in `usePlaygroundOptions` replaces it once the list loads.
  */
-export function usePlaygroundState() {
+export function usePlaygroundState(initialModel?: string) {
   // Load initial state from localStorage
-  const [config, setConfig] = useState<PlaygroundConfig>(
-    getInitialPlaygroundConfig
-  )
+  const [config, setConfig] = useState<PlaygroundConfig>(() => {
+    const base = getInitialPlaygroundConfig()
+    return initialModel ? { ...base, model: initialModel } : base
+  })
 
   const [parameterEnabled, setParameterEnabled] = useState<ParameterEnabled>(
     getInitialParameterEnabled

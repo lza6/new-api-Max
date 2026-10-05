@@ -322,7 +322,9 @@ export async function deleteDisabledChannels(): Promise<{
 }
 
 /**
- * Get channel key (requires 2FA verification)
+ * Get channel key. A step-up proof is only needed when the site enforces it
+ * (require_verification_to_read_channel_key); pass an empty token to try
+ * without a proof and let the server answer with SECURITY_PROOF_REQUIRED.
  */
 export async function getChannelKey(
   id: number,
@@ -333,7 +335,7 @@ export async function getChannelKey(
     `/api/channel/${id}/key`,
     undefined,
     channelActionConfig({
-      headers: { 'X-Security-Proof': proofToken },
+      headers: proofToken ? { 'X-Security-Proof': proofToken } : undefined,
       signal,
     })
   )

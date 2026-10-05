@@ -61,7 +61,10 @@ func Distribute() func(c *gin.Context) {
 				}
 				return
 			}
-			if channel.Status != common.ChannelStatusEnabled {
+			// Read status through the lock-guarded accessor: `channel` is a shared
+			// cache pointer whose .Status is written in place under the write lock
+			// by CacheUpdateChannelStatus, so a bare field read here would race.
+			if status, ok := model.CacheGetChannelStatus(pin.ChannelId); !ok || status != common.ChannelStatusEnabled {
 				if pin.Source == taskdto.PinSourceOriginTask {
 					abortWithOpenAiMessage(c, http.StatusBadRequest, "origin_task_channel_disabled", types.ErrorCode("origin_task_channel_disabled"))
 				} else {
@@ -105,6 +108,12 @@ func Distribute() func(c *gin.Context) {
 				}
 				var selectGroup string
 				usingGroup := common.GetContextKeyString(c, constant.ContextKeyUsingGroup)
+				// §4.8.1 领域感知路由（默认关闭）：请求带 X-Route-Tag 且命中白名单映射时，
+				// 把分组覆盖为映射目标分组（不越权：仅在用户可用分组内生效）。
+				if target, ok := service.ResolveDomainRoute(c, common.GetContextKeyString(c, constant.ContextKeyUserGroup)); ok {
+					usingGroup = target
+					common.SetContextKey(c, constant.ContextKeyUsingGroup, target)
+				}
 				// check path is /pg/chat/completions
 				if strings.HasPrefix(c.Request.URL.Path, "/pg/chat/completions") {
 					playgroundRequest := &dto.PlayGroundRequest{}
@@ -127,7 +136,9 @@ func Distribute() func(c *gin.Context) {
 					affinityUsable := false
 					preferred, err := model.CacheGetChannel(preferredChannelID)
 					affinitySatisfied := false
-					if err == nil && preferred != nil && preferred.Status == common.ChannelStatusEnabled {
+					// Status via the lock-guarded accessor (shared cache pointer).
+					preferredStatus, statusOK := model.CacheGetChannelStatus(preferredChannelID)
+					if err == nil && preferred != nil && statusOK && preferredStatus == common.ChannelStatusEnabled {
 						affinitySatisfied, _ = model.ChannelSatisfiesFilters(preferred, modelRequest.Model, constraints.Filters)
 					}
 					if affinitySatisfied {
@@ -190,6 +201,13 @@ func Distribute() func(c *gin.Context) {
 				if kind == taskdto.FilterTaskPluginIdentity {
 					logTaskPluginChannelDecision(c, channel, modelRequest.Model, "channel_rejected", "identity_mismatch")
 				}
+				abortWithOpenAiMessage(c, http.StatusServiceUnavailable, noAvailableChannelMessage(c, common.GetContextKeyString(c, constant.ContextKeyUsingGroup), modelRequest.Model), types.ErrorCodeModelNotFound)
+				return
+			}
+			// §审查 C1：熔断器半开探测令牌只在此处（渠道已最终选定、即将发请求）消费，
+			// 不在候选过滤（ChannelHealthProbe 纯判定）阶段消费——否则未选中的候选会
+			// 静默烧掉令牌，使渠道在 Open 窗口内永不恢复。Open 未到期或探测已被占用 → 拒绝。
+			if !service.AcquireCircuitProbe(channel.Id) {
 				abortWithOpenAiMessage(c, http.StatusServiceUnavailable, noAvailableChannelMessage(c, common.GetContextKeyString(c, constant.ContextKeyUsingGroup), modelRequest.Model), types.ErrorCodeModelNotFound)
 				return
 			}

@@ -1,10 +1,12 @@
 package task_pricing_setting
 
 import (
+	"maps"
 	"strings"
+	"sync"
+	"sync/atomic"
 
 	"github.com/lza6/new-api-Max/setting/config"
-	"github.com/samber/lo"
 )
 
 type TaskPricingSetting struct {
@@ -24,12 +26,58 @@ var taskPricingSetting = TaskPricingSetting{
 	},
 }
 
+// taskPricingSettingMu 保护 taskPricingSetting 主副本（两个 map）。
+var taskPricingSettingMu sync.RWMutex
+
+// taskPricingSettingSnapshot 已发布的不可变快照。任务结算计价热路径只读快照，
+// 避免与周期热更新（反射就地写 map）竞争。
+var taskPricingSettingSnapshot atomic.Pointer[TaskPricingSetting]
+
+// publishTaskPricingSettingSnapshotLocked 在持 taskPricingSettingMu 前提下深拷贝
+// 主副本并发布。
+func publishTaskPricingSettingSnapshotLocked() {
+	snap := taskPricingSetting
+	snap.SoraSizeRatio = maps.Clone(taskPricingSetting.SoraSizeRatio)
+	snap.VertexResolution4K = maps.Clone(taskPricingSetting.VertexResolution4K)
+	taskPricingSettingSnapshot.Store(&snap)
+}
+
+// loadTaskPricingSetting 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadTaskPricingSetting() *TaskPricingSetting {
+	if s := taskPricingSettingSnapshot.Load(); s != nil {
+		return s
+	}
+	return &taskPricingSetting
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (t *TaskPricingSetting) BeforeConfigWrite() { taskPricingSettingMu.Lock() }
+func (t *TaskPricingSetting) AfterConfigWrite() {
+	publishTaskPricingSettingSnapshotLocked()
+	taskPricingSettingMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (t *TaskPricingSetting) LockConfigRead()   { taskPricingSettingMu.RLock() }
+func (t *TaskPricingSetting) UnlockConfigRead() { taskPricingSettingMu.RUnlock() }
+
+// UpdateTaskPricingSetting 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateTaskPricingSetting(fn func(*TaskPricingSetting)) {
+	taskPricingSettingMu.Lock()
+	defer taskPricingSettingMu.Unlock()
+	fn(&taskPricingSetting)
+	publishTaskPricingSettingSnapshotLocked()
+}
+
 func init() {
 	config.GlobalConfig.Register("task_pricing_setting", &taskPricingSetting)
+	taskPricingSettingMu.Lock()
+	publishTaskPricingSettingSnapshotLocked()
+	taskPricingSettingMu.Unlock()
 }
 
 func SoraSizeRatio(size string) float64 {
-	if ratio, ok := taskPricingSetting.SoraSizeRatio[size]; ok && ratio > 0 {
+	if ratio, ok := loadTaskPricingSetting().SoraSizeRatio[size]; ok && ratio > 0 {
 		return ratio
 	}
 	return 1
@@ -41,7 +89,7 @@ func VertexResolutionRatio(model, resolution string) float64 {
 	}
 	matchedPattern := ""
 	matchedRatio := 1.0
-	for pattern, ratio := range taskPricingSetting.VertexResolution4K {
+	for pattern, ratio := range loadTaskPricingSetting().VertexResolution4K {
 		if !strings.Contains(model, pattern) || ratio <= 0 {
 			continue
 		}
@@ -53,9 +101,7 @@ func VertexResolutionRatio(model, resolution string) float64 {
 	return matchedRatio
 }
 
+// GetCopy 返回当前配置的深拷贝（只读快照）。
 func GetCopy() TaskPricingSetting {
-	return TaskPricingSetting{
-		SoraSizeRatio:      lo.Assign(taskPricingSetting.SoraSizeRatio),
-		VertexResolution4K: lo.Assign(taskPricingSetting.VertexResolution4K),
-	}
+	return *loadTaskPricingSetting()
 }

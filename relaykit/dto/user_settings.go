@@ -18,6 +18,10 @@ type UserSetting struct {
 	SidebarModules                   string  `json:"sidebar_modules,omitempty"`                      // SidebarModules 左侧边栏模块配置
 	BillingPreference                string  `json:"billing_preference,omitempty"`                   // BillingPreference 扣费策略（订阅/钱包）
 	Language                         string  `json:"language,omitempty"`                             // Language 用户语言偏好 (zh, en)
+	// §4.7.1 轻量用户记忆（规则+KV，非向量库）：记录用户最近一次成功调用的模型名，
+	// 供前端在新建会话/Playground 时回填默认模型，减少重复选择。JSON 列内新增字段，
+	// 无需迁移；空值表示尚未记录（前端回退到站点默认）。
+	LastUsedModel string `json:"last_used_model,omitempty"`
 }
 
 var (

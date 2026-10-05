@@ -329,6 +329,8 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/search", middleware.AdminAuth(), controller.SearchAllLogs)
 		logRoute.GET("/traffic", middleware.AdminAuth(), controller.GetLogsTraffic)
 		logRoute.GET("/overview", middleware.AdminAuth(), controller.GetSiteOverview)
+		logRoute.GET("/report", middleware.AdminAuth(), controller.GetUsageReport)
+		logRoute.GET("/report/export", middleware.AdminAuth(), controller.ExportUsageReportCSV)
 		logRoute.GET("/bandwidth/leaderboard", middleware.AdminAuth(), controller.GetBandwidthLeaderboard)
 		logRoute.GET("/bandwidth/model-leaderboard", middleware.AdminAuth(), controller.GetModelBandwidthLeaderboard)
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
@@ -348,6 +350,8 @@ func SetApiRouter(router *gin.Engine) {
 		{
 			systemInfoRoute.GET("/instances", controller.ListSystemInstances)
 			systemInfoRoute.GET("/live-requests", controller.GetLiveRequests)
+			systemInfoRoute.GET("/media-providers", controller.GetMediaProviders)
+			systemInfoRoute.GET("/channel-health", controller.GetChannelHealthScores)
 			systemInfoRoute.DELETE("/stale-instances", controller.DeleteStaleSystemInstances)
 			systemInfoRoute.DELETE("/instances/:node_name", controller.DeleteStaleSystemInstance)
 		}

@@ -8,9 +8,11 @@ import (
 )
 
 func TestGeminiSafetySettingsReadNormalization(t *testing.T) {
-	original := geminiSettings.SafetySettings
+	original := GetGeminiSettings().SafetySettings
 	t.Cleanup(func() {
-		geminiSettings.SafetySettings = original
+		UpdateGeminiSettings(func(settings *GeminiSettings) {
+			settings.SafetySettings = original
+		})
 	})
 
 	tests := []struct {
@@ -62,7 +64,9 @@ func TestGeminiSafetySettingsReadNormalization(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			geminiSettings.SafetySettings = test.settings
+			UpdateGeminiSettings(func(settings *GeminiSettings) {
+				settings.SafetySettings = test.settings
+			})
 
 			assert.Equal(t, test.want, GetGeminiSafetySetting(test.key))
 		})

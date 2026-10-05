@@ -6,19 +6,16 @@ import (
 	"os"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
-
-	"github.com/bytedance/gopkg/util/gopool"
 )
 
 const systemInstanceReportInterval = 30 * time.Second
 
-var systemInstanceReporterOnce sync.Once
+var systemInstanceReporter backgroundLoop
 
 type SystemInstanceInfo struct {
 	SchemaVersion int                       `json:"schema_version"`
@@ -63,17 +60,25 @@ type SystemInstanceStorageMetrics struct {
 }
 
 func StartSystemInstanceReporter() {
-	systemInstanceReporterOnce.Do(func() {
-		gopool.Go(func() {
-			reportSystemInstanceWithLog()
+	systemInstanceReporter.start(func(ctx context.Context) {
+		reportSystemInstanceWithLog()
 
-			ticker := time.NewTicker(systemInstanceReportInterval)
-			defer ticker.Stop()
-			for range ticker.C {
+		ticker := time.NewTicker(systemInstanceReportInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
 				reportSystemInstanceWithLog()
 			}
-		})
+		}
 	})
+}
+
+// StopSystemInstanceReporter 停止后台实例上报并等待其退出（供优雅关闭调用）。
+func StopSystemInstanceReporter() {
+	systemInstanceReporter.stop()
 }
 
 func ReportCurrentSystemInstance() error {

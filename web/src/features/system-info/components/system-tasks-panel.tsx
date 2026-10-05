@@ -42,6 +42,7 @@ import { toIntlLocale } from '@/i18n/languages'
 import { formatTimestampRelative, formatTimestampToDate } from '@/lib/format'
 import { createServerError } from '@/lib/server-error-message'
 import { cn } from '@/lib/utils'
+import { useDocumentVisible } from '@/hooks/use-document-visible'
 
 const TASK_LIMIT = 20
 const ACTIVE_POLL_INTERVAL_MS = 8000
@@ -207,6 +208,7 @@ function SystemTasksTable(props: SystemTasksTableProps) {
 
 export function SystemTasksPanel() {
   const { t } = useTranslation()
+  const documentVisible = useDocumentVisible()
   const tasksQuery = useQuery({
     queryKey: ['system-info', 'system-tasks'],
     queryFn: async () => {
@@ -218,8 +220,9 @@ export function SystemTasksPanel() {
     },
     staleTime: 30 * 1000,
     retry: false,
+    enabled: documentVisible,
     refetchInterval: (query) =>
-      query.state.data?.some((task) => isActiveStatus(task.status))
+      documentVisible && query.state.data?.some((task) => isActiveStatus(task.status))
         ? ACTIVE_POLL_INTERVAL_MS
         : false,
   })

@@ -1,6 +1,13 @@
 package operation_setting
 
-import "github.com/lza6/new-api-Max/setting/config"
+import (
+	"maps"
+	"slices"
+	"sync"
+	"sync/atomic"
+
+	"github.com/lza6/new-api-Max/setting/config"
+)
 
 type ChannelAffinityKeySource struct {
 	Type string `json:"type"` // context_int, context_string, request_header, gjson
@@ -149,10 +156,77 @@ var channelAffinitySetting = ChannelAffinitySetting{
 	},
 }
 
-func init() {
-	config.GlobalConfig.Register("channel_affinity_setting", &channelAffinitySetting)
+// channelAffinitySettingMu 保护 channelAffinitySetting 主副本（Rules 为嵌套
+// slice，规则内含多个 []string 与 map[string]any 模板）。
+var channelAffinitySettingMu sync.RWMutex
+
+// channelAffinitySettingSnapshot 已发布的不可变快照。请求热路径（匹配规则、
+// 组装缓存键、套用覆盖模板）只读快照，避免与周期热更新（反射就地写 slice/map）竞争。
+var channelAffinitySettingSnapshot atomic.Pointer[ChannelAffinitySetting]
+
+// cloneChannelAffinityRule 深拷贝单条规则的全部 slice/map 字段。
+func cloneChannelAffinityRule(rule ChannelAffinityRule) ChannelAffinityRule {
+	cloned := rule
+	cloned.ModelRegex = slices.Clone(rule.ModelRegex)
+	cloned.PathRegex = slices.Clone(rule.PathRegex)
+	cloned.UserAgentInclude = slices.Clone(rule.UserAgentInclude)
+	if rule.KeySources != nil {
+		cloned.KeySources = make([]ChannelAffinityKeySource, len(rule.KeySources))
+		copy(cloned.KeySources, rule.KeySources)
+	}
+	cloned.ParamOverrideTemplate = maps.Clone(rule.ParamOverrideTemplate)
+	return cloned
 }
 
-func GetChannelAffinitySetting() *ChannelAffinitySetting {
+// publishChannelAffinitySettingSnapshotLocked 在持 channelAffinitySettingMu 前提下
+// 深拷贝主副本并发布。
+func publishChannelAffinitySettingSnapshotLocked() {
+	snap := channelAffinitySetting
+	if channelAffinitySetting.Rules != nil {
+		rules := make([]ChannelAffinityRule, len(channelAffinitySetting.Rules))
+		for i, rule := range channelAffinitySetting.Rules {
+			rules[i] = cloneChannelAffinityRule(rule)
+		}
+		snap.Rules = rules
+	}
+	channelAffinitySettingSnapshot.Store(&snap)
+}
+
+// loadChannelAffinitySetting 返回当前不可变快照（无锁）。首次快照发布前兜底返回主副本指针。
+func loadChannelAffinitySetting() *ChannelAffinitySetting {
+	if s := channelAffinitySettingSnapshot.Load(); s != nil {
+		return s
+	}
 	return &channelAffinitySetting
+}
+
+// BeforeConfigWrite / AfterConfigWrite 实现 config.configWriteHook。
+func (c *ChannelAffinitySetting) BeforeConfigWrite() { channelAffinitySettingMu.Lock() }
+func (c *ChannelAffinitySetting) AfterConfigWrite() {
+	publishChannelAffinitySettingSnapshotLocked()
+	channelAffinitySettingMu.Unlock()
+}
+
+// LockConfigRead / UnlockConfigRead 实现 config.configReadGuard。
+func (c *ChannelAffinitySetting) LockConfigRead()   { channelAffinitySettingMu.RLock() }
+func (c *ChannelAffinitySetting) UnlockConfigRead() { channelAffinitySettingMu.RUnlock() }
+
+func init() {
+	config.GlobalConfig.Register("channel_affinity_setting", &channelAffinitySetting)
+	channelAffinitySettingMu.Lock()
+	publishChannelAffinitySettingSnapshotLocked()
+	channelAffinitySettingMu.Unlock()
+}
+
+// GetChannelAffinitySetting 返回当前不可变快照。只读，勿直接改写返回对象。
+func GetChannelAffinitySetting() *ChannelAffinitySetting {
+	return loadChannelAffinitySetting()
+}
+
+// UpdateChannelAffinitySetting 在写锁内修改主副本并发布新快照（供运行时变更与测试使用）。
+func UpdateChannelAffinitySetting(fn func(*ChannelAffinitySetting)) {
+	channelAffinitySettingMu.Lock()
+	defer channelAffinitySettingMu.Unlock()
+	fn(&channelAffinitySetting)
+	publishChannelAffinitySettingSnapshotLocked()
 }

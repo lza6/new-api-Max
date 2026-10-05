@@ -137,6 +137,9 @@ func main() {
 	// all currently alive nodes in multi-instance deployments.
 	service.StartSystemInstanceReporter()
 
+	// 站内图床清理：每 5 分钟清理超过保留期的已完成任务产物/参考素材（仅 local 模式生效）。
+	service.StartTaskArtifactCleanup()
+
 	// Wire task polling adaptor factory (breaks service -> relay import cycle).
 	// Must run before the system task runner starts: the async_task_poll handler
 	// calls service.RunTaskPollingOnce, which needs this factory set.
@@ -239,6 +242,19 @@ func main() {
 
 	// SSE streams may run for minutes; give them time to finish before forced exit
 	shutdownTimeout := time.Duration(common.GetEnvOrDefault("SHUTDOWN_TIMEOUT_SECONDS", 120)) * time.Second
+	// 优雅关闭顺序：先停后台写入任务（避免停机期间继续写库/发通知），再让 HTTP
+	// Shutdown 排空活跃请求/SSE 流，最后关闭残余空闲连接并排空缓冲队列。
+	// 后台任务循环在 ctx 取消后立即停止取用下一 tick，stop 会等待 goroutine 真正退出。
+	service.StopSystemTaskRunner()
+	service.StopCodexCredentialAutoRefreshTask()
+	service.StopSubscriptionQuotaResetTask()
+	service.StopSystemInstanceReporter()
+	service.StopTaskArtifactCleanup()
+	service.StopAuthArtifactCleanup()
+	service.StopTaskEventCleanup()
+	service.StopDiskCacheMaintenanceLoop()
+	service.StopWebProtectionMaintenanceLoop()
+
 	// 零停机关键：先停 keep-alive（新连接不再复用空闲连接，旧空闲连接关闭），
 	// 再 Shutdown 等待活跃请求/SSE 流自然结束（最多 shutdownTimeout），
 	// 最后关闭残余空闲连接。Caddy 反代会在探测到端口关闭后把流量切到备用实例。
@@ -252,6 +268,10 @@ func main() {
 	// 停止异步消费日志 worker 并排空队列，避免优雅退出丢失已入队但未落库的日志。
 	// （docker rm -f 走 SIGKILL 时仍可能丢一个批次，属已文档化的权衡。）
 	model.StopConsumeLogFlusher()
+
+	// 排空批量额度/用量增量（BATCH_UPDATE_ENABLED=true 时），避免停机丢失最近
+	// 一个 BATCH_UPDATE_INTERVAL 内已入队但未落库的额度变更。
+	model.StopBatchUpdater()
 
 	// 内存中的看板数据保存入库，避免重启丢失未落库数据 (issue #5679)
 	if common.DataExportEnabled {

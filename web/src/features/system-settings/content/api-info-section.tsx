@@ -27,19 +27,10 @@ import * as z from 'zod'
 import { BadgeCell } from '@/components/data-table/core/badge-cell'
 import { StaticDataTable } from '@/components/data-table/static/static-data-table'
 import { StaticRowActions } from '@/components/data-table/static/static-row-actions'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Dialog } from '@/components/dialog'
 import { StatusBadge } from '@/components/status-badge'
 import { useStatus } from '@/hooks/use-status'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import {
@@ -522,26 +513,21 @@ export function ApiInfoSection({ enabled, data }: ApiInfoSectionProps) {
         </Form>
       </Dialog>
 
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('Are you sure?')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {deleteTarget === 'single'
-                ? t('This API shortcut will be removed from the list.')
-                : t('{{count}} API shortcuts will be removed from the list.', {
-                    count: selectedIds.length,
-                  })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t('Cancel')}</AlertDialogCancel>
-            <AlertDialogAction variant='destructive' onClick={confirmDelete}>
-              {t('Delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        destructive
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        title={t('Are you sure?')}
+        desc={
+          deleteTarget === 'single'
+            ? t('This API shortcut will be removed from the list.')
+            : t('{{count}} API shortcuts will be removed from the list.', {
+                count: selectedIds.length,
+              })
+        }
+        confirmText={t('Delete')}
+        handleConfirm={confirmDelete}
+      />
     </SettingsSection>
   )
 }

@@ -37,7 +37,7 @@
 | username | varchar | index + index_username_model_name(2) |
 | token_name | varchar | index |
 | model_name | varchar | index + index_username_model_name(1) |
-| request_bytes/response_bytes | bigint | idx_logs_traffic(2/3) |
+| request_bytes/response_bytes | bigint | 无索引（聚合无谓词，索引零收益；idx_logs_traffic 已删） |
 | channel_id | int | index |
 | token_id | int | index |
 | group | varchar | index（保留字走 commonGroupCol） |
@@ -74,7 +74,11 @@
 ## 索引策略（慢查询猎杀结论）
 - logs 复合索引覆盖高频查询：按时间（idx_created_at_id）、按用户（idx_user_id_id）、
   按类型+时间（idx_log_type_created_id）、按用户+类型+时间（idx_log_user_type_created）、
-  按流量（idx_logs_traffic）、按 request_id 追踪（idx_logs_request_id）。
+  按 request_id 追踪（idx_logs_request_id）。
+  - ⚠️ 原 `idx_logs_traffic`（request_bytes,response_bytes）**已删除**（2026-10-04）：该索引缺
+    priority:1，且站点流量聚合是**无 WHERE 谓词的 SUM**，B-tree 完全不可用，只增加每次日志 INSERT
+    的索引维护。存量库由 `migrateLogTrafficIndex` 显式 DropIndex 清理（AutoMigrate 不删多余索引）。
+    若确需加速站点流量聚合，正确手段是「按日预聚合表」，非单列索引。
 - users 唯一索引防重复注册：username / aff_code / access_token。
 
 ## 验证

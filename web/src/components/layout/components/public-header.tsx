@@ -175,7 +175,10 @@ export function PublicHeader(props: PublicHeaderProps) {
 
   return (
     <>
-      <header className='pointer-events-none fixed inset-x-0 top-0 z-50'>
+      {/* `viewport-fit=cover` lets the page paint under the notch, so the fixed
+          public header must offset itself by the top safe-area inset or the nav
+          sits under the status bar on notched devices (landscape especially). */}
+      <header className='pointer-events-none fixed inset-x-0 top-0 z-50 pt-[env(safe-area-inset-top,0px)]'>
         <div
           className={cn(
             'pointer-events-auto mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]',

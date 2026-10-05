@@ -23,6 +23,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { DateTimePicker } from '@/components/datetime-picker'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
@@ -587,36 +588,28 @@ export function LogSettingsSection({
           ))}
       </div>
 
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('Confirm log cleanup')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {formattedPurgeDate
-                ? t(
-                    'This will permanently remove all log entries created before {{date}}.',
-                    { date: formattedPurgeDate }
-                  )
-                : t(
-                    'This will permanently remove log entries before the selected timestamp.'
-                  )}{' '}
-              {t('This action cannot be undone.')}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isStartingLogCleanup}>
-              {t('Cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant='destructive'
-              onClick={handleCleanLogs}
-              disabled={isStartingLogCleanup}
-            >
-              {isStartingLogCleanup ? t('Cleaning...') : t('Delete logs')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        destructive
+        open={showConfirmDialog}
+        onOpenChange={setShowConfirmDialog}
+        title={t('Confirm log cleanup')}
+        desc={
+          <>
+            {formattedPurgeDate
+              ? t(
+                  'This will permanently remove all log entries created before {{date}}.',
+                  { date: formattedPurgeDate }
+                )
+              : t(
+                  'This will permanently remove log entries before the selected timestamp.'
+                )}{' '}
+            {t('This action cannot be undone.')}
+          </>
+        }
+        confirmText={isStartingLogCleanup ? t('Cleaning...') : t('Delete logs')}
+        isLoading={isStartingLogCleanup}
+        handleConfirm={handleCleanLogs}
+      />
     </SettingsSection>
   )
 }

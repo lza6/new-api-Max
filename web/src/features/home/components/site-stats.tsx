@@ -14,7 +14,9 @@ import { getSiteStats } from '../api'
 /**
  * Authoritative site statistics (aggregates only): bandwidth served,
  * requests processed and tokens processed. Rendered on the marketing home
- * page; falls back to a compact empty state when the API is unavailable.
+ * page; when the API is unavailable or returns no data the whole strip is
+ * hidden (return null) rather than showing an error — a missing marketing
+ * stat is not actionable for a visitor, unlike a failed table or form.
  */
 export function SiteStats() {
   const { t } = useTranslation()

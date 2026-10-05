@@ -401,6 +401,10 @@ export function PluginsTable(props: PluginsTableProps) {
         columns={columns}
         isLoading={pluginsQuery.isLoading}
         isFetching={pluginsQuery.isFetching}
+        isError={pluginsQuery.isError}
+        errorTitle={t('Failed to load task plugins')}
+        errorDescription={t('Please check your connection and try again.')}
+        onRetry={() => pluginsQuery.refetch()}
         emptyTitle={t('No task plugins found')}
         emptyDescription={t('Upload a task plugin to add a platform.')}
         skeletonKeyPrefix='task-plugin'

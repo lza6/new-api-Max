@@ -21,11 +21,9 @@ import { useTranslation } from 'react-i18next'
 
 import { CopyButton } from '@/components/copy-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useSiteModel } from '@/hooks/use-site-model'
 import { useStatus } from '@/hooks/use-status'
 
-
-/** 站内主模型：网关在 OpenAI/Anthropic/Codex 协议下同名映射到上游。 */
-const SITE_MODEL = 'deepseek-v4-flash'
 
 interface ToolPreset {
   key: string
@@ -147,6 +145,7 @@ function buildPresets(): ToolPreset[] {
 export function ToolIntegrationSection() {
   const { t } = useTranslation()
   const { status } = useStatus()
+  const siteModel = useSiteModel()
   const baseUrl = useMemo(() => {
     const apiInfo = status?.api_info as Array<{ url?: string }> | undefined
     const candidate = status?.server_address || apiInfo?.[0]?.url
@@ -194,12 +193,12 @@ export function ToolIntegrationSection() {
           <Card key={preset.key}>
             <CardHeader className="flex flex-row items-start justify-between gap-2">
               <CardTitle className="text-base">{t(preset.titleKey)}</CardTitle>
-              <CopyButton value={preset.config(baseUrl, SITE_MODEL)} size="sm" />
+              <CopyButton value={preset.config(baseUrl, siteModel)} size="sm" />
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
               <p className="text-muted-foreground">{t(preset.introKey)}</p>
               <pre className="bg-muted/40 overflow-x-auto rounded-md border p-3 font-mono text-xs leading-relaxed">
-                {preset.config(baseUrl, SITE_MODEL)}
+                {preset.config(baseUrl, siteModel)}
               </pre>
             </CardContent>
           </Card>
@@ -214,11 +213,11 @@ export function ToolIntegrationSection() {
             <div className="bg-muted/30 overflow-x-auto rounded-md border p-3 font-mono text-xs">
               <div className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1">
                 <span className="text-muted-foreground">{t('OpenAI / Responses')}</span>
-                <span>{SITE_MODEL}</span>
+                <span>{siteModel}</span>
                 <span className="text-muted-foreground">{t('Anthropic')}</span>
-                <span>{SITE_MODEL}</span>
+                <span>{siteModel}</span>
                 <span className="text-muted-foreground">{t('Codex')}</span>
-                <span>{SITE_MODEL}</span>
+                <span>{siteModel}</span>
               </div>
             </div>
             <p className="text-muted-foreground text-xs">
