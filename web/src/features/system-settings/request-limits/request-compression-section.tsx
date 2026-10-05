@@ -60,6 +60,7 @@ const createSchema = () =>
       .min(1, 'Must be at least 1 KB')
       .max(1024 * 1024, 'Too large'),
     level: z.number().int().min(1).max(9),
+    maxMb: z.number().int().min(1).max(1024 * 1024),
   })
 
 type FormValues = z.infer<ReturnType<typeof createSchema>>
@@ -69,6 +70,7 @@ interface RequestCompressionSectionProps {
     enabled: boolean
     thresholdKb: number
     level: number
+    maxMb: number
   }
 }
 
@@ -108,6 +110,7 @@ export function RequestCompressionSection({
       enabled: defaultValues.enabled,
       thresholdKb: defaultValues.thresholdKb,
       level: defaultValues.level,
+      maxMb: defaultValues.maxMb,
     },
   })
 
@@ -116,11 +119,13 @@ export function RequestCompressionSection({
       enabled: defaultValues.enabled,
       thresholdKb: defaultValues.thresholdKb,
       level: defaultValues.level,
+      maxMb: defaultValues.maxMb,
     })
-  }, [defaultValues.enabled, defaultValues.thresholdKb, defaultValues.level, form])
+  }, [defaultValues.enabled, defaultValues.thresholdKb, defaultValues.level, defaultValues.maxMb, form])
 
   const thresholdValue = form.watch('thresholdKb')
   const levelValue = form.watch('level')
+  const maxMbValue = form.watch('maxMb')
 
   // 累积统计：复用系统信息实时接口（管理员可见），每 30s 刷新一次。
   const totalsQuery = useQuery({
@@ -143,6 +148,7 @@ export function RequestCompressionSection({
       ['relay.request_compression_enabled', values.enabled],
       ['relay.request_compression_threshold_kb', values.thresholdKb],
       ['relay.request_compression_level', values.level],
+      ['relay.request_compression_max_mb', values.maxMb],
     ]
     for (const [key, value] of updates) {
       await updateOption.mutateAsync({ key, value })
@@ -254,6 +260,42 @@ export function RequestCompressionSection({
                       {t('Current')}:{' '}
                       <span className='font-mono tabular-nums'>
                         {thresholdValue} KB
+                      </span>
+                    </>
+                  ) : null}
+                </FormDescription>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='maxMb'
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>{t('Max size to compress (MB)')}</FormLabel>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={1}
+                    step={1}
+                    value={field.value}
+                    onChange={(e) =>
+                      field.onChange(Number.parseInt(e.target.value, 10) || 20)
+                    }
+                  />
+                </FormControl>
+                <FormDescription>
+                  {t(
+                    'Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.'
+                  )}
+                  {maxMbValue > 0 ? (
+                    <>
+                      {' '}
+                      {t('Current')}:{' '}
+                      <span className='font-mono tabular-nums'>
+                        {maxMbValue} MB
                       </span>
                     </>
                   ) : null}

@@ -103,12 +103,19 @@ func MaybeCompressOutboundBody(c *gin.Context, info *RelayInfo, body io.Reader) 
 
 	threshold := int64(relay_setting.GetRequestCompressionThresholdKB()) << 10
 	level := relay_setting.GetRequestCompressionLevel()
+	// 上限：超过则不压缩（护 CPU）。超大 body 压缩极耗 CPU，明文直发更快。
+	maxBytes := int64(relay_setting.GetRequestCompressionMaxMB()) << 20
 
 	// 可回放 body：已知大小，可从独立 reader 流式压缩，原 body 保持可用以便
 	// 压缩无收益/失败时原样转发（不额外拷贝）。
 	if replayable, ok := body.(common.ReplayableBody); ok {
 		size := replayable.Size()
 		if threshold > 0 && size < threshold {
+			return body, false, nil, size, size
+		}
+		if maxBytes > 0 && size > maxBytes {
+			// 超上限：不压缩（护 CPU），明文转发。
+			logCompressionWarn(c, fmt.Sprintf("request compression: body %d bytes exceeds max %d, sending uncompressed", size, maxBytes))
 			return body, false, nil, size, size
 		}
 		reader, err := replayable.NewReader()

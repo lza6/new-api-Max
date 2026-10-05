@@ -413,6 +413,7 @@ export type SecuritySettings = {
   'relay.request_compression_enabled': boolean
   'relay.request_compression_threshold_kb': number
   'relay.request_compression_level': number
+  'relay.request_compression_max_mb': number
 }
 
 export type UpstreamChannel = {

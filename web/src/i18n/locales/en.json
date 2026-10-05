@@ -6941,6 +6941,8 @@
     "No client data yet": "No client data yet",
     "Avg cache hit rate": "Avg cache hit rate",
     "Cache hit": "Cache hit",
-    "Top client": "Top client"
+    "Top client": "Top client",
+    "Max size to compress (MB)": "Max size to compress (MB)",
+    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB."
   }
 }

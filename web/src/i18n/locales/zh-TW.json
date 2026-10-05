@@ -6941,6 +6941,8 @@
     "No client data yet": "暫無客戶端資料",
     "Avg cache hit rate": "平均快取命中率",
     "Cache hit": "快取命中",
-    "Top client": "主要客戶端"
+    "Top client": "主要客戶端",
+    "Max size to compress (MB)": "觸發壓縮的最大體積（MB）",
+    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "超過該體積的請求體不壓縮（保護 CPU）。預設 20 MB。"
   }
 }

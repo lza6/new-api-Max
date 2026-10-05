@@ -70,6 +70,7 @@ const SECURITY_SECTIONS = [
           thresholdKb:
             Number(settings['relay.request_compression_threshold_kb']) || 50,
           level: Number(settings['relay.request_compression_level']) || 6,
+          maxMb: Number(settings['relay.request_compression_max_mb']) || 20,
         }}
       />
     ),

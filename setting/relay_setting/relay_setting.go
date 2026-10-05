@@ -90,6 +90,10 @@ type RelaySetting struct {
 	// 默认 6=Default）。级别越高压缩率越好但 CPU 越多。<=0 或超范围时用默认 6。
 	// 管理员可热更新（面板展示压缩率与压缩耗时供权衡）。
 	RequestCompressionLevel int `json:"request_compression_level"`
+	// RequestCompressionMaxMB 触发压缩的**最大**请求体（MB，默认 20）。请求体大于该
+	// 值时不压缩——超大 body 压缩极耗 CPU（本站 2C/4C 小机尤甚），明文直发更快。
+	// <=0 表示不设上限。管理员可热更新。
+	RequestCompressionMaxMB int `json:"request_compression_max_mb"`
 }
 
 // RateLimitTier 限速档位（并发 + RPM）。
@@ -275,6 +279,20 @@ func GetRequestCompressionLevel() int {
 		return s.RequestCompressionLevel
 	}
 	return DefaultRequestCompressionLevel
+}
+
+// DefaultRequestCompressionMaxMB 触发压缩的最大请求体（MB）。超过则不压缩——超大
+// body 压缩极耗 CPU（小机尤甚）。20MB 覆盖绝大多数 prompt，超出者明文直发更快。
+const DefaultRequestCompressionMaxMB = 20
+
+// GetRequestCompressionMaxMB 返回触发压缩的最大请求体（MB）。
+// 管理员配置 >0 时生效；否则默认 20；<=0（未配置）与显式 0 的区分：未配置回退默认，
+// 管理员若想要「不设上限」需显式设一个很大的值（不建议）。
+func GetRequestCompressionMaxMB() int {
+	if s := GetRelaySetting(); s != nil && s.RequestCompressionMaxMB > 0 {
+		return s.RequestCompressionMaxMB
+	}
+	return DefaultRequestCompressionMaxMB
 }
 
 // GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：

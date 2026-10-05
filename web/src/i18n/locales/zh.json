@@ -6941,6 +6941,8 @@
     "No client data yet": "暂无客户端数据",
     "Avg cache hit rate": "平均缓存命中率",
     "Cache hit": "缓存命中",
-    "Top client": "主要客户端"
+    "Top client": "主要客户端",
+    "Max size to compress (MB)": "触发压缩的最大体积（MB）",
+    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "超过该体积的请求体不压缩（保护 CPU）。默认 20 MB。"
   }
 }

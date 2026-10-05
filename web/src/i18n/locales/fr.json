@@ -6941,6 +6941,8 @@
     "No client data yet": "Aucune donnée client",
     "Avg cache hit rate": "Taux de cache moyen",
     "Cache hit": "Cache",
-    "Top client": "Client principal"
+    "Top client": "Client principal",
+    "Max size to compress (MB)": "Taille max à compresser (Mo)",
+    "Request bodies larger than this are sent uncompressed to protect CPU. Default 20 MB.": "Les corps dépassant cette taille sont envoyés non compressés (protège le CPU). Défaut 20 Mo."
   }
 }
