@@ -123,3 +123,26 @@ func GetCompressionStats(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": out})
 }
+
+// GetClientStats 返回客户端使用统计（各客户端占比 + 各模型客户端占比 + 平均缓存率）。
+// GET /api/rankings/clients?days=7&models=20
+func GetClientStats(c *gin.Context) {
+	days := 7
+	if v := c.Query("days"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			days = min(n, 365)
+		}
+	}
+	models := 20
+	if v := c.Query("models"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			models = min(n, 100)
+		}
+	}
+	res, err := service.GetClientStats(days, models)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to build client stats")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": res})
+}

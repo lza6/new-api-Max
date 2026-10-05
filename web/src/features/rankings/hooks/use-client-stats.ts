@@ -16,13 +16,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-export * from './bandwidth-section'
-export * from './entity-links'
-export * from './growth-text'
-export * from './market-share-section'
-export * from './model-leaderboard'
-export * from './models-section'
-export * from './pulse-section'
-export * from './rankings-hero'
-export * from './compression-section'
-export * from './client-stats-section'
+import { useQuery } from '@tanstack/react-query'
+
+import { requireServerSuccess } from '@/lib/server-error-message'
+
+import { getClientStats } from '../api'
+
+export function useClientStats(days = 7, models = 20) {
+  return useQuery({
+    queryKey: ['rankings', 'clients', days, models],
+    queryFn: async () =>
+      requireServerSuccess(await getClientStats(days, models)).data,
+    staleTime: 5 * 60 * 1000,
+  })
+}

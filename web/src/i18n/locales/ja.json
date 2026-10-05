@@ -6934,6 +6934,12 @@
     "What is compression ratio & how does it work?": "圧縮率とは？仕組みは？",
     "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "圧縮率 = 圧縮後サイズ ÷ 元サイズ。30% は 2.1 MB のプロンプトを約 0.6 MB で送信。",
     "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "技術：アップロード前に本文を gzip 圧縮（Content-Encoding: gzip）、上流が自動解凍。根拠：RFC 1952 gzip（DEFLATE, RFC 1951）。",
-    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "99% にならない理由：gzip は冗長性しか除けません。テキスト/コードは ~1%、Base64 画像はシャノンエントロピー限界に近く圧縮困難。"
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "99% にならない理由：gzip は冗長性しか除けません。テキスト/コードは ~1%、Base64 画像はシャノンエントロピー限界に近く圧縮困難。",
+    "Client Usage": "クライアント利用",
+    "Which clients call the gateway (last 7 days)": "どのクライアントが利用しているか（直近7日）",
+    "Unable to load client data": "クライアントデータを読み込めません",
+    "No client data yet": "クライアントデータはまだありません",
+    "Avg cache hit rate": "平均キャッシュヒット率",
+    "Cache hit": "キャッシュ"
   }
 }

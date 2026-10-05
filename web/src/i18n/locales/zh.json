@@ -6934,6 +6934,12 @@
     "What is compression ratio & how does it work?": "什么是压缩率？怎么实现的？",
     "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "压缩率 = 压缩后大小 ÷ 原始大小。30% 表示 2.1 MB 的 prompt 上传时只发约 0.6 MB。",
     "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "技术：网关在上传前对请求体做 gzip 压缩（Content-Encoding: gzip），上游自动解压。技术依据：RFC 1952 gzip（DEFLATE，RFC 1951）。",
-    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "为什么到不了 99%：gzip 只能去冗余。纯文本/代码可压到 ~1%；Base64 图片与高熵数据已接近香农熵极限，几乎压不动。"
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "为什么到不了 99%：gzip 只能去冗余。纯文本/代码可压到 ~1%；Base64 图片与高熵数据已接近香农熵极限，几乎压不动。",
+    "Client Usage": "客户端使用",
+    "Which clients call the gateway (last 7 days)": "哪些客户端在调用网关（近 7 天）",
+    "Unable to load client data": "无法加载客户端数据",
+    "No client data yet": "暂无客户端数据",
+    "Avg cache hit rate": "平均缓存命中率",
+    "Cache hit": "缓存命中"
   }
 }

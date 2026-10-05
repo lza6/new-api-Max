@@ -524,5 +524,72 @@ func GetModelStats(c *gin.Context) {
 		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
 		return
 	}
-	common.ApiSuccess(c, gin.H{"stats": service.MergeModelStats(consumeToday, errorToday, consume30, error30)})
+	stats := service.MergeModelStats(consumeToday, errorToday, consume30, error30)
+
+	// §模型广场：补充每模型「压缩率」与「缓存命中率」。
+	// 压缩率来自持久表（重启不丢）；缓存命中率来自近 30 天日志 other.cache_ratio。
+	if compRows, err := model.GetModelCompressionStats(); err == nil {
+		compByName := make(map[string]float64, len(compRows))
+		for _, r := range compRows {
+			if r.OriginalBytes > 0 {
+				compByName[r.ModelName] = float64(r.CompressedBytes) / float64(r.OriginalBytes)
+			}
+		}
+		for i := range stats {
+			if v, ok := compByName[stats[i].Model]; ok {
+				stats[i].CompressionRatio = v
+			}
+		}
+	}
+	cacheByName := modelCacheHitRates(start30d)
+	for i := range stats {
+		if v, ok := cacheByName[stats[i].Model]; ok {
+			stats[i].CacheHitRate = v
+		} else {
+			stats[i].CacheHitRate = -1
+		}
+	}
+
+	common.ApiSuccess(c, gin.H{"stats": stats})
+}
+
+// modelCacheHitRates 从近 since 起的 consume 日志 other.cache_ratio 聚合每模型平均缓存命中率。
+// cache_ratio ∈ [0,1]；缺失（-1 或未采集）不计入。失败返回空 map（不阻断主统计）。
+func modelCacheHitRates(since int64) map[string]float64 {
+	type row struct {
+		ModelName string
+		Other     string
+	}
+	var rows []row
+	if err := model.LOG_DB.Model(&model.Log{}).
+		Select("model_name", "other").
+		Where("type = ? AND created_at >= ? AND model_name <> ''", model.LogTypeConsume, since).
+		Scan(&rows).Error; err != nil {
+		return nil
+	}
+	sum := map[string]float64{}
+	cnt := map[string]int64{}
+	for _, r := range rows {
+		if r.Other == "" {
+			continue
+		}
+		var o struct {
+			CacheRatio float64 `json:"cache_ratio"`
+		}
+		if common.UnmarshalJsonStr(r.Other, &o) != nil {
+			continue
+		}
+		if o.CacheRatio < 0 {
+			continue
+		}
+		sum[r.ModelName] += o.CacheRatio
+		cnt[r.ModelName]++
+	}
+	out := make(map[string]float64, len(sum))
+	for k, s := range sum {
+		if cnt[k] > 0 {
+			out[k] = s / float64(cnt[k])
+		}
+	}
+	return out
 }

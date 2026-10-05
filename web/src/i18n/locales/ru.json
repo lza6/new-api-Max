@@ -6934,6 +6934,12 @@
     "What is compression ratio & how does it work?": "Что такое коэффициент сжатия?",
     "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "Коэффициент = сжатый размер ÷ исходный. 30% — prompt 2,1 МБ уходит ~0,6 МБ.",
     "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "Технология: шлюз сжимает тело gzip (Content-Encoding: gzip), upstream распаковывает. Основа: RFC 1952 gzip (DEFLATE, RFC 1951).",
-    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Почему не 99%: gzip убирает лишь избыточность. Текст/код — до ~1%, Base64 близки к пределу Шеннона."
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Почему не 99%: gzip убирает лишь избыточность. Текст/код — до ~1%, Base64 близки к пределу Шеннона.",
+    "Client Usage": "Использование клиентов",
+    "Which clients call the gateway (last 7 days)": "Какие клиенты вызывают шлюз (7 дней)",
+    "Unable to load client data": "Не удалось загрузить данные клиентов",
+    "No client data yet": "Пока нет данных клиентов",
+    "Avg cache hit rate": "Средний кэш-хит",
+    "Cache hit": "Кэш"
   }
 }

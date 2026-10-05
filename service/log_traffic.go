@@ -174,6 +174,10 @@ type ModelStat struct {
 	TodaySuccess  int64  `json:"today_success"`
 	Days30Total   int64  `json:"days30_total"`
 	Days30Success int64  `json:"days30_success"`
+	// §模型广场展示：该模型出站请求体压缩后/原始（越小越好，0=无数据）。
+	CompressionRatio float64 `json:"compression_ratio,omitempty"`
+	// §模型广场展示：近 30 天平均缓存命中率（0-1，-1=无数据）。
+	CacheHitRate float64 `json:"cache_hit_rate"`
 }
 
 // MergeModelStats 将四组（今日成功/今日失败/30天成功/30天失败）按模型名合并为

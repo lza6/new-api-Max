@@ -6934,6 +6934,12 @@
     "What is compression ratio & how does it work?": "Tỷ lệ nén là gì và hoạt động thế nào?",
     "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "Tỷ lệ = kích thước nén ÷ kích thước gốc. 30% = prompt 2,1 MB chỉ gửi ~0,6 MB.",
     "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "Công nghệ: gateway nén gzip phần thân yêu cầu (Content-Encoding: gzip), upstream tự giải nén. Cơ sở: RFC 1952 gzip (DEFLATE, RFC 1951).",
-    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Vì sao không tới 99%: gzip chỉ loại bỏ dư thừa. Văn bản/mã còn ~1%; ảnh Base64 gần giới hạn entropy Shannon."
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Vì sao không tới 99%: gzip chỉ loại bỏ dư thừa. Văn bản/mã còn ~1%; ảnh Base64 gần giới hạn entropy Shannon.",
+    "Client Usage": "Sử dụng theo客户端",
+    "Which clients call the gateway (last 7 days)": "客户端 nào gọi gateway (7 ngày qua)",
+    "Unable to load client data": "Không tải được dữ liệu client",
+    "No client data yet": "Chưa có dữ liệu client",
+    "Avg cache hit rate": "Tỷ lệ cache trung bình",
+    "Cache hit": "Cache"
   }
 }

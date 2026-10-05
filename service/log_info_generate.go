@@ -46,6 +46,7 @@ func attachQuotaSaturation(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, o
 		clamp.Op, clamp.Kind, clamp.Original, clamp.Clamped, relayInfo.UserId, relayInfo.GetBillingModelName()))
 }
 
+// appendRequestPath 记录请求路径（去掉 query）。
 func appendRequestPath(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, other *model.LogOther) {
 	if other == nil {
 		return
@@ -105,6 +106,7 @@ func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, m
 	other.SetPublic("model_price", modelPrice)
 	other.SetPublic("user_group_ratio", userGroupRatio)
 	other.SetPublic("frt", float64(relayInfo.FirstResponseTime.UnixMilli()-relayInfo.StartTime.UnixMilli()))
+	appendClientInfo(ctx, other)
 	// T5-2 时间线 span 化：把请求阶段写成结构化数组（name/elapsed_ms/status），
 	// 前端 request-timeline 优先消费真实耗时，不再纯推测。数据全部来自
 	// StartTime/FirstResponseTime 真实时间戳；未设置时该字段省略（旧日志兼容）。

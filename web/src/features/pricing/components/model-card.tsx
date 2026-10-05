@@ -390,6 +390,24 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
                 {formatNumber(props.stats.days30_success)}
               </dd>
             </div>
+            {props.stats.compression_ratio != null &&
+            props.stats.compression_ratio > 0 ? (
+              <div>
+                <dt>{t('Compression')}</dt>
+                <dd className='text-cyan-600 dark:text-cyan-400 font-mono font-semibold tabular-nums'>
+                  -{Math.round((1 - props.stats.compression_ratio) * 100)}%
+                </dd>
+              </div>
+            ) : null}
+            {props.stats.cache_hit_rate != null &&
+            props.stats.cache_hit_rate >= 0 ? (
+              <div>
+                <dt>{t('Cache hit')}</dt>
+                <dd className='text-violet-600 dark:text-violet-400 font-mono font-semibold tabular-nums'>
+                  {(props.stats.cache_hit_rate * 100).toFixed(0)}%
+                </dd>
+              </div>
+            ) : null}
           </dl>
         ) : null}
       </CardContent>

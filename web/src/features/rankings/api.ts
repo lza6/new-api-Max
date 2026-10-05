@@ -64,3 +64,28 @@ export async function getCompressionStats(
   const res = await api.get('/api/rankings/compression', { params: { limit } })
   return res.data
 }
+
+export interface ClientUsage {
+  client: string
+  count: number
+  share: number
+}
+export interface ModelClientBreakdown {
+  model: string
+  total: number
+  clients: ClientUsage[]
+}
+export interface ClientStats {
+  window_days: number
+  total: number
+  overall: ClientUsage[]
+  by_model: ModelClientBreakdown[]
+  avg_cache_rate: number
+}
+export async function getClientStats(
+  days = 7,
+  models = 20
+): Promise<{ success: boolean; data: ClientStats }> {
+  const res = await api.get('/api/rankings/clients', { params: { days, models } })
+  return res.data
+}

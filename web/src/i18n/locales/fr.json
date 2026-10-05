@@ -6934,6 +6934,12 @@
     "What is compression ratio & how does it work?": "Qu’est-ce que le taux de compression ?",
     "Compression ratio = compressed size ÷ original size. 30% means a 2.1 MB prompt is sent upstream as ~0.6 MB.": "Taux = taille compressée ÷ taille d’origine. 30% = un prompt de 2,1 Mo envoyé en ~0,6 Mo.",
     "Technology: the gateway gzip-compresses the request body (Content-Encoding: gzip) before upload; the upstream decompresses transparently. Technical basis: RFC 1952 gzip (DEFLATE, RFC 1951).": "Technique : la passerelle compresse le corps en gzip (Content-Encoding: gzip) ; l’amont décompresse. Base : RFC 1952 gzip (DEFLATE, RFC 1951).",
-    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Pourquoi pas 99% : gzip ne retire que la redondance. Le texte/code descend à ~1% ; les images Base64 approchent l’entropie de Shannon."
+    "Why not 99%: gzip only removes redundancy. Plain text/code compresses to ~1%; Base64 images and high-entropy data approach their Shannon entropy limit and barely compress.": "Pourquoi pas 99% : gzip ne retire que la redondance. Le texte/code descend à ~1% ; les images Base64 approchent l’entropie de Shannon.",
+    "Client Usage": "Utilisation des clients",
+    "Which clients call the gateway (last 7 days)": "Quels clients appellent la passerelle (7 derniers jours)",
+    "Unable to load client data": "Impossible de charger les données clients",
+    "No client data yet": "Aucune donnée client",
+    "Avg cache hit rate": "Taux de cache moyen",
+    "Cache hit": "Cache"
   }
 }

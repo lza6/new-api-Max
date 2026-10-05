@@ -141,6 +141,10 @@ export type ModelStat = {
   today_success: number
   days30_total: number
   days30_success: number
+  // 出站请求体压缩后/原始（越小越好）；0 或缺省=无数据。
+  compression_ratio?: number
+  // 近 30 天平均缓存命中率（0-1）；-1=无数据。
+  cache_hit_rate?: number
 }
 
 export type ModelStatsResponse = {
