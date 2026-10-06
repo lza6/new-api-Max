@@ -14,9 +14,10 @@ import (
 )
 
 func SetRouter(router *gin.Engine, assets WebAssets) {
-	// §4.1.4：Prometheus 文本格式指标端点（env METRICS_ENABLED=true 开放，默认关）。
-	if strings.EqualFold(os.Getenv("METRICS_ENABLED"), "true") {
-		router.GET("/metrics", func(c *gin.Context) {
+	// §4.1.4 / B3-1：Prometheus 文本格式指标端点（env METRICS_ENABLED=true 开放，默认关）。
+	// 鉴权：仅可信来源（环回/私网）或 root 会话可读，避免指标泄漏到公网。
+	if middleware.MetricsEnabled() {
+		router.GET("/metrics", middleware.MetricsAuth(), func(c *gin.Context) {
 			c.Header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
 			c.String(http.StatusOK, common.RenderPrometheusMetrics())
 		})

@@ -16,6 +16,7 @@ func resetMetrics() {
 	metricsState.hist = make(map[string][]int64)
 	metricsState.histSum = make(map[string]float64)
 	metricsState.histN = make(map[string]int64)
+	metricsState.gauges = make(map[string]map[string]float64)
 }
 
 // TestMetricsCounterAndLabels 锁定 §4.1.4：带标签计数器累加 + 无标签 + 确定性渲染。
@@ -73,4 +74,36 @@ func TestMetricsDeterministic(t *testing.T) {
 	out2 := RenderPrometheusMetrics()
 	assert.Equal(t, out1, out2)
 	assert.Equal(t, strings.Index(out1, "a{"), strings.Index(out2, "a{"))
+}
+
+// TestMetricsGaugeRender B3-1：gauge 渲染为 # TYPE ... gauge，带标签；Reset 后清空。
+func TestMetricsGaugeRender(t *testing.T) {
+	resetMetrics()
+	MetricsSetGauge("channel_health_score", map[string]string{"channel_id": "7"}, 88.5)
+	MetricsSetGauge("consume_log_queue_depth", nil, 12)
+	out := RenderPrometheusMetrics()
+	require.Contains(t, out, "# TYPE channel_health_score gauge")
+	require.Contains(t, out, "channel_health_score{channel_id=7} 88.5")
+	require.Contains(t, out, "# TYPE consume_log_queue_depth gauge")
+	require.Contains(t, out, "consume_log_queue_depth 12")
+
+	MetricsResetGauges()
+	out2 := RenderPrometheusMetrics()
+	assert.NotContains(t, out2, "channel_health_score", "gauges must be cleared after reset")
+}
+
+// TestMetricsGaugeProviderInvoked B3-1：渲染前调用 provider 刷新派生指标。
+func TestMetricsGaugeProviderInvoked(t *testing.T) {
+	resetMetrics()
+	called := 0
+	prev := MetricsGaugeProvider
+	t.Cleanup(func() { MetricsGaugeProvider = prev })
+	MetricsGaugeProvider = func() {
+		called++
+		MetricsResetGauges()
+		MetricsSetGauge("channel_circuit_state", map[string]string{"channel_id": "3"}, 2)
+	}
+	out := RenderPrometheusMetrics()
+	assert.Equal(t, 1, called)
+	assert.Contains(t, out, "channel_circuit_state{channel_id=3} 2")
 }

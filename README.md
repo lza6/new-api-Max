@@ -379,7 +379,8 @@ docker run --name new-api -d --restart always \
 | `REDIS_CONN_STRING` | Redis connection string | - |
 | `SUBSCRIPTION_ACTIVE_CACHE_SECONDS` | 订阅档位正缓存 TTL（秒）：限流中间件对「有 active 订阅」用户每 TTL 才查询一次 DB，订阅变更即时失效；`0` = 关闭（逐位回退基线，每请求直查 DB）。多实例为进程内缓存，与 RPM 并发计数同口径 | `10` |
 | `SUBSCRIPTION_STATS_CACHE_SECONDS` | 公开订阅统计端点（`/v1/stats/subscriptions`）短缓存 TTL（秒）；`0` = 关闭实时聚合。公开只读端点已用宽松 `PublicReadRateLimit`（60/min/IP） | `30` |
-| `METRICS_ENABLED` | 是否开放 Prometheus 文本格式 `/metrics` 端点（默认关；含请求量/延迟直方图、限流命中、自动封禁、事件总线投递计数） | `false` |
+| `METRICS_ENABLED` | 是否开放 Prometheus 文本格式 `/metrics` 端点（默认关；含请求量/延迟直方图、限流命中、自动封禁、事件总线投递计数，以及**渠道健康分/熔断状态/冷却/队列深度** gauge）。**鉴权**：仅可信来源（环回/私网 `IsTrustedSourceIP`）或 root 会话可读，公网匿名 401 | `false` |
+| `READYZ_CHECK_REDIS` | `/readyz` 就绪探针是否将 Redis 可达性计入就绪码：`true`（默认）= Redis 宕机返回 503（fail-hard）；`false` = fail-soft（仅报告 Redis 状态，不影响就绪码）。未配置 `REDIS_CONN_STRING` 时 Redis 视为「未依赖」恒就绪 | `true` |
 | `SLOW_REQUEST_THRESHOLD_MS` | 慢请求采样阈值（毫秒）：超过则输出 `[SLOW] request-id=...` 日志，供按 request-id 聚合慢链路；`0` = 全部采样 | `3000` |
 | `QUOTA_WARN_THRESHOLDS` | 额度预警多档位（逗号分隔，从大到小）：用户**未显式设置** `QuotaWarningThreshold`（注册注入的默认 80% 视为未显式设置）时按此多档分级提醒；解析失败或全空时回退默认档位 | `1000,500,100` |
 | `QUOTA_REMIND_THRESHOLD`（旧） | **已弃用**：旧单阈值由多档 `QUOTA_WARN_THRESHOLDS` 取代，预警路径不再读取此值；保留仅为系统设置 UI 兼容显示，新部署无需配置 | `1000` |
@@ -410,6 +411,12 @@ docker run --name new-api -d --restart always \
 | `DOMAIN_ROUTE_ENABLED` | 领域感知路由开关（默认关）。开启后请求头 `X-Route-Tag` 命中 `DOMAIN_ROUTE_MAP` 时可覆盖分组（仅限用户可用分组） | `false` |
 | `DOMAIN_ROUTE_MAP` | 领域路由映射（逗号分隔 `tag:group`），如 `medical:medical-group,legal:legal-group` | - |
 | `CHANNEL_KEY_ENCRYPTION` | 渠道密钥**加密存储**开关（AES-256-GCM，主密钥由 `CRYPTO_SECRET` 派生）。默认关；开启后**下次保存渠道即加密**、读取自动解密，旧明文 fail-open 兼容。**多节点须一致** | `false` |
+| `PRICING_SYNC_TASK_ENABLED` | 上游**价目**定时同步开关（倍率/价目，幂等 merge）。上游源走 `PRICING_SYNC_UPSTREAMS`（JSON 数组，`[{name,base_url,path}]`）；未配置时任务空转 | `true` |
+| `PRICING_SYNC_TASK_INTERVAL_MINUTES` | 价目同步周期（分钟，最小 1） | `360` |
+| `CATALOG_SYNC_TASK_ENABLED` | **模型目录**定时同步开关（B2-2）：上游 llm-metadata 的 models/vendors 增删与字段对齐。默认关（目录变更是有副作用的写）；仅自动应用 create（新建）与 update（本地 `sync_official=1` 的官方条目），不删本地条目 | `false` |
+| `CATALOG_SYNC_TASK_INTERVAL_MINUTES` | 目录同步周期（分钟，最小 1） | `720` |
+| `CATALOG_SYNC_LOCALE` | 目录同步拉取的上游语言（`zh` / `en` / `ja`） | `zh` |
+| `LOG_STAT_MAX_DAYS` | 管理端日志统计（`SumUsedQuota`）的时间窗口**天数上限**：传入无上界/超长窗口时收敛到该边界，避免对全历史做无界 SUM 聚合；`0` = 关闭收敛 | `366` |
 
 📖 **Complete configuration:** [Environment Variables Documentation](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables)
 

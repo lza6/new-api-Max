@@ -252,14 +252,14 @@ type metadataSyncCandidate struct {
 	VendorToCreate string                `json:"vendor_to_create,omitempty"`
 }
 
-func fetchMetadataCatalog(c *gin.Context, locale string) (metadataSyncSource, map[string]model.MetadataValues, map[string]model.Vendor, error) {
+func fetchMetadataCatalog(ctx context.Context, locale string) (metadataSyncSource, map[string]model.MetadataValues, map[string]model.Vendor, error) {
 	resolved, valid := normalizeLocale(locale)
 	if !valid {
 		return metadataSyncSource{}, nil, nil, errors.New("unsupported metadata language")
 	}
 	modelsURL, vendorsURL := getUpstreamURLs(resolved)
 	source := metadataSyncSource{Locale: resolved, ModelsURL: modelsURL, VendorsURL: vendorsURL}
-	ctx, cancel := context.WithTimeout(c.Request.Context(), time.Duration(common.GetEnvOrDefault("SYNC_HTTP_TIMEOUT_SECONDS", 15))*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Duration(common.GetEnvOrDefault("SYNC_HTTP_TIMEOUT_SECONDS", 15))*time.Second)
 	defer cancel()
 	var modelsEnv upstreamEnvelope[upstreamModel]
 	var vendorsEnv upstreamEnvelope[upstreamVendor]
@@ -315,20 +315,28 @@ func fetchMetadataCatalog(c *gin.Context, locale string) (metadataSyncSource, ma
 }
 
 func SyncUpstreamPreview(c *gin.Context) {
-	source, upstream, upstreamVendors, err := fetchMetadataCatalog(c, c.Query("locale"))
+	source, candidates, err := buildMetadataSyncCandidates(c.Request.Context(), c.Query("locale"))
 	if err != nil {
 		common.ApiError(c, err)
 		return
+	}
+	common.ApiSuccess(c, gin.H{"source": source, "candidates": candidates})
+}
+
+// buildMetadataSyncCandidates 拉取上游目录并与本地比对，产出候选变更列表。
+// 供 HTTP 手动 preview 与定时目录同步共同复用（B2-2）。
+func buildMetadataSyncCandidates(ctx context.Context, locale string) (metadataSyncSource, []metadataSyncCandidate, error) {
+	source, upstream, upstreamVendors, err := fetchMetadataCatalog(ctx, locale)
+	if err != nil {
+		return source, nil, err
 	}
 	locals, vendors, err := model.GetMetadataSyncState(model.DB)
 	if err != nil {
-		common.ApiError(c, err)
-		return
+		return source, nil, err
 	}
 	missing, err := model.GetMissingModels()
 	if err != nil {
-		common.ApiError(c, err)
-		return
+		return source, nil, err
 	}
 	siteNames := make(map[string]bool)
 	allNames := make(map[string]bool)
@@ -407,7 +415,7 @@ func SyncUpstreamPreview(c *gin.Context) {
 		}
 		candidates = append(candidates, candidate)
 	}
-	common.ApiSuccess(c, gin.H{"source": source, "candidates": candidates})
+	return source, candidates, nil
 }
 
 func SyncUpstreamModels(c *gin.Context) {
@@ -420,7 +428,7 @@ func SyncUpstreamModels(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "Preview and select metadata changes before applying"})
 		return
 	}
-	source, upstream, vendors, err := fetchMetadataCatalog(c, request.Locale)
+	source, upstream, vendors, err := fetchMetadataCatalog(c.Request.Context(), request.Locale)
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -449,4 +457,109 @@ func SyncUpstreamModels(c *gin.Context) {
 	}
 	recordManageAudit(c, "model.metadata.sync", map[string]any{"created_models": result.CreatedModels, "updated_models": result.UpdatedModels, "created_vendors": result.CreatedVendors})
 	common.ApiSuccess(c, result)
+}
+
+// catalogSyncSummary 一次定时目录同步的执行摘要。
+type catalogSyncSummary struct {
+	Locale         string   `json:"locale,omitempty"`
+	Skipped        bool     `json:"skipped,omitempty"`
+	SourceVersion  string   `json:"source_version,omitempty"`
+	CreatedModels  []string `json:"created_models,omitempty"`
+	UpdatedModels  []string `json:"updated_models,omitempty"`
+	CreatedVendors []string `json:"created_vendors,omitempty"`
+	SkippedModels  int      `json:"skipped_models,omitempty"`
+	Error          string   `json:"error,omitempty"`
+}
+
+// runCatalogSyncTaskOnce B2-2：拉取上游模型目录并与本地比对，自动应用「安全」变更。
+//
+// 安全变更集（幂等、可重复执行）：
+//   - create：上游有、本地无 → 新建（sync_official=1）。
+//   - update：本地存在且 sync_official=1（允许官方同步）→ 用上游字段更新。
+//
+// 不触碰：kind=blocked（本地禁用官方同步）、kind=missing_vendor（上游供应商缺失）、
+// kind=missing_upstream（上游已下架，不自动删除本地条目）、kind=unchanged。
+// 任何单个模型冲突（preview 与 apply 之间上游又变了）只跳过该模型，不影响其余。
+func runCatalogSyncTaskOnce(ctx context.Context) (catalogSyncSummary, error) {
+	locale := common.GetEnvOrDefaultString("CATALOG_SYNC_LOCALE", "zh")
+	source, candidates, err := buildMetadataSyncCandidates(ctx, locale)
+	summary := catalogSyncSummary{Locale: source.Locale}
+	if err != nil {
+		summary.Error = err.Error()
+		return summary, err
+	}
+	summary.SourceVersion = source.Version
+
+	// 重新拉取上游 values 供 apply 使用（与 candidate 的 RecordVersion 同源）。
+	_, upstream, vendors, err := fetchMetadataCatalog(ctx, locale)
+	if err != nil {
+		summary.Error = err.Error()
+		return summary, err
+	}
+
+	selections := make([]model.MetadataSyncSelection, 0, len(candidates))
+	for _, candidate := range candidates {
+		switch candidate.Kind {
+		case "create":
+			selections = append(selections, model.MetadataSyncSelection{
+				ModelName:     candidate.ModelName,
+				RecordVersion: candidate.RecordVersion,
+				Create:        true,
+			})
+		case "update":
+			if len(candidate.Fields) == 0 {
+				summary.SkippedModels++
+				continue
+			}
+			fields := make([]string, 0, len(candidate.Fields))
+			for _, field := range candidate.Fields {
+				fields = append(fields, field.Field)
+			}
+			selections = append(selections, model.MetadataSyncSelection{
+				ModelName:     candidate.ModelName,
+				RecordVersion: candidate.RecordVersion,
+				Create:        false,
+				Fields:        fields,
+			})
+		default:
+			summary.SkippedModels++
+		}
+	}
+	if len(selections) == 0 {
+		summary.Skipped = true
+		return summary, nil
+	}
+
+	updates := make([]model.MetadataSyncUpdate, 0, len(selections))
+	for _, selection := range selections {
+		values, exists := upstream[selection.ModelName]
+		if !exists {
+			summary.SkippedModels++
+			continue
+		}
+		updates = append(updates, model.MetadataSyncUpdate{MetadataSyncSelection: selection, Values: values})
+	}
+	if len(updates) == 0 {
+		summary.Skipped = true
+		return summary, nil
+	}
+
+	// 并发竞态：apply 校验 RecordVersion，若本地在此期间变化会返回 ErrMetadataSyncConflict。
+	// 定时任务不重试（下一周期会带到），冲突即整批跳过并记录，不报失败。
+	result, err := model.ApplyMetadataSync(updates, vendors)
+	if err != nil {
+		if errors.Is(err, model.ErrMetadataSyncConflict) {
+			summary.Skipped = true
+			summary.Error = err.Error()
+			return summary, nil
+		}
+		summary.Error = err.Error()
+		return summary, err
+	}
+	summary.CreatedModels = result.CreatedModels
+	summary.CreatedVendors = result.CreatedVendors
+	for _, updated := range result.UpdatedModels {
+		summary.UpdatedModels = append(summary.UpdatedModels, updated.ModelName)
+	}
+	return summary, nil
 }

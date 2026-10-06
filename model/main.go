@@ -334,7 +334,11 @@ func migrateDB() error {
 		common.SysError("failed to migrate options primary key: " + err.Error())
 	}
 
-	err := DB.AutoMigrate(
+	// [B2-4] 当配置了独立日志库（LOG_SQL_DSN）时，主库不再 AutoMigrate &Log{}：
+	// 日志表由 migrateLOGDB 在 LOG_DB 上建立，主库重复建表既冗余，又会在日志
+	// 库/主库分离（含 ClickHouse 日志库）场景下让运维误以为主库也持有日志数据。
+	// 未配置独立日志库时 LOG_DB==DB，此处仍建，保持既有行为不变。
+	mainTables := []any{
 		&Channel{},
 		&Token{},
 		&User{},
@@ -348,7 +352,6 @@ func migrateDB() error {
 		&RedemptionUsage{},
 		&ChannelCombo{},
 		&Ability{},
-		&Log{},
 		&Midjourney{},
 		&TopUp{},
 		&QuotaData{},
@@ -378,7 +381,12 @@ func migrateDB() error {
 		&BannedIP{},
 		&WebRequestLog{},
 		&EventDelivery{},
-	)
+		&WebhookEndpoint{},
+	}
+	if os.Getenv("LOG_SQL_DSN") == "" {
+		mainTables = append(mainTables, &Log{})
+	}
+	err := DB.AutoMigrate(mainTables...)
 	if err != nil {
 		return err
 	}
@@ -420,6 +428,7 @@ func BackupTables() []any {
 		&CustomOAuthProvider{}, &UserOAuthBinding{}, &PerfMetric{},
 		&SystemInstance{}, &SystemTask{}, &SystemTaskLock{}, &CasbinRule{},
 		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &EventDelivery{},
+		&WebhookEndpoint{},
 	}
 }
 
@@ -465,7 +474,24 @@ func migrateClickHouseLogDB() error {
 	if err := LOG_DB.Exec(clickHouseLogCreateTableSQL(ttlDays)).Error; err != nil {
 		return err
 	}
+	if err := ensureClickHouseLogTrafficColumns(); err != nil {
+		return err
+	}
 	return syncClickHouseLogTTL(ttlDays)
+}
+
+// ensureClickHouseLogTrafficColumns 为既有 ClickHouse logs 表补 request_bytes/
+// response_bytes 两列（B2-4）。ClickHouse 的 CREATE TABLE IF NOT EXISTS 不会给
+// 已存在的表加列，而站点流量统计（GetLogsTraffic / SiteOverview / 带宽排行）在
+// SQL 侧直接 SUM 这两列——缺列会导致这些端点报 "Unknown identifier"。ALTER 用
+// ADD COLUMN IF NOT EXISTS，幂等；CH 支持该语法。
+func ensureClickHouseLogTrafficColumns() error {
+	for _, col := range []string{"request_bytes Int64 DEFAULT 0", "response_bytes Int64 DEFAULT 0"} {
+		if err := LOG_DB.Exec("ALTER TABLE logs ADD COLUMN IF NOT EXISTS " + col).Error; err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func clickHouseLogTTLDays() int {
@@ -507,6 +533,8 @@ CREATE TABLE IF NOT EXISTS logs (
 	completion_tokens Int32 DEFAULT 0,
 	use_time Int32 DEFAULT 0,
 	is_stream UInt8 DEFAULT 0,
+	request_bytes Int64 DEFAULT 0,
+	response_bytes Int64 DEFAULT 0,
 	channel_id Int32 DEFAULT 0,
 	token_id Int32 DEFAULT 0,
 	`+"`group`"+` String DEFAULT '',

@@ -24,6 +24,7 @@ const (
 	SystemTaskTypeCooldownRecovery = "channel_cooldown_recovery"
 	SystemTaskTypeChannelProbe     = "channel_probe"
 	SystemTaskTypePricingSync      = "pricing_sync"
+	SystemTaskTypeCatalogSync      = "catalog_sync"
 )
 
 var ErrSystemTaskLockLost = errors.New("system task lock lost")

@@ -373,8 +373,9 @@ func TestBandwidthLeaderboardRedisCache(t *testing.T) {
 	require.Equal(t, first, second, "缓存命中应返回相同数据且不依赖 DB")
 }
 
-// queryTrafficByDayCache 抽取 GetLogsTraffic 的缓存读写路径，便于独立单测：
-// 只有按日聚合结果进缓存，且命中缓存时 total/请求数由 byDay 重算。
+// queryTrafficByDayCache 抽取 GetLogsTraffic 的聚合下推 + 缓存读写路径，便于独立单测：
+// SQL 侧按日 SUM 持久化字节列（不再全表扫 other JSON），只有按日聚合结果进缓存，
+// 且命中缓存时 total/请求数由 byDay 重算。
 func queryTrafficByDayCache(t *testing.T, days int) ([]service.DailyTraffic, int64, int64, bool) {
 	t.Helper()
 	cacheKey := fmt.Sprintf("traffic:day:%d", days)
@@ -391,17 +392,35 @@ func queryTrafficByDayCache(t *testing.T, days int) ([]service.DailyTraffic, int
 			}
 		}
 	}
+	_, tzOffsetInt := time.Now().In(time.Local).Zone()
+	tzOffset := int64(tzOffsetInt)
 	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
-	var rows []service.TrafficRecord
+	type dayRow struct {
+		DayKey   int64 `gorm:"column:day_key"`
+		Requests int64 `gorm:"column:requests"`
+		Bytes    int64 `gorm:"column:bytes"`
+	}
+	var dayRows []dayRow
 	require.NoError(t, model.LOG_DB.Model(&model.Log{}).
-		Select("created_at", "other").
+		Select(fmt.Sprintf("(created_at + %d) / 86400 AS day_key", tzOffset),
+			"COUNT(*) AS requests",
+			"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
 		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
-		Scan(&rows).Error)
-	byDay := service.AggregateTrafficByDay(rows, time.Local)
+		Group("day_key").
+		Order("day_key ASC").
+		Scan(&dayRows).Error)
+	byDay := make([]service.DailyTraffic, 0, len(dayRows))
 	var total, requestCount int64
-	for i := range byDay {
-		total += byDay[i].Bytes
-		requestCount += int64(byDay[i].Requests)
+	for _, r := range dayRows {
+		date := time.Unix(r.DayKey*86400-tzOffset, 0).In(time.Local).Format("2006-01-02")
+		total += r.Bytes
+		requestCount += r.Requests
+		byDay = append(byDay, service.DailyTraffic{
+			Date:     date,
+			Requests: int(r.Requests),
+			Bytes:    r.Bytes,
+			MB:       float64(r.Bytes) / (1024 * 1024),
+		})
 	}
 	if common.RedisEnabled {
 		if raw, err := common.Marshal(byDay); err == nil {
@@ -444,9 +463,9 @@ func TestTrafficCacheStoresOnlyDailyAggregates(t *testing.T) {
 
 	now := time.Now().Unix()
 	logs := []*model.Log{
-		{Type: model.LogTypeConsume, ModelName: "m1", CreatedAt: now, Other: `{"request_bytes":100,"response_bytes":900}`},
-		{Type: model.LogTypeConsume, ModelName: "m1", CreatedAt: now, Other: `{"request_bytes":50,"response_bytes":50}`},
-		{Type: model.LogTypeConsume, ModelName: "m2", CreatedAt: now - 86400, Other: `{"request_bytes":10,"response_bytes":10}`},
+		{Type: model.LogTypeConsume, ModelName: "m1", CreatedAt: now, RequestBytes: 100, ResponseBytes: 900},
+		{Type: model.LogTypeConsume, ModelName: "m1", CreatedAt: now, RequestBytes: 50, ResponseBytes: 50},
+		{Type: model.LogTypeConsume, ModelName: "m2", CreatedAt: now - 86400, RequestBytes: 10, ResponseBytes: 10},
 	}
 	require.NoError(t, database.Create(&logs).Error)
 

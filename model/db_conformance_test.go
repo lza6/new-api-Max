@@ -125,6 +125,7 @@ func conformanceModels() []any {
 		&ModelCompressionStat{},
 		&SystemTask{}, &SystemTaskLock{}, &CasbinRule{}, &AuthzRole{},
 		&BannedIP{}, &WebRequestLog{}, &SubscriptionPlan{}, &EventDelivery{},
+		&WebhookEndpoint{},
 	}
 }
 
@@ -167,7 +168,7 @@ func TestDBConformanceLogsIndexes(t *testing.T) {
 	for _, dialect := range conformanceDialects(t) {
 		t.Run(dialect.name, func(t *testing.T) {
 			db, _ := dialect.openDB(t)
-			require.NoError(t, db.AutoMigrate(&Log{}, &TaskEvent{}))
+			require.NoError(t, db.AutoMigrate(&Log{}, &TaskEvent{}, &Task{}))
 
 			tableName := "logs"
 			for _, idx := range []string{"idx_created_at_id", "idx_user_id_id"} {
@@ -176,6 +177,9 @@ func TestDBConformanceLogsIndexes(t *testing.T) {
 			}
 			assert.True(t, db.Migrator().HasIndex("task_events", "idx_task_events_created_at"),
 				"expected retention index on task_events (%s)", dialect.name)
+			// B2-4：任务轮询正向活跃态复合索引 (status, progress, submit_time)。
+			assert.True(t, db.Migrator().HasIndex("tasks", "idx_task_active_poll"),
+				"expected active-poll composite index on tasks (%s)", dialect.name)
 		})
 	}
 }
@@ -342,6 +346,28 @@ func TestDBConformanceEventDeliveryDedup(t *testing.T) {
 			var count int64
 			require.NoError(t, db.Model(&EventDelivery{}).Count(&count).Error)
 			assert.Equal(t, int64(1), count, "replay must not add rows (%s)", dialect.name)
+		})
+	}
+}
+
+// TestDBConformanceWebhookEndpointRoundTrip B2-3：webhook_endpoints 表在三库上
+// 建表/读写/事件 JSON 字段往返一致；enabled + events 是投递路径的关键查询谓词。
+func TestDBConformanceWebhookEndpointRoundTrip(t *testing.T) {
+	for _, dialect := range conformanceDialects(t) {
+		t.Run(dialect.name, func(t *testing.T) {
+			db, _ := dialect.openDB(t)
+			require.NoError(t, db.AutoMigrate(&WebhookEndpoint{}))
+
+			ep := &WebhookEndpoint{Name: "n", URL: "https://example.com/hooks", Secret: "s", Enabled: true, Events: `["task.settled"]`}
+			require.NoError(t, db.Create(ep).Error)
+			require.NotZero(t, ep.Id)
+
+			var loaded WebhookEndpoint
+			require.NoError(t, db.Where("id = ?", ep.Id).First(&loaded).Error)
+			assert.Equal(t, "https://example.com/hooks", loaded.URL)
+			assert.True(t, loaded.Enabled)
+			assert.Equal(t, `["task.settled"]`, loaded.Events)
+			assert.NotZero(t, loaded.CreatedAt, "BeforeCreate hook must stamp created_at")
 		})
 	}
 }

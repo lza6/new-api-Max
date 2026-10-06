@@ -162,6 +162,9 @@ func main() {
 	controller.RegisterScheduledSystemTasks()
 	service.StartSystemTaskRunner()
 
+	// B3-1：注册 /metrics 的派生型瞬时指标提供者（渠道健康分/熔断/队列深度）。
+	controller.RegisterMetricsGaugeProvider()
+
 	if os.Getenv("BATCH_UPDATE_ENABLED") == "true" {
 		common.BatchUpdateEnabled = true
 		common.SysLog("batch update enabled with interval " + strconv.Itoa(common.BatchUpdateInterval) + "s")

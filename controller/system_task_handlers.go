@@ -25,6 +25,7 @@ func RegisterScheduledSystemTasks() {
 	service.RegisterSystemTaskHandler(cooldownRecoveryHandler{})
 	service.RegisterSystemTaskHandler(probeScheduledChannelsHandler{})
 	service.RegisterSystemTaskHandler(pricingSyncHandler{})
+	service.RegisterSystemTaskHandler(catalogSyncHandler{})
 }
 
 // cooldownRecoveryHandler periodically recovers channels whose B3-1 cooldown
@@ -212,5 +213,43 @@ func (pricingSyncHandler) Run(ctx context.Context, task *model.SystemTask, runne
 		return
 	}
 	summary := runPricingSyncTaskOnce(ctx)
+	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
+}
+
+// catalogSyncHandler B2-2：定时同步「模型目录」（上游 llm-metadata 的 models/vendors
+// 元数据）到本地 Model/Vendor 表。与 pricingSyncHandler（只同步倍率/价目）互补：
+// 目录同步负责模型条目本身的增删与字段（描述/图标/标签/端点/可见性）对齐。
+// Enablement 与周期走环境变量，默认关（目录变更是有副作用的写，需管理员显式开启）；
+// 默认仅创建/更新「官方同步（sync_official=1）」且上游存在的模型，不触碰管理员
+// 手工条目。语言默认 zh（可用 CATALOG_SYNC_LOCALE 覆盖）。
+type catalogSyncHandler struct{}
+
+func (catalogSyncHandler) Type() string { return model.SystemTaskTypeCatalogSync }
+
+func (catalogSyncHandler) Enabled() bool {
+	return common.GetEnvOrDefaultBool("CATALOG_SYNC_TASK_ENABLED", false)
+}
+
+func (catalogSyncHandler) Interval() time.Duration {
+	intervalMinutes := common.GetEnvOrDefault("CATALOG_SYNC_TASK_INTERVAL_MINUTES", 720)
+	if intervalMinutes < 1 {
+		intervalMinutes = 720
+	}
+	return time.Duration(intervalMinutes) * time.Minute
+}
+
+func (catalogSyncHandler) NewPayload() any { return nil }
+
+func (catalogSyncHandler) Run(ctx context.Context, task *model.SystemTask, runnerID string) {
+	var payload struct{}
+	if err := task.DecodePayload(&payload); err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, nil, err)
+		return
+	}
+	summary, err := runCatalogSyncTaskOnce(ctx)
+	if err != nil {
+		finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusFailed, summary, err)
+		return
+	}
 	finishSystemTaskHandler(task, runnerID, model.SystemTaskStatusSucceeded, summary, nil)
 }

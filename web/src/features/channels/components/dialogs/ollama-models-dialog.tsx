@@ -22,17 +22,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Dialog } from '@/components/dialog'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
@@ -566,42 +557,24 @@ export function OllamaModelsDialog({
         </div>
       )}
 
-      <AlertDialog
+      <ConfirmDialog
         open={deleteOpen}
         onOpenChange={(v) => {
           setDeleteOpen(v)
           if (!v) {setDeleteTarget(null)}
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t('Confirm delete')}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t('Delete model "{{name}}"? This cannot be undone.', {
-                name: deleteTarget || '',
-              })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>
-              {t('Cancel')}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              variant='destructive'
-              disabled={isDeleting || !deleteTarget}
-              onClick={() => {
-                if (!deleteTarget) {return}
-                void deleteModel(deleteTarget)
-              }}
-            >
-              {isDeleting ? (
-                <Loader2 className='mr-2 h-4 w-4 animate-spin' />
-              ) : null}
-              {t('Delete')}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        title={t('Confirm delete')}
+        desc={t('Delete model "{{name}}"? This cannot be undone.', {
+          name: deleteTarget || '',
+        })}
+        confirmText={t('Delete')}
+        destructive
+        disabled={!deleteTarget}
+        isLoading={isDeleting}
+        handleConfirm={() => {
+          if (deleteTarget) {void deleteModel(deleteTarget)}
+        }}
+      />
     </Dialog>
   )
 }

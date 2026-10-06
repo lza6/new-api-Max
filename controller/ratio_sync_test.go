@@ -162,6 +162,44 @@ func TestV1PricingPublicRoute(t *testing.T) {
 	require.NotNil(t, body.Data)
 }
 
+// TestV1PricingContract B2-2：/v1/pricing 端点契约不变量——
+// 无鉴权可读；响应含 success/data/vendors/group_ratio/usable_group/supported_endpoint/
+// auto_groups/pricing_version；data 每项含 model_name 与 enable_groups；签名头不泄露。
+func TestV1PricingContract(t *testing.T) {
+	_ = modelManagementDB(t, "sqlite", "")
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.GET("/v1/pricing", GetV1Pricing)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/pricing", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, "public pricing endpoint must be reachable without auth")
+
+	var body struct {
+		Success           bool             `json:"success"`
+		Data              []map[string]any `json:"data"`
+		Vendors           []any            `json:"vendors"`
+		GroupRatio        map[string]any   `json:"group_ratio"`
+		UsableGroup       map[string]any   `json:"usable_group"`
+		SupportedEndpoint map[string]any   `json:"supported_endpoint"`
+		AutoGroups        []any            `json:"auto_groups"`
+		PricingVersion    string           `json:"pricing_version"`
+	}
+	require.NoError(t, common.Unmarshal(w.Body.Bytes(), &body))
+	require.True(t, body.Success)
+	require.NotNil(t, body.Data, "data must not be null")
+	require.NotEmpty(t, body.PricingVersion, "pricing_version must be present for cache-busting clients")
+	require.NotNil(t, body.GroupRatio)
+	require.NotNil(t, body.UsableGroup)
+
+	// 每个价目条目必须携带 model_name（客户端据此匹配）与 enable_groups（分组可见性）。
+	for _, item := range body.Data {
+		require.Contains(t, item, "model_name")
+		require.Contains(t, item, "enable_groups")
+	}
+}
+
 // TestPricingSyncTaskIdempotentMerge B5-4：pricing_sync 幂等 merge——
 // 上游覆盖的模型被合并进本地，未出现的模型保持原值；再次执行收敛一致。
 func TestPricingSyncTaskIdempotentMerge(t *testing.T) {

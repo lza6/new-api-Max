@@ -200,19 +200,43 @@ func GetLogsTraffic(c *gin.Context) {
 			}
 		}
 	}
+	// [B2-4] 聚合下推：改走持久化的 request_bytes/response_bytes 列在 SQL 侧按日
+	// SUM，彻底消除「拉窗口内全量 other JSON 进 Go 内存」的全表扫描（生产 38 万行
+	// 实测 1246-1448ms，线上 SLOW SQL 最多之一）。日键用 (created_at + 时区偏移) /
+	// 86400 整除，纯整数算术，SQLite/MySQL/PG 三库一致（与 bandwidth leaderboard /
+	// SiteOverview 同法）。旧行字节列为 0，与 other 口径的差异已在列注释中说明。
+	_, tzOffsetInt := time.Now().In(time.Local).Zone()
+	tzOffset := int64(tzOffsetInt)
 	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
-	var rows []service.TrafficRecord
+	type dayRow struct {
+		DayKey   int64 `gorm:"column:day_key"`
+		Requests int64 `gorm:"column:requests"`
+		Bytes    int64 `gorm:"column:bytes"`
+	}
+	var dayRows []dayRow
 	if err := model.LOG_DB.Model(&model.Log{}).
-		Select("created_at", "other").
+		Select(fmt.Sprintf("(created_at + %d) / 86400 AS day_key", tzOffset),
+			"COUNT(*) AS requests",
+			"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
 		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
-		Scan(&rows).Error; err != nil {
+		Group("day_key").
+		Order("day_key ASC").
+		Scan(&dayRows).Error; err != nil {
 		common.ApiErrorMsg(c, "failed to query traffic: "+err.Error())
 		return
 	}
-	byDay := service.AggregateTrafficByDay(rows, time.Local)
-	var total int64
-	for i := range byDay {
-		total += byDay[i].Bytes
+	byDay := make([]service.DailyTraffic, 0, len(dayRows))
+	var total, totalRequests int64
+	for _, r := range dayRows {
+		date := time.Unix(r.DayKey*86400-tzOffset, 0).In(time.Local).Format("2006-01-02")
+		total += r.Bytes
+		totalRequests += r.Requests
+		byDay = append(byDay, service.DailyTraffic{
+			Date:     date,
+			Requests: int(r.Requests),
+			Bytes:    r.Bytes,
+			MB:       float64(r.Bytes) / (1024 * 1024),
+		})
 	}
 	if common.RedisEnabled {
 		// [fix-oom] 只缓存按日聚合结果（≤days 行），不缓存窗口内全量原始行。
@@ -222,7 +246,7 @@ func GetLogsTraffic(c *gin.Context) {
 	}
 	common.ApiSuccess(c, gin.H{
 		"days":           days,
-		"total_requests": len(rows),
+		"total_requests": totalRequests,
 		"total_bytes":    total,
 		"total_mb":       float64(total) / (1024 * 1024),
 		"by_day":         byDay,

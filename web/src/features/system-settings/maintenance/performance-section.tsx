@@ -23,19 +23,9 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import * as z from 'zod'
 
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { StatusBadge } from '@/components/status-badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
 import {
   Form,
@@ -189,6 +179,7 @@ export function PerformanceSection(props: Props) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
   const [stats, setStats] = useState<PerformanceStats | null>(null)
+  const [cacheCleanupOpen, setCacheCleanupOpen] = useState(false)
 
   const formDefaults = useMemo(
     () => buildFormDefaults(props.defaultValues),
@@ -549,32 +540,24 @@ export function PerformanceSection(props: Props) {
           <Button variant='outline' size='sm' onClick={fetchStats}>
             {t('Refresh Stats')}
           </Button>
-          <AlertDialog>
-            <AlertDialogTrigger render={<Button variant='outline' size='sm' />}>
-              {t('Clean up inactive cache')}
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>
-                  {t('Confirm cleanup of inactive disk cache?')}
-                </AlertDialogTitle>
-                <AlertDialogDescription>
-                  {t(
-                    'This will delete temporary cache files that have not been used for more than 10 minutes'
-                  )}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>{t('Cancel')}</AlertDialogCancel>
-                <AlertDialogAction
-                  variant='destructive'
-                  onClick={clearDiskCache}
-                >
-                  {t('Confirm')}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button
+            variant='outline'
+            size='sm'
+            onClick={() => setCacheCleanupOpen(true)}
+          >
+            {t('Clean up inactive cache')}
+          </Button>
+          <ConfirmDialog
+            open={cacheCleanupOpen}
+            onOpenChange={setCacheCleanupOpen}
+            title={t('Confirm cleanup of inactive disk cache?')}
+            desc={t(
+              'This will delete temporary cache files that have not been used for more than 10 minutes'
+            )}
+            confirmText={t('Confirm')}
+            destructive
+            handleConfirm={clearDiskCache}
+          />
           <Button variant='outline' size='sm' onClick={resetStats}>
             {t('Reset Stats')}
           </Button>

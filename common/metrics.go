@@ -22,7 +22,10 @@ var metricsState = struct {
 	hist     map[string][]int64          // name -> bucket count (len = buckets+1)
 	histSum  map[string]float64
 	histN    map[string]int64
-}{counters: make(map[string]map[string]int64), hist: make(map[string][]int64), histSum: make(map[string]float64), histN: make(map[string]int64)}
+	// gauges 为「瞬时值」指标（渠道健康分/熔断状态/队列深度）。与计数器不同，
+	// 每次渲染前由 provider 重算并 SetGauge 覆盖，渲染后清空（避免陈旧值残留）。
+	gauges map[string]map[string]float64 // name -> labelKey -> value
+}{counters: make(map[string]map[string]int64), hist: make(map[string][]int64), histSum: make(map[string]float64), histN: make(map[string]int64), gauges: make(map[string]map[string]float64)}
 
 func labelKey(labels map[string]string) string {
 	if len(labels) == 0 {
@@ -74,8 +77,34 @@ func MetricsObserve(name string, valueSeconds float64) {
 	metricsState.histN[name]++
 }
 
+// MetricsSetGauge 设置一个带标签的瞬时值指标（覆盖同名同标签的旧值）。
+// 供每次渲染前刷新「渠道健康分/熔断状态/队列深度」等派生量。
+func MetricsSetGauge(name string, labels map[string]string, value float64) {
+	metricsState.Lock()
+	defer metricsState.Unlock()
+	if metricsState.gauges[name] == nil {
+		metricsState.gauges[name] = make(map[string]float64)
+	}
+	metricsState.gauges[name][labelKey(labels)] = value
+}
+
+// MetricsResetGauges 清空所有瞬时值指标（渲染前调用，保证只反映本轮 provider 快照）。
+func MetricsResetGauges() {
+	metricsState.Lock()
+	defer metricsState.Unlock()
+	metricsState.gauges = make(map[string]map[string]float64)
+}
+
+// MetricsGaugeProvider 由宿主（main/controller）注入：每次渲染 /metrics 前调用，
+// 用于刷新派生型瞬时指标（渠道健康分/熔断状态/队列深度）。注入方负责先调
+// MetricsResetGauges 再逐项 MetricsSetGauge。为 nil 时跳过（仅输出计数器/直方图）。
+var MetricsGaugeProvider func()
+
 // RenderPrometheusMetrics 渲染 Prometheus 文本格式（确定性排序）。
 func RenderPrometheusMetrics() string {
+	if MetricsGaugeProvider != nil {
+		MetricsGaugeProvider()
+	}
 	metricsState.Lock()
 	defer metricsState.Unlock()
 	var b strings.Builder
@@ -115,6 +144,28 @@ func RenderPrometheusMetrics() string {
 		fmt.Fprintf(&b, "%s_bucket{le=\"+Inf\"} %d\n", n, buckets[len(buckets)-1])
 		fmt.Fprintf(&b, "%s_sum %g\n", n, metricsState.histSum[n])
 		fmt.Fprintf(&b, "%s_count %d\n", n, metricsState.histN[n])
+	}
+
+	gNames := make([]string, 0, len(metricsState.gauges))
+	for n := range metricsState.gauges {
+		gNames = append(gNames, n)
+	}
+	sort.Strings(gNames)
+	for _, n := range gNames {
+		fmt.Fprintf(&b, "# TYPE %s gauge\n", n)
+		keys := make([]string, 0, len(metricsState.gauges[n]))
+		for k := range metricsState.gauges[n] {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		for _, k := range keys {
+			v := metricsState.gauges[n][k]
+			if k == "" {
+				fmt.Fprintf(&b, "%s %g\n", n, v)
+			} else {
+				fmt.Fprintf(&b, "%s{%s} %g\n", n, k, v)
+			}
+		}
 	}
 	return b.String()
 }

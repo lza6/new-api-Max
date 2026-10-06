@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQueryClient, useIsFetching, useQuery } from '@tanstack/react-query'
 import { useNavigate, getRouteApi } from '@tanstack/react-router'
 import type { Table } from '@tanstack/react-table'
-import { Eye, EyeOff } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -44,7 +44,7 @@ import { useMediaQuery } from '@/hooks'
 import { getUserGroups } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-import { LOG_TYPE_ALL_VALUE, LOG_TYPE_FILTERS } from '../constants'
+import { LOG_TYPE_ALL_VALUE, LOG_TYPE_ENUM, LOG_TYPE_FILTERS } from '../constants'
 import { buildSearchParams } from '../lib/filter'
 import { getDefaultTimeRange } from '../lib/utils'
 import type { CommonLogFilters } from '../types'
@@ -211,14 +211,14 @@ export function CommonLogsFilterBar<TData>(
   )
 
   const handleApply = useCallback(
-    (nextFilters: CommonLogFilters = filters) => {
+    (nextFilters: CommonLogFilters = filters, nextLogType: string = logType) => {
       const filterParams = buildSearchParams(nextFilters, 'common')
       navigate({
         to: '/usage-logs/$section',
         params: { section: 'common' },
         search: {
           ...filterParams,
-          type: [logType],
+          type: [nextLogType],
           page: 1,
         },
       })
@@ -316,6 +316,25 @@ export function CommonLogsFilterBar<TData>(
         {sensitiveVisible ? t('Hide') : t('Show')}
       </TooltipContent>
     </Tooltip>
+  )
+
+  // 一键切换「全部 ↔ 仅错误日志」：无需展开类型下拉，管理员排障用。
+  const isErrorOnly = logType === String(LOG_TYPE_ENUM.ERROR)
+  const errorOnlyToggle = (
+    <Button
+      variant={isErrorOnly ? 'destructive' : 'outline'}
+      size='sm'
+      aria-pressed={isErrorOnly}
+      onClick={() => {
+        const nextLogType = isErrorOnly
+          ? LOG_TYPE_ALL_VALUE
+          : String(LOG_TYPE_ENUM.ERROR)
+        handleApply(filters, nextLogType)
+      }}
+    >
+      <AlertCircle data-icon='inline-start' />
+      {isErrorOnly ? t('All Types') : t('Error Logs Only')}
+    </Button>
   )
 
   const dateRangeFilter = (
@@ -487,7 +506,12 @@ export function CommonLogsFilterBar<TData>(
       table={props.table}
       compactMobile
       stats={statsBar}
-      actionStart={sensitiveToggle}
+      actionStart={
+        <>
+          {errorOnlyToggle}
+          {sensitiveToggle}
+        </>
+      }
       primaryFilters={
         <>
           {dateRangeFilter}

@@ -79,7 +79,13 @@ func SendSignedEventWebhook(webhookURL string, webhookSecret string, body []byte
 // NotifyWebhooks 向全局配置的 webhook URL 发送事件通知。
 // 未启用 / 未订阅 / URL 非法（非 https 或 SSRF 拒绝）时静默跳过（仅日志）。
 // 返回前不发起网络请求（异步派发），调用方业务不受影响。
+//
+// B2-3：本函数同时驱动「多端点 webhook 子系统」的扇出（NotifyWebhookEndpoints），
+// 与单 URL 全局配置相互独立——即使单 URL 未配置，多端点表里的订阅端点仍会收到事件。
 func NotifyWebhooks(ctx context.Context, eventType, eventID string, payload any) {
+	// B2-3 多端点扇出（独立于单 URL 配置；内部自行过滤订阅与启用状态）。
+	NotifyWebhookEndpoints(ctx, eventType, eventID, payload)
+
 	setting := operation_setting.GetWebhookSetting()
 	if !setting.Enabled || setting.URL == "" || setting.Secret == "" {
 		return

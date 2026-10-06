@@ -13,4 +13,9 @@ func SetWebhookRouter(router *gin.Engine) {
 	admin.Use(middleware.AdminAuth())
 	admin.GET("/webhook/settings", controller.GetWebhookSettings)
 	admin.PUT("/webhook/settings", controller.UpdateWebhookSettings)
+	// B2-3 多端点管理。
+	admin.GET("/webhook/endpoints", controller.GetWebhookEndpoints)
+	admin.POST("/webhook/endpoints", controller.CreateWebhookEndpoint)
+	admin.PUT("/webhook/endpoints/:id", controller.UpdateWebhookEndpoint)
+	admin.DELETE("/webhook/endpoints/:id", controller.DeleteWebhookEndpoint)
 }

@@ -35,6 +35,7 @@ import {
   WEBHOOK_EVENT_OPTIONS,
   type WebhookSettings,
 } from './api'
+import { WebhookEndpointsPage } from './webhook-endpoints'
 
 export function WebhookSettingsPage() {
   const { t } = useTranslation()
@@ -192,6 +193,8 @@ export function WebhookSettingsPage() {
           {isSaving ? t('Saving...') : t('Save')}
         </Button>
       </div>
+
+      <WebhookEndpointsPage />
     </div>
   )
 }

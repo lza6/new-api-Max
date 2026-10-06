@@ -116,6 +116,32 @@ func clickHouseLogOrder(prefix string) string {
 	return prefix + "created_at desc, " + prefix + "request_id desc"
 }
 
+// logDeepOffsetThreshold 深分页阈值：偏移量超过该值时分页改用「延迟关联
+// （late row lookup / deferred join）」——先在覆盖索引（idx_created_at_id 等）上只
+// 取主键（不回表），再用主键 IN 精确捞整行。语义与 LIMIT/OFFSET 完全一致（同样的
+// ORDER BY + OFFSET + LIMIT、同样的 total、同样的排序），仅避免数据库为被 OFFSET
+// 跳过的前 N 行做无谓回表读取。浅分页（阈值内）保持原 SQL 字节级不变。
+// [B2-4] 深 OFFSET 在 60 万行级日志表上会退化为全表扫描 + 大量回表。
+const logDeepOffsetThreshold = 500
+
+// findLogsPage 按当前 tx 条件取一页日志。tx 必须已携带全部 WHERE 条件；
+// order 为 GORM order 串（含表前缀），num 为页大小，startIdx 为偏移。
+// ClickHouse 无自增主键语义（显示 id 由 assignDisplayLogIds 派生），故不启用延迟关联。
+func findLogsPage(tx *gorm.DB, order string, num, startIdx int, out *[]*Log) error {
+	if startIdx < logDeepOffsetThreshold || common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
+		return tx.Order(order).Limit(num).Offset(startIdx).Find(out).Error
+	}
+	var ids []int
+	if err := tx.Model(&Log{}).Order(order).Limit(num).Offset(startIdx).Pluck("id", &ids).Error; err != nil {
+		return err
+	}
+	if len(ids) == 0 {
+		*out = nil
+		return nil
+	}
+	return LOG_DB.Model(&Log{}).Where("id IN ?", ids).Order(order).Find(out).Error
+}
+
 func assignDisplayLogIds(logs []*Log, startIdx int) {
 	for i := range logs {
 		logs[i].Id = startIdx + i + 1
@@ -550,7 +576,7 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		order = clickHouseLogOrder("logs.")
 	}
-	err = tx.Order(order).Limit(num).Offset(startIdx).Find(&logs).Error
+	err = findLogsPage(tx, order, num, startIdx, &logs)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -641,7 +667,7 @@ func GetUserLogs(userId int, logType int, startTimestamp int64, endTimestamp int
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		order = clickHouseLogOrder("logs.")
 	}
-	err = tx.Order(order).Limit(num).Offset(startIdx).Find(&logs).Error
+	err = findLogsPage(tx, order, num, startIdx, &logs)
 	if err != nil {
 		common.SysError("failed to search user logs: " + err.Error())
 		return nil, 0, errors.New("查询日志失败")
@@ -658,6 +684,16 @@ type Stat struct {
 }
 
 func SumUsedQuota(logType int, startTimestamp int64, endTimestamp int64, modelName string, username string, tokenName string, channel int, group string) (stat Stat, err error) {
+	// [B2-4] 天数上限：管理端统计可被传入任意（含 0=全量）start_timestamp，导致对
+	// logs 表的无界 SUM 聚合（生产 60 万行级）。数据是展示口径、非计费，给窗口加
+	// 一个可配上限（LOG_STAT_MAX_DAYS，默认 366 天）兜底：start 早于该边界即按边界
+	// 收敛。窗口已限定时保持调用方原值，不改变既有语义。
+	if capDays := common.GetEnvOrDefault("LOG_STAT_MAX_DAYS", 366); capDays > 0 {
+		floor := time.Now().Add(-time.Duration(capDays) * 24 * time.Hour).Unix()
+		if startTimestamp == 0 || startTimestamp < floor {
+			startTimestamp = floor
+		}
+	}
 	tx := LOG_DB.Table("logs").Select("COALESCE(sum(quota), 0) quota")
 
 	// 为rpm和tpm创建单独的查询

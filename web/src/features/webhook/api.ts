@@ -47,3 +47,42 @@ export function getWebhookSettings(): Promise<WebhookSettings> {
 export function updateWebhookSettings(patch: Partial<WebhookSettings>) {
   return api.put('/api/admin/webhook/settings', patch)
 }
+
+// B2-3 多端点 webhook 管理。
+export interface WebhookEndpoint {
+  id: number
+  name: string
+  url: string
+  enabled: boolean
+  events: string[]
+  has_secret: boolean
+  created_at: number
+  updated_at: number
+}
+
+export interface WebhookEndpointInput {
+  name: string
+  url: string
+  secret?: string
+  enabled: boolean
+  events: string[]
+}
+
+export function getWebhookEndpoints(): Promise<WebhookEndpoint[]> {
+  return api.get('/api/admin/webhook/endpoints').then((r) => {
+    const data = r.data?.data
+    return Array.isArray(data) ? data : []
+  })
+}
+
+export function createWebhookEndpoint(input: WebhookEndpointInput) {
+  return api.post('/api/admin/webhook/endpoints', input)
+}
+
+export function updateWebhookEndpoint(id: number, input: WebhookEndpointInput) {
+  return api.put(`/api/admin/webhook/endpoints/${id}`, input)
+}
+
+export function deleteWebhookEndpoint(id: number) {
+  return api.delete(`/api/admin/webhook/endpoints/${id}`)
+}

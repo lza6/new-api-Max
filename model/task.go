@@ -63,13 +63,13 @@ type Task struct {
 	Group      string                `json:"group" gorm:"type:varchar(50)"` // 修正计费用
 	ChannelId  int                   `json:"channel_id" gorm:"index"`
 	Quota      int                   `json:"quota"`
-	Action     string                `json:"action" gorm:"type:varchar(40);index"` // 任务类型, song, lyrics, description-mode
-	Status     TaskStatus            `json:"status" gorm:"type:varchar(20);index"` // 任务状态
+	Action     string                `json:"action" gorm:"type:varchar(40);index"`                                       // 任务类型, song, lyrics, description-mode
+	Status     TaskStatus            `json:"status" gorm:"type:varchar(20);index;index:idx_task_active_poll,priority:1"` // 任务状态
 	FailReason string                `json:"fail_reason"`
-	SubmitTime int64                 `json:"submit_time" gorm:"index"`
+	SubmitTime int64                 `json:"submit_time" gorm:"index;index:idx_task_active_poll,priority:3"`
 	StartTime  int64                 `json:"start_time" gorm:"index"`
 	FinishTime int64                 `json:"finish_time" gorm:"index"`
-	Progress   string                `json:"progress" gorm:"type:varchar(20);index"`
+	Progress   string                `json:"progress" gorm:"type:varchar(20);index;index:idx_task_active_poll,priority:2"`
 	Properties Properties            `json:"properties" gorm:"type:json"`
 	Username   string                `json:"username,omitempty" gorm:"-"`
 	// 禁止返回给用户，内部可能包含key等隐私信息
