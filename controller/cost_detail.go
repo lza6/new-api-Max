@@ -109,6 +109,115 @@ func parseLogCostDetail(log *model.Log) *logCostDetail {
 	return detail
 }
 
+// T2 黑匣子日志分级透明化：把同一条日志的诊断数据渲染成两档视图。
+//   - plain：白话版（任何能看该日志的用户可读）——「这次请求花了多久、慢在哪、
+//     省了多少流量、是否命中缓存」，不含渠道 id/内部分组等敏感信息。
+//   - technical：技术版（日志所有者或管理员）——延迟拆解、压缩、客户端、
+//     路由候选数、quota_saturation 等结构化诊断。
+//
+// 关键：technical 视图只回显**该用户本就有权看到**的字段——owner 看自己日志的
+// public+自身诊断，admin 看含 admin_info 的完整诊断；不越过既有可见性边界。
+type logTransparencyView struct {
+	Plain     map[string]any `json:"plain"`
+	Technical map[string]any `json:"technical,omitempty"`
+}
+
+// GetLogTransparency 返回分级透明视图。GET /api/log/usage/:id/transparency
+func GetLogTransparency(c *gin.Context) {
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "message": "invalid log id"})
+		return
+	}
+	role := c.GetInt("role")
+	isAdmin := role >= common.RoleAdminUser
+	log, exists, err := model.GetConsumeLogByID(id, c.GetInt("id"), isAdmin)
+	if err != nil {
+		common.SysError("query transparency log error: " + err.Error())
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "message": "failed to query log"})
+		return
+	}
+	if !exists {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "message": "log not found"})
+		return
+	}
+	var other map[string]any
+	_ = common.UnmarshalJsonStr(log.Other, &other)
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": buildTransparencyView(log, other, isAdmin)})
+}
+
+// buildTransparencyView 组装分级透明视图（纯函数）。
+func buildTransparencyView(log *model.Log, other map[string]any, isAdmin bool) logTransparencyView {
+	view := logTransparencyView{Plain: map[string]any{}}
+
+	// —— 白话版：无敏感字段，负责「这段请求发生了什么」。
+	frt := detailFloat(other, "frt")
+	view.Plain["model"] = log.ModelName
+	view.Plain["tokens"] = log.PromptTokens + log.CompletionTokens
+	view.Plain["prompt_tokens"] = log.PromptTokens
+	view.Plain["completion_tokens"] = log.CompletionTokens
+	if frt > 0 {
+		view.Plain["first_token_ms"] = frt
+	}
+	if v := detailFloat(other, "upstream_ttfb_ms"); v > 0 {
+		view.Plain["upstream_wait_ms"] = v
+	}
+	if rb := detailFloat(other, "request_bytes"); rb > 0 {
+		view.Plain["request_bytes"] = int64(rb)
+	}
+	if cb := detailFloat(other, "response_bytes"); cb > 0 {
+		view.Plain["response_bytes"] = int64(cb)
+	}
+	if cacheTokens := detailFloat(other, "cache_tokens"); cacheTokens > 0 && log.PromptTokens > 0 {
+		view.Plain["cache_hit_rate"] = cacheTokens / float64(log.PromptTokens)
+	}
+	if log.Quota > 0 {
+		view.Plain["quota"] = log.Quota
+	}
+	view.Plain["summary"] = transparencySummary(log, other)
+
+	// —— 技术版：结构化诊断。owner 见 public 范围，admin 见全部（含 admin_info）。
+	tech := map[string]any{
+		"timeline_stages":          other["timeline_stages"],
+		"upstream_connect_ms":      other["upstream_connect_ms"],
+		"upstream_upload_ms":       other["upstream_upload_ms"],
+		"upstream_ttfb_ms":         other["upstream_ttfb_ms"],
+		"request_compression_ms":   other["request_compression_ms"],
+		"request_original_bytes":   other["request_original_bytes"],
+		"request_compressed_bytes": other["request_compressed_bytes"],
+		"cache_tokens":             other["cache_tokens"],
+		"client":                   other["client"],
+		"request_path":             other["request_path"],
+		"stream_status":            other["stream_status"],
+	}
+	// 清理 nil，避免前端出现全 null 字段。
+	for k, v := range tech {
+		if v == nil {
+			delete(tech, k)
+		}
+	}
+	if adminInfo, ok := other["admin_info"].(map[string]any); ok && isAdmin {
+		tech["channels_considered"] = adminInfo["channels_considered"]
+		tech["quota_saturation"] = adminInfo["quota_saturation"]
+		tech["use_channel"] = adminInfo["use_channel"]
+		tech["conversion_diagnostics"] = adminInfo["conversion_diagnostics"]
+	}
+	view.Technical = tech
+	return view
+}
+
+// transparencySummary 生成一句白话摘要（无敏感信息）。
+func transparencySummary(log *model.Log, other map[string]any) string {
+	if log.Quota == 0 && log.PromptTokens == 0 && log.CompletionTokens == 0 {
+		if ss, ok := other["stream_status"].(map[string]any); ok {
+			if s, _ := ss["status"].(string); s == "error" {
+				return "Request did not complete normally."
+			}
+		}
+	}
+	return "Request completed."
+}
+
 func detailFloat(other map[string]any, key string) float64 {
 	v, ok := other[key]
 	if !ok {

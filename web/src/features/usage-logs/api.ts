@@ -240,3 +240,29 @@ export async function getLogCostDetail(logId: number): Promise<LogCostDetail> {
   )
   return res.data.data
 }
+
+// T2 黑匣子日志分级透明化：白话版 + 技术版诊断视图。
+export interface LogTransparencyView {
+  plain: {
+    model?: string
+    tokens?: number
+    prompt_tokens?: number
+    completion_tokens?: number
+    first_token_ms?: number
+    upstream_wait_ms?: number
+    request_bytes?: number
+    response_bytes?: number
+    cache_hit_rate?: number
+    quota?: number
+    summary?: string
+  }
+  technical?: Record<string, unknown>
+}
+
+/** T2：分级透明视图（白话版给所有可读用户，技术版给 owner/admin）。 */
+export async function getLogTransparency(logId: number): Promise<LogTransparencyView> {
+  const res = await api.get<{ success: boolean; data: LogTransparencyView }>(
+    `/api/log/usage/${logId}/transparency`
+  )
+  return res.data.data
+}

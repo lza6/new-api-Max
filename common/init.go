@@ -129,6 +129,9 @@ func InitEnv() {
 	// 上游 prefill），主要是省出口字节。
 	RelayRequestCompressionEnabled = GetEnvOrDefaultBool("RELAY_REQUEST_COMPRESSION_ENABLED", true)
 	RelayRequestCompressionThresholdKB = GetEnvOrDefault("RELAY_REQUEST_COMPRESSION_THRESHOLD_KB", DefaultRequestCompressionThresholdKB)
+	// T1 Savings Baseline：观测到的上行带宽（bps），用于把「节省字节」折算成「省时」。
+	// 默认 0 = 不折算（只报字节口径）。生产可设实际上行带宽（如 75Mbps=75000000）。
+	OutboundUploadBandwidthBps = int64(GetEnvOrDefault("OUTBOUND_UPLOAD_BANDWIDTH_BPS", 0))
 	if RelayRequestCompressionThresholdKB <= 0 {
 		// 0/负数会让判定短路为「始终压缩」，连 tiny body 也压（配置 footgun）。
 		// 归一为默认值并告警，而不是静默接受一个危险值。

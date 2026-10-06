@@ -146,3 +146,28 @@ func GetClientStats(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": res})
 }
+
+// GetSavingsBaseline T1：统一节省口径 + 反事实基准。
+//
+// 基于已持久化的按模型压缩统计（model_compression_stats）计算「若未压缩」的
+// 反事实：不压缩就要上传的原始字节数、按实测压缩率折算的额外上传量，以及
+// 在观测到的上游带宽下可省的时间。口径统一为「节省字节 / 原始字节」。
+// GET /api/rankings/savings-baseline?limit=50
+func GetSavingsBaseline(c *gin.Context) {
+	limit := 50
+	if v := c.Query("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			limit = min(n, 500)
+		}
+	}
+	rows, err := model.GetModelCompressionStats()
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to load compression stats")
+		return
+	}
+	baseline := service.ComputeSavingsBaseline(rows)
+	if len(baseline.Models) > limit {
+		baseline.Models = baseline.Models[:limit]
+	}
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": baseline})
+}

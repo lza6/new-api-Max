@@ -417,6 +417,16 @@ docker run --name new-api -d --restart always \
 | `CATALOG_SYNC_TASK_INTERVAL_MINUTES` | 目录同步周期（分钟，最小 1） | `720` |
 | `CATALOG_SYNC_LOCALE` | 目录同步拉取的上游语言（`zh` / `en` / `ja`） | `zh` |
 | `LOG_STAT_MAX_DAYS` | 管理端日志统计（`SumUsedQuota`）的时间窗口**天数上限**：传入无上界/超长窗口时收敛到该边界，避免对全历史做无界 SUM 聚合；`0` = 关闭收敛 | `366` |
+| `COMPLEXITY_ROUTING` | 复杂度路由开关（规则版 7 维打分：长度/代码/数学/推理/工具/多模态/多轮 → simple/medium/complex）。默认关 | `false` |
+| `TOOL_DRAWER_ENABLED` | 工具抽屉开关：对 `tools` 定义做**等价去重**（同 name/schema 指纹只留一份），省 prompt token。默认关 | `false` |
+| `CHANNEL_HEALTH_WEIGHTED_LB` | 健康加权负载均衡：渠道选择按「基础权重 × 健康系数」加权，健康渠道更常被选中。默认关 | `false` |
+| `CHANNEL_HEALTH_MIN_WEIGHT_FACTOR` | 健康分为 0 的渠道保留的最小权重比例（%），避免彻底饿死、保留探测恢复 | `5` |
+| `CHANNEL_COOLDOWN_AUTH_SECONDS` | 渠道鉴权失败（401/403）冷却时长（秒）；`0`=用默认 300 | `300` |
+| `CHANNEL_COOLDOWN_RATE_LIMIT_SECONDS` | 渠道限流（429，无 Retry-After 时）冷却时长（秒）；`0`=用默认 60 | `60` |
+| `CHANNEL_COOLDOWN_SERVER_ERROR_SECONDS` | 渠道 5xx 冷却时长（秒）；`0`=用默认 60 | `60` |
+| `CHANNEL_COOLDOWN_TIMEOUT_SECONDS` | 渠道超时冷却时长（秒）；`0`=用默认 30 | `30` |
+| `RELAY_AUDIT_ENABLED` | 中继一致性自检开关（SSE 白名单/usage 单调/错误不泄漏/渠道指纹）。默认关 | `false` |
+| `OUTBOUND_UPLOAD_BANDWIDTH_BPS` | Savings Baseline 折算省时用的上行带宽（bps）；`0` = 只报字节口径不折算 | `0` |
 
 📖 **Complete configuration:** [Environment Variables Documentation](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables)
 

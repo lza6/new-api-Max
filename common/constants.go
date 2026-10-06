@@ -202,6 +202,11 @@ var RelayRequestCompressionThresholdKB = DefaultRequestCompressionThresholdKB
 // 引用同一常量，保证默认值单一来源。
 const DefaultRequestCompressionThresholdKB = 50
 
+// OutboundUploadBandwidthBps T1 Savings Baseline 折算用上行带宽（bps）。
+// 0 = 不折算省时（只报字节口径）。生产可设实际上行带宽（如 75Mbps=75000000）。
+// env：OUTBOUND_UPLOAD_BANDWIDTH_BPS。
+var OutboundUploadBandwidthBps int64 = 0
+
 // Relay429RetryDelayMs 429 有界退避等待毫秒数（默认 1000 = 1s）。
 var Relay429RetryDelayMs int
 

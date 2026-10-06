@@ -8,6 +8,8 @@ import (
 	"github.com/lza6/new-api-Max/dto"
 	kitdto "github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/stretchr/testify/assert"
+	"math/rand"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -325,4 +327,42 @@ func TestGetRandomSatisfiedChannelSingleCandidateFiltered(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "only one channel serves this model")
 	assert.Contains(t, err.Error(), "gpt-4")
+}
+
+
+// T6 健康加权负载均衡：健康渠道被显著更常选中，弱渠道保底可探测。
+// 用固定种子的均匀随机源驱动，断言健康渠道占比显著高于弱渠道（约 20:1）。
+func TestWeightedSelectWithHealthBias(t *testing.T) {
+	weights := []int{1, 1, 1}
+	scores := []float64{100, 50, 0}
+	hasSamples := []bool{true, true, true}
+	r := rand.New(rand.NewSource(1))
+
+	counts := make([]int, 3)
+	const iters = 30000
+	for i := 0; i < iters; i++ {
+		idx := WeightedSelectWithHealth(weights, scores, hasSamples, 0.05, r.Intn)
+		require.GreaterOrEqual(t, idx, 0)
+		counts[idx]++
+	}
+	// 健康渠道（100 分）应远多于弱渠道（0 分）：实测约 19000 vs 950（≈20×）。
+	assert.Greater(t, counts[0], counts[1], "healthiest must beat mid")
+	assert.Greater(t, counts[1], counts[2], "mid must beat weakest")
+	assert.Greater(t, counts[0], counts[2]*5, "healthiest must dominate weakest by a wide margin")
+	// 弱渠道仍非零（保底可探测恢复）。
+	assert.Greater(t, counts[2], 0, "weak channel must retain a nonzero share for probe recovery")
+}
+
+// T6 无样本渠道（冷启动）不因缺分被弱化——回退到基础权重（近似均分）。
+func TestWeightedSelectWithHealthNoSamples(t *testing.T) {
+	weights := []int{1, 1}
+	scores := []float64{0, 0}
+	hasSamples := []bool{false, false}
+	r := rand.New(rand.NewSource(2))
+	counts := [2]int{}
+	for i := 0; i < 20000; i++ {
+		counts[WeightedSelectWithHealth(weights, scores, hasSamples, 0.05, r.Intn)]++
+	}
+	assert.Greater(t, counts[0], 8000)
+	assert.Greater(t, counts[1], 8000)
 }

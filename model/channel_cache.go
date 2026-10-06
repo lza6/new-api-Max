@@ -233,6 +233,24 @@ func GetRandomSatisfiedChannel(
 	// Calculate the total weight of all channels up to endIdx
 	totalWeight := sumWeight * smoothingFactor
 
+	// T6 健康加权负载均衡：开关开启且有健康快照时，用「权重 × 健康系数」选择，
+	// 让健康渠道更常被选中、问题渠道被弱化（保底可探测）。开关关闭时行为完全不变。
+	if ChannelHealthWeightedLBEnabled() && ChannelHealthProbe != nil {
+		weights := make([]int, len(targetChannels))
+		scores := make([]float64, len(targetChannels))
+		hasSamples := make([]bool, len(targetChannels))
+		for i, ch := range targetChannels {
+			weights[i] = ch.GetWeight()
+			s, _, hs := ChannelHealthProbe(ch.Id)
+			scores[i] = s
+			hasSamples[i] = hs
+		}
+		idx := WeightedSelectWithHealth(weights, scores, hasSamples, channelHealthMinWeightFactor, rand.Intn)
+		if idx >= 0 && idx < len(targetChannels) {
+			return targetChannels[idx], nil
+		}
+	}
+
 	// Generate a random value in the range [0, totalWeight)
 	randomWeight := rand.Intn(totalWeight)
 
@@ -245,6 +263,56 @@ func GetRandomSatisfiedChannel(
 	}
 	// return null if no channel is not found
 	return nil, errors.New("channel not found")
+}
+
+// WeightedSelectWithHealth T6：在候选集合内按「健康分加权」随机选择（借用 ccLoad /
+// NewAPI-Gateway 的健康排序思路）。与 GetRandomSatisfiedChannel 的纯权重随机不同，
+// 这里把每个渠道的有效权重 = baseWeight × 健康权重系数，使健康渠道被显著更频繁选中，
+// 弱化问题渠道；健康分为 0 或降级渠道获得最低但仍非零的权重（保底可探测恢复）。
+//
+// 纯函数、无副作用，不改变调用方状态；由 service 层在开关开启时选用。
+//   - 入参 weights/healthScores 按同一索引对应；healthScores 取值 0..100。
+//   - fallbackWeight：健康分缺失（无样本）时的权重系数（1.0=等同原权重）。
+//   - minFactor：健康分 0 的渠道保留的最小权重比例（避免饿死，便于半开探测）。
+func WeightedSelectWithHealth(weights []int, healthScores []float64, hasSamples []bool, minFactor float64, rng func(int) int) int {
+	n := len(weights)
+	if n == 0 {
+		return -1
+	}
+	if minFactor <= 0 {
+		minFactor = 0.05
+	}
+	if minFactor > 1 {
+		minFactor = 1
+	}
+	effective := make([]float64, n)
+	total := 0.0
+	for i := range weights {
+		base := float64(weights[i])
+		if base <= 0 {
+			base = 1 // 权重 0 视为 1，否则永远选不到
+		}
+		factor := 1.0
+		if i < len(hasSamples) && hasSamples[i] && i < len(healthScores) {
+			// 健康分 0..100 → factor ∈ [minFactor, 1.0]。
+			factor = minFactor + (1.0-minFactor)*(healthScores[i]/100.0)
+		}
+		effective[i] = base * factor
+		total += effective[i]
+	}
+	if total <= 0 {
+		return 0
+	}
+	// rng 返回 [0, scale)；调用方传 rand.Intn，scale 用 10000 提升精度。
+	pick := float64(rng(10000)) / 10000.0 * total
+	acc := 0.0
+	for i, e := range effective {
+		acc += e
+		if pick < acc {
+			return i
+		}
+	}
+	return n - 1
 }
 
 func CacheGetChannel(id int) (*Channel, error) {

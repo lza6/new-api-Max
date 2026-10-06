@@ -432,7 +432,52 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		request.Messages[0].Role = "developer"
 	}
 
+	// T5 工具抽屉：默认关（service.ToolDrawerEnabled()）。开启时对 tools 做
+	// **等价去重**（同 name / 同 schema 指纹只保留首份）——上游按 name 调用，
+	// 重复定义无意义，去重零语义风险。原地替换 request.Tools 切片。
+	if service.ToolDrawerEnabled() && len(request.Tools) > 1 {
+		request.Tools = dedupOpenAITools(request.Tools)
+	}
+
 	return request, nil
+}
+
+// dedupOpenAITools T5：对 OpenAI tools 定义做等价去重（保留首次出现顺序）。
+// 判同依据：工具名相同，或参数 JSON 归一化指纹相同。纯函数，无副作用。
+func dedupOpenAITools(tools []dto.ToolCallRequest) []dto.ToolCallRequest {
+	if len(tools) <= 1 {
+		return tools
+	}
+	seenName := make(map[string]struct{}, len(tools))
+	seenFP := make(map[string]struct{}, len(tools))
+	out := make([]dto.ToolCallRequest, 0, len(tools))
+	for _, t := range tools {
+		name := t.Function.Name
+		if _, ok := seenName[name]; ok {
+			continue
+		}
+		fp := toolFingerprint(t)
+		if fp != "" {
+			if _, ok := seenFP[fp]; ok {
+				continue
+			}
+			seenFP[fp] = struct{}{}
+		}
+		seenName[name] = struct{}{}
+		out = append(out, t)
+	}
+	return out
+}
+
+// toolFingerprint 生成工具定义的归一化指纹（name + 参数 schema 文本）。
+func toolFingerprint(t dto.ToolCallRequest) string {
+	params := ""
+	if t.Function.Parameters != nil {
+		if b, err := common.Marshal(t.Function.Parameters); err == nil {
+			params = string(b)
+		}
+	}
+	return service.FingerprintTool(t.Function.Name, params)
 }
 
 func (a *Adaptor) ConvertRerankRequest(c *gin.Context, relayMode int, request dto.RerankRequest) (any, error) {

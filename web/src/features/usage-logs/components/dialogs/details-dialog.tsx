@@ -67,6 +67,7 @@ import { formatLogQuota, formatTokens, formatUseTime } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
 import { AuditDetailFields } from '../../audit/components/audit-detail-fields'
+import { TransparencyPanel } from './transparency-panel'
 import {
   buildLogExportPayload,
   logExportFilename,
@@ -1289,6 +1290,11 @@ export function DetailsDialog(props: DetailsDialogProps) {
         {/* Cost detail (T4-2/B5-2)：用户版费用明细（分段 + 影子价），消费日志展示 */}
         {isConsume && !isViolation && props.log.id != null && (
           <CostDetailPanel logId={Number(props.log.id)} />
+        )}
+
+        {/* T3 请求解释页：黑匣子可读化（白话版 + 技术版），消费日志展示 */}
+        {isConsume && !isViolation && props.log.id != null && (
+          <TransparencyPanel logId={Number(props.log.id)} />
         )}
 
         {/* Request timeline (B2-2)：黑匣子打开——阶段时间线 + JSON 导出 */}

@@ -48,6 +48,7 @@ func SetApiRouter(router *gin.Engine) {
 		apiRouter.GET("/rankings/bandwidth", middleware.HeaderNavModuleAuth("rankings"), controller.GetRankingsBandwidth)
 		apiRouter.GET("/rankings/compression", middleware.HeaderNavModuleAuth("rankings"), controller.GetCompressionStats)
 		apiRouter.GET("/rankings/clients", middleware.HeaderNavModuleAuth("rankings"), controller.GetClientStats)
+		apiRouter.GET("/rankings/savings-baseline", middleware.HeaderNavModuleAuth("rankings"), controller.GetSavingsBaseline)
 		apiRouter.GET("/verification", middleware.EmailVerificationRateLimit(), middleware.TurnstileCheck(), controller.SendEmailVerification)
 		apiRouter.GET("/reset_password", middleware.CriticalRateLimit(), middleware.TurnstileCheck(), controller.SendPasswordResetEmail)
 		apiRouter.POST("/user/reset", middleware.CriticalRateLimit(), anonymousRequestBodyLimit, controller.ResetPassword)
@@ -338,6 +339,8 @@ func SetApiRouter(router *gin.Engine) {
 		logRoute.GET("/self", middleware.UserAuth(), controller.GetUserLogs)
 		logRoute.GET("/self/search", middleware.UserAuth(), middleware.SearchRateLimit(), controller.SearchUserLogs)
 		logRoute.GET("/usage/:id/cost-detail", middleware.UserAuth(), controller.GetLogCostDetail)
+		// T2 黑匣子日志分级透明化（白话版 + 技术版）。
+		logRoute.GET("/usage/:id/transparency", middleware.UserAuth(), controller.GetLogTransparency)
 
 		systemTaskRoute := apiRouter.Group("/system-task")
 		systemTaskRoute.Use(middleware.RootAuth())

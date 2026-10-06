@@ -47,6 +47,17 @@ const (
 	DefaultTimeoutCooldown     = 30 * time.Second
 )
 
+// T6 可配置冷却：各错误类的冷却时长可经 env 覆盖（秒），默认沿用上述常量。
+// env：CHANNEL_COOLDOWN_AUTH_SECONDS / RATE_LIMIT_SECONDS / SERVER_ERROR_SECONDS /
+// TIMEOUT_SECONDS。0/负数回退默认（防 footgun）。
+func cooldownDuration(envKey string, def time.Duration) time.Duration {
+	secs := common.GetEnvOrDefault(envKey, int(def/time.Second))
+	if secs <= 0 {
+		return def
+	}
+	return time.Duration(secs) * time.Second
+}
+
 type channelCooldownEntry struct {
 	until     time.Time
 	class     RelayErrorClass
@@ -70,21 +81,21 @@ func DecideCooldown(channelId int, class RelayErrorClass, retryAfter time.Durati
 	switch class {
 	case ErrClassAuth:
 		// aisix 教训：401/403 不可重试但必须冷却，否则后续每个请求都重复撞。
-		duration = DefaultAuthCooldown
+		duration = cooldownDuration("CHANNEL_COOLDOWN_AUTH_SECONDS", DefaultAuthCooldown)
 	case ErrClassRateLimited:
 		// 尊重上游 Retry-After（超长钳制到 DefaultCooldownCap）；缺失/非法 → 默认 60s。
 		switch {
 		case retryAfter <= 0:
-			duration = DefaultRateLimitedCooldown
+			duration = cooldownDuration("CHANNEL_COOLDOWN_RATE_LIMIT_SECONDS", DefaultRateLimitedCooldown)
 		case retryAfter > DefaultCooldownCap:
 			duration = DefaultCooldownCap
 		default:
 			duration = retryAfter
 		}
 	case ErrClassServerError:
-		duration = DefaultServerErrorCooldown
+		duration = cooldownDuration("CHANNEL_COOLDOWN_SERVER_ERROR_SECONDS", DefaultServerErrorCooldown)
 	case ErrClassTimeout:
-		duration = DefaultTimeoutCooldown
+		duration = cooldownDuration("CHANNEL_COOLDOWN_TIMEOUT_SECONDS", DefaultTimeoutCooldown)
 	default:
 		// BadRequest/Capability/OK/Unknown：我方问题或可确认终态，不冷却。
 		return false, time.Time{}
