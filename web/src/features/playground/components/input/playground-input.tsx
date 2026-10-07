@@ -122,6 +122,10 @@ export function PlaygroundInput({
         setIsPreparingImages(false)
       }
     }
+    // 防「空提交」：无文字且图片全部转换失败时，不发送空消息。
+    if (!submittableText.trim() && imageUrls.length === 0) {
+      return
+    }
     onSubmit(submittableText, imageUrls)
     setText('')
   }
