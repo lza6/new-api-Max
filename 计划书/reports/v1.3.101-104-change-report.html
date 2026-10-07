@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>new-api 变更报告 v1.3.101–v1.3.104</title>
+<style>
+  :root {
+    --bg: #0b0f14; --card: #131a22; --card2: #0f151c; --fg: #e6edf3;
+    --muted: #93a4b5; --accent: #4ea1ff; --ok: #35d07f; --warn: #f0b429;
+    --err: #ff6b6b; --border: #233040; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+    font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 40px 20px 80px; }
+  h1 { font-size: 28px; margin: 0 0 6px; letter-spacing: -.02em; }
+  h2 { font-size: 20px; margin: 40px 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 16px; margin: 24px 0 8px; color: var(--accent); }
+  p, li { color: var(--fg); }
+  .sub { color: var(--muted); font-size: 14px; margin-bottom: 28px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin: 14px 0; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .kv { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+  .kv .k { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  .kv .v { font-size: 18px; font-weight: 600; margin-top: 4px; }
+  code, .mono { font-family: var(--mono); font-size: 13px; }
+  code { background: #1b2530; padding: 1.5px 6px; border-radius: 5px; color: #cfe6ff; }
+  pre { background: var(--card2); border: 1px solid var(--border); border-radius: 10px; padding: 14px; overflow: auto; }
+  pre code { background: none; padding: 0; }
+  .tag { display: inline-block; font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); margin-right: 6px; }
+  .tag.ok { color: var(--ok); border-color: #1f4b34; } .tag.warn { color: var(--warn); border-color: #4a3c16; }
+  .tag.err { color: var(--err); border-color: #4a2020; } .tag.n { color: var(--accent); border-color: #1d3a5c; }
+  table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; }
+  .quiz { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .q { margin: 18px 0; } .q p { font-weight: 600; margin: 0 0 8px; }
+  .opt { display: block; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; margin: 6px 0; cursor: pointer; transition: .15s; }
+  .opt:hover { border-color: var(--accent); }
+  .opt input { margin-right: 8px; }
+  .opt.correct { border-color: var(--ok); background: #10241a; }
+  .opt.wrong { border-color: var(--err); background: #241012; }
+  .expl { color: var(--muted); font-size: 13px; margin: 6px 0 0 4px; display: none; }
+  button { background: var(--accent); color: #04111f; border: none; border-radius: 8px; padding: 10px 18px; font-weight: 700; cursor: pointer; font-size: 14px; }
+  button:hover { filter: brightness(1.08); }
+  #result { margin-top: 16px; font-weight: 700; font-size: 16px; }
+  .foot { color: var(--muted); font-size: 12px; margin-top: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>变更报告 · v1.3.101 → v1.3.104</h1>
+  <p class="sub">new-api-Max 生产网关 ｜ 2026-10-07 → 10-08 ｜ 4 次零停机发布 ｜ 全部已上线</p>
+
+  <h2>1. 上下文（为什么要改）</h2>
+  <div class="card">
+    <p>你（运营者）在生产环境报告了 3 个真实问题，另有 1 份参考计划指南要求补齐游乐场能力：</p>
+    <ul>
+      <li><b>「错误日志一条都没有」</b> —— 管理端错误日志视图几乎为空，无法排障。</li>
+      <li><b>「首字 3 分钟、¥0 的空输出」</b> —— 日志显示首字耗时 180s、消耗 0，但不知道从哪查。</li>
+      <li><b>「游乐场用图片模型没适配好」</b> —— 没有尺寸档位、图生图/多图参考不可用。</li>
+      <li><b>参考计划指南 P0-4</b> —— 游乐场无法新建会话。</li>
+    </ul>
+  </div>
+
+  <h2>2. 核心直觉（根因是怎么找到的）</h2>
+  <div class="card">
+    <h3>为什么错误日志是空的？</h3>
+    <p>直接查数据库近 24h：<span class="tag n">type=2 消耗日志 41680 条</span><span class="tag err">type=5 错误日志仅 9 条</span></p>
+    <p>那些「首字 180s、0 token」的请求，<b>被记成了消耗日志</b>（content = <code>上游没有返回计费信息，无法扣费（可能是上游超时）</code>），
+       走的是 <code>RecordConsumeLog</code>（type=2）路径 —— <b>从未调用 <code>RecordErrorLog</code>（type=5）</b>。
+       所以错误日志视图里自然什么都没有。</p>
+    <p>直觉修正：<b>「HTTP 200 但 0 token」不是成功，是上游空响应</b>，应当同时进错误日志。</p>
+
+    <h3>为什么游乐场出不了图？</h3>
+    <p>数据模型其实<b>早已支持多模态</b>（<code>ContentPart.image_url</code>），但：</p>
+    <ul>
+      <li>参数面板只有文本参数（temperature/top_p/max_tokens）—— 没有生图需要的 <code>size</code>；</li>
+      <li>输入框<b>丢弃图片附件</b>（<code>getSubmittableInputText</code> 只取文本）；</li>
+      <li>消息只存 <code>string</code>，图片无处安放。</li>
+    </ul>
+    <p>直觉：<b>缺的不是「能不能」，而是「有没有接线」</b> —— 既有能力没被接通。</p>
+  </div>
+
+  <h2>3. 做了什么（逐版本）</h2>
+
+  <h3>v1.3.101 · 错误日志空输出补齐 + 慢请求筛选 + 数据丢失修复</h3>
+  <table>
+    <tr><th>改动</th><th>文件</th><th>说明</th></tr>
+    <tr><td>空输出进错误日志</td><td class="mono">service/text_quota.go</td><td>新增 <code>recordEmptyUpstreamResponse</code>：HTTP 200 但 0 token/无计费（<code>eof</code>/<code>done</code>，<b>排除 client_gone</b>）时额外记 type=5（含 frt/end_reason/渠道）</td></tr>
+    <tr><td>首字/耗时筛选</td><td class="mono">model/log.go, controller/log.go</td><td><code>min_use_time</code> 查询参数 + 使用日志页「慢请求 (≥20s)」一键按钮</td></tr>
+    <tr><td>P1 数据丢失修复</td><td class="mono">controller/user.go</td><td><code>UpdateUserSetting</code> 从零构造会抹掉 LastUsedModel/Language/SidebarModules 等 —— 改为以现有设置为基底</td></tr>
+  </table>
+
+  <h3>v1.3.102 · 游乐场生图尺寸档位</h3>
+  <p>参数面板识别生图模型（<code>image</code>/<code>dall-e</code>/<code>gpt-image</code>）时展示「图片尺寸」下拉（1024×1024 … 4096×4096）+ 启用开关；请求体仅启用非空时发 <code>size</code>。</p>
+  <pre><code>// payload-builder.ts
+if (parameterEnabled.size &amp;&amp; config.size) {
+  payload.size = config.size
+}</code></pre>
+
+  <h3>v1.3.103 · 图生图 / 多图参考</h3>
+  <ul>
+    <li><code>MessageVersion.images</code> 承载附图；输入框开启 <code>accept="image/*" multiple maxFiles=8</code>，缩略图可移除；</li>
+    <li>提交时 <b>blob: URL → data: URL</b>（上游无法回访浏览器本地 blob）；图片-only 也可提交；</li>
+    <li><code>formatMessageForAPI</code> 组装 <code>text</code> + <code>image_url</code> parts。</li>
+  </ul>
+
+  <h3>v1.3.104 · 游乐场多会话</h3>
+  <ul>
+    <li><code>lib/storage/conversations.ts</code>：会话列表持久化、标题从首条用户消息生成、上限 50；</li>
+    <li><b>旧单会话数据自动迁移</b>为第一个会话并清理旧键（幂等）；</li>
+    <li>顶部工具条：切换下拉 + 新建 + 删除；切换/新建/删除前先冲刷未落盘消息防丢。</li>
+  </ul>
+
+  <h2>4. 验证证据</h2>
+  <div class="grid">
+    <div class="kv"><div class="k">Go build / vet</div><div class="v"><span class="tag ok">干净</span></div></div>
+    <div class="kv"><div class="k">service 测试</div><div class="v"><span class="tag ok">ok 9.2s</span></div></div>
+    <div class="kv"><div class="k">model 测试</div><div class="v"><span class="tag ok">ok 54.8s</span></div></div>
+    <div class="kv"><div class="k">前端 typecheck</div><div class="v"><span class="tag ok">0 错</span></div></div>
+    <div class="kv"><div class="k">i18n 一致性</div><div class="v"><span class="tag ok">0 missing</span></div></div>
+    <div class="kv"><div class="k">生产版本</div><div class="v"><span class="tag ok">v1.3.104</span></div></div>
+  </div>
+  <p>反向验证（先红后绿）：<b>用户设置数据丢失</b> —— 临时还原旧实现 → 4 条断言 FAIL（LastUsedModel/Language/SidebarModules/MemoryInjection must survive）；修复后 PASS。</p>
+
+  <h2>5. 部署状态</h2>
+  <table>
+    <tr><th>版本</th><th>内容</th><th>生产</th></tr>
+    <tr><td>v1.3.101</td><td>错误日志+慢请求筛选+数据丢失修复</td><td><span class="tag ok">已上线</span></td></tr>
+    <tr><td>v1.3.102</td><td>生图尺寸档位</td><td><span class="tag ok">已上线</span></td></tr>
+    <tr><td>v1.3.103</td><td>图生图/多图参考</td><td><span class="tag ok">已上线</span></td></tr>
+    <tr><td>v1.3.104</td><td>多会话（P0-4）</td><td><span class="tag ok">已上线</span></td></tr>
+  </table>
+  <p>全部零停机蓝绿部署；<code>/readyz</code> = ready（db up, redis up）；公网 200；容器内存上限 900MB 保持。</p>
+
+  <h2>6. 诚实边界</h2>
+  <div class="card">
+    <ul>
+      <li><b>空输出错误日志</b>：部署后近期空响应全是 <code>client_gone</code>（用户主动取消，正确排除）；真 <code>eof</code> 上游故障再现时才会产生 type=5 —— 设计如此。</li>
+      <li><b>生图/图生图</b>：未做真实付费图像 API 调用（预算红线），仅验证参数组装与链路（单测 + typecheck + build）。</li>
+      <li><b>多会话</b>：会话仅存本地（localStorage），未做服务端持久化（原设计即如此）。</li>
+    </ul>
+  </div>
+
+  <h2>7. 变更测验（必须通过）</h2>
+  <div class="quiz" id="quiz">
+    <div class="q" data-answer="b">
+      <p>1. 「错误日志一条都没有」的根因是什么？</p>
+      <label class="opt"><input type="radio" name="q1" value="a"> 错误日志功能被关闭了</label>
+      <label class="opt"><input type="radio" name="q1" value="b"> 空输出被记成了消耗日志（type=2），从未写错误日志（type=5）</label>
+      <label class="opt"><input type="radio" name="q1" value="c"> 数据库没有 error 表</label>
+      <p class="expl">正确：空输出走 <code>RecordConsumeLog</code>（type=2）路径，从未调用 <code>RecordErrorLog</code>（type=5）。</p>
+    </div>
+    <div class="q" data-answer="c">
+      <p>2. 为什么 <code>client_gone</code> 的空响应不记错误日志？</p>
+      <label class="opt"><input type="radio" name="q2" value="a"> 因为它有 quota</label>
+      <label class="opt"><input type="radio" name="q2" value="b"> 因为它是流式</label>
+      <label class="opt"><input type="radio" name="q2" value="c"> 因为那是用户主动取消，不是上游故障</label>
+      <p class="expl">正确：client_gone = 用户取消/切页/网络抖动，非上游故障，记错误日志会污染排障。</p>
+    </div>
+    <div class="q" data-answer="a">
+      <p>3. 图生图提交时为什么要 blob: → data: 转换？</p>
+      <label class="opt"><input type="radio" name="q3" value="a"> 上游无法获取浏览器本地 blob，需内联为 base64</label>
+      <label class="opt"><input type="radio" name="q3" value="b"> 为了压缩图片</label>
+      <label class="opt"><input type="radio" name="q3" value="c"> 为了通过类型检查</label>
+      <p class="expl">正确：blob: 是浏览器进程内地址，服务端/上游拿不到；data: URL 内联图片内容。</p>
+    </div>
+    <div class="q" data-answer="b">
+      <p>4. 多会话功能如何处理旧版单会话数据？</p>
+      <label class="opt"><input type="radio" name="q4" value="a"> 直接丢弃</label>
+      <label class="opt"><input type="radio" name="q4" value="b"> 首次加载自动迁移为第一个会话，并清理旧键（幂等）</label>
+      <label class="opt"><input type="radio" name="q4" value="c"> 要求用户手动导入</label>
+      <p class="expl">正确：迁移后删除 playground_messages 旧键，避免二次迁移。</p>
+    </div>
+    <div class="q" data-answer="c">
+      <p>5. <code>UpdateUserSetting</code> 的数据丢失 bug 是怎么修的？</p>
+      <label class="opt"><input type="radio" name="q5" value="a"> 加了一个新表</label>
+      <label class="opt"><input type="radio" name="q5" value="b"> 用数据库触发器恢复</label>
+      <label class="opt"><input type="radio" name="q5" value="c"> 以现有设置为基底，只覆盖通知字段（不再从零构造）</label>
+      <p class="expl">正确：从零构造 <code>dto.UserSetting{}</code> 会抹掉未覆盖字段。</p>
+    </div>
+    <button onclick="checkQuiz()">提交答案</button>
+    <div id="result"></div>
+  </div>
+
+  <p class="foot">由 Claude Code 生成 ｜ 本报告仅陈述事实与证据</p>
+</div>
+
+<script>
+function checkQuiz() {
+  var qs = document.querySelectorAll('#quiz .q');
+  var correct = 0, total = qs.length;
+  qs.forEach(function (q) {
+    var answer = q.getAttribute('data-answer');
+    var opts = q.querySelectorAll('.opt');
+    var picked = null;
+    opts.forEach(function (o) {
+      var input = o.querySelector('input');
+      o.classList.remove('correct', 'wrong');
+      if (input.checked) { picked = input.value; }
+    });
+    opts.forEach(function (o) {
+      var input = o.querySelector('input');
+      if (input.value === answer) { o.classList.add('correct'); }
+      else if (input.checked) { o.classList.add('wrong'); }
+    });
+    q.querySelector('.expl').style.display = 'block';
+    if (picked === answer) { correct++; }
+  });
+  var el = document.getElementById('result');
+  if (correct === total) {
+    el.style.color = 'var(--ok)';
+    el.textContent = '✅ 全部通过（' + correct + '/' + total + '）—— 你已完整理解本次变更。';
+  } else {
+    el.style.color = 'var(--err)';
+    el.textContent = '❌ ' + correct + '/' + total + ' —— 请重读上文相关小节后重试。';
+  }
+}
+</script>
+</body>
+</html>
