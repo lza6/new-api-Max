@@ -569,7 +569,8 @@ func GetAllLogs(logType int, startTimestamp int64, endTimestamp int64, modelName
 		tx = tx.Where("logs."+logGroupCol+" = ?", group)
 	}
 	// [首字/耗时筛选] min_use_time>0 时只列出耗时 ≥ 该秒数的请求，供管理端一键
-	// 定位「首字/总耗时很久」的慢请求（如 >20s）。走 logs.use_time 索引。
+	// 定位「首字/总耗时很久」的慢请求（如 >20s）。use_time 无独立索引，走 created_at
+	// 复合索引取窗口后再按 use_time 过滤（窗口通常已限定，代价可控）。
 	if minUseTime > 0 {
 		tx = tx.Where("logs.use_time >= ?", minUseTime)
 	}

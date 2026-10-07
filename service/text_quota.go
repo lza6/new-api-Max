@@ -601,11 +601,14 @@ func emptyUpstreamResponseIsError(relayInfo *relaycommon.RelayInfo) bool {
 	switch ss.EndReason {
 	case relaycommon.StreamEndReasonClientGone:
 		return false
+	case relaycommon.StreamEndReasonNone:
+		// 流结束但从未设置原因（异常/未走完状态机）：与非流式 0 token 一样视为异常。
+		return true
 	case relaycommon.StreamEndReasonDone:
 		// 正常 done 但 0 token：上游确实回了空内容——仍值得记（用户看到空回复）。
 		return true
 	default:
-		// eof / timeout / scanner_error / panic / ping_fail / none 等：异常结束。
+		// eof / timeout / scanner_error / panic / ping_fail 等：异常结束。
 		return true
 	}
 }

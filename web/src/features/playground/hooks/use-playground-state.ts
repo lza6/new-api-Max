@@ -217,7 +217,11 @@ export function usePlaygroundState(initialModel?: string) {
       )
     }
     const fresh = createConversation()
+    // 与持久化上限保持一致（保留最近更新的 50 个），避免内存/落盘列表分叉。
     const next = [...conversationsRef.current, fresh]
+      .sort((a, b) => b.updatedAt - a.updatedAt)
+      .slice(0, 50)
+      .sort((a, b) => a.createdAt - b.createdAt)
     persistConversations(next)
     setConversations(next)
     activeConversationIdRef.current = fresh.id

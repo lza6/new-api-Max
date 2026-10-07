@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils'
 
 import { MESSAGE_STATUS } from '../../constants'
 import {
+  getCurrentVersion,
   getMessageAlignmentClass,
   getMessageContentState,
   isErrorMessage,
@@ -84,7 +85,7 @@ export function PlaygroundMessageContent({
     message.status !== MESSAGE_STATUS.LOADING &&
     message.status !== MESSAGE_STATUS.STREAMING
   // 用户消息附带的图片（图生图 / 多图参考）：在正文上方展示缩略图。
-  const userImages = message.versions[0]?.images ?? []
+  const userImages = getCurrentVersion(message).images ?? []
 
   return (
     <div

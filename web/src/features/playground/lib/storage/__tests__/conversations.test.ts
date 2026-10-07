@@ -78,3 +78,28 @@ describe('conversations (P0-4)', () => {
     expect(loaded.map((c) => c.id).sort()).toEqual([a.id, b.id].sort())
   })
 })
+
+// 审阅修复：单个损坏会话不丢弃整个列表。
+describe('conversations salvage (review fixes)', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('salvages valid conversations when one entry is corrupt', () => {
+    const good = createConversation([userMessage('好的会话')])
+    // 手工写入一个「好 + 坏」的数组：坏条目缺字段。
+    localStorage.setItem(
+      'playground_conversations',
+      JSON.stringify([
+        good,
+        { id: 'broken', title: 1, messages: 'nope' },
+      ])
+    )
+    const loaded = loadConversations()
+    expect(loaded).toHaveLength(1)
+    expect(loaded[0].id).toBe(good.id)
+  })
+
+  it('never returns an empty array', () => {
+    localStorage.setItem('playground_conversations', '[]')
+    expect(loadConversations().length).toBeGreaterThanOrEqual(1)
+  })
+})

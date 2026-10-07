@@ -61,11 +61,13 @@ function readRaw(key: string): string | null {
   }
 }
 
-function writeRaw(key: string, value: string): void {
+function writeRaw(key: string, value: string): boolean {
   try {
     localStorage.setItem(key, value)
+    return true
   } catch {
-    // localStorage 不可用（隐私模式/配额满）：静默降级，不阻断会话。
+    // localStorage 不可用 / 配额满：返回 false，由调用方降级处理。
+    return false
   }
 }
 
@@ -94,34 +96,61 @@ export function createConversation(messages: Message[] = []): Conversation {
 /**
  * 加载会话列表。首次调用时若存在旧版单会话数据，则迁移为第一个会话。
  * 返回值永不为空（至少含一个会话），保证 UI 有可用会话。
+ *
+ * 容错：**逐会话**校验 —— 单个会话数据损坏不会丢弃整个列表（否则一条坏消息
+ * 会导致用户全部会话消失）。损坏的会话被安全跳过。
  */
 export function loadConversations(): Conversation[] {
   const migrated = migrateLegacyMessages()
   const raw = readRaw(CONVERSATIONS_KEY)
   if (raw) {
+    let decoded: unknown
     try {
-      const parsed = conversationsSchema.parse(JSON.parse(raw)) as Conversation[]
-      if (parsed.length > 0) {
-        return parsed
-      }
+      decoded = JSON.parse(raw)
     } catch {
-      // 损坏数据：重建（用迁移结果或空列表）。
+      decoded = null
+    }
+    if (Array.isArray(decoded)) {
+      const salvaged: Conversation[] = []
+      for (const item of decoded) {
+        const result = conversationSchema.safeParse(item)
+        if (result.success) {
+          salvaged.push(result.data as Conversation)
+        }
+      }
+      if (salvaged.length > 0) {
+        return salvaged
+      }
     }
   }
   return migrated ?? [createConversation()]
 }
 
-/** 保存会话列表（裁剪到上限，保留最近更新的）。 */
+/** 保存会话列表（裁剪到上限，保留最近更新的）。
+ *
+ * 配额/校验失败时**逐会话降级重试**：从最旧的会话开始丢弃，直到写入成功——
+ * 避免「附图撑爆 localStorage 导致当前会话完全无法持久化」。 */
 export function saveConversations(conversations: Conversation[]): void {
-  try {
-    const trimmed = [...conversations]
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, MAX_CONVERSATIONS)
-      .sort((a, b) => a.createdAt - b.createdAt)
-    const parsed = conversationsSchema.parse(trimmed)
-    writeRaw(CONVERSATIONS_KEY, JSON.stringify(parsed))
-  } catch {
-    // 校验失败（脏消息）：不写坏数据，静默跳过。
+  const ordered = [...conversations]
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .slice(0, MAX_CONVERSATIONS)
+    .sort((a, b) => a.createdAt - b.createdAt)
+
+  for (let drop = 0; drop < ordered.length; drop++) {
+    // drop 个最旧的会话（保持至少一个）。
+    const candidate = ordered.slice(drop)
+    let serialized: string
+    try {
+      const parsed = conversationsSchema.parse(candidate)
+      serialized = JSON.stringify(parsed)
+    } catch {
+      // 某会话校验失败：继续丢弃更旧的再试。
+      continue
+    }
+    if (writeRaw(CONVERSATIONS_KEY, serialized)) {
+      return
+    }
+    // 写入失败（配额满）：丢弃下一个最旧的再试。
   }
 }
 

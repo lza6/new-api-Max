@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { MESSAGE_ROLES, MESSAGE_STATUS } from '../../constants'
 import type { Message } from '../../types'
 import { parseThinkTags } from './message-reasoning-utils'
+import { getCurrentVersion } from './message-utils'
 
 type MessageContentStateBase = {
   displayContent: string
@@ -59,7 +60,7 @@ function shouldShowMessageContent(
   versionContent: string
 ): boolean {
   // 图片-only 用户消息（无文字、有附图）也要渲染，否则缩略图不显示。
-  const hasImages = (message.versions[0]?.images?.length ?? 0) > 0
+  const hasImages = (getCurrentVersion(message).images?.length ?? 0) > 0
   return (
     (message.from === MESSAGE_ROLES.USER || !message.isReasoningStreaming) &&
     (versionContent.length > 0 || hasImages)
