@@ -76,6 +76,9 @@ export interface ChatCompletionRequest {
   frequency_penalty?: number
   presence_penalty?: number
   seed?: number
+  // 图片生成模型（如 gpt-image 系列走 chat/completions）支持 size 档位：
+  // 宽x高，如 1024x1024 / 1536x1024 / 2048x2048 / 4096x4096。
+  size?: string
 }
 
 export interface ChatCompletionChunk {
@@ -126,6 +129,8 @@ export interface PlaygroundConfig {
   presence_penalty: number
   seed: number | null
   stream: boolean
+  // 图片生成尺寸（宽x高）。空串 = 不发送 size（上游用默认）。
+  size: string
 }
 
 export interface ParameterEnabled {
@@ -135,6 +140,7 @@ export interface ParameterEnabled {
   frequency_penalty: boolean
   presence_penalty: boolean
   seed: boolean
+  size: boolean
 }
 
 // Model and group options

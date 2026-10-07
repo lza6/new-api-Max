@@ -35,6 +35,13 @@ import {
   SheetTrigger,
 } from '@/components/ui/sheet'
 import { Slider } from '@/components/ui/slider'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import {
   Tooltip,
@@ -46,9 +53,11 @@ import { cn } from '@/lib/utils'
 
 import {
   getParameterControlValueText,
+  isImageSizeModel,
   normalizeParameterNumberValue,
   PLAYGROUND_PARAMETER_CONTROLS,
   PLAYGROUND_PARAMETER_PANEL_SCROLL_CLASS,
+  PLAYGROUND_SIZE_CONTROL,
   type PlaygroundParameterKey,
 } from '../../lib/parameters/playground-parameters'
 import type { ParameterEnabled, PlaygroundConfig } from '../../types'
@@ -191,6 +200,57 @@ function PlaygroundParameterContent({
           </div>
         )
       })}
+
+      {/* 图片生成尺寸档位：仅当所选模型是生图模型时展示（gpt-image 等走 chat/completions）。 */}
+      {isImageSizeModel(config.model) && (
+        <div className='border-border/70 bg-background/60 grid gap-2 rounded-lg border p-3 transition-opacity'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0 space-y-1'>
+              <label className='truncate text-sm leading-5 font-medium'>
+                {t(PLAYGROUND_SIZE_CONTROL.labelKey)}
+              </label>
+              <p className='text-muted-foreground text-xs leading-4'>
+                {t(PLAYGROUND_SIZE_CONTROL.descriptionKey)}
+              </p>
+            </div>
+            <Switch
+              aria-label={t('Enable {{parameter}}', {
+                parameter: t(PLAYGROUND_SIZE_CONTROL.labelKey),
+              })}
+              checked={parameterEnabled.size}
+              disabled={disabled}
+              onCheckedChange={(checked) =>
+                onParameterEnabledChange('size', checked)
+              }
+              size='sm'
+            />
+          </div>
+          <Select
+            items={PLAYGROUND_SIZE_CONTROL.options.map((s) => ({
+              value: s,
+              label: s,
+            }))}
+            value={config.size || undefined}
+            onValueChange={(value) =>
+              onConfigChange('size', value ?? '')
+            }
+          >
+            <SelectTrigger
+              aria-label={t('Image Size')}
+              disabled={disabled || !parameterEnabled.size}
+            >
+              <SelectValue placeholder={t('Default')} />
+            </SelectTrigger>
+            <SelectContent>
+              {PLAYGROUND_SIZE_CONTROL.options.map((size) => (
+                <SelectItem key={size} value={size}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
     </div>
   )
 }

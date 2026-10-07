@@ -4599,6 +4599,8 @@
     "Request Header Overrides": "リクエストヘッダーの上書き",
     "Request headers must be a JSON object with string values.": "リクエストヘッダーは値が文字列の JSON オブジェクトである必要があります。",
     "Request ID": "リクエストID",
+    "Image Size": "Image Size",
+    "Output size (width x height) for image generation models": "Output size (width x height) for image generation models",
     "Request Explanation": "Request Explanation",
     "No explanation available for this request.": "No explanation available for this request.",
     "Upstream wait": "Upstream wait",

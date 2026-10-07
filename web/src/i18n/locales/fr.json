@@ -4599,6 +4599,8 @@
     "Request Header Overrides": "Remplacements d'en-têtes de requête",
     "Request headers must be a JSON object with string values.": "Les en-têtes doivent être un objet JSON dont les valeurs sont des chaînes.",
     "Request ID": "ID de requête",
+    "Image Size": "Image Size",
+    "Output size (width x height) for image generation models": "Output size (width x height) for image generation models",
     "Request Explanation": "Request Explanation",
     "No explanation available for this request.": "No explanation available for this request.",
     "Upstream wait": "Upstream wait",

@@ -58,6 +58,7 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   presence_penalty: 0,
   seed: null,
   stream: true,
+  size: '',
 }
 
 export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {
@@ -67,6 +68,7 @@ export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {
   frequency_penalty: true,
   presence_penalty: true,
   seed: false,
+  size: false,
 }
 
 // Storage keys

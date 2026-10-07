@@ -32,6 +32,36 @@ export type PlaygroundParameterControl = {
   step: number
 }
 
+// 图片生成尺寸档位（gpt-image 系列走 chat/completions 时用 size 指定）。
+// 以 select 控件呈现，值直接是 "宽x高" 字符串。
+export type PlaygroundSizeControl = {
+  key: 'size'
+  labelKey: string
+  descriptionKey: string
+  valueType: 'select'
+  options: readonly string[]
+}
+
+export const PLAYGROUND_SIZE_CONTROL: PlaygroundSizeControl = {
+  key: 'size',
+  labelKey: 'Image Size',
+  descriptionKey: 'Output size (width x height) for image generation models',
+  valueType: 'select',
+  options: [
+    '1024x1024',
+    '1536x1024',
+    '1024x1536',
+    '2048x2048',
+    '4096x4096',
+  ],
+} as const
+
+// 图片尺寸是否适用于当前模型（宽松匹配 image / 生图关键词）。
+export function isImageSizeModel(model: string): boolean {
+  const m = model.toLowerCase()
+  return m.includes('image') || m.includes('dall-e') || m.includes('gpt-image')
+}
+
 export const PLAYGROUND_PARAMETER_CONTROLS = [
   {
     key: 'temperature',

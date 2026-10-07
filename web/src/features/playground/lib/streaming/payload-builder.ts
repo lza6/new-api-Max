@@ -68,5 +68,10 @@ export function buildChatCompletionPayload(
     payload.seed = config.seed
   }
 
+  // 图片生成模型尺寸档位（如 gpt-image 系列）。仅在启用且非空时发送。
+  if (parameterEnabled.size && config.size) {
+    payload.size = config.size
+  }
+
   return payload
 }

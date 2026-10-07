@@ -4599,6 +4599,8 @@
     "Request Header Overrides": "請求頭覆蓋",
     "Request headers must be a JSON object with string values.": "請求標頭必須是值為字串的 JSON 物件。",
     "Request ID": "請求 ID",
+    "Image Size": "圖片尺寸",
+    "Output size (width x height) for image generation models": "生圖模型的輸出尺寸（寬x高）",
     "Request Explanation": "請求解釋",
     "No explanation available for this request.": "該請求暫無解釋資訊。",
     "Upstream wait": "上游等待",

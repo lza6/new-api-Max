@@ -34,6 +34,7 @@ export const playgroundConfigSchema = z.object({
   presence_penalty: z.number().optional(),
   seed: z.number().nullable().optional(),
   stream: z.boolean().optional(),
+  size: z.string().optional(),
 })
 
 export const parameterEnabledSchema = z.object({
@@ -43,6 +44,7 @@ export const parameterEnabledSchema = z.object({
   frequency_penalty: z.boolean().optional(),
   presence_penalty: z.boolean().optional(),
   seed: z.boolean().optional(),
+  size: z.boolean().optional(),
 })
 
 const messageRoleSchema = z.enum(['user', 'assistant', 'system'])
