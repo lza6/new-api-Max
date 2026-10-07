@@ -12,6 +12,7 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 */
 import { PlaygroundChat } from './components/chat/playground-chat'
+import { ConversationSwitcher } from './components/header/conversation-switcher'
 import { PlaygroundInput } from './components/input/playground-input'
 import {
   useChatHandler,
@@ -26,6 +27,8 @@ export function Playground({ initialModel }: { initialModel?: string }) {
     config,
     parameterEnabled,
     messages,
+    conversations,
+    activeConversationId,
     isLoadingMessages,
     models,
     groups,
@@ -35,6 +38,9 @@ export function Playground({ initialModel }: { initialModel?: string }) {
     updateConfig,
     updateParameterEnabled,
     clearMessages,
+    createNewConversation,
+    switchConversation,
+    deleteConversation,
   } = usePlaygroundState(initialModel)
 
   const { sendChat, stopGeneration, isGenerating } = useChatHandler({
@@ -77,6 +83,17 @@ export function Playground({ initialModel }: { initialModel?: string }) {
 
   return (
     <div className='relative flex size-full min-h-0 flex-col overflow-hidden'>
+      {/* 多会话工具条（P0-4）：新建 / 切换 / 删除会话。 */}
+      <div className='mx-auto flex w-full max-w-4xl items-center justify-between px-1 pt-2'>
+        <ConversationSwitcher
+          conversations={conversations}
+          activeConversationId={activeConversationId}
+          disabled={isGenerating}
+          onCreate={createNewConversation}
+          onSwitch={switchConversation}
+          onDelete={deleteConversation}
+        />
+      </div>
       {/* Full-width scroll container: scrolling works even over side whitespace */}
       <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
         <PlaygroundChat

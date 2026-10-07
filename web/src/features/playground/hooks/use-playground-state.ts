@@ -22,11 +22,16 @@ import { DEFAULT_CONFIG, DEFAULT_PARAMETER_ENABLED } from '../constants'
 import {
   saveConfig,
   saveParameterEnabled,
-  saveMessages,
   applyMessageStateUpdate,
+  createConversation,
+  deriveConversationTitle,
   getInitialParameterEnabled,
   getInitialPlaygroundConfig,
-  loadMessages,
+  loadActiveConversationId,
+  loadConversations,
+  saveActiveConversationId,
+  saveConversations,
+  type Conversation,
   type MessageStateUpdater,
 } from '../lib'
 import type {
@@ -59,44 +64,87 @@ export function usePlaygroundState(initialModel?: string) {
   )
 
   const [messages, setMessages] = useState<Message[]>([])
+  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [activeConversationId, setActiveConversationId] = useState<string>('')
   const [isLoadingMessages, setIsLoadingMessages] = useState(true)
   const messagesSaveTimerRef = useRef<number | null>(null)
   const latestMessagesRef = useRef<Message[]>(messages)
   const hasLoadedMessagesRef = useRef(false)
+  // 会话集合的实时引用（避免 persistMessages 闭包过期读到旧会话）。
+  const conversationsRef = useRef<Conversation[]>([])
+  const activeConversationIdRef = useRef<string>('')
 
   const [models, setModels] = useState<ModelOption[]>([])
   const [groups, setGroups] = useState<GroupOption[]>([])
 
-  const persistMessages = useCallback((messagesToSave: Message[]) => {
-    latestMessagesRef.current = messagesToSave
+  // persistConversations 把当前会话的最新标题/时间/消息写回会话列表并落盘。
+  const persistConversations = useCallback(
+    (nextConversations: Conversation[]) => {
+      conversationsRef.current = nextConversations
+      saveConversations(nextConversations)
+    },
+    []
+  )
 
-    if (!hasLoadedMessagesRef.current) {
-      return
-    }
+  // persistMessages 把消息写入「当前会话」并防抖落盘（会话标题随首条用户消息更新）。
+  const persistMessages = useCallback(
+    (messagesToSave: Message[]) => {
+      latestMessagesRef.current = messagesToSave
 
-    if (messagesSaveTimerRef.current !== null) {
-      window.clearTimeout(messagesSaveTimerRef.current)
-    }
+      if (!hasLoadedMessagesRef.current) {
+        return
+      }
 
-    messagesSaveTimerRef.current = window.setTimeout(() => {
-      messagesSaveTimerRef.current = null
-      saveMessages(latestMessagesRef.current)
-    }, MESSAGE_SAVE_DEBOUNCE_MS)
-  }, [])
+      if (messagesSaveTimerRef.current !== null) {
+        window.clearTimeout(messagesSaveTimerRef.current)
+      }
+
+      messagesSaveTimerRef.current = window.setTimeout(() => {
+        messagesSaveTimerRef.current = null
+        const activeId = activeConversationIdRef.current
+        const updated = conversationsRef.current.map((c) =>
+          c.id === activeId
+            ? {
+                ...c,
+                messages: latestMessagesRef.current,
+                title:
+                  // 有用户消息才更新标题（避免 assistant-only 覆盖为占位）。
+                  latestMessagesRef.current.some((m) => m.from === 'user')
+                    ? deriveConversationTitle(latestMessagesRef.current)
+                    : c.title,
+                updatedAt: Date.now(),
+              }
+            : c
+        )
+        persistConversations(updated)
+        setConversations(updated)
+      }, MESSAGE_SAVE_DEBOUNCE_MS)
+    },
+    [persistConversations]
+  )
 
   useEffect(() => {
     let cancelled = false
 
     window.setTimeout(() => {
-      const loadedMessages = loadMessages() ?? []
+      const loadedConversations = loadConversations()
+      const savedActiveId = loadActiveConversationId()
+      const active =
+        loadedConversations.find((c) => c.id === savedActiveId) ??
+        loadedConversations[0]
       if (cancelled) {
         return
       }
 
-      latestMessagesRef.current = loadedMessages
+      conversationsRef.current = loadedConversations
+      activeConversationIdRef.current = active.id
+      latestMessagesRef.current = active.messages
       hasLoadedMessagesRef.current = true
-      setMessages(loadedMessages)
+      setConversations(loadedConversations)
+      setActiveConversationId(active.id)
+      setMessages(active.messages)
       setIsLoadingMessages(false)
+      saveActiveConversationId(active.id)
     }, 0)
 
     return () => {
@@ -108,10 +156,10 @@ export function usePlaygroundState(initialModel?: string) {
     () => () => {
       if (messagesSaveTimerRef.current !== null) {
         window.clearTimeout(messagesSaveTimerRef.current)
-        saveMessages(latestMessagesRef.current)
+        persistConversations(conversationsRef.current)
       }
     },
-    []
+    [persistConversations]
   )
 
   // Update config with automatic save
@@ -150,10 +198,89 @@ export function usePlaygroundState(initialModel?: string) {
     [persistMessages]
   )
 
-  // Clear all messages
+  // Clear all messages (current conversation). 先冲刷未落盘的消息，避免切换后丢失。
   const clearMessages = useCallback(() => {
     updateMessages([])
   }, [updateMessages])
+
+  // 新建会话：切到新会话（空消息），当前会话已由防抖落盘保留。
+  const createNewConversation = useCallback(() => {
+    if (messagesSaveTimerRef.current !== null) {
+      window.clearTimeout(messagesSaveTimerRef.current)
+      messagesSaveTimerRef.current = null
+      persistConversations(
+        conversationsRef.current.map((c) =>
+          c.id === activeConversationIdRef.current
+            ? { ...c, messages: latestMessagesRef.current, updatedAt: Date.now() }
+            : c
+        )
+      )
+    }
+    const fresh = createConversation()
+    const next = [...conversationsRef.current, fresh]
+    persistConversations(next)
+    setConversations(next)
+    activeConversationIdRef.current = fresh.id
+    latestMessagesRef.current = fresh.messages
+    setActiveConversationId(fresh.id)
+    setMessages(fresh.messages)
+    saveActiveConversationId(fresh.id)
+  }, [persistConversations])
+
+  // 切换会话：落盘当前会话，再载入目标会话。
+  const switchConversation = useCallback(
+    (id: string) => {
+      if (id === activeConversationIdRef.current) {
+        return
+      }
+      if (messagesSaveTimerRef.current !== null) {
+        window.clearTimeout(messagesSaveTimerRef.current)
+        messagesSaveTimerRef.current = null
+        persistConversations(
+          conversationsRef.current.map((c) =>
+            c.id === activeConversationIdRef.current
+              ? {
+                  ...c,
+                  messages: latestMessagesRef.current,
+                  updatedAt: Date.now(),
+                }
+              : c
+          )
+        )
+      }
+      const target = conversationsRef.current.find((c) => c.id === id)
+      if (!target) {
+        return
+      }
+      activeConversationIdRef.current = id
+      latestMessagesRef.current = target.messages
+      setActiveConversationId(id)
+      setMessages(target.messages)
+      saveActiveConversationId(id)
+    },
+    [persistConversations]
+  )
+
+  // 删除会话：删除后若删的是当前会话，切到剩余第一个；全删则新建一个。
+  const deleteConversation = useCallback(
+    (id: string) => {
+      let next = conversationsRef.current.filter((c) => c.id !== id)
+      if (next.length === 0) {
+        next = [createConversation()]
+      }
+      persistConversations(next)
+      setConversations(next)
+      if (id === activeConversationIdRef.current) {
+        const target = next[0]
+        activeConversationIdRef.current = target.id
+        latestMessagesRef.current = target.messages
+        setActiveConversationId(target.id)
+        setMessages(target.messages)
+        saveActiveConversationId(target.id)
+      }
+    },
+    [persistConversations]
+  )
 
   // Reset config to defaults
   const resetConfig = useCallback(() => {
@@ -168,6 +295,8 @@ export function usePlaygroundState(initialModel?: string) {
     config,
     parameterEnabled,
     messages,
+    conversations,
+    activeConversationId,
     isLoadingMessages,
     models,
     groups,
@@ -181,6 +310,9 @@ export function usePlaygroundState(initialModel?: string) {
     updateParameterEnabled,
     updateMessages,
     clearMessages,
+    createNewConversation,
+    switchConversation,
+    deleteConversation,
     resetConfig,
   }
 }
