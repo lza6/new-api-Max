@@ -603,6 +603,88 @@ function ModelBackendDetailsSection(props: { model: PricingModel }) {
 }
 
 // ----------------------------------------------------------------------------
+// Image-model usage guide
+//
+// 图片生成模型（gpt-image 系列等）走 chat/completions，图片以 Markdown 链接出现在
+// 流式正文里。用户常反馈「不知道怎么用」——这里给出参数说明 + 取图正则 + 示例，
+// 覆盖「文本→图」与「图→图（多图参考）」两种用法。仅对生图模型展示。
+// ----------------------------------------------------------------------------
+
+function isImageGenerationModel(model: PricingModel): boolean {
+  const name = (model.model_name || '').toLowerCase()
+  const endpoints = model.supported_endpoint_types || []
+  return (
+    name.includes('image') ||
+    name.includes('dall-e') ||
+    endpoints.includes('image-generation')
+  )
+}
+
+function ImageModelUsageGuide(props: { model: PricingModel }) {
+  const { t } = useTranslation()
+  const model = props.model
+  const endpointPath = '/v1/chat/completions'
+  const example = `curl https://<your-gateway>${endpointPath} \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer sk-<your-key>" \\
+  -d '{
+    "model": "${model.model_name}",
+    "messages": [{"role":"user","content":"一只橘猫在雪地里看风景，戴红色围巾"}],
+    "stream": true,
+    "size": "1024x1024"
+  }'`
+
+  const extract = `# 图片以 Markdown 链接出现在流式正文里，用正则抽出：
+import re
+m = re.search(r'!\\[[^\\]]*\\]\\((https?://[^)\\s]+)\\)', line.decode())
+if m:
+    url = m.group(1).replace('\\\\u0026', '&')`
+
+  return (
+    <section className='bg-card/60 space-y-3 rounded-xl border p-4 shadow-card'>
+      <SectionTitle>{t('How to use (image generation)')}</SectionTitle>
+      <p className='text-muted-foreground text-sm leading-relaxed'>
+        {t(
+          'Image models use the chat/completions endpoint with stream=true. The generated image appears as a Markdown image link in the streaming content.'
+        )}
+      </p>
+      <StaticDataTable
+        data={[
+          { param: 'model', type: 'string', required: t('Yes'), desc: model.model_name },
+          { param: 'messages', type: 'array', required: t('Yes'), desc: t('Prompt text in messages[].content') },
+          { param: 'stream', type: 'boolean', required: t('Yes'), desc: t('Must be true') },
+          { param: 'size', type: 'string', required: t('No'), desc: '1024x1024 / 1536x1024 / 2048x2048 / 4096x4096' },
+        ]}
+        getRowKey={(row) => row.param}
+        columns={[
+          { id: 'param', header: t('Parameter'), cell: (row) => <span className='font-mono text-xs'>{row.param}</span> },
+          { id: 'type', header: t('Type'), cell: (row) => row.type },
+          { id: 'required', header: t('Required'), cell: (row) => row.required },
+          { id: 'desc', header: t('Description'), cell: (row) => row.desc },
+        ]}
+      />
+      <div className='space-y-1'>
+        <p className='text-xs font-medium'>{t('Text to image')}</p>
+        <pre className='bg-muted/40 overflow-auto rounded-md p-3 text-xs'>
+          <code>{example}</code>
+        </pre>
+      </div>
+      <div className='space-y-1'>
+        <p className='text-xs font-medium'>{t('Extract the image URL')}</p>
+        <pre className='bg-muted/40 overflow-auto rounded-md p-3 text-xs'>
+          <code>{extract}</code>
+        </pre>
+      </div>
+      <p className='text-muted-foreground text-xs leading-relaxed'>
+        {t(
+          'Image-to-image / multi-image reference: attach images in the message content (image_url parts) and the model will use them as references.'
+        )}
+      </p>
+    </section>
+  )
+}
+
+// ----------------------------------------------------------------------------
 // Model header (always visible above the detail sections)
 // ----------------------------------------------------------------------------
 
@@ -1409,6 +1491,10 @@ export function ModelDetailsContent(props: ModelDetailsContentProps) {
 
         <TabsContent value='overview' className='space-y-6 outline-none'>
           <OverviewSummaryGrid model={props.model} />
+
+          {isImageGenerationModel(props.model) && (
+            <ImageModelUsageGuide model={props.model} />
+          )}
 
           <section className='bg-card/60 space-y-5 rounded-xl border p-4 shadow-card'>
             <SectionTitle>{t('Pricing')}</SectionTitle>
