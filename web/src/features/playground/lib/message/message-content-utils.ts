@@ -58,9 +58,11 @@ function shouldShowMessageContent(
   message: Message,
   versionContent: string
 ): boolean {
+  // 图片-only 用户消息（无文字、有附图）也要渲染，否则缩略图不显示。
+  const hasImages = (message.versions[0]?.images?.length ?? 0) > 0
   return (
     (message.from === MESSAGE_ROLES.USER || !message.isReasoningStreaming) &&
-    versionContent.length > 0
+    (versionContent.length > 0 || hasImages)
   )
 }
 

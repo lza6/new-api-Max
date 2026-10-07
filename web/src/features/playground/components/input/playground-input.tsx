@@ -16,12 +16,14 @@ import { useTranslation } from 'react-i18next'
 
 import {
   PromptInput,
+  PromptInputAttachment,
+  PromptInputAttachments,
   PromptInputFooter,
   PromptInputTextarea,
   type PromptInputMessage,
 } from '@/components/ai-elements/prompt-input'
 
-import { getSubmittableInputText } from '../../lib'
+import { blobUrlToDataUrl, extractInputImageUrls, getSubmittableInputText } from '../../lib'
 import {
   getEstimateGroups,
   getEstimatePlan,
@@ -40,7 +42,7 @@ import { CostEstimateHint } from './cost-estimate-hint'
 
 interface PlaygroundInputProps {
   config: PlaygroundConfig
-  onSubmit: (text: string) => void
+  onSubmit: (text: string, imageUrls?: string[]) => void
   onStop?: () => void
   disabled?: boolean
   isGenerating?: boolean
@@ -100,12 +102,27 @@ export function PlaygroundInput({
 }: PlaygroundInputProps) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
+  const [isPreparingImages, setIsPreparingImages] = useState(false)
 
-  const handleSubmit = (message: PromptInputMessage) => {
+  const handleSubmit = async (message: PromptInputMessage) => {
     const submittableText = getSubmittableInputText(message, disabled)
 
-    if (!submittableText) {return}
-    onSubmit(submittableText)
+    if (submittableText === null) {return}
+    // 附件是 blob: URL（浏览器本地对象），上游无法获取 → 转成 data: URL 再发。
+    const rawUrls = extractInputImageUrls(message)
+    let imageUrls: string[] = []
+    if (rawUrls.length > 0) {
+      setIsPreparingImages(true)
+      try {
+        imageUrls = await Promise.all(rawUrls.map(blobUrlToDataUrl))
+      } catch {
+        // 转换失败：跳过图片而非阻断发送（纯文本仍可发）。
+        imageUrls = []
+      } finally {
+        setIsPreparingImages(false)
+      }
+    }
+    onSubmit(submittableText, imageUrls)
     setText('')
   }
 
@@ -120,16 +137,23 @@ export function PlaygroundInput({
     <div className='grid shrink-0 gap-4 px-1 md:pb-4'>
       <PromptInput
         className='relative'
+        accept='image/*'
+        multiple
+        maxFiles={8}
         groupClassName='bg-background/95 dark:bg-background/80 border-border/70 shadow-[0_18px_60px_-32px_rgba(0,0,0,0.65)] ring-1 ring-foreground/5 rounded-xl overflow-hidden transition-all duration-200 focus-within:border-primary/45 focus-within:ring-primary/15 focus-within:shadow-[0_22px_70px_-34px_rgba(0,0,0,0.75)]'
         onSubmit={handleSubmit}
       >
+        {/* 已附图片缩略图（图生图 / 多图参考）：可移除。 */}
+        <PromptInputAttachments>
+          {(attachment) => <PromptInputAttachment data={attachment} />}
+        </PromptInputAttachments>
         <PromptInputTextarea
           autoComplete='off'
           autoCorrect='off'
           autoCapitalize='off'
           spellCheck={false}
           className='min-h-20 px-5 pt-4 pb-3 leading-7 md:min-h-24 md:text-base'
-          disabled={disabled}
+          disabled={disabled || isPreparingImages}
           onChange={(event) => setText(event.target.value)}
           placeholder={t('Ask anything')}
           value={text}

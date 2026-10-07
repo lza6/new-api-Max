@@ -83,6 +83,8 @@ export function PlaygroundMessageContent({
   const isMessageFinal =
     message.status !== MESSAGE_STATUS.LOADING &&
     message.status !== MESSAGE_STATUS.STREAMING
+  // 用户消息附带的图片（图生图 / 多图参考）：在正文上方展示缩略图。
+  const userImages = message.versions[0]?.images ?? []
 
   return (
     <div
@@ -136,6 +138,18 @@ export function PlaygroundMessageContent({
 
       {!isError && showMessageContent && (
         <>
+          {userImages.length > 0 && (
+            <div className='mb-2 flex flex-wrap gap-2'>
+              {userImages.map((url, index) => (
+                <img
+                  key={`${message.key}-img-${index}`}
+                  src={url}
+                  alt={t('Attached image')}
+                  className='border-border/70 max-h-40 rounded-md border object-contain'
+                />
+              ))}
+            </div>
+          )}
           {isSourceVisible ? (
             <CodeBlock
               code={versionContent}
@@ -151,12 +165,15 @@ export function PlaygroundMessageContent({
               <CodeBlockCopyButton />
             </CodeBlock>
           ) : (
-            <MessageContent
-              variant='flat'
-              className={cn(getMessageContentStyles())}
-            >
-              <Response final={isMessageFinal}>{displayContent}</Response>
-            </MessageContent>
+            // 图片-only 消息（无文字）时不渲染空正文。
+            displayContent.length > 0 && (
+              <MessageContent
+                variant='flat'
+                className={cn(getMessageContentStyles())}
+              >
+                <Response final={isMessageFinal}>{displayContent}</Response>
+              </MessageContent>
+            )
           )}
           <MessageMetadata alignment={alignment} message={message} />
           {actions}

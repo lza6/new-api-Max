@@ -26,6 +26,9 @@ export type PlaygroundMessageLayoutMode = 'alternating' | 'left'
 export interface MessageVersion {
   id: string
   content: string
+  // 多模态：本版本附带的图片 URL（data URL 或远程 URL）。用于图生图 / 多图参考。
+  // 空/未设 = 纯文本消息。持久化到 localStorage 的 schema 已含该可选字段。
+  images?: string[]
 }
 
 export interface Message {

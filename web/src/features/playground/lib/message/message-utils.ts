@@ -29,11 +29,18 @@ import type {
 /**
  * Create a new message version
  */
-export function createMessageVersion(content: string): MessageVersion {
-  return {
+export function createMessageVersion(
+  content: string,
+  images?: string[]
+): MessageVersion {
+  const version: MessageVersion = {
     id: nanoid(),
     content,
   }
+  if (images && images.length > 0) {
+    version.images = images
+  }
+  return version
 }
 
 /**
@@ -52,9 +59,14 @@ export function getMessageContent(message: Message): string {
 
 /**
  * Check whether a message has non-empty content in its current version.
+ * 图片-only 消息（图生图/多图参考，无文字）也算有内容。
  */
 export function hasMessageContent(message: Message): boolean {
-  return getMessageContent(message).trim() !== ''
+  const version = getCurrentVersion(message)
+  if (version.content.trim() !== '') {
+    return true
+  }
+  return (version.images?.length ?? 0) > 0
 }
 
 /**
@@ -76,12 +88,13 @@ export function updateCurrentVersionContent(
  */
 export function createUserMessage(
   content: string,
-  createdAt: number = Date.now()
+  createdAt: number = Date.now(),
+  images?: string[]
 ): Message {
   return {
     key: nanoid(),
     from: MESSAGE_ROLES.USER,
-    versions: [createMessageVersion(content)],
+    versions: [createMessageVersion(content, images)],
     createdAt,
   }
 }
@@ -156,7 +169,11 @@ export function formatMessageForAPI(message: Message): ChatCompletionMessage {
   const currentVersion = getCurrentVersion(message)
   return {
     role: message.from,
-    content: currentVersion.content,
+    // 含图片时组装多模态 content parts（图生图 / 多图参考）；否则纯文本。
+    content: buildMessageContent(
+      currentVersion.content,
+      currentVersion.images ?? []
+    ),
   }
 }
 

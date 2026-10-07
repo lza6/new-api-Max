@@ -58,6 +58,8 @@ const messageStatusSchema = z.enum([
 const messageVersionSchema = z.object({
   id: z.string(),
   content: z.string(),
+  // 多模态附图（data URL 或远程 URL）。可选；旧数据无此字段兼容。
+  images: z.array(z.string()).optional(),
 })
 
 const sourceSchema = z.object({

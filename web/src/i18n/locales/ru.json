@@ -4599,6 +4599,8 @@
     "Request Header Overrides": "Переопределения заголовков запроса",
     "Request headers must be a JSON object with string values.": "Заголовки должны быть объектом JSON со строковыми значениями.",
     "Request ID": "ID запроса",
+    "Add image": "Add image",
+    "Attached image": "Attached image",
     "Image Size": "Image Size",
     "Output size (width x height) for image generation models": "Output size (width x height) for image generation models",
     "Request Explanation": "Request Explanation",

@@ -4599,6 +4599,8 @@
     "Request Header Overrides": "Request Header Overrides",
     "Request headers must be a JSON object with string values.": "Request headers must be a JSON object with string values.",
     "Request ID": "Request ID",
+    "Add image": "Add image",
+    "Attached image": "Attached image",
     "Image Size": "Image Size",
     "Output size (width x height) for image generation models": "Output size (width x height) for image generation models",
     "Request Explanation": "Request Explanation",

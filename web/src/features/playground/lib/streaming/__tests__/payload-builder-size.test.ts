@@ -58,3 +58,42 @@ describe('buildChatCompletionPayload size', () => {
     expect(payload.size).toBeUndefined()
   })
 })
+
+// 图生图 / 多图参考：带附图的消息应组装为多模态 content parts。
+describe('buildChatCompletionPayload multimodal images', () => {
+  it('builds image_url parts for a message with images', () => {
+    const withImage: Message[] = [
+      {
+        key: 'k2',
+        from: 'user',
+        versions: [
+          {
+            id: 'v2',
+            content: '改成水彩风格',
+            images: ['data:image/png;base64,AAAA', 'data:image/png;base64,BBBB'],
+          },
+        ],
+        status: 'complete',
+      } as unknown as Message,
+    ]
+    const payload = buildChatCompletionPayload(
+      withImage,
+      { ...DEFAULT_CONFIG, model: 'gpt-4o' },
+      DEFAULT_PARAMETER_ENABLED
+    )
+    const content = payload.messages[0].content
+    expect(Array.isArray(content)).toBe(true)
+    const parts = content as { type: string; image_url?: { url: string } }[]
+    expect(parts[0].type).toBe('text')
+    expect(parts.filter((p) => p.type === 'image_url')).toHaveLength(2)
+  })
+
+  it('keeps plain string content when no images', () => {
+    const payload = buildChatCompletionPayload(
+      messages,
+      { ...DEFAULT_CONFIG, model: 'gpt-4o' },
+      DEFAULT_PARAMETER_ENABLED
+    )
+    expect(typeof payload.messages[0].content).toBe('string')
+  })
+})

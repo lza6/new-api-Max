@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Trash2Icon } from 'lucide-react'
+import { ImageIcon, Trash2Icon } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
@@ -24,6 +24,7 @@ import { toast } from 'sonner'
 import {
   PromptInputButton,
   PromptInputTools,
+  usePromptInputAttachments,
 } from '@/components/ai-elements/prompt-input'
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import {
@@ -62,6 +63,7 @@ export function PlaygroundInputTools({
 }: PlaygroundInputToolsProps) {
   const { t } = useTranslation()
   const [clearConfirmOpen, setClearConfirmOpen] = useState(false)
+  const attachments = usePromptInputAttachments()
 
   const handleClearMessages = () => {
     onClearMessages?.()
@@ -72,6 +74,26 @@ export function PlaygroundInputTools({
   return (
     <>
       <PromptInputTools className='bg-background/70 border-border/60 rounded-lg border p-1 shadow-xs'>
+        {/* 添加图片（图生图 / 多图参考）：打开文件选择，附图在上方缩略图区展示。 */}
+        <Tooltip>
+          <TooltipTrigger
+            render={
+              <PromptInputButton
+                aria-label={t('Add image')}
+                className='text-muted-foreground hover:text-foreground font-medium'
+                disabled={disabled}
+                onClick={() => attachments.openFileDialog()}
+                variant='ghost'
+              >
+                <ImageIcon size={16} />
+              </PromptInputButton>
+            }
+          />
+          <TooltipContent>
+            <p>{t('Add image')}</p>
+          </TooltipContent>
+        </Tooltip>
+
         <PlaygroundParameterPanel
           config={config}
           disabled={disabled}
