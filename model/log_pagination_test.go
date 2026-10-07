@@ -47,13 +47,13 @@ func TestLogPaginationDeferredJoinCorrectness(t *testing.T) {
 	require.NoError(t, db.CreateInBatches(&logs, 200).Error)
 
 	// 第 1 页（偏移 0，浅路径）
-	page1, count1, err := GetUserLogs(1, LogTypeConsume, 0, 0, "", "", 0, 10, "", "", "")
+	page1, count1, err := GetUserLogs(1, LogTypeConsume, 0, 0, "", "", 0, 10, "", "", "", 0)
 	require.NoError(t, err)
 	require.Equal(t, int64(total), count1)
 	require.Len(t, page1, 10)
 
 	// 深页：偏移 1500（≥ logDeepOffsetThreshold，走延迟关联）。
-	page151, count151, err := GetUserLogs(1, LogTypeConsume, 0, 0, "", "", 1500, 10, "", "", "")
+	page151, count151, err := GetUserLogs(1, LogTypeConsume, 0, 0, "", "", 1500, 10, "", "", "", 0)
 	require.NoError(t, err)
 	require.Equal(t, int64(total), count151)
 	require.Len(t, page151, 10, "deep page must return a full page")
@@ -69,7 +69,7 @@ func TestLogPaginationDeferredJoinCorrectness(t *testing.T) {
 	assert.Equal(t, 1501, page151[0].Id, "display id must remain offset-based")
 
 	// 边界：越界偏移返回空页、total 不变。
-	pageOOB, _, err := GetUserLogs(1, LogTypeConsume, 0, 0, "", "", 5000, 10, "", "", "")
+	pageOOB, _, err := GetUserLogs(1, LogTypeConsume, 0, 0, "", "", 5000, 10, "", "", "", 0)
 	require.NoError(t, err)
 	assert.Empty(t, pageOOB)
 }
@@ -84,10 +84,35 @@ func TestLogPaginationShallowPathUnchanged(t *testing.T) {
 	}
 	require.NoError(t, db.CreateInBatches(&logs, 50).Error)
 
-	page, count, err := GetUserLogs(7, LogTypeConsume, 0, 0, "", "", 20, 10, "", "", "")
+	page, count, err := GetUserLogs(7, LogTypeConsume, 0, 0, "", "", 20, 10, "", "", "", 0)
 	require.NoError(t, err)
 	require.Equal(t, int64(100), count)
 	require.Len(t, page, 10)
 	// 偏移 20 → 第 21..30 条（DB id desc，第 1 条 id=100）。显示 id = 21..30，ShallowPath 用 Id 校验显示口径。
 	assert.Equal(t, 21, page[0].Id)
+}
+
+// 首字/耗时筛选：min_use_time 只返回耗时 ≥ 阈值的行（三库语义一致）。
+func TestGetUserLogsMinUseTimeFilter(t *testing.T) {
+	db := setupLogPaginationDB(t)
+	logs := []*Log{
+		{UserId: 42, Type: LogTypeConsume, ModelName: "m", CreatedAt: 100, UseTime: 5},
+		{UserId: 42, Type: LogTypeConsume, ModelName: "m", CreatedAt: 101, UseTime: 25},
+		{UserId: 42, Type: LogTypeConsume, ModelName: "m", CreatedAt: 102, UseTime: 180},
+	}
+	require.NoError(t, db.CreateInBatches(&logs, 10).Error)
+
+	// 无筛选 → 3 条。
+	_, total, err := GetUserLogs(42, LogTypeConsume, 0, 0, "", "", 0, 20, "", "", "", 0)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), total)
+
+	// min_use_time=20 → 2 条（25s、180s）。
+	rows, total, err := GetUserLogs(42, LogTypeConsume, 0, 0, "", "", 0, 20, "", "", "", 20)
+	require.NoError(t, err)
+	require.Equal(t, int64(2), total)
+	require.Len(t, rows, 2)
+	for _, r := range rows {
+		assert.GreaterOrEqual(t, r.UseTime, 20)
+	}
 }

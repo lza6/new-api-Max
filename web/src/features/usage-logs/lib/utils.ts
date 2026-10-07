@@ -201,6 +201,10 @@ export function buildApiParams(config: {
     ...(searchParams.upstreamRequestId
       ? { upstream_request_id: String(searchParams.upstreamRequestId) }
       : {}),
+    // 首字/耗时筛选：>0 时只列耗时 ≥ 该秒数的请求。
+    ...(searchParams.minUseTime && Number(searchParams.minUseTime) > 0
+      ? { min_use_time: Number(searchParams.minUseTime) }
+      : {}),
     ...buildTimeRangeParams(searchParams, false),
   }
 

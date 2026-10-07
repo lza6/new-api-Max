@@ -495,6 +495,7 @@ export interface GetLogsParams {
   group?: string
   request_id?: string
   upstream_request_id?: string
+  min_use_time?: number
 }
 
 export interface GetLogsResponse {

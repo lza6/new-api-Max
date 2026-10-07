@@ -24,6 +24,20 @@ func RegisterMetricsGaugeProvider() {
 		common.MetricsSetGauge("consume_log_flush_failures_total", nil, float64(failures))
 		common.MetricsSetGauge("consume_log_flush_retries_total", nil, float64(retries))
 
+		// T7 中继一致性自检命中计数。
+		if snap := service.RelayAuditSnapshot(); len(snap) > 0 {
+			for check, n := range snap {
+				common.MetricsSetGauge("relay_audit_findings_total", map[string]string{"check": check}, float64(n))
+			}
+		}
+		// T10 策略引擎命中计数。
+		if snap := service.PolicySnapshot(); len(snap) > 0 {
+			common.MetricsSetGauge("policy_engine_eval_total", nil, float64(service.PolicyEvalTotal()))
+			for k, n := range snap {
+				common.MetricsSetGauge("policy_decision_total", map[string]string{"decision": k}, float64(n))
+			}
+		}
+
 		// 渠道健康分 + 熔断状态。查询失败（DB 未就绪等）时静默跳过，不影响计数/直方图输出。
 		var ids []int
 		if err := model.DB.Model(&model.Channel{}).Pluck("id", &ids).Error; err != nil {

@@ -472,6 +472,12 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 	if !summary.hasBillableUsage() {
 		extraContent = append(extraContent, "上游没有返回计费信息，无法扣费（可能是上游超时）")
 		logger.LogError(ctx, fmt.Sprintf("total tokens is 0, cannot consume quota, userId %d, channelId %d, tokenId %d, model %s， pre-consumed quota %d", relayInfo.UserId, relayInfo.ChannelId, relayInfo.TokenId, summary.ModelName, relayInfo.FinalPreConsumedQuota))
+		// [修复] 空输出（HTTP 200 但 0 token、无计费信息）此前只写「消耗日志(type=2)」，
+		// 错误日志(type=5)里一条都看不到 —— 管理端「错误日志」筛选因此毫无内容，
+		// 排障（尤其是「首字很久 + ¥0 空回复」）无从下手。这里**额外**记一条错误日志，
+		// 让这类「空壳成功响应」出现在错误日志里可直接筛选。仅在上游空流/无 usage 且
+		// 非客户端主动断开（client_gone 是用户行为，不算上游故障）时记录。
+		recordEmptyUpstreamResponse(ctx, relayInfo, summary)
 	} else {
 		model.UpdateUserUsedQuotaAndRequestCount(relayInfo.UserId, summary.Quota)
 		model.UpdateChannelUsedQuota(relayInfo.ChannelId, summary.Quota)
@@ -578,3 +584,67 @@ func PostTextConsumeQuota(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, us
 		perfmetrics.RecordRelaySample(relayInfo, true, int64(summary.CompletionTokens))
 	})
 }
+
+// emptyUpstreamResponseIsError 判定「空壳响应」是否应记入错误日志。
+// 仅当上游以非正常原因结束（eof/timeout/scanner_error/panic/ping_fail）且**不是**
+// 客户端主动断开（client_gone——用户取消/切页/网络抖动，非上游故障）时，才视为
+// 需要排障的空输出。无 StreamStatus（非流式）时也记（非流式返回 0 token 同样异常）。
+func emptyUpstreamResponseIsError(relayInfo *relaycommon.RelayInfo) bool {
+	if relayInfo == nil {
+		return true
+	}
+	ss := relayInfo.StreamStatus
+	if ss == nil {
+		// 非流式：0 token 且无计费信息本身就是异常（上游可能超时/空体）。
+		return true
+	}
+	switch ss.EndReason {
+	case relaycommon.StreamEndReasonClientGone:
+		return false
+	case relaycommon.StreamEndReasonDone:
+		// 正常 done 但 0 token：上游确实回了空内容——仍值得记（用户看到空回复）。
+		return true
+	default:
+		// eof / timeout / scanner_error / panic / ping_fail / none 等：异常结束。
+		return true
+	}
+}
+
+// recordEmptyUpstreamResponse 为「HTTP 200 但 0 token、无计费信息」的空输出记录一条
+// 错误日志（type=5），使这类问题在管理端「错误日志」视图可见、可筛选。
+// 客户端主动断开的（client_gone）不记（用户行为，非上游故障）。
+func recordEmptyUpstreamResponse(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, summary textQuotaSummary) {
+	if relayInfo == nil || ctx == nil {
+		return
+	}
+	if !emptyUpstreamResponseIsError(relayInfo) {
+		return
+	}
+	other := model.NewLogOther()
+	other.SetPublic("error_type", "empty_response")
+	other.SetPublic("error_code", "upstream_empty_response")
+	other.SetPublic("status_code", 200)
+	other.SetPublic("error_class", "server_error")
+	other.SetPublic("empty_response", true)
+	if relayInfo.StreamStatus != nil {
+		other.SetPublic("end_reason", string(relayInfo.StreamStatus.EndReason))
+	}
+	// 首字耗时（若有）——「首字很久 + ¥0」是本次排障的核心特征，务必带上。
+	if !relayInfo.FirstResponseTime.IsZero() && !relayInfo.StartTime.IsZero() {
+		other.SetPublic("frt", float64(relayInfo.FirstResponseTime.UnixMilli()-relayInfo.StartTime.UnixMilli()))
+	}
+	if relayInfo.RequestBytes > 0 {
+		other.SetPublic("request_bytes", relayInfo.RequestBytes)
+	}
+	if relayInfo.ResponseBytes > 0 {
+		other.SetPublic("response_bytes", relayInfo.ResponseBytes)
+	}
+	other.SetAdmin("use_channel", ctx.GetStringSlice("use_channel"))
+	if relayInfo.ChannelId > 0 {
+		other.SetAdmin("channel_id", relayInfo.ChannelId)
+	}
+	content := "上游返回空响应（HTTP 200 但无 token / 无计费信息）"
+	useTimeSeconds := int(summary.UseTimeSeconds)
+	model.RecordErrorLog(ctx, relayInfo.UserId, relayInfo.ChannelId, relayInfo.OriginModelName, summary.TokenName, content, relayInfo.TokenId, useTimeSeconds, relayInfo.IsStream, relayInfo.UsingGroup, other)
+}
+

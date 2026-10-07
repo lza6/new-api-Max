@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/model"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -172,4 +173,24 @@ func TestMetaFunctionIndex(t *testing.T) {
 	assert.Equal(t, "search", idx[0]["name"])
 	assert.LessOrEqual(t, len(idx[0]["hint"]), 12) // 含 rune 边界余量
 	assert.True(t, strings.HasPrefix(idx[0]["hint"], "a very"))
+}
+
+// 空输出 → 错误日志判定：仅上游故障类（eof/timeout/空/非流式）记错误日志；
+// 客户端主动断开（client_gone）不记。
+func TestEmptyUpstreamResponseIsError(t *testing.T) {
+	// 非流式（无 StreamStatus）→ 记。
+	require.True(t, emptyUpstreamResponseIsError(&relaycommon.RelayInfo{}))
+
+	// 流式 done（上游确实回空）→ 记。
+	require.True(t, emptyUpstreamResponseIsError(&relaycommon.RelayInfo{
+		StreamStatus: &relaycommon.StreamStatus{EndReason: relaycommon.StreamEndReasonDone},
+	}))
+	// eof（上游提前结束）→ 记。
+	require.True(t, emptyUpstreamResponseIsError(&relaycommon.RelayInfo{
+		StreamStatus: &relaycommon.StreamStatus{EndReason: relaycommon.StreamEndReasonEOF},
+	}))
+	// client_gone（用户取消）→ 不记。
+	require.False(t, emptyUpstreamResponseIsError(&relaycommon.RelayInfo{
+		StreamStatus: &relaycommon.StreamStatus{EndReason: relaycommon.StreamEndReasonClientGone},
+	}))
 }

@@ -46,6 +46,8 @@ const usageLogsSearchSchema = z.object({
   username: z.string().optional().catch(''),
   requestId: z.string().optional().catch(''),
   upstreamRequestId: z.string().optional().catch(''),
+  // 首字/耗时筛选：min_use_time 秒，>0 时只列耗时 ≥ 该值的请求（如 20 → >20s）。
+  minUseTime: z.number().optional().catch(undefined),
   startTime: z.number().optional(),
   endTime: z.number().optional(),
 })

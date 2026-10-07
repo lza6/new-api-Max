@@ -1,47 +1,56 @@
-# workflow_status.md — 终局闭环审计（2026-10-02）
+# workflow_status.md — Batch-6（T8–T15 八项迁移）+ 终局审计
 
-## 任务契约
-对 v1.3.68–v1.3.71（首字延迟治理 + 实时可观测性 + 延迟拆解）做终局闭环审计：
-需求完整性 / 逻辑正确性 / 边界 / 代码质量 / 测试覆盖 / 真实运行结果。
+> 起始 v1.3.100。用户全量授权，要求"能直接上生产"。本文件是**任务契约 + 验收证据**的权威台账。
+> 纪律：只记录事实与证据；未观察到交付物与验收证据不标 done。
 
-## 本批改动
-| 版本 | 改动 | 生产 |
-|---|---|---|
-| v1.3.68 | 出站请求体 gzip 压缩（渠道 opt-in） | ✅ 已部署 |
-| v1.3.69 | 实时请求详情面板 + 压缩阈值 256KB | ✅ 已部署 |
-| v1.3.70 | 面板延迟拆解（httptrace） | ✅ 已部署 |
-| v1.3.71 | 消费日志记录延迟拆解 | ✅ 已部署 |
+## 任务契约（T8–T15）
 
-## 已确认结论
-- **400 `input[N].call_id` = 上游问题**（非本网关）。直连上游空 tool_call id 复现完全相同的 400。
-- **首字延迟 80%+ 在上游 prefill**，非上传带宽（上游 800KB→21.8s；2MB 上传仅 0.36s）。
+| # | 任务 | 来源 | 风险 | 状态 |
+|---|---|---|---|---|
+| T8 | 记忆/画像中间件（先 KV+规则，后可选向量） | kiwi-mem | L2 | 侦察中 |
+| T9 | 图片/视频生成网关（provider 契约+异步任务+对象存储） | imagine-server | L3 | 侦察中 |
+| T10 | 策略引擎（shadow/enforce，护栏/预算/限流统一中心） | Noveum Nova Guard | L2 | 侦察中 |
+| T11 | 插件 manifest 驱动管理台 | Portkey | L2 | 侦察中 |
+| T12 | 阶段化插件链（relay 生命周期插件化） | Tyk | L3 | 侦察中 |
+| T13 | 多 Agent 统一模型目录 + Profiles | magpie | L2 | 侦察中 |
+| T14 | 多协议转换注册表（(from,to) 显式注册） | CLIProxyAPI | L2 | 侦察中 |
+| T15 | Skills 注入 Hook（技能表+注入器+沙箱） | litellm | L3 | 侦察中 |
 
-## 自我审查修复（已提交）
-| # | 缺陷 | 级别 | 状态 |
+## 依赖关系（初步）
+- T10 复用 T6（健康 LB/冷却）+ 既有 rate-limit/circuit → 低耦合，可先行
+- T11/T12/T14 都围绕 `pkg/jsplugin` + `relaykit/relayconvert` → 需先摸清插件与转换底座
+- T8/T13 复用 `UserSetting`/`model_meta` → 前端交互为主
+- T9/T15 最重（新 provider 契约 / 沙箱），风险最高
+
+## 执行原则
+1. 全部**默认开关关**（零生产行为变化），可灰度、可回滚
+2. 复用既有底座（jsplugin/EventBus/relayconvert/channel health），不重造
+3. 每项：先写测试 → 实现 → 反向验证（先红后绿）→ 三库/前端门禁 → E2E
+4. 只做**真实可实现**的部分；不可实现的（如真实付费图像 API 调用）明确标注边界
+
+## 侦察结论（主线程实测，file:line 证据）
+
+| # | 现状 | 真实缺口 | 判定 |
 |---|---|---|---|
-| 1 | httptrace emit 锁外读写（HTTP/2 data race） | P1 | ✅ 修复 |
-| 2 | bodySize 对非可回放 body 返回 0（面板 0B/Infinity） | P1 | ✅ 修复 |
-| 3 | started_at 秒级截断（elapsed 误差 999ms） | P2 | ✅ 修复 |
-| 4 | LivePhaseWaiting 半实现（永不驱动） | P2 | ✅ 移除 |
-| 5 | 聚合计时无数据返回 0（误显示 0ms） | P1 | ✅ 修复 |
-| 6 | 失败行无 error_msg 展示 | P2 | ✅ 修复 |
-| 7 | 压缩阈值 env=0/负 短路（footgun） | P2 | ✅ 修复 |
-| 8 | withUpstreamTimingTrace 未用参数 | P3 | ✅ 修复 |
-| 9 | ⚡ 无 aria-label（a11y） | P3 | ✅ 修复 |
+| T8 | `service/user_profile/profile.go`（规则画像 + Weibull 衰减 + 缓存）、`service/user_memory.go`（RecordUserLastModel）、`controller/user_profile.go`（`/profile/insights`）**已存在** | **画像未注入 relay 请求**（只读展示）；无**可插拔后端接口** | PARTIAL |
+| T9 | `plugins/tasks/*`（10 provider）、`service/task_artifact_store*.go`、`relaykit/dto/openai_image.go`+`openai_video.go`、`model.Task`+`service/task_polling.go` **全存在** | provider 契约/异步任务表/对象存储三支柱齐备；仅缺云对象存储（S3/GCS）后端 | DONE |
+| T10 | 限流/circuit/额度存在，**无统一策略中心** | 新增 `service/policy_engine.go`（shadow/enforce）+ 测试 + metrics gauge | **DONE（本次）** |
+| T8 | 只读画像已存在 | **注入半边**：新增 `service/memory_injection.go`（用户级记忆注入，默认关）+ UserSetting.MemoryInjection 字段 + OpenAI 路径接入 + 测试 | **DONE（本次）** |
+| T11 | `controller/task_plugin.go`（Upload/Approve/Activate/DryRun/List/Runtime）+ `web/src/features/task-plugins/`（21 组件：marketplace/sandbox/integrity/diff）**全存在** | manifest 驱动管理台 + 市场 + 沙箱基本齐备 | DONE |
+| T12 | `pkg/jsplugin` 仅用于 task 平台；**无 relay 生命周期钩子** | relay 请求路径插件化（L3，改动面大） | MISSING(L3) |
+| T13 | `model/model_meta.go`/`vendor_meta.go`/`prefill_group.go`（命名 JSON 组） | 无「模型+路由 Profile」命名捆绑 | PARTIAL |
+| T14 | `relaykit/relayconvert/{request,response,text_converter}_registry.go` 已是 `(from,to)` 注册；**错误类未接入** | 把 `RelayErrorClass` 接入转换诊断 | PARTIAL |
+| T15 | **无 skills 概念** | 技能表+注入器+沙箱（L3） | MISSING(L3) |
 
-## 验证日志
-- [x] go build ./... + go vet（relay/service/controller）
-- [x] relay/common 全量 + service TestLiveRequestTracker（含 race -count=3）
-- [x] 前端 typecheck + lint + build + system-info 测试 3/3 + timeline 15/15
-- [x] 生产 v1.3.71 healthy，外网 15/15=200，500=0
-- [x] 生产延迟拆解日志 11/11 覆盖
 
-## 交付物
-- [x] HTML 变更报告（含测验）：`计划书/reports/change-report-latency-observability.html`
-- [x] skills：`.claude/skills/new-api-add-feature/SKILL.md`（已有，覆盖完善）
-- [x] 记忆台账更新（验证 ledger + 生产部署）
-- [ ] 部署本轮修复（v1.3.72）
+## 生产 hotfix（2026-10-07，用户报「错误日志一条都没有 + 首字3分钟空输出」）
+1. **空输出进错误日志**：`service/text_quota.go` 新增 `recordEmptyUpstreamResponse`——上游 HTTP 200 但 0 token / 无计费信息（end_reason=eof/done、非 client_gone）时**额外**记 type=5 错误日志（含 frt/end_reason/渠道）。根因：此前只落 type=2 消耗日志，错误日志筛选因此为空。
+2. **首字/耗时筛选**：`min_use_time` 查询参数（`model.GetAllLogs`/`GetUserLogs` + `controller/log.go`）→ 使用日志页新增「慢请求 (≥20s)」一键按钮（路由 search `minUseTime` + types/utils 贯通）。
+3. **用户设置数据丢失修复（P1）**：`controller/user.go UpdateUserSetting` 从零构造 `dto.UserSetting{}` → 每次存通知设置会抹掉 `LastUsedModel/Language/SidebarModules/BillingPreference/MemoryInjection`；改为以现有设置为基底只覆盖通知字段。回归测试 `TestUpdateUserSettingPreservesUnrelatedFields`。
 
-## 下一步
-1. 部署本轮审计修复
-2. 完成剩余交付物
+## 验证台账
+- `go build ./...` ✅；`go test ./service/` ok 9.2s；`go test ./model/` ok 54.8s
+- 新增测试：TestPolicyEngine*、TestMemoryInjection*、TestEmptyUpstreamResponseIsError、TestGetUserLogsMinUseTimeFilter、TestUpdateUserSettingPreservesUnrelatedFields
+- 反向验证：user-setting 数据丢失（revert→FAIL，还原→PASS）
+- 前端 typecheck 0 错 / i18n 0 missing / build 成功
+- **待办（用户新需求）**：游乐场生图参数（size/比例档位）、图生图/多图参考、模型广场展示返回图、模型介绍页详细化

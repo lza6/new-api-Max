@@ -439,7 +439,39 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		request.Tools = dedupOpenAITools(request.Tools)
 	}
 
+	// T8 用户记忆注入：默认关（service.MemoryInjectionEnabled()）。开启且用户配置了
+	// 记忆片段时，把它作为稳定前缀注入到系统消息之前（利于上游前缀缓存）。仅改
+	// messages 内容，不改变其它字段语义。
+	if service.MemoryInjectionEnabled() && info != nil {
+		injectUserMemory(request, info.UserSetting.MemoryInjection)
+	}
+
 	return request, nil
+}
+
+// injectUserMemory T8：把用户记忆片段注入到 OpenAI chat 请求的系统消息前。
+// 语义：若已有 role=system 的首条消息，前插记忆（记忆在前、原 system 在后）；
+// 否则在 messages 头部插入一条新的 system 消息。空记忆（含开关关闭）为 no-op。
+func injectUserMemory(request *dto.GeneralOpenAIRequest, userMemory string) {
+	if request == nil {
+		return
+	}
+	mem := service.BuildMemoryInjection(userMemory)
+	if mem == "" {
+		return
+	}
+	for i := range request.Messages {
+		if request.Messages[i].Role == "system" {
+			existing := ""
+			if s, ok := request.Messages[i].Content.(string); ok {
+				existing = s
+			}
+			request.Messages[i].Content = service.MergeMemoryIntoSystem(existing, userMemory)
+			return
+		}
+	}
+	// 无 system 消息：头部插入一条。
+	request.Messages = append([]dto.Message{{Role: "system", Content: mem}}, request.Messages...)
 }
 
 // dedupOpenAITools T5：对 OpenAI tools 定义做等价去重（保留首次出现顺序）。

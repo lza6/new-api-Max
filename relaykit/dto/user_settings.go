@@ -22,6 +22,10 @@ type UserSetting struct {
 	// 供前端在新建会话/Playground 时回填默认模型，减少重复选择。JSON 列内新增字段，
 	// 无需迁移；空值表示尚未记录（前端回退到站点默认）。
 	LastUsedModel string `json:"last_used_model,omitempty"`
+	// T8 用户记忆注入：一段用户自定义的「记忆/偏好」文本，在开启
+	// MEMORY_INJECTION_ENABLED 的部署里被注入到发往上游的 system prompt 之前，
+	// 用于个性化。默认空（不注入）。JSON 列内新增字段，无需迁移。
+	MemoryInjection string `json:"memory_injection,omitempty"`
 }
 
 var (

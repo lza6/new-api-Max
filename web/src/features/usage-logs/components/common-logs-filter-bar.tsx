@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useQueryClient, useIsFetching, useQuery } from '@tanstack/react-query'
 import { useNavigate, getRouteApi } from '@tanstack/react-router'
 import type { Table } from '@tanstack/react-table'
-import { AlertCircle, Eye, EyeOff } from 'lucide-react'
+import { AlertCircle, Eye, EyeOff, Timer } from 'lucide-react'
 import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -211,7 +211,11 @@ export function CommonLogsFilterBar<TData>(
   )
 
   const handleApply = useCallback(
-    (nextFilters: CommonLogFilters = filters, nextLogType: string = logType) => {
+    (
+      nextFilters: CommonLogFilters = filters,
+      nextLogType: string = logType,
+      nextMinUseTime: number | undefined = searchParams.minUseTime
+    ) => {
       const filterParams = buildSearchParams(nextFilters, 'common')
       navigate({
         to: '/usage-logs/$section',
@@ -219,13 +223,14 @@ export function CommonLogsFilterBar<TData>(
         search: {
           ...filterParams,
           type: [nextLogType],
+          minUseTime: nextMinUseTime,
           page: 1,
         },
       })
       queryClient.invalidateQueries({ queryKey: ['logs'] })
       queryClient.invalidateQueries({ queryKey: ['usage-logs-stats'] })
     },
-    [filters, logType, navigate, queryClient]
+    [filters, logType, navigate, queryClient, searchParams.minUseTime]
   )
 
   const handleReset = useCallback(() => {
@@ -334,6 +339,27 @@ export function CommonLogsFilterBar<TData>(
     >
       <AlertCircle data-icon='inline-start' />
       {isErrorOnly ? t('All Types') : t('Error Logs Only')}
+    </Button>
+  )
+
+  // 一键切换「耗时 ≥20s 的慢请求」：排障「首字很久」时直接筛出来。
+  const SLOW_USE_TIME_SECONDS = 20
+  const isSlowOnly = Number(searchParams.minUseTime) === SLOW_USE_TIME_SECONDS
+  const slowOnlyToggle = (
+    <Button
+      variant={isSlowOnly ? 'destructive' : 'outline'}
+      size='sm'
+      aria-pressed={isSlowOnly}
+      onClick={() =>
+        handleApply(
+          filters,
+          logType,
+          isSlowOnly ? undefined : SLOW_USE_TIME_SECONDS
+        )
+      }
+    >
+      <Timer data-icon='inline-start' />
+      {isSlowOnly ? t('Show All') : t('Slow Requests (>=20s)')}
     </Button>
   )
 
@@ -509,6 +535,7 @@ export function CommonLogsFilterBar<TData>(
       actionStart={
         <>
           {errorOnlyToggle}
+          {slowOnlyToggle}
           {sensitiveToggle}
         </>
       }
