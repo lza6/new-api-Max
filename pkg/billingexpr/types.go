@@ -11,6 +11,12 @@ type RequestInput struct {
 	Headers map[string]string
 	Body    []byte
 	Usage   map[string]any
+	// Group 是请求最终使用的分组名（与 group_ratio 同一维度），供表达式
+	// 按分组切换计费方式（如 `group == "按次" ? tier("req", fixed(0.02)) : ...`）。
+	Group string
+	// ChannelID 是本次最终路由到的上游渠道 ID，供表达式按渠道切换计费方式。
+	// 0 表示未知（例如任务/实时等未走渠道选择的路径）。
+	ChannelID int64
 }
 
 // TokenParams holds all token dimensions passed into an Expr evaluation.

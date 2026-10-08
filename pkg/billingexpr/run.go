@@ -66,6 +66,9 @@ func runProgram(prog *vm.Program, requestRules []RequestRuleTrace, params TokenP
 		"img_o": params.ImgO,
 		"ai":    params.AI,
 		"ao":    params.AO,
+		// 计费维度选择：按分组 / 按渠道切换计费方式。
+		"group":   request.Group,
+		"channel": request.ChannelID,
 		"tier": func(name string, value float64) float64 {
 			trace.MatchedTier = name
 			trace.Cost = value

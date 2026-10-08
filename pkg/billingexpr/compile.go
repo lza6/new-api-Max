@@ -125,16 +125,21 @@ var (
 
 // compileEnvPrototypeV1 is the v1 type-checking prototype used at compile time.
 var compileEnvPrototypeV1 = map[string]any{
-	"p":          float64(0),
-	"c":          float64(0),
-	"len":        float64(0),
-	"cr":         float64(0),
-	"cc":         float64(0),
-	"cc1h":       float64(0),
-	"img":        float64(0),
-	"img_o":      float64(0),
-	"ai":         float64(0),
-	"ao":         float64(0),
+	"p":     float64(0),
+	"c":     float64(0),
+	"len":   float64(0),
+	"cr":    float64(0),
+	"cc":    float64(0),
+	"cc1h":  float64(0),
+	"img":   float64(0),
+	"img_o": float64(0),
+	"ai":    float64(0),
+	"ao":    float64(0),
+	// group / channel：计费维度选择变量（按分组或按渠道切换计费方式）。
+	// group 为请求实际使用的分组名（与 group_ratio 同一维度）；channel 为
+	// 最终选中的上游渠道 ID。二者在结算快照中冻结，见 RequestInput。
+	"group":      "",
+	"channel":    int64(0),
 	"tier":       func(string, float64) float64 { return 0 },
 	"fixed":      func(float64) float64 { return 0 },
 	"_trace":     func(int, bool, float64) float64 { return 1 },

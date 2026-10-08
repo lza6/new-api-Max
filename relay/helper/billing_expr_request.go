@@ -12,17 +12,24 @@ import (
 )
 
 func ResolveIncomingBillingExprRequestInput(c *gin.Context, info *relaycommon.RelayInfo) (billingexpr.RequestInput, error) {
-	if info != nil && info.BillingRequestInput != nil {
-		input := cloneRequestInput(*info.BillingRequestInput)
-		merged := cloneStringMap(info.RequestHeaders)
-		maps.Copy(merged, input.Headers)
-		input.Headers = merged
-		return input, nil
-	}
-
 	input := billingexpr.RequestInput{}
 	if info != nil {
+		input.Group = info.UsingGroup
+		// ChannelId 定义在嵌入的 *ChannelMeta 上，未初始化时解引用会 panic；
+		// GetChannelID 判空并返回 0（未知渠道）。
+		input.ChannelID = int64(info.GetChannelID())
 		input.Headers = cloneStringMap(info.RequestHeaders)
+	}
+
+	if info != nil && info.BillingRequestInput != nil {
+		cached := cloneRequestInput(*info.BillingRequestInput)
+		merged := cloneStringMap(info.RequestHeaders)
+		maps.Copy(merged, cached.Headers)
+		cached.Headers = merged
+		// 计费维度随最终选中的分组/渠道刷新（auto 分组重试后会换分组）。
+		cached.Group = input.Group
+		cached.ChannelID = input.ChannelID
+		return cached, nil
 	}
 
 	bodyBytes, err := readIncomingBillingExprBody(c)
@@ -62,7 +69,9 @@ func readIncomingBillingExprBody(c *gin.Context) ([]byte, error) {
 
 func cloneRequestInput(src billingexpr.RequestInput) billingexpr.RequestInput {
 	input := billingexpr.RequestInput{
-		Headers: cloneStringMap(src.Headers),
+		Headers:   cloneStringMap(src.Headers),
+		Group:     src.Group,
+		ChannelID: src.ChannelID,
 	}
 	if len(src.Body) > 0 {
 		input.Body = append([]byte(nil), src.Body...)

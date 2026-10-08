@@ -170,6 +170,12 @@ func TryTieredSettle(relayInfo *relaycommon.RelayInfo, params billingexpr.TokenP
 	if relayInfo.BillingRequestInput != nil {
 		requestInput = *relayInfo.BillingRequestInput
 	}
+	// 计费维度（group/channel）是**路由上下文**而非请求内容，与 group_ratio 同源：
+	// 必须取结算时刻的最终值。auto 分组重试或渠道 fallover 会改变二者，
+	// 若沿用预扣费时冻结的旧值，表达式 `group == ...` / `channel == ...` 会
+	// 按错误的维度计价。请求内容类探针（header/param）仍保持冻结语义。
+	requestInput.Group = relayInfo.UsingGroup
+	requestInput.ChannelID = int64(relayInfo.GetChannelID())
 
 	tr, err := billingexpr.ComputeTieredQuotaWithRequest(snap, params, requestInput)
 	if err != nil {
