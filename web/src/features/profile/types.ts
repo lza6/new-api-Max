@@ -176,7 +176,9 @@ export interface UpdateUserSettingsRequest {
 export interface BindingItem {
   id: string
   label: string
-  icon: React.ElementType
+  // 收窄为可接收 className 的组件：React.ElementType 的联合会让 JSX props 收窄成
+  // never，导致 <icon className=.../> 报 TS2322。与项目内其他 icon 字段约定一致。
+  icon: React.ComponentType<{ className?: string }>
   value?: string
   isBound: boolean
   isEnabled: boolean

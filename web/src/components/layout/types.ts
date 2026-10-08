@@ -25,7 +25,10 @@ import type { TFunction } from 'i18next'
 type BaseNavItem = {
   title: string
   badge?: string
-  icon?: React.ElementType
+  // 收窄为「可接收 className 的组件」：React.ElementType 是大量组件签名的联合，
+  // JSX 展开后 props 被收窄成 never，导致 <item.icon className=.../> 报 TS2322。
+  // 与 view-mode-toggle / performance-health-panel 等处的既有约定一致。
+  icon?: React.ComponentType<{ className?: string }>
   activeUrls?: (LinkProps['to'] | (string & {}))[]
   configUrls?: (LinkProps['to'] | (string & {}))[]
   /**

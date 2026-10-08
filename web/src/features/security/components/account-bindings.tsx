@@ -238,7 +238,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
     {
       id: 'wechat',
       label: t('WeChat'),
-      icon: SiWechat as React.ComponentType<{ className?: string }>,
+      icon: SiWechat,
       value: undefined,
       isBound: Boolean(
         (profile as unknown as Record<string, unknown>).wechat_id
@@ -299,7 +299,7 @@ export function AccountBindings({ profile, onUpdate }: AccountBindingsProps) {
     {
       id: 'linuxdo',
       label: t('LinuxDO'),
-      icon: SiLinux as React.ComponentType<{ className?: string }>,
+      icon: SiLinux,
       value: (profile as unknown as Record<string, unknown>).linux_do_id as
         | string
         | undefined,
