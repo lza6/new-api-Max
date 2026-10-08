@@ -82,6 +82,9 @@ const (
 	MsgUserPasswordRegisterDisabled  = "user.password_register_disabled"
 	MsgUserUsernameOrPasswordEmpty   = "user.username_or_password_empty"
 	MsgUserUsernameOrPasswordError   = "user.username_or_password_error"
+	// MsgUserNoPasswordUseOAuth：账号未设置密码且由第三方登录注册时使用。
+	// 参数 provider 为注册来源显示名（如 NodeLoc / GitHub）。
+	MsgUserNoPasswordUseOAuth = "user.no_password_use_oauth"
 	MsgUserEmailOrPasswordEmpty      = "user.email_or_password_empty"
 	MsgUserExists                    = "user.exists"
 	MsgUserNotExists                 = "user.not_exists"

@@ -62,6 +62,7 @@ func TestMain(m *testing.M) {
 		&SystemTask{},
 		&SystemTaskLock{},
 		&EventDelivery{},
+		&CustomOAuthProvider{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}
@@ -96,6 +97,7 @@ func truncateTables(t *testing.T) {
 		DB.Exec("DELETE FROM system_task_locks")
 		DB.Exec("DELETE FROM system_tasks")
 		DB.Exec("DELETE FROM event_deliveries")
+		DB.Exec("DELETE FROM custom_oauth_providers")
 	})
 }
 

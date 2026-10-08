@@ -31,6 +31,38 @@ const (
 	UserSourceOIDC     = "oidc"
 )
 
+// userSourceDisplayNames 内置注册来源 → 用户可读的登录方式名。
+// 自定义 OAuth provider 不在表内，由其 slug 查 custom_oauth_providers 得到 Name。
+var userSourceDisplayNames = map[string]string{
+	UserSourceGithub:   "GitHub",
+	UserSourceDiscord:  "Discord",
+	UserSourceWeChat:   "WeChat",
+	UserSourceTelegram: "Telegram",
+	UserSourceLinuxDO:  "LinuxDO",
+	UserSourceOIDC:     "OIDC",
+}
+
+// LoginProviderDisplayName 把用户注册来源解析为「请用 X 登录」里可展示的登录方式名。
+// 返回空串表示该来源无法用于登录引导（密码/管理员创建/未知来源）。
+// 自定义 OAuth provider 通过其 slug 查配置拿显示名；查不到时回退为 slug 本身。
+func LoginProviderDisplayName(source string) string {
+	if source == "" {
+		return ""
+	}
+	if name, ok := userSourceDisplayNames[source]; ok {
+		return name
+	}
+	if source == UserSourcePassword || source == UserSourceAdmin {
+		return ""
+	}
+	provider, err := GetCustomOAuthProviderBySlug(source)
+	if err == nil && provider != nil && provider.Name != "" {
+		return provider.Name
+	}
+	// 未知来源：仍回退为原始标识，便于用户辨认是哪种第三方登录。
+	return source
+}
+
 var userSortColumns = map[string]string{
 	"id":            "id",
 	"username":      "username",
@@ -1096,7 +1128,9 @@ func (user *User) ValidateAndFill() (err error) {
 		return fmt.Errorf("%w: %v", ErrDatabase, err)
 	}
 	if user.Password == "" {
-		return ErrInvalidCredentials
+		// 账号存在但从未设置密码（第三方登录注册，见 user.Source）。
+		// 单独返回，便于登录失败时提示「请用对应第三方方式登录」，而非笼统错误。
+		return ErrUserNoPassword
 	}
 	okay := common.ValidatePasswordAndHash(password, user.Password)
 	if !okay || user.Status != common.UserStatusEnabled {

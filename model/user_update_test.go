@@ -347,7 +347,10 @@ func TestValidateAndFillRejectsPasswordlessUser(t *testing.T) {
 		Password: "NewPassword123",
 	}
 	err := loginUser.ValidateAndFill()
-	require.ErrorIs(t, err, ErrInvalidCredentials)
+	// 安全不变量不变：无密码账号**不可**通过密码登录。
+	// 仅错误身份从笼统的 ErrInvalidCredentials 细化为 ErrUserNoPassword，
+	// 以便登录失败时给出「请用对应第三方方式登录」的精确提示。
+	require.ErrorIs(t, err, ErrUserNoPassword)
 
 	var stored User
 	require.NoError(t, DB.Where("username = ?", "passwordless-user").First(&stored).Error)

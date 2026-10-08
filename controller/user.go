@@ -97,6 +97,17 @@ func Login(c *gin.Context) {
 		case errors.Is(err, model.ErrUserEmptyCredentials):
 			recordLoginFailureAudit(c, username, nil, "invalid_params", http.StatusBadRequest)
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		case errors.Is(err, model.ErrUserNoPassword):
+			// 账号存在但从未设置密码（第三方登录注册）。给出「请用 X 登录」的精确
+			// 引导，而非笼统的「用户名或密码错误，或用户已被封禁」。
+			// 注意：这会透露「该账号存在且未设密码」，属于有意的可用性取舍（用户要求）。
+			provider := model.LoginProviderDisplayName(user.Source)
+			recordLoginFailureAudit(c, username, &user, "no_password_use_oauth", http.StatusUnauthorized)
+			if provider == "" {
+				common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
+			} else {
+				common.ApiErrorI18n(c, i18n.MsgUserNoPasswordUseOAuth, map[string]any{"Provider": provider})
+			}
 		default:
 			recordLoginFailureAudit(c, username, nil, "invalid_credentials", http.StatusUnauthorized)
 			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)

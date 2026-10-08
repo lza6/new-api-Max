@@ -11,9 +11,13 @@ var (
 var (
 	ErrInvalidCredentials   = errors.New("invalid credentials")
 	ErrUserEmptyCredentials = errors.New("empty credentials")
-	ErrEmailAlreadyTaken    = errors.New("email already taken")
-	ErrEmailNotFound        = errors.New("email not found")
-	ErrEmailAmbiguous       = errors.New("email matches multiple users")
+	// ErrUserNoPassword：账号存在但未设置密码（通常由第三方登录注册，如 NodeLoc）。
+	// 与 ErrInvalidCredentials 区分，便于登录失败时给出「请用第三方登录」的精确提示，
+	// 而不是笼统的「用户名或密码错误，或用户已被封禁」。
+	ErrUserNoPassword    = errors.New("user has no password")
+	ErrEmailAlreadyTaken = errors.New("email already taken")
+	ErrEmailNotFound     = errors.New("email not found")
+	ErrEmailAmbiguous    = errors.New("email matches multiple users")
 )
 
 // Token auth errors
