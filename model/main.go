@@ -409,6 +409,8 @@ func migrateDB() error {
 	if err := migrateChannelKeyEncryption(); err != nil {
 		common.SysError("channel key encryption migration failed: " + err.Error())
 	}
+	// 启动自检：开关与库内容不一致时告警（只告警，不改行为）。
+	AssertChannelKeyEncryptionState()
 	return nil
 }
 

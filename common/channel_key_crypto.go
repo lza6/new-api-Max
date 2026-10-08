@@ -22,6 +22,11 @@ import (
 //
 // 兼容：读取时若值无 `enc:v1:` 前缀 → 视为明文直接返回（旧数据 fail-open）；
 // 迁移幂等：对已加密值再次加密会被 DecryptIfEncrypted 跳过（有前缀即不再加）。
+//
+// ⚠️ 重要：「fail-open」只对**旧的明文数据**成立。若库中已存在 `enc:v1:` 密文，
+// 却把开关 CHANNEL_KEY_ENCRYPTION 关掉，AfterFind 会直接 return，channel.Key
+// 保持密文原样发往上游 → 全部渠道鉴权失败（401）。即关闭开关对已加密库**不是**
+// 安全降级而是服务中断。启动时由 assertChannelKeyEncryptionState 检测并告警。
 
 const (
 	channelKeyCipherPrefix = "enc:v1:"
@@ -42,6 +47,12 @@ func deriveChannelKeyAESKey() []byte {
 // IsChannelKeyEncrypted 报告字符串是否为本模块产出的密文（带版本前缀）。
 func IsChannelKeyEncrypted(value string) bool {
 	return strings.HasPrefix(value, channelKeyCipherPrefix)
+}
+
+// ChannelKeyEncryptedPrefixPattern 返回供 SQL LIKE 使用的前缀匹配串（`enc:v1:%`）。
+// 调用方用它做「库中是否存在密文」的原始列查询，避免把前缀硬编码到 model 层。
+func ChannelKeyEncryptedPrefixPattern() string {
+	return channelKeyCipherPrefix + "%"
 }
 
 // EncryptChannelKey 加密渠道密钥（含多 key 的整段文本亦可，按整体字节加密）。

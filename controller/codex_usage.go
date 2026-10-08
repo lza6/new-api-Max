@@ -131,7 +131,7 @@ func fetchCodexChannelWhamData(
 
 			encoded, encErr := common.Marshal(oauthKey)
 			if encErr == nil {
-				if updErr := model.DB.Model(&model.Channel{}).Where("id = ?", ch.Id).Update("key", string(encoded)).Error; updErr != nil {
+				if updErr := model.UpdateChannelKeyColumn(ch.Id, string(encoded)); updErr != nil {
 					common.SysError("failed to persist refreshed codex channel key: " + updErr.Error())
 				}
 				model.InitChannelCache()

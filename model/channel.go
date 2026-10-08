@@ -437,6 +437,28 @@ func (channel *Channel) Save() error {
 	return DB.Save(channel).Error
 }
 
+// UpdateChannelKeyColumn 单列更新渠道 key，并在加密开启时显式加密。
+//
+// 为什么不能直接 `DB.Model(&Channel{}).Where(...).Update("key", v)`：
+// 该写法是单列 map 式更新，GORM **不会**触发 BeforeSave 钩子（钩子只在
+// 带完整 schema 的 Save/Updates(struct) 路径生效），于是明文会直接落库，
+// 静默绕过渠道密钥加密（真实缺陷：Codex OAuth 令牌自动刷新走的就是这条路径）。
+// 凡是不经 Save/Update 而直接改 key 列的地方，都必须走本函数。
+func UpdateChannelKeyColumn(channelId int, key string) error {
+	if channelId <= 0 {
+		return errors.New("channel ID is 0")
+	}
+	value := key
+	if common.ChannelKeyEncryptionEnabled && value != "" {
+		enc, err := common.EncryptChannelKey(value)
+		if err != nil {
+			return err
+		}
+		value = enc
+	}
+	return DB.Model(&Channel{}).Where("id = ?", channelId).Update("key", value).Error
+}
+
 // saveStatusState persists only the fields owned by the channel status flow.
 // Keeping this allowlist here prevents a stale channel snapshot from
 // overwriting credentials, accounting counters, or channel configuration.
