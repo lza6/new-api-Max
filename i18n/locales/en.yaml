@@ -69,7 +69,7 @@ user.password_login_disabled: "Password login has been disabled by administrator
 user.register_disabled: "New user registration has been disabled by administrator"
 user.password_register_disabled: "Password registration has been disabled by administrator, please use third-party account verification"
 user.username_or_password_empty: "Username or password is empty"
-user.username_or_password_error: "Username or password is incorrect, or user has been banned"
+user.username_or_password_error: "Incorrect username or password. If you signed up through a third-party login (e.g. NodeLoc / GitHub), your account may not have a password yet — please sign in with that provider, or use Forgot password to set one"
 user.email_or_password_empty: "Email or password is empty!"
 user.exists: "Username already exists or has been deleted"
 user.not_exists: "User does not exist"
