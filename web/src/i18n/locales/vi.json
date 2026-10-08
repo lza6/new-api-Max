@@ -2307,6 +2307,7 @@
     "Failed to regenerate backup codes": "Không thể tạo lại mã sao lưu",
     "Failed to register Passkey": "Không thể đăng ký Passkey",
     "Failed to remove Passkey": "Không thể xóa Passkey",
+    "Failed to read the attached file. Please remove it and try again.": "Không thể đọc tệp đính kèm. Vui lòng xóa và thử lại.",
     "Failed to repair channel consistency": "Không thể sửa tính nhất quán kênh",
     "Failed to reset 2FA": "Không thể đặt lại 2FA",
     "Failed to reset model ratios": "Không thể đặt lại tỷ lệ mô hình",

@@ -440,7 +440,7 @@ export type PromptInputProps = Omit<
   maxFiles?: number
   maxFileSize?: number // bytes
   onError?: (err: {
-    code: 'max_files' | 'max_file_size' | 'accept'
+    code: 'max_files' | 'max_file_size' | 'accept' | 'attachment_conversion'
     message: string
   }) => void
   onSubmit: (
@@ -765,7 +765,15 @@ export const PromptInput = ({
         // Don't clear on error - user may want to retry
       }
     }).catch(() => {
-      // Blob conversion failure: leave attachments for retry (already caught above)
+      // 附件（blob: URL）读取失败——例如 CSP 未放行 blob:、对象已失效。
+      // 不再静默吞掉：上报 onError，否则「点发送毫无反应」无法被定位。
+      // 保留附件以便重试。
+      onError?.({
+        code: 'attachment_conversion',
+        message: t(
+          'Failed to read the attached file. Please remove it and try again.'
+        ),
+      })
     })
   }
 

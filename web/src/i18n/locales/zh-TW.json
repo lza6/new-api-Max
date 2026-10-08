@@ -2307,6 +2307,7 @@
     "Failed to regenerate backup codes": "重新生成備份代碼失敗",
     "Failed to register Passkey": "註冊 Passkey 失敗",
     "Failed to remove Passkey": "移除 Passkey 失敗",
+    "Failed to read the attached file. Please remove it and try again.": "讀取附件失敗，請移除後重試。",
     "Failed to repair channel consistency": "修復渠道一致性失敗",
     "Failed to reset 2FA": "重置 2FA 失敗",
     "Failed to reset model ratios": "重置模型比率失敗",

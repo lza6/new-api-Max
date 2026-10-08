@@ -2307,6 +2307,7 @@
     "Failed to regenerate backup codes": "Failed to regenerate backup codes",
     "Failed to register Passkey": "Failed to register Passkey",
     "Failed to remove Passkey": "Failed to remove Passkey",
+    "Failed to read the attached file. Please remove it and try again.": "Failed to read the attached file. Please remove it and try again.",
     "Failed to repair channel consistency": "Failed to repair channel consistency",
     "Failed to reset 2FA": "Failed to reset 2FA",
     "Failed to reset model ratios": "Failed to reset model ratios",

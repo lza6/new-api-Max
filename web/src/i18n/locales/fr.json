@@ -2307,6 +2307,7 @@
     "Failed to regenerate backup codes": "Échec de la régénération des codes de sauvegarde",
     "Failed to register Passkey": "Échec de l'enregistrement du Passkey",
     "Failed to remove Passkey": "Échec de la suppression de la Passkey",
+    "Failed to read the attached file. Please remove it and try again.": "Échec de la lecture du fichier joint. Supprimez-le et réessayez.",
     "Failed to repair channel consistency": "Échec de la réparation de la cohérence des canaux",
     "Failed to reset 2FA": "Échec de la réinitialisation de la 2FA",
     "Failed to reset model ratios": "Échec de la réinitialisation des ratios du modèle",

@@ -2307,6 +2307,7 @@
     "Failed to regenerate backup codes": "Не удалось перегенерировать резервные коды",
     "Failed to register Passkey": "Не удалось зарегистрировать Passkey",
     "Failed to remove Passkey": "Не удалось удалить Passkey",
+    "Failed to read the attached file. Please remove it and try again.": "Не удалось прочитать вложенный файл. Удалите его и попробуйте снова.",
     "Failed to repair channel consistency": "Не удалось восстановить согласованность каналов",
     "Failed to reset 2FA": "Не удалось сбросить 2FA",
     "Failed to reset model ratios": "Не удалось сбросить коэффициенты модели",

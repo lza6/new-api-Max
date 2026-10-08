@@ -2307,6 +2307,7 @@
     "Failed to regenerate backup codes": "バックアップコードの再生成に失敗しました",
     "Failed to register Passkey": "Passkeyの登録に失敗しました",
     "Failed to remove Passkey": "パスキーの削除に失敗しました",
+    "Failed to read the attached file. Please remove it and try again.": "添付ファイルの読み込みに失敗しました。削除して再試行してください。",
     "Failed to repair channel consistency": "チャネル整合性の修復に失敗しました",
     "Failed to reset 2FA": "2FAのリセットに失敗しました",
     "Failed to reset model ratios": "モデル比率のリセットに失敗しました",
