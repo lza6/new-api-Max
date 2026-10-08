@@ -270,3 +270,38 @@ func TestApplySystemPromptIntoMessagesPassThrough(t *testing.T) {
 		require.Len(t, req.Messages, 1)
 	})
 }
+
+// 透传路径注入的**端到端**验证：原始 body → injectSystemPromptIntoPassThroughBody
+// → 输出 JSON 必须包含注入的 system 消息，且其余字段（model/stream/messages 内容）保留。
+func TestInjectSystemPromptIntoPassThroughBody(t *testing.T) {
+	info := &relaycommon.RelayInfo{
+		ChannelMeta: &relaycommon.ChannelMeta{
+			ChannelSetting: dto.ChannelSettings{SystemPrompt: "CHANNEL-SYS"},
+		},
+	}
+	in := `{"model":"deepseek-v4.1-flash","stream":true,"messages":[{"role":"user","content":"hi"}],"temperature":0.5}`
+	storage, err := common.CreateBodyStorage([]byte(in))
+	require.NoError(t, err)
+
+	r, err := injectSystemPromptIntoPassThroughBody(storage, info)
+	require.NoError(t, err)
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+
+	var body struct {
+		Model       string        `json:"model"`
+		Stream      bool          `json:"stream"`
+		Temperature float64       `json:"temperature"`
+		Messages    []dto.Message `json:"messages"`
+	}
+	require.NoError(t, common.Unmarshal(out, &body))
+	// 系统消息已注入到最前。
+	require.Len(t, body.Messages, 2)
+	require.Equal(t, "system", body.Messages[0].Role)
+	require.Equal(t, "CHANNEL-SYS", body.Messages[0].StringContent())
+	require.Equal(t, "user", body.Messages[1].Role)
+	// 其余字段原样保留（透传语义）。
+	require.Equal(t, "deepseek-v4.1-flash", body.Model)
+	require.True(t, body.Stream)
+	require.Equal(t, 0.5, body.Temperature)
+}
