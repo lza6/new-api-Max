@@ -223,3 +223,50 @@ func TestApplySystemPromptIfNeededSkipsToolLoadingMessages(t *testing.T) {
 		})
 	}
 }
+
+// 渠道 system_prompt 在**透传路径**也必须注入（生产 bug：channel 50
+// pass_through_body_enabled + system_prompt 时提示词被丢弃）。
+func TestApplySystemPromptIntoMessagesPassThrough(t *testing.T) {
+	t.Run("inserts system when absent", func(t *testing.T) {
+		info := &relaycommon.RelayInfo{
+			ChannelMeta: &relaycommon.ChannelMeta{
+				ChannelSetting: dto.ChannelSettings{SystemPrompt: "Be terse."},
+			},
+		}
+		req := &dto.GeneralOpenAIRequest{Messages: []dto.Message{{Role: "user", Content: "hi"}}}
+		applySystemPromptIntoMessages(info, req)
+		require.Len(t, req.Messages, 2)
+		require.Equal(t, "system", req.Messages[0].Role)
+		require.Equal(t, "Be terse.", req.Messages[0].StringContent())
+	})
+
+	t.Run("override merges into existing system", func(t *testing.T) {
+		info := &relaycommon.RelayInfo{
+			ChannelMeta: &relaycommon.ChannelMeta{
+				ChannelSetting: dto.ChannelSettings{SystemPrompt: "PREFIX", SystemPromptOverride: true},
+			},
+		}
+		req := &dto.GeneralOpenAIRequest{Messages: []dto.Message{{Role: "system", Content: "orig"}, {Role: "user", Content: "hi"}}}
+		applySystemPromptIntoMessages(info, req)
+		require.Len(t, req.Messages, 2)
+		require.Equal(t, "PREFIX\norig", req.Messages[0].StringContent())
+	})
+
+	t.Run("no override keeps existing system", func(t *testing.T) {
+		info := &relaycommon.RelayInfo{
+			ChannelMeta: &relaycommon.ChannelMeta{
+				ChannelSetting: dto.ChannelSettings{SystemPrompt: "PREFIX"},
+			},
+		}
+		req := &dto.GeneralOpenAIRequest{Messages: []dto.Message{{Role: "system", Content: "orig"}}}
+		applySystemPromptIntoMessages(info, req)
+		require.Equal(t, "orig", req.Messages[0].StringContent())
+	})
+
+	t.Run("noop when no prompt", func(t *testing.T) {
+		info := &relaycommon.RelayInfo{ChannelMeta: &relaycommon.ChannelMeta{}}
+		req := &dto.GeneralOpenAIRequest{Messages: []dto.Message{{Role: "user", Content: "hi"}}}
+		applySystemPromptIntoMessages(info, req)
+		require.Len(t, req.Messages, 1)
+	})
+}

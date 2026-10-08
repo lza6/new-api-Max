@@ -57,6 +57,7 @@ import {
   normalizeParameterNumberValue,
   PLAYGROUND_PARAMETER_CONTROLS,
   PLAYGROUND_PARAMETER_PANEL_SCROLL_CLASS,
+  PLAYGROUND_REASONING_CONTROL,
   PLAYGROUND_SIZE_CONTROL,
   type PlaygroundParameterKey,
 } from '../../lib/parameters/playground-parameters'
@@ -251,6 +252,61 @@ function PlaygroundParameterContent({
           </Select>
         </div>
       )}
+
+      {/* 思考程度：可调档位 + 可关闭（none）。空串=不发送（上游默认）。 */}
+      <div className='border-border/70 bg-background/60 grid gap-2 rounded-lg border p-3 transition-opacity'>
+        <div className='flex items-start justify-between gap-3'>
+          <div className='min-w-0 space-y-1'>
+            <label className='truncate text-sm leading-5 font-medium'>
+              {t(PLAYGROUND_REASONING_CONTROL.labelKey)}
+            </label>
+            <p className='text-muted-foreground text-xs leading-4'>
+              {t(PLAYGROUND_REASONING_CONTROL.descriptionKey)}
+            </p>
+          </div>
+          <Switch
+            aria-label={t('Enable {{parameter}}', {
+              parameter: t(PLAYGROUND_REASONING_CONTROL.labelKey),
+            })}
+            checked={parameterEnabled.reasoning_effort}
+            disabled={disabled}
+            onCheckedChange={(checked) =>
+              onParameterEnabledChange('reasoning_effort', checked)
+            }
+            size='sm'
+          />
+        </div>
+        <Select
+          items={PLAYGROUND_REASONING_CONTROL.options.map((o) => ({
+            value: o.value === '' ? '__default__' : o.value,
+            label: t(o.labelKey),
+          }))}
+          value={config.reasoning_effort === '' ? '__default__' : config.reasoning_effort}
+          onValueChange={(value) =>
+            onConfigChange(
+              'reasoning_effort',
+              value === '__default__' || value === null ? '' : value
+            )
+          }
+        >
+          <SelectTrigger
+            aria-label={t('Reasoning Effort')}
+            disabled={disabled || !parameterEnabled.reasoning_effort}
+          >
+            <SelectValue placeholder={t('Default')} />
+          </SelectTrigger>
+          <SelectContent>
+            {PLAYGROUND_REASONING_CONTROL.options.map((o) => (
+              <SelectItem
+                key={o.value || '__default__'}
+                value={o.value === '' ? '__default__' : o.value}
+              >
+                {t(o.labelKey)}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </div>
   )
 }

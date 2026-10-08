@@ -62,6 +62,30 @@ export function isImageSizeModel(model: string): boolean {
   return m.includes('image') || m.includes('dall-e') || m.includes('gpt-image')
 }
 
+// 思考程度档位（reasoning_effort）：none = 关闭思考；其余为可调档。
+// 空串 = 不发送（上游默认）。以 select 呈现。
+export type PlaygroundReasoningControl = {
+  key: 'reasoning_effort'
+  labelKey: string
+  descriptionKey: string
+  valueType: 'select'
+  options: readonly { value: string; labelKey: string }[]
+}
+
+export const PLAYGROUND_REASONING_CONTROL: PlaygroundReasoningControl = {
+  key: 'reasoning_effort',
+  labelKey: 'Reasoning Effort',
+  descriptionKey: 'Controls how much the model thinks. Choose Off to disable thinking.',
+  valueType: 'select',
+  options: [
+    { value: '', labelKey: 'Default' },
+    { value: 'none', labelKey: 'Off (no thinking)' },
+    { value: 'low', labelKey: 'Low' },
+    { value: 'medium', labelKey: 'Medium' },
+    { value: 'high', labelKey: 'High' },
+  ],
+} as const
+
 export const PLAYGROUND_PARAMETER_CONTROLS = [
   {
     key: 'temperature',

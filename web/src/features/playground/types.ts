@@ -82,6 +82,8 @@ export interface ChatCompletionRequest {
   // 图片生成模型（如 gpt-image 系列走 chat/completions）支持 size 档位：
   // 宽x高，如 1024x1024 / 1536x1024 / 2048x2048 / 4096x4096。
   size?: string
+  // 思考程度：none（关闭）/ low / medium / high。关闭时上游不进行思考。
+  reasoning_effort?: string
 }
 
 export interface ChatCompletionChunk {
@@ -134,6 +136,9 @@ export interface PlaygroundConfig {
   stream: boolean
   // 图片生成尺寸（宽x高）。空串 = 不发送 size（上游用默认）。
   size: string
+  // 思考程度（reasoning_effort）。'' = 不发送（上游默认）；none=关闭思考；
+  // 其余（low/medium/high）为可调档位。仅对支持的模型有效。
+  reasoning_effort: string
 }
 
 export interface ParameterEnabled {
@@ -144,6 +149,7 @@ export interface ParameterEnabled {
   presence_penalty: boolean
   seed: boolean
   size: boolean
+  reasoning_effort: boolean
 }
 
 // Model and group options

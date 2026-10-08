@@ -59,6 +59,7 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   seed: null,
   stream: true,
   size: '',
+  reasoning_effort: '',
 }
 
 export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {
@@ -69,6 +70,7 @@ export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {
   presence_penalty: true,
   seed: false,
   size: false,
+  reasoning_effort: false,
 }
 
 // Storage keys

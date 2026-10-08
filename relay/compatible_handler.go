@@ -113,10 +113,24 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 				logger.LogDebug(c, "requestBody: %s", debugBytes)
 			}
 		}
-		// [fix-defensive] OpenAI 透传路径：归一非标准 reasoning_effort（on/true
-		// -> 剔除、off/false -> none）。透传体原样转发，但非法 effort 会触发上游
-		// 400 "field ReasoningEffort invalid"（channel 38 第三方中转实锤）。
-		requestBody = sanitizeOpenAIPassThroughReasoningEffort(common.NewReplayableBodyReader(storage), info.RelayMode)
+		// [fix] 透传路径也必须注入渠道级系统提示词：否则「渠道已配 system_prompt +
+		// 开启请求体透传」时系统提示词被静默丢弃（用户反馈「渠道内置提示词不生效」，
+		// channel 50 pass_through_body_enabled=true 实测）。注入是对请求体做一次
+		// JSON 就地改写（把 system message 前插/合并），再原样透传其余字段。
+		if info.ChannelSetting.SystemPrompt != "" {
+			if injected, iErr := injectSystemPromptIntoPassThroughBody(storage, info); iErr != nil {
+				logger.LogError(c, "failed to inject channel system prompt into pass-through body: "+iErr.Error())
+				// 注入失败：退回原始透传体（不阻断请求，仅告警）。
+				requestBody = sanitizeOpenAIPassThroughReasoningEffort(common.NewReplayableBodyReader(storage), info.RelayMode)
+			} else {
+				requestBody = injected
+			}
+		} else {
+			// [fix-defensive] OpenAI 透传路径：归一非标准 reasoning_effort（on/true
+			// -> 剔除、off/false -> none）。透传体原样转发，但非法 effort 会触发上游
+			// 400 "field ReasoningEffort invalid"（channel 38 第三方中转实锤）。
+			requestBody = sanitizeOpenAIPassThroughReasoningEffort(common.NewReplayableBodyReader(storage), info.RelayMode)
+		}
 	} else {
 		convertedRequest, err := adaptor.ConvertOpenAIRequest(c, info, request)
 		if err != nil {

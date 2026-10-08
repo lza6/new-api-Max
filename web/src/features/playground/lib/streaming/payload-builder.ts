@@ -73,5 +73,10 @@ export function buildChatCompletionPayload(
     payload.size = config.size
   }
 
+  // 思考程度：仅启用且非空时发送（none=关闭思考）。
+  if (parameterEnabled.reasoning_effort && config.reasoning_effort) {
+    payload.reasoning_effort = config.reasoning_effort
+  }
+
   return payload
 }
