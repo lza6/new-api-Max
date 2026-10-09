@@ -895,9 +895,19 @@ func (a *TaskAdaptor) BuildContentRequest(task *model.Task, artifactKey string, 
 		if len(descriptor.Headers) != 0 || descriptor.Body != nil {
 			return nil, fmt.Errorf("credentialless artifact requests cannot contain headers or a body")
 		}
-		parsedURL, parseErr := url.Parse(descriptor.URL)
-		if parseErr != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
-			return nil, fmt.Errorf("credentialless artifact request URL must be absolute HTTP(S)")
+		// 纯函数型插件（在沙箱内**生成**产物字节而不是转发上游 URL）用 data: URL
+		// 返回结果——它没有上游可指。此前这里强制要求绝对 http(s)，导致这类插件
+		// 永远无法交付产物。
+		//
+		// 安全边界与既有 legacy 任务一致：真正的长度上限（64 MiB）与 MIME 校验在
+		// controller 侧 writeVideoDataURL 完成，这里只做「是不是 data: 且声明 base64」
+		// 的形态判断，不放宽任何其它限制（仍禁止 headers/body，仍只允许 GET/HEAD）。
+		// 非 data: 时仍按原样要求绝对 HTTP(S)。
+		if !isBase64DataURL(descriptor.URL) {
+			parsedURL, parseErr := url.Parse(descriptor.URL)
+			if parseErr != nil || parsedURL.Host == "" || (parsedURL.Scheme != "http" && parsedURL.Scheme != "https") {
+				return nil, fmt.Errorf("credentialless artifact request URL must be absolute HTTP(S) or a base64 data URL")
+			}
 		}
 	} else if err = pluginruntime.ValidateRequestURL(descriptor.URL, a.info.ChannelBaseUrl, a.plugin.Meta.AllowedHosts); err != nil {
 		return nil, err
@@ -1593,3 +1603,24 @@ var _ channel.TaskContentRequestProvider = (*TaskAdaptor)(nil)
 var _ channel.TaskUsageFactsProvider = (*TaskAdaptor)(nil)
 var _ channel.TaskValidatedBillingProvider = (*TaskAdaptor)(nil)
 var _ channel.TaskValidatedUsageFactsProvider = (*TaskAdaptor)(nil)
+
+// isBase64DataURL 判断字符串是否为「声称 base64 的 data: URL」。
+//
+// 只做形态判断（前缀 + ";base64" 声明），不做解码、不校验长度与 MIME——
+// 那些由 controller 侧 writeVideoDataURL 统一负责（64 MiB 上限、媒体类型
+// 合法性、base64 可解码性），避免同一套校验在多处实现而分叉。
+//
+// 长度上限在此处刻意**不**检查：descriptor.URL 的长度上限由上游
+// pluginState 的 1 MiB 限制天然约束，而最终产物大小由 writeVideoDataURL 把关。
+func isBase64DataURL(raw string) bool {
+	trimmed := strings.TrimSpace(raw)
+	if !strings.HasPrefix(trimmed, "data:") {
+		return false
+	}
+	comma := strings.IndexByte(trimmed, ',')
+	if comma < 0 {
+		return false
+	}
+	header := trimmed[:comma]
+	return strings.Contains(header, ";base64")
+}
