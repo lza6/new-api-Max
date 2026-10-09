@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import {
   BILLING_FUNCTIONS,
+  CONTEXT_VARIABLES,
   TOKEN_VARIABLES,
   TIME_FUNCTIONS,
   BillingExpressionError,
@@ -26,6 +27,7 @@ import {
   visitExpression,
   type CompilationResult,
   type CompiledBillingExpression,
+  type ContextVariable,
   type ExpressionNode,
   type TokenVariable,
 } from './types'
@@ -311,6 +313,16 @@ class BillingParser {
       return { kind: 'literal', value: token.text === 'true', ...span }
     }
     if (this.current.text !== '(') {
+      // 上下文变量（group/channel）只用于选择计价分支，不是可计费数量。
+      // 必须与 TOKEN_VARIABLES 分开，否则「按分组切换计费」的表达式会被判为
+      // unsupported，价格展示层只能回退到给用户看表达式源码。
+      if ((CONTEXT_VARIABLES as readonly string[]).includes(token.text)) {
+        return {
+          kind: 'context',
+          name: token.text as ContextVariable,
+          ...span,
+        }
+      }
       if (!(TOKEN_VARIABLES as readonly string[]).includes(token.text)) {
         throw new BillingExpressionError({
           code: 'unsupported',
@@ -371,6 +383,9 @@ function checkExpressionTypes(ast: ExpressionNode): void {
       else if (typeof node.value === 'string') {result = 'string'}
       else {result = 'boolean'}
     } else if (node.kind === 'variable') {result = 'number'}
+    // group 是字符串、channel 是数值；标为 dynamic 让比较运算自行判定
+    // （== 两侧类型由运行时决定），避免把合法的 group == "x" 判成类型错误。
+    else if (node.kind === 'context') {result = 'dynamic'}
     else if (node.kind === 'unary') {
       result = node.operator === '!' ? 'boolean' : 'number'
       requireType(node.operand, result)

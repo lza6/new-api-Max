@@ -102,14 +102,15 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
   let priceSummary: ReactNode
   if (dynamicSummary) {
     if (dynamicSummary.isSpecialExpression) {
+      // 用户不该在模型广场读到计费表达式的源码。真正可解析的阶梯（含按分组/
+      // 渠道切换的写法）已由 readTokenTierChain 展开成价格条目；走到这里说明
+      // 表达式形态无法被归纳成「一次调用多少钱」，此时只给一句人话说明，
+      // 具体计费口径在模型详情页与使用日志里可查。
       priceSummary = (
         <div className='col-span-full min-w-0'>
-          <span className='text-warning'>
-            {t('Special billing expression')}
+          <span className='text-muted-foreground text-sm'>
+            {t('Pricing varies by usage — see details')}
           </span>
-          <code className='text-muted-foreground mt-1 line-clamp-2 block font-mono text-xs break-all'>
-            {dynamicSummary.rawExpression}
-          </code>
         </div>
       )
     } else if (dynamicSummary.primaryEntries.length > 0) {

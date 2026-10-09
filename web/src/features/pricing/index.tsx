@@ -16,10 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { Crown } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Link } from '@tanstack/react-router'
 
 import { Button } from '@/components/ui/button'
 import { PublicLayout } from '@/components/layout'
@@ -227,17 +225,6 @@ export function Pricing() {
               className='mx-auto mt-4 max-w-2xl sm:mt-6'
             />
           </header>
-
-          <div className='mx-auto mb-6 flex justify-center'>
-            <Button
-              variant='outline'
-              size='sm'
-              render={<Link to='/pricing/plans' />}
-            >
-              <Crown className='size-3.5' aria-hidden />
-              {t('Plan Comparison')}
-            </Button>
-          </div>
 
           <QuotaBalanceBanner />
 

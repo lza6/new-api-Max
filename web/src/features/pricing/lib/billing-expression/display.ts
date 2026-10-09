@@ -142,8 +142,40 @@ function tokenTier(
   return { label: node.args[0].value, conditions, prices }
 }
 
+/**
+ * 判断条件是否是**计价分支守卫**（group/channel 选择哪套价），而不是长度阈值。
+ *
+ * 典型形态：`group == "token计费"` / `channel == 12` / `group != "x"`。
+ * 这类条件不改变「一次调用多少钱」的语义，只是说明**不同分组/渠道价格不同**；
+ * 价格展示层应跳过它直接读阶梯链，否则用户只能在卡片上看到表达式源码。
+ */
+function isContextGuard(node: ExpressionNode): boolean {
+  if (node.kind !== 'binary' || !['==', '!=', '===', '!=='].includes(node.operator)) {
+    return false
+  }
+  const sides = [node.left, node.right]
+  const hasContext = sides.some((side) => side.kind === 'context')
+  const hasComparable = sides.every(
+    (side) =>
+      side.kind === 'context' ||
+      side.kind === 'literal' ||
+      side.kind === 'variable'
+  )
+  return hasContext && hasComparable
+}
+
 /** Legacy token summary contract: ordered linear chain, never a minimum or partial price extraction. */
 export function readTokenTierChain(node: ExpressionNode): TokenTier[] | null {
+  // 先剥掉外层的 group/channel 守卫：`group == "x" ? <阶梯> : <按次>`。
+  // 只剥一层且只在 yes 分支仍是合法阶梯链时才生效；若 yes 分支不是阶梯
+  // （例如守卫里包的是纯 token 计价），则由下方原有逻辑处理。
+  if (node.kind === 'conditional' && isContextGuard(node.condition)) {
+    const guarded = readTokenTierChain(node.yes)
+    if (guarded) {
+      return guarded
+    }
+  }
+
   const tiers: TokenTier[] = []
   let remaining = node
   while (remaining.kind === 'conditional') {

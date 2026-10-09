@@ -44,7 +44,6 @@ export type ModelPriceCellOptions = {
 export function ModelPriceCell(props: {
   model: PricingModel
   options?: ModelPriceCellOptions
-  showExpression?: boolean
 }) {
   const { t } = useTranslation()
   const currency = useSystemConfigStore((state) => state.config.currency)
@@ -72,16 +71,10 @@ export function ModelPriceCell(props: {
 
   if (dynamic) {
     if (dynamic.isSpecialExpression) {
+      // 同上（model-card.tsx）：不向用户暴露计费表达式源码。
       return (
-        <span className='block max-w-full min-w-0'>
-          <span className='text-muted-foreground block truncate text-sm'>
-            {t('Special billing expression')}
-          </span>
-          {props.showExpression !== false && (
-            <code className='text-muted-foreground mt-1 line-clamp-2 block text-xs break-all whitespace-normal'>
-              {dynamic.rawExpression}
-            </code>
-          )}
+        <span className='text-muted-foreground block text-sm'>
+          {t('Pricing varies by usage — see details')}
         </span>
       )
     }

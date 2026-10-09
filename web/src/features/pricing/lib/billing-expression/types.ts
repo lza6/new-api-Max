@@ -29,6 +29,19 @@ export const TOKEN_VARIABLES = [
   'ao',
 ] as const
 export type TokenVariable = (typeof TOKEN_VARIABLES)[number]
+/**
+ * 上下文变量：不参与价格计算，只用于**在表达式中选择计价分支**。
+ *
+ * - `group`  请求使用的分组名（v1.3.114 起支持），例如同一个模型在
+ *            「token计费」分组走阶梯价、其他分组走按次价。
+ * - `channel` 命中的渠道 id（同上），用于按渠道差异化定价。
+ *
+ * 语义上它们是**字符串/数值型分支条件**，而不是可计费的数量。价格展示层
+ * （display.ts）在读取阶梯链时会跳过包在外层的 group/channel 守卫，直接展示
+ * 用户真正关心的「一次调用多少钱」，而不是让用户去读表达式源码。
+ */
+export const CONTEXT_VARIABLES = ['group', 'channel'] as const
+export type ContextVariable = (typeof CONTEXT_VARIABLES)[number]
 export const TIME_FUNCTIONS = [
   'hour',
   'minute',
@@ -63,6 +76,7 @@ export type ExpressionNode = (
       integer?: boolean
     }
   | { kind: 'variable'; name: TokenVariable }
+  | { kind: 'context'; name: ContextVariable }
   | { kind: 'call'; name: string; args: ExpressionNode[] }
   | { kind: 'unary'; operator: string; operand: ExpressionNode }
   | {
@@ -128,6 +142,12 @@ export type BillingSimulationContext = {
   request?: { body?: unknown; headers?: Record<string, string> }
   usage?: Record<string, unknown>
   now?: Date
+  /**
+   * 计价分支上下文（group/channel）。仅用于按分组/渠道切换计费方式的表达式；
+   * 未提供时 group 视为空串、channel 视为 -1，使守卫条件不成立而走 else 分支，
+   * 从而仍能展示一套可用价格，而不是报 missing_context。
+   */
+  context?: Partial<Record<ContextVariable, string | number>>
 }
 export type BillingEvaluationResult =
   | ExpressionFailure

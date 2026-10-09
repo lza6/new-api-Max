@@ -265,6 +265,13 @@ class BillingRuntime {
       }
       return { value }
     }
+    // 上下文变量（group/channel）：只用于选择计价分支，本身不是可计费数量。
+    // 上下文缺失时按「未提供」处理，让分组守卫条件判定为不成立（走 else 分支），
+    // 而不是抛 missing_context —— 价格展示不需要知道具体分组也能展示阶梯。
+    if (node.kind === 'context') {
+      const provided = this.context.context?.[node.name]
+      return { value: provided ?? (node.name === 'channel' ? -1 : '') }
+    }
     if (node.kind === 'conditional') {
       const condition = this.boolean(node.condition)
       const ruleIndex = this.compiled.requestRules.findIndex(

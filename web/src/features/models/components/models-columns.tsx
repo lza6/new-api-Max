@@ -191,7 +191,6 @@ export function useModelsColumns(
                 entry ?? { model_name: row.original.model_name, effective: {} }
               )}
               options={{ tokenUnit: 'M' }}
-              showExpression={false}
             />
           </Button>
         )

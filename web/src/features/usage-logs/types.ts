@@ -201,6 +201,22 @@ export interface LogOtherData {
     // Reject / intercept reason (admin only)
     reject_reason?: string
     task_plugin?: TaskPluginInfo
+    // T7 中继一致性自检发现（admin only）。空/未开启 RELAY_AUDIT_ENABLED 时不存在。
+    relay_audit?: RelayAuditFinding[]
+    relay_audit_dropped?: number
+    // T4 复杂度打分细分（admin only）。档位 complexity_tier 是公开字段。
+    complexity?: {
+      length?: number
+      code?: number
+      math?: number
+      reasoning?: number
+      tools?: number
+      multimodal?: number
+      multi_turn?: number
+      total?: number
+      tier?: string
+      reasons?: string[]
+    }
   }
   root_info?: {
     task_plugin?: TaskPluginRuntimeInfo
@@ -254,6 +270,9 @@ export interface LogOtherData {
   audio_ratio?: number
   audio_completion_ratio?: number
   frt?: number
+  // T4 复杂度档位（public）：simple | medium | complex。仅在后端开启
+  // COMPLEXITY_ROUTING 时写入；细维度与命中的理由在 admin_info.complexity。
+  complexity_tier?: string
   // httptrace 延迟拆解（毫秒）：区分「网关→上游上传」与「上游首 token」。
   // 由后端 appendUpstreamTiming 写入，未采集时缺省。
   upstream_connect_ms?: number
@@ -401,6 +420,19 @@ export interface TaskLog {
   }
   created_at?: number
   updated_at?: number
+}
+
+/**
+ * T7 中继一致性自检的一条发现（对应后端 service.RelayAuditFinding）。
+ * 仅管理员可见（落在日志 other.admin_info.relay_audit）。
+ */
+export interface RelayAuditFinding {
+  /** 检查项：sse_whitelist | usage_monotonic | error_leak | model_fingerprint */
+  check: string
+  /** 严重级别：warn | error */
+  severity: string
+  /** 人可读的说明（英文，后端生成） */
+  detail: string
 }
 
 export interface TaskPluginInfo {

@@ -393,7 +393,7 @@ describe('model cards', () => {
     expect(screen.getByText(/480p · 5s ≈/)).toBeVisible()
   })
 
-  it('keeps an unrecognized expression visible with the special billing message', () => {
+  it('never shows an unrecognized expression as source code to the user', () => {
     const expression =
       'u("seconds") > 30 ? tier("long", u("seconds") * 0.3) : tier("short", u("seconds") * 0.4)'
     render(
@@ -406,8 +406,12 @@ describe('model cards', () => {
         onClick={vi.fn()}
       />
     )
-    expect(screen.getByText('Special billing expression')).toBeVisible()
-    expect(screen.getByText(expression)).toBeVisible()
+    // 计费表达式的源码属于实现细节，用户看不懂也不该看到；只给一句人话。
+    expect(screen.queryByText(expression)).toBeNull()
+    expect(screen.queryByText('Special billing expression')).toBeNull()
+    expect(
+      screen.getByText('Pricing varies by usage — see details')
+    ).toBeVisible()
   })
 
   it('keeps browsing and neutral health placeholders available after the metrics request fails', async () => {

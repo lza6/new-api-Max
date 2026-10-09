@@ -1387,6 +1387,67 @@ export function DetailsDialog(props: DetailsDialogProps) {
           </DetailSection>
         )}
 
+        {/* T4 复杂度档位（public）：帮助用户理解「为什么这次慢/贵」。
+            仅在后端开启 COMPLEXITY_ROUTING 时存在。细维度见下方 admin 区。 */}
+        {other?.complexity_tier && (
+          <DetailSection label={t('Request Complexity')}>
+            <DetailRow
+              label={t('Complexity Tier')}
+              value={<StatusBadge label={other.complexity_tier} size='sm' copyable={false} />}
+            />
+            {props.isAdmin && adminInfo?.complexity && (
+              <>
+                <DetailRow
+                  label={t('Complexity Score')}
+                  value={
+                    adminInfo.complexity.total !== undefined
+                      ? adminInfo.complexity.total.toFixed(1)
+                      : '—'
+                  }
+                />
+                {Array.isArray(adminInfo.complexity.reasons) &&
+                  adminInfo.complexity.reasons.length > 0 && (
+                    <DetailRow
+                      label={t('Matched Signals')}
+                      value={adminInfo.complexity.reasons.join(', ')}
+                    />
+                  )}
+              </>
+            )}
+          </DetailSection>
+        )}
+
+        {/* T7 中继一致性自检（admin only）：上游返回的 SSE 帧、usage 累计、
+            错误文本、回显模型名是否与契约一致。开启 RELAY_AUDIT_ENABLED 才有值。 */}
+        {props.isAdmin &&
+          Array.isArray(adminInfo?.relay_audit) &&
+          adminInfo.relay_audit.length > 0 && (
+            <DetailSection label={t('Relay Self-Check')}>
+              <ul className='space-y-1.5'>
+                {adminInfo.relay_audit.map((f) => (
+                  <li
+                    key={`${f.check}-${f.detail}`}
+                    className='flex min-w-0 items-start gap-1.5 text-xs'
+                  >
+                    <StatusBadge
+                      label={f.check}
+                      variant={f.severity === 'error' ? 'red' : 'orange'}
+                      size='sm'
+                      copyable={false}
+                    />
+                    <span className='min-w-0 break-words'>{f.detail}</span>
+                  </li>
+                ))}
+              </ul>
+              {(adminInfo.relay_audit_dropped ?? 0) > 0 && (
+                <DetailRow
+                  label={t('Dropped Findings')}
+                  value={String(adminInfo.relay_audit_dropped)}
+                />
+              )}
+            </DetailSection>
+          )}
+
         {/* Subscription billing details */}
         {isSubscription && other && (
           <DetailSection label={t('Subscription Billing')}>
