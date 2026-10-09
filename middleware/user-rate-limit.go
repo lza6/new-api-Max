@@ -58,6 +58,19 @@ func releaseUserRateLimitConcurrency(userId int) {
 	}
 }
 
+// UserRateLimitLiveState 返回指定用户当前**已发生**的限速计数，供统一策略中心
+// （service/policy_engine）做判定时读取真实状态，而不是重新实现一套计数器。
+// currentRpm 为当前 60s 窗口内已发生的请求数；currentConcurrency 为进行中请求数。
+// 调用方自行用 relay_setting.GetUserRateLimitTier 取档位上限。
+func UserRateLimitLiveState(userId int) (currentConcurrency, currentRpm int) {
+	currentRpm = userRateLimitRpmLimiter.Count("ubase:" + strconv.Itoa(userId) + ":rpm")
+
+	userRateLimitConcurrencyStore.Lock()
+	currentConcurrency = userRateLimitConcurrencyStore.counts[userId]
+	userRateLimitConcurrencyStore.Unlock()
+	return currentConcurrency, currentRpm
+}
+
 // UserRateLimit 每用户基础限速中间件：rpm（60s 滑动窗口）+ 并发（进程内信号量）。
 func UserRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {

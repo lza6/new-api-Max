@@ -93,6 +93,29 @@ func AppendRelayLogAdminInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo,
 	}
 
 	AppendChannelAffinityAdminInfo(ctx, other)
+
+	// T7 中继一致性自检收口：把本次请求收集到的发现落到 admin_info 并计入指标。
+	// 未开启开关或无发现时为 no-op。
+	FlushRelayAudit(ctx, other.SetAdmin)
+
+	// T4 复杂度档位/细维度。放在此处（而非各调用点）的原因：本函数是成功日志
+	// （GenerateTextOtherInfo）与错误日志（controller 错误路径）的**共同入口**，
+	// 放这里可保证两条路径都带上复杂度，不会因新增调用点而漏写。
+	appendComplexityScore(ctx, other)
+}
+
+// appendComplexityScore T4：把本次请求的复杂度打分写入日志。
+//
+// 可见性分级：档位（simple/medium/complex）与总分对**用户可见**（公开），
+// 帮助用户理解「为什么这次慢/贵」；各维度细分与命中的理由只进 admin_info
+// （含请求内容特征推断，属运维信息）。
+func appendComplexityScore(ctx *gin.Context, other *model.LogOther) {
+	score, ok := common.GetContextKeyType[ComplexityScore](ctx, constant.ContextKeyComplexityScore)
+	if !ok {
+		return
+	}
+	other.SetPublic("complexity_tier", string(score.Tier))
+	other.SetAdmin("complexity", score)
 }
 
 func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, modelRatio, groupRatio, completionRatio float64,

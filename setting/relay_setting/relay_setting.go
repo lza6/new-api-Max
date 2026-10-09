@@ -94,6 +94,13 @@ type RelaySetting struct {
 	// 值时不压缩——超大 body 压缩极耗 CPU（本站 2C/4C 小机尤甚），明文直发更快。
 	// <=0 表示不设上限。管理员可热更新。
 	RequestCompressionMaxMB int `json:"request_compression_max_mb"`
+
+	// PolicyMaxPromptChars 统一策略中心的「提示词长度护栏」上限（字符）。0 = 不限制。
+	// 仅在 POLICY_ENGINE_MODE=enforce 时真正拦截；shadow 模式只记录「本应拦截」。
+	// 这是策略引擎三类判定的**唯一**新增判定源：预算与限流已分别由预扣费
+	// （service.PreConsumeBilling）与每用户限速中间件（middleware.UserRateLimit）
+	// 强制执行，策略引擎只读取它们的真实状态做统一观测，不重复实现。
+	PolicyMaxPromptChars int `json:"policy_max_prompt_chars"`
 }
 
 // RateLimitTier 限速档位（并发 + RPM）。
@@ -293,6 +300,15 @@ func GetRequestCompressionMaxMB() int {
 		return s.RequestCompressionMaxMB
 	}
 	return DefaultRequestCompressionMaxMB
+}
+
+// GetPolicyMaxPromptChars 返回统一策略中心的提示词长度护栏上限（字符）。
+// 0 = 不限制（默认，零行为变化）。
+func GetPolicyMaxPromptChars() int {
+	if s := GetRelaySetting(); s != nil {
+		return s.PolicyMaxPromptChars
+	}
+	return 0
 }
 
 // GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：

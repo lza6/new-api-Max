@@ -365,6 +365,10 @@ func StreamScannerHandler(c *gin.Context, resp *http.Response, info *relaycommon
 				continue
 			}
 			if !strings.HasPrefix(data, "[DONE]") {
+				// T7 中继一致性自检：逐帧检查 SSE 顶层键白名单 + usage 单调性。
+				// 开关关闭（RELAY_AUDIT_ENABLED）时内部首行即返回，零分配零开销。
+				service.AuditStreamFrame(c, data)
+
 				if !fallover || isUsefulStreamData(data) {
 					// B3-2/B1-1：首个“有效”data 块（含 content/tool_call）到达
 					// → 一次性放行缓冲，进入直通。仅 reasoning 的空壳流不提交。

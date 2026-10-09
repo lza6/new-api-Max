@@ -93,4 +93,14 @@ const (
 	// decide between refunding the pre-consumed quota and persisting an
 	// unconfirmed task row.
 	ContextKeySubmitUnconfirmed ContextKey = "submit_unconfirmed"
+
+	// ContextKeyComplexityScore 缓存本次请求的复杂度打分结果（service.ComplexityScore）。
+	// 由 controller 在预扣费前计算一次，供日志（Transparency/AdminInfo）与前端回显复用，
+	// 避免在多个位置重复打分。未开启复杂度路由时不存在。
+	ContextKeyComplexityScore ContextKey = "complexity_score"
+
+	// ContextKeyRelayAuditFindings 收集中继一致性自检的四类发现
+	// （service.RelayAuditFinding）。流式/非流式响应处理过程中追加，请求结束时
+	// 由统一出口写入日志其它信息（admin_info）并计入 /metrics。
+	ContextKeyRelayAuditFindings ContextKey = "relay_audit_findings"
 )

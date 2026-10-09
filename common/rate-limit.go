@@ -41,6 +41,18 @@ func (l *InMemoryRateLimiter) clearExpiredItems() {
 	}
 }
 
+// Count 返回 key 在当前窗口内的请求数（只读观测，不推进窗口）。
+// 供统一策略中心（service/policy_engine）读取真实限流状态，避免重复造计数器。
+func (l *InMemoryRateLimiter) Count(key string) int {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	queue, ok := l.store[key]
+	if !ok {
+		return 0
+	}
+	return len(*queue)
+}
+
 // Request parameter duration's unit is seconds
 func (l *InMemoryRateLimiter) Request(key string, maxRequestNum int, duration int64) bool {
 	l.mutex.Lock()

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
@@ -27,6 +28,8 @@ import (
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
+	"github.com/lza6/new-api-Max/setting/relay_setting"
+	hosttypes "github.com/lza6/new-api-Max/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/samber/lo"
@@ -196,6 +199,18 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 	relayInfo.SetEstimatePromptTokens(tokens)
 
+	// T4 复杂度路由（默认关，COMPLEXITY_ROUTING=on 开启）：在**本地**对请求做
+	// 7 维规则打分并映射 simple/medium/complex 档位。打分只读已抽取的文本信号，
+	// 不调外部模型、<1ms。结果缓存到 context 供日志与前端回显复用。
+	//
+	// 注意：本步骤**只打分不改路由**——渠道选择仍由既有逻辑决定（复杂度档位
+	// 目前用于观测与可解释展示）。这与 litellm 的 complexity router 一致：
+	// 先让档位在日志中可见、可校准，再按需接入实际选模。
+	if service.ComplexityRoutingEnabled() {
+		if score, ok := scoreRequestComplexity(request, meta); ok {
+			common.SetContextKey(c, constant.ContextKeyComplexityScore, score)
+		}
+	}
 	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
 	if err != nil {
 		newAPIError = types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
@@ -203,6 +218,26 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	}
 
 	// common.SetContextKey(c, constant.ContextKeyTokenCountMeta, meta)
+
+	// T10 统一策略中心（默认 off，POLICY_ENGINE_MODE=shadow|enforce 开启）：
+	// 在**预扣费之前**做一次统一判定，三类策略：
+	//   - guardrail：提示词长度超过 relay.policy_max_prompt_chars（唯一新增判定源）
+	//   - budget：本次预估消耗 > 用户剩余额度（与后续 PreConsumeBilling 同口径）
+	//   - rate：每用户并发/RPM 超限（读取限速中间件的**真实**计数，不重复实现）
+	// shadow 模式只记录「本应拦截」并计入 /metrics；enforce 模式命中即拦截。
+	// 默认 off 时 Evaluate 首行即返回，零开销零行为变化。
+	if service.PolicyEngineEnabled() {
+		if decision := evaluateRequestPolicy(c, relayInfo, meta, priceData); decision.Action == service.PolicyBlock {
+			if decision.Enforced {
+				newAPIError = types.NewErrorWithStatusCode(
+					fmt.Errorf("%s", decision.Reason), "policy_blocked",
+					http.StatusForbidden, types.ErrOptionWithSkipRetry())
+				return
+			}
+			logger.LogWarn(c, fmt.Sprintf("policy shadow: would block (%s/%s) - %s",
+				decision.Kind, decision.Rule, decision.Reason))
+		}
+	}
 
 	if priceData.FreeModel {
 		logger.LogInfo(c, fmt.Sprintf("模型 %s 免费，跳过预扣费", relayInfo.OriginModelName))
@@ -280,6 +315,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 
 		if newAPIError == nil {
 			relayInfo.LastError = nil
+			// T7 中继一致性自检：上游回显的模型名应与请求模型同族（防串号/串渠道）。
+			// 每个请求只校验一次；未回显上游模型名时跳过。
+			service.AuditModelFingerprintOnce(c, relayInfo.OriginModelName, relayInfo.UpstreamModelName)
 			// B3-3：成功结果计入渠道健康分聚合。
 			service.RecordChannelOutcome(channel.Id, true, time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)), service.ErrClassOK)
 			return
@@ -312,6 +350,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		logger.LogInfo(c, retryLogStr)
 	}
 	if newAPIError != nil {
+		// T7 中继一致性自检：错误文本不得泄漏上游密钥/Bearer/内部堆栈。
+		// 只做记录（写入 admin_info，非管理员不可见），不改动返回给用户的错误。
+		service.AuditUpstreamError(c, newAPIError.Error())
 		gopool.Go(func() {
 			perfmetrics.RecordRelaySample(relayInfo, false, 0)
 		})
@@ -361,6 +402,88 @@ func addUsedChannel(c *gin.Context, channelId int) {
 	useChannel := c.GetStringSlice("use_channel")
 	useChannel = append(useChannel, fmt.Sprintf("%d", channelId))
 	c.Set("use_channel", useChannel)
+}
+
+// scoreRequestComplexity T4：从已解析的请求中抽取复杂度信号并打分。
+// 只读文本与结构性布尔信号。返回 ok=false 表示该请求类型不支持打分
+// （调用方跳过，不写入 context）。
+//
+// meta 通常来自本函数调用方已算好的 TokenCountMeta（含 CombineText/MessagesCount）。
+// 若 meta 缺文本（如 CountToken 关闭时走的是 fastTokenCountMetaForPricing 轻量路径），
+// 则回退到 request.GetTokenCountMeta() 取一次文本——仅在操作员显式开启复杂度路由时
+// 发生，代价可接受。
+func scoreRequestComplexity(request dto.Request, meta *types.TokenCountMeta) (service.ComplexityScore, bool) {
+	if request == nil {
+		return service.ComplexityScore{}, false
+	}
+	if meta == nil || meta.CombineText == "" {
+		if full := request.GetTokenCountMeta(); full != nil {
+			if meta == nil {
+				meta = full
+			} else {
+				full.MessagesCount = max(full.MessagesCount, meta.MessagesCount)
+				full.ToolsCount = max(full.ToolsCount, meta.ToolsCount)
+				meta = full
+			}
+		}
+	}
+	signals := service.ComplexitySignals{}
+	if meta != nil {
+		signals = service.ExtractComplexitySignals([]string{meta.CombineText}, signals)
+		signals.MessageCount = meta.MessagesCount
+		signals.HasTools = meta.ToolsCount > 0
+		signals.HasMultiModal = len(meta.Files) > 0
+	}
+	if openAIReq, ok := request.(*dto.GeneralOpenAIRequest); ok {
+		// 以请求结构为准覆盖文本推断（更精确）：消息条数、工具、工具选择。
+		signals.MessageCount = len(openAIReq.Messages)
+		signals.HasTools = len(openAIReq.Tools) > 0
+		signals.HasToolChoice = openAIReq.ToolChoice != nil
+		if signals.HasToolChoice {
+			signals.HasTools = true
+		}
+	}
+	return service.ScoreComplexity(signals), true
+}
+
+// evaluateRequestPolicy T10：为统一策略中心组装一次判定的输入。
+//
+// 三个数据源都取自**已有的权威来源**，不新增并行计数器：
+//   - 提示词长度：meta.CombineText 的字符数（与计费/敏感词检查同源）
+//   - 预算：relayInfo.UserQuota 与 priceData.QuotaToPreConsume（与预扣费同口径）
+//   - 限流：middleware.UserRateLimitLiveState 的真实进程内计数
+//
+// UserRemainingQuota < 0 表示额度未知（如信任用户/订阅计费），此时预算判定跳过，
+// 交由 PreConsumeBilling 做权威处理——避免策略中心误拦。
+func evaluateRequestPolicy(c *gin.Context, relayInfo *relaycommon.RelayInfo, meta *types.TokenCountMeta, priceData hosttypes.PriceData) service.PolicyDecision {
+	in := service.PolicyInput{
+		MaxPromptChar:      relay_setting.GetPolicyMaxPromptChars(),
+		RequestEstimate:    int64(priceData.QuotaToPreConsume),
+		UserRemainingQuota: -1,
+	}
+	if relayInfo != nil {
+		in.Model = relayInfo.OriginModelName
+		in.IsStream = relayInfo.IsStream
+		in.UserID = relayInfo.UserId
+		in.Group = relayInfo.UsingGroup
+		in.UserRemainingQuota = int64(relayInfo.UserQuota)
+	}
+	if meta != nil {
+		in.PromptChars = utf8.RuneCountInString(meta.CombineText)
+	}
+
+	// 限流：读限速中间件的真实计数；档位上限来自 relay 设置（与中间件同一函数）。
+	if relayInfo != nil && relayInfo.UserId > 0 {
+		limitConcurrency, limitRpm := relay_setting.GetUserRateLimitTier(relayInfo.UserId, in.Group)
+		currentConcurrency, currentRpm := middleware.UserRateLimitLiveState(relayInfo.UserId)
+		in.ConcurrencyLimit = limitConcurrency
+		in.RpmLimit = limitRpm
+		in.CurrentConcurrency = currentConcurrency
+		in.CurrentRpm = currentRpm
+	}
+
+	service.RecordPolicyEval()
+	return service.Evaluate(in)
 }
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
