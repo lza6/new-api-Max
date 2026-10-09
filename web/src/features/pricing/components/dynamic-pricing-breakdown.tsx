@@ -319,16 +319,18 @@ export function DynamicPricingBreakdown({
   if (!expr) {return null}
 
   if (!hasTiers) {
+    // 不渲染计费表达式源码：用户看不懂，也不该看到实现细节
+    // （用户反馈「人家用户只有看懂一次调用要花多少」）。
     return (
       <section className={cn('min-w-0', !compact && 'py-4')}>
         {!compact && (
           <div className='mb-3 flex items-center gap-2'>
-            <span className='inline-flex size-6 items-center justify-center rounded-lg bg-amber-100 text-amber-700 shadow-sm dark:bg-amber-500/20 dark:text-amber-300'>
+            <span className='inline-flex size-6 items-center justify-center rounded-lg bg-muted text-muted-foreground shadow-sm'>
               <TagIcon className='size-3.5' />
             </span>
             <div>
               <div className='text-foreground text-base font-medium'>
-                {t('Special billing expression')}
+                {t('Pricing varies by usage — see details')}
               </div>
               <div className='text-muted-foreground text-xs'>
                 {t('Unable to parse structured pricing')}
@@ -336,12 +338,6 @@ export function DynamicPricingBreakdown({
             </div>
           </div>
         )}
-        <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
-          {t('Raw expression')}
-        </div>
-        <code className='text-muted-foreground block text-xs break-all'>
-          {expr}
-        </code>
       </section>
     )
   }

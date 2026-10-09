@@ -5905,6 +5905,7 @@
     "Unable to open chat": "Unable to open chat",
     "Unable to parse Passkey login options from response": "Unable to parse Passkey login options from response",
     "Unable to parse structured pricing": "Unable to parse structured pricing",
+    "This model is billed by usage. Check your usage logs to see what each call actually cost.": "This model is billed by usage. Check your usage logs to see what each call actually cost.",
     "Pricing varies by usage — see details": "Pricing varies by usage — see details",
     "Relay Self-Check": "Relay Self-Check",
     "Complexity Tier": "Complexity Tier",

@@ -793,24 +793,21 @@ function PriceSection(props: {
 
   if (dynamicSummary) {
     if (dynamicSummary.isSpecialExpression) {
+      // 不向用户展示计费表达式源码（用户反馈「看不懂，只想知道一次调用多少钱」）。
+      // 可解析的阶梯（含按分组/渠道切换的写法）已在上面展开；走到这里说明该表达式
+      // 无法被归纳成价格，此时如实说明「随用量变化」，并指向使用日志查看实际扣费。
       return (
         <section>
           <SectionTitle>{t('Base Price')}</SectionTitle>
-          <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-500/20 dark:bg-amber-500/10'>
-            <div className='text-sm font-medium text-amber-800 dark:text-amber-200'>
-              {t('Special billing expression')}
+          <div className='bg-muted/40 rounded-lg border p-3'>
+            <div className='text-sm font-medium'>
+              {t('Pricing varies by usage — see details')}
             </div>
             <p className='text-muted-foreground mt-1 text-xs'>
-              {t('Unable to parse structured pricing')}
+              {t(
+                'This model is billed by usage. Check your usage logs to see what each call actually cost.'
+              )}
             </p>
-            <div className='mt-3'>
-              <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
-                {t('Raw expression')}
-              </div>
-              <code className='text-muted-foreground bg-background/80 block max-h-28 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
-                {dynamicSummary.rawExpression}
-              </code>
-            </div>
           </div>
         </section>
       )
@@ -1120,23 +1117,15 @@ function GroupPricingSection(props: {
         <section>
           <SectionTitle>{t('Pricing by Group')}</SectionTitle>
           <AutoGroupChain model={props.model} autoGroups={props.autoGroups} />
-          <div className='rounded-lg border border-amber-200/70 bg-amber-50/70 p-3 dark:border-amber-500/20 dark:bg-amber-500/10'>
-            <div className='text-sm font-medium text-amber-800 dark:text-amber-200'>
-              {t('Special billing expression')}
+          <div className='bg-muted/40 rounded-lg border p-3'>
+            <div className='text-sm font-medium'>
+              {t('Pricing varies by usage — see details')}
             </div>
             <p className='text-muted-foreground mt-1 text-xs'>
               {t(
                 'Group prices cannot be expanded because this expression is not a standard tiered pricing expression.'
               )}
             </p>
-            <div className='mt-3'>
-              <div className='text-muted-foreground mb-1 text-[10px] font-medium tracking-wider uppercase'>
-                {t('Raw expression')}
-              </div>
-              <code className='text-muted-foreground bg-background/80 block max-h-28 overflow-auto rounded-md border px-2 py-1.5 font-mono text-xs break-all'>
-                {props.model.billing_expr}
-              </code>
-            </div>
           </div>
         </section>
       )

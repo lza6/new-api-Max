@@ -5905,6 +5905,7 @@
     "Unable to open chat": "チャットを開けません",
     "Unable to parse Passkey login options from response": "応答からPasskeyのログインオプションを読み取れません",
     "Unable to parse structured pricing": "構造化された価格を解析できません",
+    "This model is billed by usage. Check your usage logs to see what each call actually cost.": "このモデルは利用量に応じた課金です。実際の課金は「使用ログ」で確認できます。",
     "Pricing varies by usage — see details": "利用量に応じた課金です（詳細を参照）",
     "Relay Self-Check": "リレー自己診断",
     "Complexity Tier": "複雑度ティア",

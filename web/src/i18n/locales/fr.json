@@ -5905,6 +5905,7 @@
     "Unable to open chat": "Impossible d'ouvrir la discussion",
     "Unable to parse Passkey login options from response": "Impossible de lire les options de connexion Passkey dans la réponse",
     "Unable to parse structured pricing": "Impossible d'analyser la tarification structurée",
+    "This model is billed by usage. Check your usage logs to see what each call actually cost.": "Ce modèle est facturé à l’usage. Consultez vos journaux d’utilisation pour voir le coût réel de chaque appel.",
     "Pricing varies by usage — see details": "Tarification selon l’usage — voir les détails",
     "Relay Self-Check": "Auto-contrôle du relais",
     "Complexity Tier": "Niveau de complexité",

@@ -5905,6 +5905,7 @@
     "Unable to open chat": "無法打開聊天",
     "Unable to parse Passkey login options from response": "無法解析回應中的 Passkey 登入選項",
     "Unable to parse structured pricing": "無法解析為結構化價格",
+    "This model is billed by usage. Check your usage logs to see what each call actually cost.": "該模型依用量計費。可在「使用日誌」中查看每次呼叫的實際扣費。",
     "Pricing varies by usage — see details": "依用量計費，詳見模型詳情",
     "Relay Self-Check": "中繼自檢",
     "Complexity Tier": "複雜度檔位",
