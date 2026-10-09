@@ -139,6 +139,26 @@ export interface PlaygroundConfig {
   // 思考程度（reasoning_effort）。'' = 不发送（上游默认）；none=关闭思考；
   // 其余（low/medium/high）为可调档位。仅对支持的模型有效。
   reasoning_effort: string
+  // T13 系统提示词（角色设定）。'' = 不发送。作为 messages 的首条 system 消息
+  // 发送；Agent 预设应用时会写入这里。
+  system_prompt: string
+}
+
+/**
+ * T13 Agent 预设：可复用的对话配置快照（per-agent 能力下沉）。
+ *
+ * 与 `UserSetting.agent_presets` 同构（服务端存储于用户设置的 JSON 列）。
+ * 应用预设 = 把这里记录的字段写进 PlaygroundConfig。
+ */
+export interface AgentPreset {
+  id: string
+  name: string
+  model?: string
+  group?: string
+  system_prompt?: string
+  temperature?: number
+  max_tokens?: number
+  reasoning_effort?: string
 }
 
 export interface ParameterEnabled {

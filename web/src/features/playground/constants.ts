@@ -60,6 +60,7 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   stream: true,
   size: '',
   reasoning_effort: '',
+  system_prompt: '',
 }
 
 export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {

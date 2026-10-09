@@ -11,7 +11,10 @@ but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 */
+import { useState } from 'react'
+
 import { PlaygroundChat } from './components/chat/playground-chat'
+import { AgentPresetSwitcher } from './components/header/agent-preset-switcher'
 import { ConversationSwitcher } from './components/header/conversation-switcher'
 import { PlaygroundInput } from './components/input/playground-input'
 import {
@@ -21,6 +24,7 @@ import {
   usePlaygroundState,
 } from './hooks'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
+import { useProfile } from '@/features/profile/hooks'
 
 export function Playground({ initialModel }: { initialModel?: string }) {
   const {
@@ -78,6 +82,10 @@ export function Playground({ initialModel }: { initialModel?: string }) {
 
   const { models: pricingModels } = usePricingData()
 
+  // T13 Agent 预设：从用户设置解析（与记忆/技能同一条持久化管线）。
+  const { profile, refreshProfile } = useProfile()
+  const [activePresetId, setActivePresetId] = useState('')
+
   const estimateModel =
     pricingModels.find((item) => item.model_name === config.model) ?? null
 
@@ -92,6 +100,23 @@ export function Playground({ initialModel }: { initialModel?: string }) {
           onCreate={createNewConversation}
           onSwitch={switchConversation}
           onDelete={deleteConversation}
+        />
+        <AgentPresetSwitcher
+          config={config}
+          disabled={isGenerating}
+          setting={profile?.setting}
+          activePresetId={activePresetId}
+          onActivePresetChange={setActivePresetId}
+          onProfileUpdate={refreshProfile}
+          onApplyPreset={(next) => {
+            // 逐字段写回，复用既有 updateConfig（会自动落盘到 localStorage）。
+            updateConfig('model', next.model)
+            updateConfig('group', next.group)
+            updateConfig('temperature', next.temperature)
+            updateConfig('max_tokens', next.max_tokens)
+            updateConfig('reasoning_effort', next.reasoning_effort)
+            updateConfig('system_prompt', next.system_prompt)
+          }}
         />
       </div>
       {/* Full-width scroll container: scrolling works even over side whitespace */}

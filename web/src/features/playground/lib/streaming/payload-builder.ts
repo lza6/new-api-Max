@@ -78,5 +78,18 @@ export function buildChatCompletionPayload(
     payload.reasoning_effort = config.reasoning_effort
   }
 
+  // T13 系统提示词：非空时作为首条 system 消息前插。
+  // 只在对话里尚无 system 消息时插入，避免与用户在消息列表中手写的 system 重复。
+  const systemPrompt = config.system_prompt?.trim()
+  if (systemPrompt !== undefined && systemPrompt !== '') {
+    const hasSystemMessage = payload.messages.some((m) => m.role === 'system')
+    if (!hasSystemMessage) {
+      payload.messages = [
+        { role: 'system', content: systemPrompt },
+        ...payload.messages,
+      ]
+    }
+  }
+
   return payload
 }

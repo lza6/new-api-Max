@@ -954,6 +954,52 @@ func UpdateSelf(c *gin.Context) {
 		return
 	}
 
+	// T13 Skills 注入 v1：用户自定义技能表。与 memory_injection 同构。
+	if skillsRaw, skillsExist := requestData["skills"]; skillsExist && !passwordRequested {
+		skills, ok := parseUserSkills(skillsRaw)
+		if !ok {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+		userId := c.GetInt("id")
+		user, err := model.GetUserById(userId, false)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		currentSetting := user.GetSetting()
+		currentSetting.Skills = skills
+		if err := model.UpdateUserSetting(user.Id, currentSetting); err != nil {
+			common.ApiErrorI18n(c, i18n.MsgUpdateFailed)
+			return
+		}
+		common.ApiSuccessI18n(c, i18n.MsgUpdateSuccess, nil)
+		return
+	}
+
+	// T13 Agent 预设：游乐场可一键套用的对话配置快照。与 memory_injection 同构。
+	if presetsRaw, presetsExist := requestData["agent_presets"]; presetsExist && !passwordRequested {
+		presets, ok := parseAgentPresets(presetsRaw)
+		if !ok {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+		userId := c.GetInt("id")
+		user, err := model.GetUserById(userId, false)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		currentSetting := user.GetSetting()
+		currentSetting.AgentPresets = presets
+		if err := model.UpdateUserSetting(user.Id, currentSetting); err != nil {
+			common.ApiErrorI18n(c, i18n.MsgUpdateFailed)
+			return
+		}
+		common.ApiSuccessI18n(c, i18n.MsgUpdateSuccess, nil)
+		return
+	}
+
 	// 原有的用户信息更新逻辑
 	var user model.User
 	requestDataBytes, err := common.Marshal(requestData)
@@ -1412,6 +1458,161 @@ type UpdateUserSettingRequest struct {
 	RecordIpLog                      bool    `json:"record_ip_log"`
 }
 
+// parseUserSkills T13：校验并规范化用户技能表。
+//
+// 边界（每一项都会进入每一次上游请求的 system 前缀，必须限长限数）：
+//   - 数量 ≤ dto.MaxUserSkills
+//   - 名称 ≤ MaxSkillNameRunes、内容 ≤ MaxSkillPromptRunes（按 Unicode 码点）
+//   - 丢弃名称为空的项；Id 为空时按序号补一个稳定 Id
+//
+// 返回 ok=false 表示载荷不合法（调用方回 400），不做静默截断——静默截断会让
+// 用户以为保存成功而实际内容被改。
+func parseUserSkills(raw any) ([]dto.UserSkill, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	if len(items) > dto.MaxUserSkills {
+		return nil, false
+	}
+	out := make([]dto.UserSkill, 0, len(items))
+	for i, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		skill := dto.UserSkill{
+			Id:      stringField(m, "id"),
+			Name:    strings.TrimSpace(stringField(m, "name")),
+			Prompt:  strings.TrimSpace(stringField(m, "prompt")),
+			Enabled: boolField(m, "enabled"),
+		}
+		if skill.Name == "" {
+			continue
+		}
+		if skill.Id == "" {
+			skill.Id = "skill-" + strconv.Itoa(i)
+		}
+		if utf8.RuneCountInString(skill.Name) > dto.MaxSkillNameRunes {
+			return nil, false
+		}
+		if utf8.RuneCountInString(skill.Prompt) > dto.MaxSkillPromptRunes {
+			return nil, false
+		}
+		out = append(out, skill)
+	}
+	return out, true
+}
+
+// parseAgentPresets T13：校验并规范化 Agent 预设。边界与技能表同理。
+func parseAgentPresets(raw any) ([]dto.AgentPreset, bool) {
+	if raw == nil {
+		return nil, true
+	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	if len(items) > dto.MaxAgentPresets {
+		return nil, false
+	}
+	out := make([]dto.AgentPreset, 0, len(items))
+	for i, item := range items {
+		m, ok := item.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		preset := dto.AgentPreset{
+			Id:              stringField(m, "id"),
+			Name:            strings.TrimSpace(stringField(m, "name")),
+			Model:           strings.TrimSpace(stringField(m, "model")),
+			Group:           strings.TrimSpace(stringField(m, "group")),
+			SystemPrompt:    stringField(m, "system_prompt"),
+			ReasoningEffort: stringField(m, "reasoning_effort"),
+		}
+		if preset.Name == "" {
+			continue
+		}
+		if preset.Id == "" {
+			preset.Id = "preset-" + strconv.Itoa(i)
+		}
+		if utf8.RuneCountInString(preset.Name) > dto.MaxPresetNameRunes {
+			return nil, false
+		}
+		if utf8.RuneCountInString(preset.SystemPrompt) > dto.MaxPresetSystemRunes {
+			return nil, false
+		}
+		if v, ok := m["temperature"]; ok {
+			f, ok := toFloat64(v)
+			if !ok || f < 0 || f > 2 {
+				return nil, false
+			}
+			preset.Temperature = &f
+		}
+		if v, ok := m["max_tokens"]; ok {
+			n, ok := toUint(v)
+			if !ok || n == 0 || n > maxPresetMaxTokens {
+				return nil, false
+			}
+			preset.MaxTokens = &n
+		}
+		out = append(out, preset)
+	}
+	return out, true
+}
+
+// maxPresetMaxTokens Agent 预设 max_tokens 的上界。预设会被原样用于请求，
+// 因此必须限一个合理的最大值，避免用户存下一个天文数字。
+const maxPresetMaxTokens = 32000
+
+func stringField(m map[string]any, key string) string {
+	if v, ok := m[key]; ok {
+		if s, ok := v.(string); ok {
+			return s
+		}
+	}
+	return ""
+}
+
+func boolField(m map[string]any, key string) bool {
+	if v, ok := m[key]; ok {
+		if b, ok := v.(bool); ok {
+			return b
+		}
+	}
+	return false
+}
+
+func toFloat64(v any) (float64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return n, true
+	case int:
+		return float64(n), true
+	default:
+		return 0, false
+	}
+}
+
+func toUint(v any) (uint, bool) {
+	switch n := v.(type) {
+	case float64:
+		if n < 0 || n != float64(uint(n)) {
+			return 0, false
+		}
+		return uint(n), true
+	default:
+		return 0, false
+	}
+}
+
+// parseUserSkills / parseAgentPresets 用到的 JSON 数字统一走 float64 分支
+// （common.DecodeJson 解到 map[string]any 时的默认形态）。
+
+// UpdateUserSetting 更新用户设置（通知相关）。
 func UpdateUserSetting(c *gin.Context) {
 	var req UpdateUserSettingRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

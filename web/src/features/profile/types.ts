@@ -99,6 +99,40 @@ export interface UserProfile {
 export type NotifyType = 'email' | 'webhook' | 'bark' | 'gotify'
 
 /**
+ * T13 Skills 注入 v1：用户自定义的「技能/提示片段」。
+ * 启用中的技能会被拼进发往上游的 system 前缀（与记忆注入同一条管线）。
+ */
+export interface UserSkill {
+  id: string
+  name: string
+  prompt: string
+  enabled: boolean
+}
+
+/**
+ * T13 Agent 预设：可复用的对话配置快照（模型/参数/系统提示词）。
+ */
+export interface AgentPreset {
+  id: string
+  name: string
+  model?: string
+  group?: string
+  system_prompt?: string
+  temperature?: number
+  max_tokens?: number
+  reasoning_effort?: string
+}
+
+/** 与服务端 relaykit/dto 的上界保持一致（前端先拦，避免用户撞 400）。 */
+export const MAX_USER_SKILLS = 20
+export const MAX_SKILL_NAME_RUNES = 64
+export const MAX_SKILL_PROMPT_RUNES = 2000
+export const MAX_AGENT_PRESETS = 20
+export const MAX_PRESET_NAME_RUNES = 64
+export const MAX_PRESET_SYSTEM_RUNES = 8000
+export const MAX_PRESET_MAX_TOKENS = 32000
+
+/**
  * Parsed user settings
  */
 export interface UserSettings {
@@ -133,6 +167,10 @@ export interface UserSettings {
    * 每一次发往上游的 system prompt 之前，用于个性化。空值=不注入。
    */
   memory_injection?: string
+  /** T13 技能表：启用中的技能会被拼进 system 前缀。 */
+  skills?: UserSkill[]
+  /** T13 Agent 预设：游乐场可一键套用的配置快照。 */
+  agent_presets?: AgentPreset[]
 }
 
 /**

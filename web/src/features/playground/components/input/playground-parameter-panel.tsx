@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { Textarea } from '@/components/ui/textarea'
 import {
   Tooltip,
   TooltipContent,
@@ -51,6 +52,9 @@ import {
 import { useIsMobile } from '@/hooks/use-mobile'
 import { cn } from '@/lib/utils'
 
+import {
+  MAX_PRESET_SYSTEM_RUNES,
+} from '../../lib/presets/agent-preset-utils'
 import {
   getParameterControlValueText,
   isImageSizeModel,
@@ -306,6 +310,31 @@ function PlaygroundParameterContent({
             ))}
           </SelectContent>
         </Select>
+      </div>
+
+      {/* T13 系统提示词（角色设定）：非空时作为首条 system 消息发送。
+          Agent 预设的应用会把预设里的系统提示词写到这里，用户也能手改。 */}
+      <div className='border-border/70 bg-background/60 grid gap-2 rounded-lg border p-3'>
+        <div className='min-w-0 space-y-1'>
+          <label
+            className='truncate text-sm leading-5 font-medium'
+            htmlFor='playground-system-prompt'
+          >
+            {t('System prompt')}
+          </label>
+          <p className='text-muted-foreground text-xs leading-5'>
+            {t('Sent as the first system message of every request in this chat.')}
+          </p>
+        </div>
+        <Textarea
+          id='playground-system-prompt'
+          rows={3}
+          value={config.system_prompt}
+          disabled={disabled}
+          maxLength={MAX_PRESET_SYSTEM_RUNES}
+          onChange={(event) => onConfigChange('system_prompt', event.target.value)}
+          placeholder={t('Optional. For example: you are a senior Go engineer.')}
+        />
       </div>
     </div>
   )

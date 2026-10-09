@@ -36,6 +36,7 @@ export const playgroundConfigSchema = z.object({
   stream: z.boolean().optional(),
   size: z.string().optional(),
   reasoning_effort: z.string().optional(),
+  system_prompt: z.string().optional(),
 })
 
 export const parameterEnabledSchema = z.object({

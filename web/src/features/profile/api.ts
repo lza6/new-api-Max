@@ -31,6 +31,8 @@ import type {
   CheckinResponse,
   AccountSecurityResult,
   EmailBindingFlow,
+  UserSkill,
+  AgentPreset,
 } from './types'
 
 // ============================================================================
@@ -110,6 +112,27 @@ export async function updateUserMemoryInjection(
   const res = await api.put('/api/user/self', {
     memory_injection: memoryInjection,
   })
+  return res.data
+}
+
+/**
+ * T13 保存用户技能表（整表覆盖）。与 memory_injection 同构。
+ * 服务端按数量/长度校验，超限返回失败；前端也应先拦。
+ */
+export async function updateUserSkills(
+  skills: UserSkill[]
+): Promise<ApiResponse> {
+  const res = await api.put('/api/user/self', { skills })
+  return res.data
+}
+
+/**
+ * T13 保存 Agent 预设（整表覆盖）。
+ */
+export async function updateAgentPresets(
+  presets: AgentPreset[]
+): Promise<ApiResponse> {
+  const res = await api.put('/api/user/self', { agent_presets: presets })
   return res.data
 }
 

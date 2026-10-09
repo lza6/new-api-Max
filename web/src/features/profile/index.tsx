@@ -43,6 +43,7 @@ import { MemoryPreferencesCard } from './components/memory-preferences-card'
 import { ProfileHeader } from './components/profile-header'
 import { ProfileSettingsCard } from './components/profile-settings-card'
 import { SidebarModulesCard } from './components/sidebar-modules-card'
+import { SkillsPreferencesCard } from './components/skills-preferences-card'
 import { useProfile } from './hooks'
 
 export function Profile() {
@@ -101,6 +102,14 @@ export function Profile() {
                   onProfileUpdate={refreshProfile}
                 />
                 <MemoryPreferencesCard
+                  profile={profile}
+                  onProfileUpdate={refreshProfile}
+                  enabled={
+                    (status as { memory_injection_enabled?: boolean })
+                      ?.memory_injection_enabled === true
+                  }
+                />
+                <SkillsPreferencesCard
                   profile={profile}
                   onProfileUpdate={refreshProfile}
                   enabled={
