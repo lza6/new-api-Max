@@ -25,6 +25,7 @@ import type {
   ChatCompletionResponse,
   ModelOption,
   GroupOption,
+  VideoGenerationRequest,
 } from './types'
 
 /**
@@ -82,4 +83,41 @@ export async function getUserGroups(): Promise<GroupOption[]> {
     ratio: info.ratio,
     desc: info.desc,
   }))
+}
+
+// ============================================================================
+// P1-6 视频生成（复用后端既有 task 平台端点）
+// ============================================================================
+
+/**
+ * 提交一次视频生成任务，返回任务 id。
+ *
+ * 后端 `POST /v1/video/generations` 走 task 平台（异步），立即返回任务 id，
+ * 之后由 `getVideoTask` 轮询。失败时抛出（由调用方统一展示）。
+ */
+export async function submitVideoGeneration(
+  payload: VideoGenerationRequest,
+  signal?: AbortSignal
+): Promise<unknown> {
+  const res = await api.post(API_ENDPOINTS.VIDEO_GENERATIONS, payload, {
+    signal,
+    skipErrorHandler: true,
+  } as Record<string, unknown>)
+  return res.data
+}
+
+/**
+ * 轮询一次视频任务状态。
+ * 后端返回 OpenAI Video API 格式或 TaskDto（两种都由
+ * `lib/video/video-generation-utils.ts` 归一化）。
+ */
+export async function getVideoTask(
+  taskId: string,
+  signal?: AbortSignal
+): Promise<unknown> {
+  const res = await api.get(
+    `${API_ENDPOINTS.VIDEO_GENERATIONS}/${encodeURIComponent(taskId)}`,
+    { signal, skipErrorHandler: true } as Record<string, unknown>
+  )
+  return res.data
 }

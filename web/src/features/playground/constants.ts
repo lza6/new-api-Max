@@ -37,7 +37,21 @@ export const API_ENDPOINTS = {
   CHAT_COMPLETIONS: '/pg/chat/completions',
   USER_MODELS: '/api/user/models',
   USER_GROUPS: '/api/user/self/groups',
+  // P1-6 视频生成（后端既有 task 平台端点，本次仅前端消费）。
+  VIDEO_GENERATIONS: '/v1/video/generations',
 } as const
+
+/** P1-6 视频时长档位（秒）。空串 = 不发送，由上游用默认值。 */
+export const VIDEO_SECONDS_OPTIONS = ['', '4', '5', '8', '10'] as const
+
+/** P1-6 视频分辨率档位。空串 = 不发送。 */
+export const VIDEO_SIZE_OPTIONS = [
+  '',
+  '1280x720',
+  '720x1280',
+  '1920x1080',
+  '1080x1920',
+] as const
 
 // Default group — uses 'default' as the safe fallback; auto-group is
 // only selected when the backend confirms it is available for the user.

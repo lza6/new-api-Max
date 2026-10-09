@@ -172,6 +172,38 @@ export interface ParameterEnabled {
   reasoning_effort: boolean
 }
 
+/**
+ * P1-6 视频生成：提交给 POST /v1/video/generations 的请求体。
+ */
+export interface VideoGenerationRequest {
+  model: string
+  prompt: string
+  group?: string
+  /** 时长（秒，字符串以贴合上游契约）。空 = 不发送。 */
+  seconds?: string
+  /** 分辨率档位，如 "1280x720"。空 = 不发送。 */
+  size?: string
+}
+
+/** 归一化后的生成状态（三种语义）。 */
+export type VideoGenerationStatus = 'pending' | 'succeeded' | 'failed'
+
+/**
+ * P1-6 视频任务响应（轮询）。字段取自后端 TaskDto 与 OpenAI Video API
+ * 两种格式的并集；解析统一走 lib/video/video-generation-utils.ts。
+ */
+export interface VideoTaskResponse {
+  task_id?: string
+  id?: string
+  status?: string
+  progress?: number
+  result_url?: string
+  url?: string
+  video_url?: string
+  fail_reason?: string
+  error?: string
+}
+
 // Model and group options
 export interface ModelOption {
   label: string

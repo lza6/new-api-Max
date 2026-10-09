@@ -17,12 +17,16 @@ import { PlaygroundChat } from './components/chat/playground-chat'
 import { AgentPresetSwitcher } from './components/header/agent-preset-switcher'
 import { ConversationSwitcher } from './components/header/conversation-switcher'
 import { PlaygroundInput } from './components/input/playground-input'
+import { VideoGenerationControls } from './components/video/video-generation-controls'
+import { VideoResultPanel } from './components/video/video-result-panel'
 import {
   useChatHandler,
   usePlaygroundConversation,
   usePlaygroundOptions,
   usePlaygroundState,
+  useVideoGeneration,
 } from './hooks'
+import { isVideoModel } from './lib/video/video-generation-utils'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { useProfile } from '@/features/profile/hooks'
 
@@ -86,6 +90,22 @@ export function Playground({ initialModel }: { initialModel?: string }) {
   const { profile, refreshProfile } = useProfile()
   const [activePresetId, setActivePresetId] = useState('')
 
+  // P1-6 视频生成：仅对视频模型启用，参数（时长/分辨率）随会话保留。
+  const video = useVideoGeneration()
+  const isVideo = isVideoModel(config.model)
+  const [videoSeconds, setVideoSeconds] = useState('')
+  const [videoSize, setVideoSize] = useState('')
+
+  // 视频模式下回车不再走对话，而是提交异步视频任务并轮询。
+  const handleVideoSubmit = (text: string) => {
+    void video.generate({
+      config,
+      prompt: text,
+      seconds: videoSeconds,
+      size: videoSize,
+    })
+  }
+
   const estimateModel =
     pricingModels.find((item) => item.model_name === config.model) ?? null
 
@@ -137,13 +157,22 @@ export function Playground({ initialModel }: { initialModel?: string }) {
       </div>
 
       {/* Input area: center content and constrain to the same container width */}
-      <div className='mx-auto w-full max-w-4xl'>
+      <div className='mx-auto w-full max-w-4xl space-y-2'>
+        {isVideo && (
+          <VideoGenerationControls
+            seconds={videoSeconds}
+            size={videoSize}
+            disabled={video.isGenerating}
+            onSecondsChange={setVideoSeconds}
+            onSizeChange={setVideoSize}
+          />
+        )}
         <PlaygroundInput
           config={config}
-          disabled={isGenerating}
+          disabled={isGenerating || video.isGenerating}
           groups={groups}
           groupValue={config.group}
-          isGenerating={isGenerating}
+          isGenerating={isGenerating || video.isGenerating}
           isModelLoading={isLoadingModels}
           modelValue={config.model}
           models={models}
@@ -152,12 +181,19 @@ export function Playground({ initialModel }: { initialModel?: string }) {
           onClearMessages={handleClearMessages}
           onModelChange={(value) => updateConfig('model', value)}
           onParameterEnabledChange={updateParameterEnabled}
-          onStop={stopGeneration}
-          onSubmit={handleSendMessage}
+          onStop={isVideo ? video.cancel : stopGeneration}
+          onSubmit={isVideo ? handleVideoSubmit : handleSendMessage}
           parameterEnabled={parameterEnabled}
           hasMessages={messages.length > 0}
-          estimateModel={estimateModel}
+          estimateModel={isVideo ? null : estimateModel}
         />
+        {isVideo && (
+          <VideoResultPanel
+            state={video}
+            onReset={video.reset}
+            onCancel={video.cancel}
+          />
+        )}
       </div>
     </div>
   )
