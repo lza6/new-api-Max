@@ -37,17 +37,32 @@ grep -rn "Evaluate(" --include=*.go . （排除 _test.go 与 pkg/）
 
 | # | 任务 | 来源 | 风险 | 状态 |
 |---|---|---|---|---|
-| T7-1 | **修伪闭环 T4**：复杂度打分接入 relay 请求路径（开关默认关） | 自查 | L2 | **DONE** |
-| T7-2 | **修伪闭环 T7**：中继自检四类检查接入流式/非流式/错误路径 | 自查 | L2 | **DONE** |
-| T7-3 | **修伪闭环 T10**：策略引擎接入 pre-consume 判定 | 自查 | L2 | **DONE** |
+| T7-1 | 修伪闭环 T4：复杂度打分接入 relay 请求路径 | 自查 | L2 | **DONE** |
+| T7-2 | 修伪闭环 T7：中继自检接入流式/错误/成功路径 | 自查 | L2 | **DONE** |
+| T7-3 | 修伪闭环 T10：策略引擎接入 pre-consume 判定 | 自查 | L2 | **DONE** |
 | T7-4 | 模型广场按分组计费表达式显示为源码（用户看不懂） | 用户报告 | L1 | **DONE** |
 | T7-5 | 模型广场「套餐对比」入口移除 | 用户要求 | L1 | **DONE** |
-| T7-6 | P1-1 记忆层增强：MemoryInjection 后端已有，**前端配置缺失** | 指南 §6 | L2 | TODO |
-| T7-7 | P1-2 per-agent 能力下沉（Agent 预设实体） | 指南 §6 | L2 | TODO |
-| T7-8 | P1-5 Skills 注入 Hook v1 | 指南 §6 | L2 | TODO |
-| T7-9 | P1-6 游乐场内嵌图片/视频生成 | 指南 §6 | L2 | TODO |
-| T7-10 | P2-6 PPT/文档生成 | 指南 §6 | L2 | TODO |
-| T7-11 | P0-1 渠道密钥加密：**默认关**（L3，需单独审批才可开） | 指南 §6 | L3 | 已实现待审批 |
+| T7-6 | 修伪闭环 T1：反事实节省基准前端零消费 | 自查 | L1 | **DONE** |
+| T7-7 | P1-1 记忆层：补齐 MemoryInjection 的**用户配置界面** | 指南 §6 | L2 | **DONE** |
+| T7-8 | P1-2 per-agent 能力下沉（Agent 预设实体） | 指南 §6 | L2 | TODO |
+| T7-9 | P1-5 Skills 注入 Hook v1 | 指南 §6 | L2 | TODO |
+| T7-10 | P1-6 游乐场内嵌图片/视频生成（图片已有，视频缺） | 指南 §6 | L2 | TODO |
+| T7-11 | P2-6 PPT/文档生成 | 指南 §6 | L2 | TODO |
+| T7-12 | P0-1 渠道密钥加密：**默认关**（L3，需单独审批才可开） | 指南 §6 | L3 | 已实现待审批 |
+
+## 本轮交付（commit 序列）
+
+| 版本 | commit | 内容 |
+|---|---|---|
+| v1.3.117 | `a9c3bc2b2` | T4/T7/T10 三个死代码模块接线（后端） |
+| v1.3.117 | `ec2abaa5c` | 模型广场计费显示修复 + 移除套餐对比 + T4/T7 结果前端可见 |
+| v1.3.118 | `bde441e19` | 模型详情页/成本明细同样不再展示表达式源码 |
+| v1.3.119 | `841a43300` | 记忆注入的用户配置界面（补齐 T8 另一半） |
+| v1.3.120 | `9cd9ffbe4` | 反事实节省基准的前端消费（补齐 T1 另一半） |
+
+**共性**：本轮主要在修「已宣称完成、实际用户/链路用不到」的伪闭环
+（T4/T7/T10 死代码、T8 只有注入没有配置、T1 只有后端没有前端）。
+
 
 ## 已验证交付物
 
@@ -86,11 +101,19 @@ grep -rn "Evaluate(" --include=*.go . （排除 _test.go 与 pkg/）
 
 **效果**（实测）：deepseek-v4.1-flash 现在展开为 3 档价格
 `tok_lt200k $0.001` / `tok_200k_500k $0.0015` / `tok_ge500k $0.002`，并保留长度阈值条件。
+glm-5.3-flash 同形态展开为 `$0.004 / $0.005 / $0.006`。
 无法归纳的表达式改为一句人话 `Pricing varies by usage — see details`（**任何情况下都不再展示源码**）。
+
+前端**全部**源码展示点已清除（commit bde441e19 补齐）：
+- `model-card.tsx`（模型广场卡片）
+- `model-price-cell.tsx`（广场/管理端横条）
+- `model-details.tsx`（详情页 Base Price 与 Pricing by Group 两处）
+- `dynamic-pricing-breakdown.tsx`（成本明细）
+- 保留：`system-settings/models/tiered-pricing-editor.tsx`（管理员配置界面，源码编辑器是功能本身）
 
 同时移除模型广场的「套餐对比」入口按钮（`pricing/index.tsx`；`/pricing/plans` 路由保留，旧书签仍可解析）。
 
-新增测试：`web/src/features/pricing/__tests__/group-gated-tier-display.test.ts`（2 例，RED→GREEN 已验证）；
+新增测试：`web/src/features/pricing/__tests__/group-gated-tier-display.test.ts`（3 例，含两个生产表达式，RED→GREEN 已验证）；
 更新 `model-cards.test.tsx` 断言「不得展示表达式源码」。
 
 ## 验证台账（Batch-7）
