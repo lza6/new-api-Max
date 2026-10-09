@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/i18n"
@@ -917,6 +918,38 @@ func UpdateSelf(c *gin.Context) {
 			return
 		}
 
+		common.ApiSuccessI18n(c, i18n.MsgUpdateSuccess, nil)
+		return
+	}
+
+	// T8 用户记忆注入文本更新。与 language/sidebar_modules 同构：以现有设置为基底
+	// 只覆盖该字段，避免抹掉其它设置。仅在部署开启 MEMORY_INJECTION_ENABLED 时
+	// 真正生效（未开启时保存无副作用，也不会注入）。
+	if memoryInjection, memExists := requestData["memory_injection"]; memExists && !passwordRequested {
+		memStr, ok := memoryInjection.(string)
+		if !ok {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+		// 边界校验：记忆文本会进入每一次上游请求的 system 前缀，必须限长，
+		// 否则用户可提交超大文本放大 token 成本。按字符计（中文场景）。
+		if utf8.RuneCountInString(memStr) > dto.MaxMemoryInjectionRunes {
+			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+			return
+		}
+
+		userId := c.GetInt("id")
+		user, err := model.GetUserById(userId, false)
+		if err != nil {
+			common.ApiError(c, err)
+			return
+		}
+		currentSetting := user.GetSetting()
+		currentSetting.MemoryInjection = memStr
+		if err := model.UpdateUserSetting(user.Id, currentSetting); err != nil {
+			common.ApiErrorI18n(c, i18n.MsgUpdateFailed)
+			return
+		}
 		common.ApiSuccessI18n(c, i18n.MsgUpdateSuccess, nil)
 		return
 	}

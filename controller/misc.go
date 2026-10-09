@@ -100,6 +100,10 @@ func GetStatus(c *gin.Context) {
 
 		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabled,
 
+		// T8 记忆注入是否在本部署开启（前端据此决定是否显示「我的记忆」配置项；
+		// 未开启时保存无效，不应给用户一个看起来能用的开关）。
+		"memory_injection_enabled": service.MemoryInjectionEnabled(),
+
 		"usd_exchange_rate": operation_setting.USDExchangeRate,
 		"price":             operation_setting.Price,
 		"stripe_unit_price": setting.StripeUnitPrice,

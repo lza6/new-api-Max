@@ -133,6 +133,8 @@ export interface SystemStatus {
     register_enabled?: boolean
     password_login_enabled?: boolean
     password_login_encryption_enabled?: boolean
+    /** T8 记忆注入是否在本部署开启（决定是否显示「我的记忆」配置项） */
+    memory_injection_enabled?: boolean
     password_register_enabled?: boolean
     custom_oauth_providers?: CustomOAuthProviderInfo[]
     [key: string]: unknown

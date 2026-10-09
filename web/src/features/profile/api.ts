@@ -99,6 +99,21 @@ export async function updateUserLanguage(
 }
 
 /**
+ * T8 更新用户记忆注入文本。
+ *
+ * 与 language 同构：走 PUT /api/user/self，后端以现有设置为基底只覆盖该字段。
+ * 服务端按字符数限长（MaxMemoryInjectionRunes），超长返回失败。
+ */
+export async function updateUserMemoryInjection(
+  memoryInjection: string
+): Promise<ApiResponse> {
+  const res = await api.put('/api/user/self', {
+    memory_injection: memoryInjection,
+  })
+  return res.data
+}
+
+/**
  * Delete user account
  */
 export function deleteUserAccount(

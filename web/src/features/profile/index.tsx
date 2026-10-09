@@ -39,6 +39,7 @@ import { cn } from '@/lib/utils'
 
 import { CheckinCalendarCard } from './components/checkin-calendar-card'
 import { LanguagePreferencesCard } from './components/language-preferences-card'
+import { MemoryPreferencesCard } from './components/memory-preferences-card'
 import { ProfileHeader } from './components/profile-header'
 import { ProfileSettingsCard } from './components/profile-settings-card'
 import { SidebarModulesCard } from './components/sidebar-modules-card'
@@ -98,6 +99,14 @@ export function Profile() {
                 <LanguagePreferencesCard
                   profile={profile}
                   onProfileUpdate={refreshProfile}
+                />
+                <MemoryPreferencesCard
+                  profile={profile}
+                  onProfileUpdate={refreshProfile}
+                  enabled={
+                    (status as { memory_injection_enabled?: boolean })
+                      ?.memory_injection_enabled === true
+                  }
                 />
               </div>
 

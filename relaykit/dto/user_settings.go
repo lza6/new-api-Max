@@ -28,6 +28,11 @@ type UserSetting struct {
 	MemoryInjection string `json:"memory_injection,omitempty"`
 }
 
+// MaxMemoryInjectionRunes 记忆注入文本的最大字符数（按 Unicode 码点计）。
+// 记忆文本会进入每一次上游请求的 system 前缀，必须限长，否则用户可提交超大
+// 文本把成本转嫁到每一次调用上。2000 字符足以表达稳定的偏好/背景设定。
+const MaxMemoryInjectionRunes = 2000
+
 var (
 	NotifyTypeEmail   = "email"   // Email 邮件
 	NotifyTypeWebhook = "webhook" // Webhook

@@ -128,6 +128,11 @@ export interface UserSettings {
   upstream_model_update_notify_enabled?: boolean
   /** Preferred interface/API response language */
   language?: string
+  /**
+   * T8 用户记忆注入文本：部署开启 MEMORY_INJECTION_ENABLED 时，会被注入到
+   * 每一次发往上游的 system prompt 之前，用于个性化。空值=不注入。
+   */
+  memory_injection?: string
 }
 
 /**
