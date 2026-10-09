@@ -21,7 +21,7 @@ import { useTranslation } from 'react-i18next'
 
 import { Skeleton } from '@/components/ui/skeleton'
 
-import { useCompressionStats } from '../hooks/use-compression'
+import { useCompressionStats, useSavingsBaseline } from '../hooks/use-compression'
 
 function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) {
@@ -33,6 +33,59 @@ function formatBytes(bytes: number): string {
     units.length - 1
   )
   return `${(bytes / 1024 ** i).toFixed(i === 0 ? 0 : 1)} ${units[i]}`
+}
+
+/**
+ * T1 反事实节省基准摘要：回答「如果不做压缩，会多传多少」。
+ *
+ * 数据来自 /api/rankings/savings-baseline（与压缩统计同源、口径统一为
+ * saved/original）。折算省时只在服务端配置了观测上行带宽时才有意义
+ * （bandwidth_bps > 0），否则不显示该指标，避免给出无依据的数字。
+ */
+export function SavingsBaselineSummary() {
+  const { t } = useTranslation()
+  const query = useSavingsBaseline(50)
+  const baseline = query.data
+
+  if (!baseline || baseline.total_count === 0) {
+    return null
+  }
+
+  const savedPct = (baseline.overall_saved_ratio * 100).toFixed(1)
+  const hasBandwidth = baseline.bandwidth_bps > 0
+
+  return (
+    <div className='bg-muted/30 mb-3 rounded-lg border p-3 text-xs'>
+      <p className='text-muted-foreground leading-relaxed'>
+        {t(
+          'Without compression these {{count}} requests would have uploaded {{original}} upstream instead of {{actual}}.',
+          {
+            count: baseline.total_count,
+            original: formatBytes(baseline.counterfactual_bytes),
+            actual: formatBytes(baseline.total_compressed_bytes),
+          }
+        )}
+      </p>
+      <div className='mt-2 flex flex-wrap gap-x-5 gap-y-1'>
+        <span className='text-muted-foreground'>
+          {t('Saved')}:{' '}
+          <span className='text-foreground font-medium'>
+            {baseline.saved_text} ({savedPct}%)
+          </span>
+        </span>
+        {hasBandwidth && (
+          <span className='text-muted-foreground'>
+            {t('Upload time saved')}:{' '}
+            <span className='text-foreground font-medium'>
+              {t('{{n}} s', {
+                n: baseline.saved_time_seconds.toFixed(1),
+              })}
+            </span>
+          </span>
+        )}
+      </div>
+    </div>
+  )
 }
 
 /**
@@ -94,6 +147,7 @@ export function CompressionSection() {
               <span className='text-foreground font-medium'>{totalCount}</span>
             </span>
           </div>
+          <SavingsBaselineSummary />
           <ul className='divide-border/60 divide-y'>
             {rows.map((row, index) => {
               const ratioPct = Math.round((1 - row.ratio) * 100)

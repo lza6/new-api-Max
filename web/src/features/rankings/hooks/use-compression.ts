@@ -20,13 +20,23 @@ import { useQuery } from '@tanstack/react-query'
 
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-import { getCompressionStats } from '../api'
+import { getCompressionStats, getSavingsBaseline } from '../api'
 
 export function useCompressionStats(limit = 50) {
   return useQuery({
     queryKey: ['rankings', 'compression', limit],
     queryFn: async () =>
       requireServerSuccess(await getCompressionStats(limit)).data,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
+/** T1 反事实节省基准（与压缩统计同源，口径统一）。 */
+export function useSavingsBaseline(limit = 50) {
+  return useQuery({
+    queryKey: ['rankings', 'savings-baseline', limit],
+    queryFn: async () =>
+      requireServerSuccess(await getSavingsBaseline(limit)).data,
     staleTime: 5 * 60 * 1000,
   })
 }
