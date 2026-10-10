@@ -285,3 +285,62 @@ Error: "0" is not positive                             ← 溢出计数器未生
 2. **G10 剩余项 + §12.2.2 资源 gauge**（用户明确关切，收益是"可观测"而非"更快"）。
 3. **Batch-9 剩余**：`relay/` 渠道 handler 的读取收口（在 `relay/channel/api_request.go` 统一做）。
 4. 四个语言的翻译补齐。
+
+---
+
+# Batch-9 / G3 — 网关精确响应缓存（追加，v1.3.125）
+
+## 交付物
+
+| 文件 | 性质 |
+|---|---|
+| `service/response_cache.go` / `_redis.go` | 新增：带 TTL 的进程内 LRU（**硬容量上界**，清扫在写入路径分批做、**不常驻 goroutine**）+ 可选 Redis 后端 |
+| `setting/response_cache_setting/` | 新增：TTL / 容量 / 模型白黑名单 / 跨用户共享 / 命中计费 / 后端类型 |
+| `setting/feature_switch` | 第 **14** 个开关 `RESPONSE_CACHE_ENABLED`（管理端可见、可灰度、可回滚） |
+| `relay/response_cache_hook.go` | 新增：**取数钩子** |
+| `relay/compatible_handler.go` | 改：两处 `adaptor.DoRequest` 改为走钩子 |
+| `relay/channel/openai/relay-openai.go` | 改：**写入钩子**（非流式 + 200 + usage 存在；命中时跳过重复写回） |
+| `controller/{feature_switch,metrics}.go` | 改：把开关声明的 3 个指标**真正产出**（`/metrics` 与「实验功能」页同源） |
+
+## 两个关键设计决定（都来自真实证据）
+
+1. **归一化必须保留值的原始字节**：顶层解成 `map[string]json.RawMessage`，而不是 `map[string]any`。
+   否则 `seed: 12345678901234567890` 这类大整数会被 float64 舍入，两个**不同的**请求
+   可能算出同一个键 → **错命中**。刻意不递归排序嵌套键（那要求解成 any），
+   代价是嵌套键序不同的等价请求不命中 —— 方向正确：**宁可漏命中，不可错命中**。
+
+2. **钩子必须包在 `adaptor.DoRequest` 外层，伪造 200 响应喂给既有链路**。
+   我最初把它放在 `controller/relay.go`（命中即自己回写 + 自己调 `PostTextConsumeQuota`）：
+   **单测全绿、接口测试也看不出，真实 E2E 抓到它每次命中都 panic**（3 次命中 → 3 次 panic），
+   因为 `PostTextConsumeQuota` 依赖 relay handler 逐层填充的 relayInfo 状态。
+   而且那条路径**不会写消费日志** —— 管理员会看到「上游调用量下降但日志里什么都没有」。
+   改成伪造响应后：**16/16 PASS 且 panic 归零**。
+
+## 验收证据
+
+```
+go build ./... / go vet（relay service controller）        → 干净
+go test ./service/ -run TestResponseCache|TestExtractUsage → 11 用例全 PASS
+RED：把 userID 从缓存键去掉 → TestResponseCacheIsolatesUsersByDefault 如期 FAIL
+真实 E2E（mock 上游，零付费调用）                          → 16/16 PASS，panic 0
+  · 同一 prompt 连发两次 → 上游调用数 0→1→**停在 1**（第二次由缓存服务）
+  · 两次响应体逐字节一致（usage 如实回填）
+  · 换内容 → 上游被调用第 2 次（键确实随内容变化）
+  · 指标 hits=1 / misses=2 / live_entries=2
+go test ./service/ ./relay/ ./setting/... -count=1          → 全绿
+go test ./controller/ -count=1                             → 失败项与基线既有噪声（§14.1）一致
+```
+
+新增**反伪闭环守卫用例** `TestFeatureSwitchDeclaredMetricsAreActuallyProduced`：
+注册表里每个开关声明的 `MetricKeys` 必须真的被产出，否则用例 FAIL。
+它当场抓出 `CHANNEL_HEALTH_WEIGHTED_LB` 的 `channel_health_score_avg` 在无渠道时缺失
+（已修成恒定产出）。
+
+## 未闭环（诚实披露）
+
+1. v1 **不缓存流式**（指南范围外）。
+2. 写入侧只接在 **OpenAI 适配器路径**（覆盖绝大多数 OpenAI 兼容渠道）；
+   原生 Claude/Gemini 适配器的非流式路径**尚未接写入**，这些请求只会读、不会写。
+3. `fr/ru/ja/vi` 的新增 3 个键仍是英文占位值（en/zh/zh-TW 已完整翻译）。
+4. 响应缓存**参数**（TTL/容量/白名单）目前只能经选项 API 设置，**还没有专属管理端页面**
+   （总开关在「实验功能」页可见可切换）。
