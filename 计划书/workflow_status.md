@@ -424,3 +424,28 @@ controller: 反伪闭环守卫 TestFeatureSwitchDeclaredMetricsAreActuallyProduc
 **E2E 纠正的两处"我的断言写错"**（不是产品 bug）：指标真名是 `process_memory_heap_objects`；
 `task_artifact_cleanup` 的心跳在默认配置下**本就应当缺席**（图床模式为 `upstream` 时该 loop 不启动）
 —— 现已把这两条写进断言，使"缺席"也成为被验证的行为。
+
+## Batch-10 / G10 — 生产部署与生产验收（已完成）
+
+- 蓝绿零停机上线 `v1.3.126`（`[deploy] 完成：new-api:v1.3.126 在端口 3000`）；
+  容器 healthy、`healthz/readyz=200`、经公网域名 + 真实 TLS **200**、版本头 `v1.3.126`、
+  内存 **29.37 MiB / 900 MiB**、重启 **0**。
+- **生产真实浏览器验收 20/20 PASS**（14 个开关全渲染 + 切换 + 持久化 + 复位）。
+- **生产压测**：`/api/status` 与新增 `/api/option/feature-switches` 并发 30×5 **各 150/150 全 200，
+  0 个 5xx**；`/v1/pricing` 的 429 是既有限流器（60/min/IP）正常工作。
+  压测后：**mem 128.9 MiB / 900 MiB、restarts 0、近 10 分钟 0 个 5xx**。
+- **`feature_switch.values = {}`** → 14 个开关全部停在 env 默认，**生产行为与部署前完全一致**。
+- Release：<https://github.com/lza6/new-api-Max/releases/tag/v1.3.126>
+
+### ⚠️ 生产上 `METRICS_ENABLED` 未开启 —— 本轮新增的资源指标在生产**看不到**
+
+实测：生产 `/metrics` 返回的是前端 SPA（3983 字节 HTML），因为 `METRICS_ENABLED` 未设置，
+该路由根本没有注册（`middleware.MetricsEnabled()` 读该 env）。
+**这意味着本批次新增的内存/goroutine/DB/loop 心跳指标目前只在本地验证可用，
+生产尚不可观测。** 需要用户决定是否在生产开启 `METRICS_ENABLED=true`：
+- 已有保护：`middleware.MetricsAuth()` —— 可信来源 IP 放行，否则要求 root 会话；端点本身不是公开的。
+- 开启后即可用 `/metrics` 直接观察内存/goroutine 趋势与 loop 心跳（这正是本轮的目的）。
+
+### ⚠️ 生产磁盘：30 个历史镜像，`docker system df` 显示 **4.868GB 可回收（82%）**，根分区已用 71%（余 24G）
+
+建议保留最近若干版本用于回滚、清理更早的 tag。属于破坏性操作，**未擅自执行**，等用户确认。
