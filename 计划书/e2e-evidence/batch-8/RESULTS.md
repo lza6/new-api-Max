@@ -1,6 +1,6 @@
 # Batch-8 / G1 浏览器 E2E 结果
 
-- 时间：2026-10-10T18:44:45.036Z
+- 时间：2026-10-10T21:14:40.970Z
 - 目标：https://freeapi.tingfengai.art
 - 结果：**20/20 PASS**，失败 0
 
@@ -10,7 +10,7 @@
 | 2 | login (UI form) | ✅ | https://freeapi.tingfengai.art/dashboard/overview |
 | 3 | page not redirected to login | ✅ | https://freeapi.tingfengai.art/system-settings/feature-switches/switches |
 | 4 | page shows section title | ✅ |  |
-| 5 | all 13 switches rendered | ✅ | missing=[] |
+| 5 | all 14 switches rendered | ✅ | missing=[] |
 | 6 | effect metrics block present | ✅ |  |
 | 7 | risk badges present | ✅ |  |
 | 8 | rollback hint present | ✅ |  |
