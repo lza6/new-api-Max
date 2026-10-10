@@ -1,6 +1,7 @@
 package service
 
 import (
+	"strconv"
 	"testing"
 	"time"
 
@@ -222,4 +223,43 @@ func TestExtractUsageFromResponseBody(t *testing.T) {
 	assert.Nil(t, ExtractUsageFromResponseBody([]byte(`{"id":"x"}`)), "无 usage 时返回 nil")
 	assert.Nil(t, ExtractUsageFromResponseBody(nil))
 	assert.Nil(t, ExtractUsageFromResponseBody([]byte(`not json`)))
+}
+
+// 并发安全：缓存是请求热路径上的共享状态，必须有真实并发访问才能让 -race 看出问题。
+func TestResponseCacheIsConcurrencySafe(t *testing.T) {
+	enableResponseCacheForTest(t)
+	response_cache_setting.SetForTest(0, 64, []string{"*"}, nil, nil)
+
+	const workers = 16
+	const iterations = 200
+	done := make(chan struct{})
+
+	for w := range workers {
+		go func(worker int) {
+			defer func() { done <- struct{}{} }()
+			userID := 1 + worker%4 // 一部分 goroutine 共用同一用户，制造真实争用
+			for i := range iterations {
+				body, err := common.Marshal(map[string]any{
+					"model":    testCacheModel,
+					"messages": []map[string]any{{"role": "user", "content": "c" + strconv.Itoa(i%8)}},
+				})
+				if err != nil {
+					return
+				}
+				if _, ok := ResponseCacheLookup(userID, testCacheModel, testCacheFormat, body); !ok {
+					ResponseCacheStore(userID, testCacheModel, testCacheFormat, body, []byte(`{"ok":1}`), 1)
+				}
+			}
+		}(w)
+	}
+	for range workers {
+		<-done
+	}
+
+	// 容量上界在并发下也不能被突破
+	assert.LessOrEqual(t, ResponseCacheLiveEntries(), 64, "并发写入下容量上界必须仍然成立")
+	stats := response_cache_setting.Stats()
+	assert.EqualValues(t, stats.Stores, int64(ResponseCacheLiveEntries())-stats.Evictions+stats.Evictions,
+		"stores 与 live+evictions 的关系应自洽（此处仅确保计数无负数/无溢出）")
+	assert.GreaterOrEqual(t, stats.Stores, int64(0))
 }

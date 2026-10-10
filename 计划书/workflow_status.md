@@ -344,3 +344,16 @@ go test ./controller/ -count=1                             → 失败项与基�
 3. `fr/ru/ja/vi` 的新增 3 个键仍是英文占位值（en/zh/zh-TW 已完整翻译）。
 4. 响应缓存**参数**（TTL/容量/白名单）目前只能经选项 API 设置，**还没有专属管理端页面**
    （总开关在「实验功能」页可见可切换）。
+
+## Batch-9 / G3 — 生产部署与生产验收（已完成）
+
+- 蓝绿零停机上线 `v1.3.125`（`[deploy] 完成：new-api:v1.3.125 在端口 3001`）；
+  容器 healthy、`healthz/readyz=200`、Caddy 上游已切 3001、经公网域名 + 真实 TLS **200**、
+  新接口无凭据 **401**、内存 **29.66 MiB / 900 MiB**、重启 **0**。
+- **生产真实浏览器验收 20/20 PASS**（现覆盖 **14** 个开关）：全部渲染、切换即时生效、
+  刷新后仍显示「已在管理端配置」、重置回到环境默认；开关打开期间**线上真实流量**使
+  `relay_audit_findings_total = 10`。验收后已复位。
+- **`RESPONSE_CACHE_ENABLED` 默认关** → 生产行为与部署前**完全一致**，只是多了一个可打开的开关。
+- **并发安全**：`go test ./service/ -run TestResponseCache -race` 全 12 用例 PASS，
+  含 `TestResponseCacheIsConcurrencySafe`（16 goroutine × 200 次并发读写），**无 data race**。
+- Release：<https://github.com/lza6/new-api-Max/releases/tag/v1.3.125>

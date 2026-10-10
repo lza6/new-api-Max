@@ -131,10 +131,10 @@ async function apiJson(url, options) {
     'POLICY_ENGINE_MODE', 'CHANNEL_HEALTH_WEIGHTED_LB', 'DOMAIN_ROUTE_ENABLED',
     'MEMORY_INJECTION_ENABLED', 'CHANNEL_CIRCUIT_BREAKER', 'CHANNEL_KEY_ENCRYPTION',
     'PASSWORD_LOGIN_ENCRYPTION_ENABLED', 'CATALOG_SYNC_TASK_ENABLED',
-    'ERROR_LOG_ENABLED', 'GET_MEDIA_TOKEN_NOT_STREAM',
+    'ERROR_LOG_ENABLED', 'GET_MEDIA_TOKEN_NOT_STREAM', 'RESPONSE_CACHE_ENABLED',
   ]
   const missingKeys = KEYS.filter((k) => !body.includes(k))
-  check('all 13 switches rendered', missingKeys.length === 0, `missing=${JSON.stringify(missingKeys)}`)
+  check(`all ${KEYS.length} switches rendered`, missingKeys.length === 0, `missing=${JSON.stringify(missingKeys)}`)
   check('effect metrics block present', body.includes('效果度量') || body.includes('Effect metrics'))
   check('risk badges present', body.includes('高风险') || body.includes('High risk'))
   check('rollback hint present', body.includes('回滚') || body.includes('Rollback'))
