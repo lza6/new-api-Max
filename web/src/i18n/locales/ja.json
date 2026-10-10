@@ -7124,6 +7124,9 @@
     "Turn off to accept plaintext password submission again.": "Turn off to accept plaintext password submission again.",
     "Turn off to stop the scheduled sync; already synced rows are left as they are.": "Turn off to stop the scheduled sync; already synced rows are left as they are.",
     "Turn off to stop persisting error rows. Confirm log database capacity and rotation first.": "Turn off to stop persisting error rows. Confirm log database capacity and rotation first.",
-    "Turn off to return to streaming responses.": "Turn off to return to streaming responses."
+    "Turn off to return to streaming responses.": "Turn off to return to streaming responses.",
+    "Response Cache": "Response Cache",
+    "Serves byte-identical non-streaming requests from an in-process (or Redis) cache instead of calling the upstream again. Caching is limited to the models you list in the response cache settings; entries are isolated per user unless you explicitly allow sharing.": "Serves byte-identical non-streaming requests from an in-process (or Redis) cache instead of calling the upstream again. Caching is limited to the models you list in the response cache settings; entries are isolated per user unless you explicitly allow sharing.",
+    "Turn off to bypass the cache entirely; upstream calls resume immediately.": "Turn off to bypass the cache entirely; upstream calls resume immediately."
   }
 }

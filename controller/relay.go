@@ -302,6 +302,10 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			relayInfo.RequestBytes = replayable.Size()
 		}
 
+		// 响应缓存（G3）的取数钩子在 `relay.doRequestWithResponseCache` 里 ——
+		// 刻意**不**在这里直接回写响应：下游计费/日志依赖 relay handler 逐层填充的
+		// relayInfo 状态，绕过 handler 会 nil 解引用且丢消费日志。
+
 		switch relayFormat {
 		case types.RelayFormatOpenAIRealtime:
 			newAPIError = relay.WssHelper(c, relayInfo)

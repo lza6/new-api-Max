@@ -199,3 +199,20 @@ func optionValueFor(t *testing.T, db *gorm.DB, key string) string {
 	require.NoError(t, db.Where("key = ?", key).First(&option).Error)
 	return option.Value
 }
+
+// Batch-9 / G3：**反伪闭环**守卫。
+//
+// 注册表里的每个开关都用 `MetricKeys` 声明了「打开后可在哪看效果」。若声明了却没人
+// 产出这个指标，「实验功能」页会永远显示「暂无数据」—— 那正是本项目最忌讳的伪闭环。
+// 本用例把「声明 = 必须有实现」变成机器可验证的约束。
+func TestFeatureSwitchDeclaredMetricsAreActuallyProduced(t *testing.T) {
+	setupFeatureSwitchTestDB(t)
+
+	produced := featureSwitchMetrics()
+	for _, s := range feature_switch.List() {
+		for _, key := range s.MetricKeys {
+			assert.Containsf(t, produced, key,
+				"开关 %s 声明了指标 %s，但 featureSwitchMetrics() 没有产出它 —— 声明与实现不一致（伪闭环）", s.Key, key)
+		}
+	}
+}

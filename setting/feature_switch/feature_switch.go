@@ -188,6 +188,14 @@ var registry = []FeatureSwitch{
 		MetricKeys:   []string{},
 		RollbackHint: "Turn off to return to streaming responses.",
 	},
+	{
+		Key: common.FlagResponseCacheEnabled, Kind: KindBool, Default: "false",
+		TitleKey:       "Response Cache",
+		DescriptionKey: "Serves byte-identical non-streaming requests from an in-process (or Redis) cache instead of calling the upstream again. Caching is limited to the models you list in the response cache settings; entries are isolated per user unless you explicitly allow sharing.",
+		Risk:           RiskMedium, AdminEditable: true,
+		MetricKeys:   []string{"response_cache_hits_total", "response_cache_misses_total", "response_cache_live_entries"},
+		RollbackHint: "Turn off to bypass the cache entirely; upstream calls resume immediately.",
+	},
 }
 
 // featureSwitchConfig 是注册进 config 框架的持久化载体。

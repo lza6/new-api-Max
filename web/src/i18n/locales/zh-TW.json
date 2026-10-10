@@ -7124,6 +7124,9 @@
     "Turn off to accept plaintext password submission again.": "關閉即重新接受明文密碼提交。",
     "Turn off to stop the scheduled sync; already synced rows are left as they are.": "關閉即停止定時同步；已同步的資料列保持原樣。",
     "Turn off to stop persisting error rows. Confirm log database capacity and rotation first.": "關閉即停止錯誤日誌落庫。開啟前請先確認日誌庫容量與輪轉策略。",
-    "Turn off to return to streaming responses.": "關閉即回退為串流回傳。"
+    "Turn off to return to streaming responses.": "關閉即回退為串流回傳。",
+    "Response Cache": "回應快取",
+    "Serves byte-identical non-streaming requests from an in-process (or Redis) cache instead of calling the upstream again. Caching is limited to the models you list in the response cache settings; entries are isolated per user unless you explicitly allow sharing.": "對位元組完全相同的非串流請求，直接由行程內（或 Redis）快取回傳，不再呼叫上游。只有你在回應快取設定裡列出的模型會被快取；除非你顯式允許共享，否則快取項目會依使用者隔離。",
+    "Turn off to bypass the cache entirely; upstream calls resume immediately.": "關閉即完全繞過快取，上游呼叫立即恢復。"
   }
 }

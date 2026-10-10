@@ -40,6 +40,7 @@ const (
 	FlagCatalogSyncTaskEnabled  = "CATALOG_SYNC_TASK_ENABLED"
 	FlagErrorLogEnabled         = "ERROR_LOG_ENABLED"
 	FlagGetMediaTokenNotStream  = "GET_MEDIA_TOKEN_NOT_STREAM"
+	FlagResponseCacheEnabled    = "RESPONSE_CACHE_ENABLED"
 )
 
 // FeatureFlagKeys 返回全部受治理开关的 key（顺序不保证，调用方按需排序）。
@@ -58,6 +59,7 @@ func FeatureFlagKeys() []string {
 		FlagCatalogSyncTaskEnabled,
 		FlagErrorLogEnabled,
 		FlagGetMediaTokenNotStream,
+		FlagResponseCacheEnabled,
 	}
 }
 

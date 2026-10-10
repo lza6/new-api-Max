@@ -38,6 +38,11 @@ func RegisterMetricsGaugeProvider() {
 			}
 		}
 
+		// G3 响应缓存效果度量（与「实验功能」页显示的是同一组数字）。
+		for k, v := range ResponseCacheMetrics() {
+			common.MetricsSetGauge(k, nil, v)
+		}
+
 		// 渠道健康分 + 熔断状态。查询失败（DB 未就绪等）时静默跳过，不影响计数/直方图输出。
 		var ids []int
 		if err := model.DB.Model(&model.Channel{}).Pluck("id", &ids).Error; err != nil {

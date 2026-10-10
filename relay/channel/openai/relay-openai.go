@@ -355,6 +355,20 @@ func OpenaiHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http.Respo
 		responseBody = geminiRespStr
 	}
 
+	// Batch-9 / G3 响应缓存**写入侧**：只缓存「非流式 + HTTP 200 + usage 存在」的完整响应。
+	// 流式、上游错误、以及走到这里的空壳响应都不会写入。
+	// 注意 `responseBody` 此时**已经是客户端格式**（上面的 switch 做过格式转换），
+	// 而缓存键里包含 relayFormat —— 两者一致，不会把 OpenAI 格式的体回给 Claude 客户端。
+	// 命中缓存时本次响应本身就是从缓存来的，跳过重复写回（内容完全相同）。
+	if !service.IsResponseCacheServed(c) && resp.StatusCode == http.StatusOK && !info.IsStream &&
+		(simpleResponse.Usage.TotalTokens > 0 || simpleResponse.Usage.PromptTokens > 0 || simpleResponse.Usage.CompletionTokens > 0) &&
+		service.ResponseCacheEligible(info.UserId, info.OriginModelName, string(info.RelayFormat), false) {
+		if rawBody := service.ResponseCacheRawBody(c); len(rawBody) > 0 {
+			service.ResponseCacheStore(info.UserId, info.OriginModelName, string(info.RelayFormat),
+				rawBody, responseBody, int64(simpleResponse.Usage.TotalTokens))
+		}
+	}
+
 	service.IOCopyBytesGracefully(c, resp, responseBody)
 
 	return &simpleResponse.Usage, nil

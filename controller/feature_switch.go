@@ -9,6 +9,7 @@ import (
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/feature_switch"
+	"github.com/lza6/new-api-Max/setting/response_cache_setting"
 )
 
 // 能力开关（Feature Switch）管理端接口 —— Batch-8 / G1。
@@ -181,6 +182,10 @@ func persistFeatureSwitches() error {
 func featureSwitchMetrics() map[string]float64 {
 	out := map[string]float64{}
 
+	for k, v := range ResponseCacheMetrics() {
+		out[k] = v
+	}
+
 	var auditFindings int64
 	for _, n := range service.RelayAuditSnapshot() {
 		auditFindings += n
@@ -212,8 +217,30 @@ func featureSwitchMetrics() map[string]float64 {
 	}
 	out["channel_circuit_open_total"] = float64(openCircuits)
 	out["channels_tracked"] = float64(tracked)
+	// 恒定产出（无渠道时为 0）：注册表声明了这个指标，就必须始终存在 ——
+	// 否则「实验功能」页在有/无渠道两种状态下表现不一致，且守门用例会判为声明与实现不符。
+	out["channel_health_score_avg"] = 0
 	if tracked > 0 {
 		out["channel_health_score_avg"] = scoreSum / float64(tracked)
 	}
 	return out
+}
+
+// responseCacheMetricKeys 是响应缓存开关在注册表里声明的指标名。
+// 单独列出并加一条**断言**：声明了就必须有实现，否则「实验功能」页会永远显示
+// 「暂无数据」——那正是本项目最忌讳的伪闭环。
+var responseCacheMetricKeys = []string{
+	"response_cache_hits_total",
+	"response_cache_misses_total",
+	"response_cache_live_entries",
+}
+
+// ResponseCacheMetrics 返回响应缓存的效果度量（与 /metrics 同名指标同源）。
+func ResponseCacheMetrics() map[string]float64 {
+	stats := response_cache_setting.Stats()
+	return map[string]float64{
+		"response_cache_hits_total":   float64(stats.Hits),
+		"response_cache_misses_total": float64(stats.Misses),
+		"response_cache_live_entries": float64(service.ResponseCacheLiveEntries()),
+	}
 }

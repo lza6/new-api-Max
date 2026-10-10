@@ -7124,6 +7124,9 @@
     "Turn off to accept plaintext password submission again.": "关闭即重新接受明文密码提交。",
     "Turn off to stop the scheduled sync; already synced rows are left as they are.": "关闭即停止定时同步；已同步的行保持原样。",
     "Turn off to stop persisting error rows. Confirm log database capacity and rotation first.": "关闭即停止错误日志落库。开启前请先确认日志库容量与轮转策略。",
-    "Turn off to return to streaming responses.": "关闭即回退为流式返回。"
+    "Turn off to return to streaming responses.": "关闭即回退为流式返回。",
+    "Response Cache": "响应缓存",
+    "Serves byte-identical non-streaming requests from an in-process (or Redis) cache instead of calling the upstream again. Caching is limited to the models you list in the response cache settings; entries are isolated per user unless you explicitly allow sharing.": "对字节完全相同的非流式请求，直接由进程内（或 Redis）缓存返回，不再调用上游。只有你在响应缓存设置里列出的模型会被缓存；除非你显式允许共享，否则缓存条目按用户隔离。",
+    "Turn off to bypass the cache entirely; upstream calls resume immediately.": "关闭即完全绕过缓存，上游调用立即恢复。"
   }
 }
