@@ -23,12 +23,14 @@ func StartTaskArtifactCleanup() {
 		ticker := time.NewTicker(taskArtifactCleanupInterval)
 		defer ticker.Stop()
 		runTaskArtifactCleanupOnce()
+		common.RecordLoopHeartbeat("task_artifact_cleanup")
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
 				runTaskArtifactCleanupOnce()
+				common.RecordLoopHeartbeat("task_artifact_cleanup")
 			}
 		}
 	})

@@ -130,6 +130,9 @@ func consumeLogFlusherLoop(ctx context.Context) {
 			}
 		case <-ticker.C:
 			safeFlush()
+			// G10 §12.2.2：心跳打在 **ticker 分支**而不是 flush 内部 ——
+			// 空闲时 flush 会提前返回，若在那里打点，「没活干」会被误读成「卡死了」。
+			common.RecordLoopHeartbeat("consume_log_flusher")
 		}
 	}
 }

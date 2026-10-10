@@ -41,6 +41,7 @@ func StartCodexCredentialAutoRefreshTask() {
 		defer ticker.Stop()
 
 		runCodexCredentialAutoRefreshOnce()
+		common.RecordLoopHeartbeat("codex_credential_refresh")
 		for {
 			select {
 			case <-ctx.Done():
@@ -48,6 +49,7 @@ func StartCodexCredentialAutoRefreshTask() {
 				return
 			case <-ticker.C:
 				runCodexCredentialAutoRefreshOnce()
+				common.RecordLoopHeartbeat("codex_credential_refresh")
 			}
 		}
 	})

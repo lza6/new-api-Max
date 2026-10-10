@@ -211,6 +211,8 @@ func SyncOptions(frequency int) {
 		time.Sleep(time.Duration(frequency) * time.Second)
 		common.SysLog("syncing options from database")
 		loadOptionsFromDatabase()
+		// G10 §12.2.2：打完这一轮的时间戳，/metrics 里可见「选项同步是否还在跑」。
+		common.RecordLoopHeartbeat("sync_options")
 	}
 }
 

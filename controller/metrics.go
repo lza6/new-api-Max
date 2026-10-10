@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"runtime"
 	"strconv"
 
 	"github.com/lza6/new-api-Max/common"
@@ -16,6 +17,11 @@ import (
 func RegisterMetricsGaugeProvider() {
 	common.MetricsGaugeProvider = func() {
 		common.MetricsResetGauges()
+
+		// 资源类指标放最前面：**不依赖 DB、任何情况下都能输出**。
+		// 目的是让"跑三天之后变慢"从靠猜变成可观测（指南 §12.2.2）。
+		setRuntimeResourceGauges()
+		setBackgroundLoopHeartbeatGauges()
 
 		// 队列深度/批量落库指标（进程内原子量，无 DB 依赖）。
 		queueDepth, lastBatch, failures, retries := model.GetConsumeLogFlusherMetrics()
@@ -40,6 +46,10 @@ func RegisterMetricsGaugeProvider() {
 
 		// G3 响应缓存效果度量（与「实验功能」页显示的是同一组数字）。
 		for k, v := range ResponseCacheMetrics() {
+			common.MetricsSetGauge(k, nil, v)
+		}
+		// G3 工具抽屉收益度量。
+		for k, v := range ToolDrawerMetrics() {
 			common.MetricsSetGauge(k, nil, v)
 		}
 
@@ -70,5 +80,57 @@ func RegisterMetricsGaugeProvider() {
 			}
 			common.MetricsSetGauge("channel_cooling_down", labels, cooling)
 		}
+	}
+}
+
+// setRuntimeResourceGauges 输出进程与运行时资源指标。
+//
+// 为什么需要：项目此前**没有任何**进程内存/goroutine 指标，判断"跑久会不会变慢"
+// 只能靠猜。这里用 `runtime.ReadMemStats`（已在 performance.go 有先例）与
+// `runtime.NumGoroutine`，成本约几十微秒、只在 /metrics 渲染时执行。
+//
+// 指标含义（判读方式）：
+//   - process_goroutines 持续上升不回落 → 大概率有 goroutine 泄漏（例如未 stop 的 ticker）；
+//   - process_heap_objects 持续上升而 process_memory_alloc_bytes 也在涨 → 大概率有
+//     "只加不减"的 map/slice（本批次已在修若干处，见台账 §G10）；
+//   - gc_cycles_total 与 gc_pause_total_seconds 的**增速**上升 → GC 压力变大。
+func setRuntimeResourceGauges() {
+	var mem runtime.MemStats
+	runtime.ReadMemStats(&mem)
+
+	common.MetricsSetGauge("process_goroutines", nil, float64(runtime.NumGoroutine()))
+	common.MetricsSetGauge("process_memory_alloc_bytes", nil, float64(mem.Alloc))
+	common.MetricsSetGauge("process_memory_heap_bytes", nil, float64(mem.HeapAlloc))
+	common.MetricsSetGauge("process_memory_sys_bytes", nil, float64(mem.Sys))
+	common.MetricsSetGauge("process_memory_heap_objects", nil, float64(mem.HeapObjects))
+	common.MetricsSetGauge("process_memory_stack_bytes", nil, float64(mem.StackInuse))
+	common.MetricsSetGauge("process_gc_cycles_total", nil, float64(mem.NumGC))
+	common.MetricsSetGauge("process_gc_pause_total_seconds", nil, float64(mem.PauseTotalNs)/1e9)
+
+	// DB 连接池：等待计数/等待时长增长说明池子偏小或被慢查询占满。
+	if model.DB == nil {
+		return
+	}
+	sqlDB, err := model.DB.DB()
+	if err != nil {
+		return
+	}
+	stats := sqlDB.Stats()
+	common.MetricsSetGauge("db_max_open_connections", nil, float64(stats.MaxOpenConnections))
+	common.MetricsSetGauge("db_open_connections", nil, float64(stats.OpenConnections))
+	common.MetricsSetGauge("db_in_use_connections", nil, float64(stats.InUse))
+	common.MetricsSetGauge("db_idle_connections", nil, float64(stats.Idle))
+	common.MetricsSetGauge("db_wait_count_total", nil, float64(stats.WaitCount))
+	common.MetricsSetGauge("db_wait_duration_seconds_total", nil, stats.WaitDuration.Seconds())
+}
+
+// setBackgroundLoopHeartbeatGauges 输出各常驻后台 loop 的「上次执行时刻」Unix 秒。
+//
+// 用途：某个 loop 卡死（heartbeat 不再前进）时一眼可见 —— 否则只能靠翻日志猜。
+// 值为 0 表示该 loop 自进程启动以来还没跑过（或在本版本尚未接心跳）。
+func setBackgroundLoopHeartbeatGauges() {
+	for name, atMs := range common.LoopHeartbeatSnapshot() {
+		common.MetricsSetGauge("background_loop_last_run_timestamp_seconds",
+			map[string]string{"loop": name}, float64(atMs)/1000)
 	}
 }

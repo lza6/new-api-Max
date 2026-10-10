@@ -185,6 +185,9 @@ func featureSwitchMetrics() map[string]float64 {
 	for k, v := range ResponseCacheMetrics() {
 		out[k] = v
 	}
+	for k, v := range ToolDrawerMetrics() {
+		out[k] = v
+	}
 
 	var auditFindings int64
 	for _, n := range service.RelayAuditSnapshot() {
@@ -242,5 +245,14 @@ func ResponseCacheMetrics() map[string]float64 {
 		"response_cache_hits_total":   float64(stats.Hits),
 		"response_cache_misses_total": float64(stats.Misses),
 		"response_cache_live_entries": float64(service.ResponseCacheLiveEntries()),
+	}
+}
+
+// ToolDrawerMetrics 返回工具抽屉的效果度量（去重次数与被移除的字节量）。
+func ToolDrawerMetrics() map[string]float64 {
+	savings := service.ToolDrawerSavings()
+	return map[string]float64{
+		"tool_drawer_deduped_requests_total": float64(savings.DedupedRequests),
+		"tool_drawer_saved_bytes_total":      float64(savings.SavedBytes),
 	}
 }

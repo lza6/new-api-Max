@@ -35,6 +35,7 @@ func StartSubscriptionQuotaResetTask() {
 		defer ticker.Stop()
 
 		runSubscriptionQuotaResetOnce()
+		common.RecordLoopHeartbeat("subscription_quota_reset")
 		for {
 			select {
 			case <-ctx.Done():
@@ -42,6 +43,7 @@ func StartSubscriptionQuotaResetTask() {
 				return
 			case <-ticker.C:
 				runSubscriptionQuotaResetOnce()
+				common.RecordLoopHeartbeat("subscription_quota_reset")
 			}
 		}
 	})

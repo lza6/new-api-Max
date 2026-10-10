@@ -27,6 +27,11 @@ const (
 	webProtectionIdleTTL     = 10 * time.Minute
 	webProtectionRetryAfter  = 60
 	webProtectionBanCacheTTL = 5 * time.Second
+	// webProtectionBanCacheMaxEntries 是封禁缓存的**硬条目上界**。
+	// 键是客户端 IP（外部输入驱动），没有上界就可能在扫描/攻击下把内存吃掉。
+	// 达到上界后停止写入新条目（仍会实时查库，只是不再缓存）—— 正确性不受影响，
+	// 只损失一点缓存命中率。
+	webProtectionBanCacheMaxEntries = 8192
 )
 
 // webTokenBucket 每-IP 令牌桶：容量=burst，速率=perSec/s。
@@ -166,18 +171,31 @@ func webProtectionWindowStart(now time.Time, windowSec int64) int64 {
 	return now.Unix() - now.Unix()%windowSec
 }
 
+// isIPBannedCached 查询某 IP 是否被封禁（带进程内缓存）。
+//
+// **调用方必须持有 t.mu**（本函数会读取并就地清理 t.banCache）。
+//
+// [修复] G10 §12.2.1：缓存过期时必须**就地删除**。此前只做读侧 TTL 判断、从不 delete，
+// 而键是**客户端 IP**（完全由外部输入驱动）—— 这是一张无界增长的表。
 func (t *webProtectionTracker) isIPBannedCached(ip string, now time.Time) bool {
-	if entry, ok := t.banCache[ip]; ok && now.Sub(entry.checkedAt) < webProtectionBanCacheTTL {
-		if entry.banned {
-			if entry.expiresAt == 0 || entry.expiresAt > now.Unix() {
-				return true
+	if entry, ok := t.banCache[ip]; ok {
+		if now.Sub(entry.checkedAt) < webProtectionBanCacheTTL {
+			if entry.banned {
+				if entry.expiresAt == 0 || entry.expiresAt > now.Unix() {
+					return true
+				}
+			} else {
+				return false
 			}
 		} else {
-			return false
+			delete(t.banCache, ip)
 		}
 	}
 	expiresAt, banned := model.IsIPBanned(ip)
-	t.banCache[ip] = webBanCacheEntry{banned: banned, expiresAt: expiresAt, checkedAt: now}
+	// 硬上界兜底：即便 TTL 判断被绕过（时钟回拨等），也不让这张表无限增长。
+	if len(t.banCache) < webProtectionBanCacheMaxEntries {
+		t.banCache[ip] = webBanCacheEntry{banned: banned, expiresAt: expiresAt, checkedAt: now}
+	}
 	return banned
 }
 

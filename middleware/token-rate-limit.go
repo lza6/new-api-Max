@@ -60,16 +60,37 @@ func releaseTokenConcurrency(tokenId int) {
 }
 
 // tokenQBSBuckets 令牌桶：tokenId -> 剩余令牌 + 上次回填时间。
+//
+// [修复] G10 §12.2.1：此前只写不删 —— token 被删除后条目永远残留，是一张
+// 「只加不减」的表。现在按空闲时间淘汰：桶空闲超过 tokenQBSIdleEvictAfter 后
+// 一定已回填满，删掉它与新建一个等价，**不改变限流语义**。
 var tokenQBSBuckets = struct {
 	sync.Mutex
 	tokens map[int]struct {
 		remaining float64
 		updated   time.Time
 	}
+	sweepCount int
 }{tokens: make(map[int]struct {
 	remaining float64
 	updated   time.Time
 })}
+
+const (
+	// tokenQBSIdleEvictAfter 桶空闲多久后可以安全淘汰（回填公式保证此时已满）。
+	tokenQBSIdleEvictAfter = 10 * time.Minute
+	// tokenQBSSweepEvery 每多少次写入做一次全量清扫（分批做，不常驻 goroutine）。
+	tokenQBSSweepEvery = 1024
+)
+
+// sweepIdleTokenQBSLocked 移除空闲过久的桶。调用方必须持锁。
+func sweepIdleTokenQBSLocked(now time.Time) {
+	for id, b := range tokenQBSBuckets.tokens {
+		if now.Sub(b.updated) > tokenQBSIdleEvictAfter {
+			delete(tokenQBSBuckets.tokens, id)
+		}
+	}
+}
 
 func allowTokenQBS(tokenId, qbs int) bool {
 	if qbs <= 0 {
@@ -78,6 +99,13 @@ func allowTokenQBS(tokenId, qbs int) bool {
 	now := time.Now()
 	tokenQBSBuckets.Lock()
 	defer tokenQBSBuckets.Unlock()
+
+	tokenQBSBuckets.sweepCount++
+	if tokenQBSBuckets.sweepCount >= tokenQBSSweepEvery {
+		tokenQBSBuckets.sweepCount = 0
+		sweepIdleTokenQBSLocked(now)
+	}
+
 	b, ok := tokenQBSBuckets.tokens[tokenId]
 	if !ok {
 		b = struct {

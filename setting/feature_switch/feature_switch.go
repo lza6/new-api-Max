@@ -96,7 +96,7 @@ var registry = []FeatureSwitch{
 		TitleKey:       "Tool Schema Deduplication",
 		DescriptionKey: "Removes duplicated tool definitions from requests to save prompt tokens. Semantically equivalent, but clients that rely on the exact submitted schema layout may be affected.",
 		Risk:           RiskMedium, AdminEditable: true,
-		MetricKeys:   []string{},
+		MetricKeys:   []string{"tool_drawer_deduped_requests_total", "tool_drawer_saved_bytes_total"},
 		RollbackHint: "Turn off to send tool definitions through untouched.",
 	},
 	{

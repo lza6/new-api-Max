@@ -181,3 +181,52 @@ func TestSSRFGuardDisabledSwitch(t *testing.T) {
 	err = ValidateChannelURL("http://127.0.0.1:18080/v1")
 	require.Error(t, err, "re-enable must reject loopback again")
 }
+
+// G10 §12.2.1：SSRF 判定缓存的键是**上游 host**，必须有硬上界。
+// 此前只做读侧 TTL 判断、从不删除 —— 管理员反复改渠道 URL 时这张表会单调增长。
+func TestSSRFCacheRespectsMaxEntries(t *testing.T) {
+	clearSSRFCache(t)
+	previousHook := ssrfLookupHook
+	ssrfLookupHook = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("93.184.216.34")}}, nil
+	}
+	t.Cleanup(func() { ssrfLookupHook = previousHook })
+
+	for i := range ssrfCacheMaxEntries + 64 {
+		_, _ = lookupSSRFCached(fmt.Sprintf("bounded-%d.test", i))
+	}
+
+	ssrfCacheMu.RLock()
+	n := len(ssrfCache)
+	ssrfCacheMu.RUnlock()
+
+	assert.LessOrEqual(t, n, ssrfCacheMaxEntries,
+		"SSRF 缓存条目数必须有硬上界（键由渠道配置驱动，但代码不能假设它一定很小）")
+}
+
+// 过期条目必须被**就地删除**，而不是留在表里等下次覆盖。
+func TestSSRFCacheDeletesExpiredEntry(t *testing.T) {
+	clearSSRFCache(t)
+	previousHook := ssrfLookupHook
+	ssrfLookupHook = func(ctx context.Context, host string) ([]net.IPAddr, error) {
+		return []net.IPAddr{{IP: net.ParseIP("93.184.216.34")}}, nil
+	}
+	t.Cleanup(func() { ssrfLookupHook = previousHook })
+
+	_, _ = lookupSSRFCached("expiring.test")
+
+	ssrfCacheMu.Lock()
+	entry := ssrfCache["expiring.test"]
+	entry.expiresAt = time.Now().Add(-time.Second)
+	ssrfCache["expiring.test"] = entry
+	ssrfCacheMu.Unlock()
+
+	// 这一次查询会先删掉过期项再重建 —— 断言重建后的 TTL 是未来时间
+	_, _ = lookupSSRFCached("expiring.test")
+
+	ssrfCacheMu.RLock()
+	renewed, ok := ssrfCache["expiring.test"]
+	ssrfCacheMu.RUnlock()
+	require.True(t, ok)
+	assert.True(t, renewed.expiresAt.After(time.Now()), "过期后应重建为带新 TTL 的条目")
+}

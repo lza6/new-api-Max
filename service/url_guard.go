@@ -48,26 +48,26 @@ import (
 // IPv4-mapped 的判定由 common.IsPrivateIP 的其它分支处理。
 var ssrfBlockedCIDRs = func() []*net.IPNet {
 	cidrs := []string{
-		"0.0.0.0/8",         // 未指定
-		"10.0.0.0/8",        // 私有
-		"100.64.0.0/10",     // 运营商级 NAT (CGNAT)
-		"127.0.0.0/8",       // 回环
-		"169.254.0.0/16",    // 链路本地 + 云元数据 169.254.169.254
-		"172.16.0.0/12",     // 私有
-		"192.0.0.0/24",      // IETF 协议分配
-		"192.0.2.0/24",      // TEST-NET-1
-		"192.168.0.0/16",    // 私有
-		"198.18.0.0/15",     // 基准测试
-		"198.51.100.0/24",   // TEST-NET-2
-		"203.0.113.0/24",    // TEST-NET-3
-		"224.0.0.0/4",       // 组播
-		"240.0.0.0/4",       // 保留
+		"0.0.0.0/8",          // 未指定
+		"10.0.0.0/8",         // 私有
+		"100.64.0.0/10",      // 运营商级 NAT (CGNAT)
+		"127.0.0.0/8",        // 回环
+		"169.254.0.0/16",     // 链路本地 + 云元数据 169.254.169.254
+		"172.16.0.0/12",      // 私有
+		"192.0.0.0/24",       // IETF 协议分配
+		"192.0.2.0/24",       // TEST-NET-1
+		"192.168.0.0/16",     // 私有
+		"198.18.0.0/15",      // 基准测试
+		"198.51.100.0/24",    // TEST-NET-2
+		"203.0.113.0/24",     // TEST-NET-3
+		"224.0.0.0/4",        // 组播
+		"240.0.0.0/4",        // 保留
 		"255.255.255.255/32", // 受限广播
-		"::/128",            // IPv6 未指定
-		"::1/128",           // IPv6 回环
-		"64:ff9b::/96",      // IPv4/IPv6 转换
-		"fc00::/7",          // IPv6 ULA
-		"fe80::/10",         // IPv6 链路本地
+		"::/128",             // IPv6 未指定
+		"::1/128",            // IPv6 回环
+		"64:ff9b::/96",       // IPv4/IPv6 转换
+		"fc00::/7",           // IPv6 ULA
+		"fe80::/10",          // IPv6 链路本地
 	}
 	list := make([]*net.IPNet, 0, len(cidrs))
 	for _, c := range cidrs {
@@ -83,6 +83,9 @@ const (
 	ssrfLookupTimeout = 3 * time.Second
 	// ssrfCacheTTL DNS 判定缓存：同一 host 的校验结果短暂复用，避免每请求解析。
 	ssrfCacheTTL = 5 * time.Minute
+	// ssrfCacheMaxEntries 缓存条目硬上界。键是上游 host（由渠道配置驱动，正常很小），
+	// 达到上界后不再新增条目 —— 校验仍然照做，只是不复用结果。
+	ssrfCacheMaxEntries = 4096
 )
 
 type ssrfCacheEntry struct {
@@ -112,18 +115,29 @@ func init() {
 	}
 }
 
-// lookupSSRF 解析 host 全部 A/AAAA 记录，任一命中私网段即拒绝。
+// lookupSSRFCached 查询 host 的 SSRF 判定（带进程内缓存）。
+//
+// [修复] G10 §12.2.1：过期条目必须**就地删除**。此前只做读侧 TTL 判断、从不 delete，
+// 而键是上游 host —— 管理员反复改渠道 URL 时这张表会单调增长。
 func lookupSSRFCached(host string) (bool, string) {
 	ssrfCacheMu.RLock()
-	if entry, ok := ssrfCache[host]; ok && time.Now().Before(entry.expiresAt) {
-		ssrfCacheMu.RUnlock()
+	entry, cached := ssrfCache[host]
+	ssrfCacheMu.RUnlock()
+	if cached && time.Now().Before(entry.expiresAt) {
 		return entry.allowed, entry.reason
 	}
-	ssrfCacheMu.RUnlock()
+	if cached {
+		ssrfCacheMu.Lock()
+		delete(ssrfCache, host)
+		ssrfCacheMu.Unlock()
+	}
 
 	allowed, reason := lookupSSRF(host)
 	ssrfCacheMu.Lock()
-	ssrfCache[host] = ssrfCacheEntry{allowed: allowed, reason: reason, expiresAt: time.Now().Add(ssrfCacheTTL)}
+	// 硬上界兜底（键空间由渠道配置驱动，正常远小于此值）。
+	if len(ssrfCache) < ssrfCacheMaxEntries {
+		ssrfCache[host] = ssrfCacheEntry{allowed: allowed, reason: reason, expiresAt: time.Now().Add(ssrfCacheTTL)}
+	}
 	ssrfCacheMu.Unlock()
 	return allowed, reason
 }

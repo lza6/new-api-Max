@@ -432,10 +432,13 @@ func (a *Adaptor) ConvertOpenAIRequest(c *gin.Context, info *relaycommon.RelayIn
 		request.Messages[0].Role = "developer"
 	}
 
-	// T5 工具抽屉：默认关（service.ToolDrawerEnabled()）。开启时对 tools 做
-	// **等价去重**（同 name / 同 schema 指纹只保留首份）——上游按 name 调用，
-	// 重复定义无意义，去重零语义风险。原地替换 request.Tools 切片。
-	if service.ToolDrawerEnabled() && len(request.Tools) > 1 {
+	// T5 工具抽屉（默认关，可被请求头 `X-NewAPI-Tool-Drawer` 覆盖，
+	// 优先级：请求头 > 全局开关 TOOL_DRAWER_ENABLED）。
+	// 开启时对 tools 做**等价去重**（同 name / 同 schema 指纹只保留首份）——上游按
+	// name 调用，重复定义无意义，去重零语义风险。原地替换 request.Tools 切片。
+	// 请求级 opt-in 的意义：全局开关会影响所有客户端，而依赖完整 schema 的调用方
+	// 可能被破坏；下放到请求头后，保守客户端不受影响。
+	if len(request.Tools) > 1 && service.ResolveToolDrawerMode(c) != service.ToolDrawerModeOff {
 		request.Tools = dedupOpenAITools(request.Tools)
 	}
 
@@ -486,6 +489,9 @@ func mergeInjectedBlock(existing, block string) string {
 
 // dedupOpenAITools T5：对 OpenAI tools 定义做等价去重（保留首次出现顺序）。
 // 判同依据：工具名相同，或参数 JSON 归一化指纹相同。纯函数，无副作用。
+//
+// 顺带把**被移除定义的字节量**计入工具抽屉收益度量 —— 「省了多少」必须可观测，
+// 否则这个开关打开后既没人知道有没有用，也没法判断该不该继续开。
 func dedupOpenAITools(tools []dto.ToolCallRequest) []dto.ToolCallRequest {
 	if len(tools) <= 1 {
 		return tools
@@ -493,21 +499,33 @@ func dedupOpenAITools(tools []dto.ToolCallRequest) []dto.ToolCallRequest {
 	seenName := make(map[string]struct{}, len(tools))
 	seenFP := make(map[string]struct{}, len(tools))
 	out := make([]dto.ToolCallRequest, 0, len(tools))
+	savedBytes := 0
 	for _, t := range tools {
 		name := t.Function.Name
+		duplicated := false
 		if _, ok := seenName[name]; ok {
-			continue
-		}
-		fp := toolFingerprint(t)
-		if fp != "" {
-			if _, ok := seenFP[fp]; ok {
-				continue
+			duplicated = true
+		} else {
+			fp := toolFingerprint(t)
+			if fp != "" {
+				if _, ok := seenFP[fp]; ok {
+					duplicated = true
+				} else {
+					seenFP[fp] = struct{}{}
+				}
 			}
-			seenFP[fp] = struct{}{}
+		}
+		if duplicated {
+			if b, err := common.Marshal(t); err == nil {
+				savedBytes += len(b)
+			}
+			continue
 		}
 		seenName[name] = struct{}{}
 		out = append(out, t)
 	}
+	// 只在真的移除了内容时记收益（没省到东西不该计入"节省"）。
+	service.RecordToolDrawerSavings(savedBytes)
 	return out
 }
 

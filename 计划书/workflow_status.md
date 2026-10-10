@@ -357,3 +357,70 @@ go test ./controller/ -count=1                             → 失败项与基�
 - **并发安全**：`go test ./service/ -run TestResponseCache -race` 全 12 用例 PASS，
   含 `TestResponseCacheIsConcurrencySafe`（16 goroutine × 200 次并发读写），**无 data race**。
 - Release：<https://github.com/lza6/new-api-Max/releases/tag/v1.3.125>
+
+---
+
+# Batch-10 / G10 + G3 §5.2.2（追加）
+
+## 一、G10 §12.2.2 —— 让「跑久会不会变慢」从靠猜变成可观测
+
+新增 `process_*` / `db_*` 资源 gauge（`controller/metrics.go`，仅 /metrics 渲染时执行）：
+
+| 指标 | 判读方式 |
+|---|---|
+| `process_goroutines` | 持续上升不回落 → 大概率 goroutine 泄漏（如未 stop 的 ticker） |
+| `process_memory_alloc_bytes` / `_heap_bytes` / `_sys_bytes` / `_stack_bytes` | 绝对量与增长趋势 |
+| `process_memory_heap_objects` | 持续上升且 alloc 也在涨 → 大概率有「只加不减」的 map/slice |
+| `process_gc_cycles_total` / `process_gc_pause_total_seconds` | 增速上升 → GC 压力变大 |
+| `db_open_connections` / `db_in_use_connections` / `db_idle_connections` / `db_max_open_connections` | 池子是否够用 |
+| `db_wait_count_total` / `db_wait_duration_seconds_total` | 增长说明池偏小或被慢查询占满 |
+| `background_loop_last_run_timestamp_seconds{loop=…}` | **某条曲线不再前进 = 那个 loop 卡死了** |
+
+后台 loop 心跳（新增 `common/loop_heartbeat.go`）已接入 **6** 个主要常驻任务：
+`sync_options`、`system_task_runner`、`subscription_quota_reset`、`task_artifact_cleanup`、
+`codex_credential_refresh`、`consume_log_flusher`。
+登记表的键是**编译期常量 + 128 条硬上界**（超出拒绝登记并告警）—— 这张表自己
+绝不能成为新的无界增长点，上界是被强制的而非靠约定。
+
+## 二、G10 §12.2.1 —— 修掉 4 处已确认的无界点
+
+| 位置 | 问题 | 修复 |
+|---|---|---|
+| `service/web_protection_tracker.go` `banCache` | 键 = **客户端 IP**（外部输入驱动），**只读侧判 TTL、从不删除** | 过期**就地删除** + `webProtectionBanCacheMaxEntries = 8192` 硬上界（达界后不缓存新条目，只损失命中率） |
+| `service/url_guard.go` `ssrfCache` | 键 = 上游 host，过期不删 | 过期**就地删除** + `ssrfCacheMaxEntries = 4096` 硬上界 |
+| `service/tokenizer.go` `tokenEncoderMap` | 键 = **请求里的模型名**（子串匹配，任意含 "gpt" 的名字都会进表）；原注释「won't grow after initialization」**不成立** | `tokenEncoderMaxEntries = 512` 上界；达界后不缓存（codec 是共享词表对象，不缓存只是多一次查找） |
+| `middleware/token-rate-limit.go` `tokenQBSBuckets` | token 删除后条目**永远残留**（只加不减） | 空闲 > 10min 的桶在写入路径分批淘汰（每 1024 次写入扫一次）；**因桶空闲足够久必已回填满，淘汰不改变限流语义** |
+
+**未处理（诚实披露）**：3 处按正则串索引的 `sync.Map`（`channel_affinity` / `openai_chat_responses_mode` /
+`relay/channel/api_request.go`）仍无配置变更失效钩子；`channelHealthTable` / `circuitTable`
+在渠道删除后仍残留（键有界 = 渠道数，无界风险低但会残留）。二者均只随**配置变更**增长，
+不随流量增长，风险等级低于上面 4 处。
+
+## 三、G3 §5.2.2 —— 工具抽屉改为请求级 opt-in
+
+- 新增请求头 `X-NewAPI-Tool-Drawer: off|dedupe|meta`，**优先级：请求头 > 全局开关**。
+- `off` 能覆盖**已开启**的全局开关 → 依赖完整 schema 的保守客户端不再被全局开关伤害
+  （这正是原注释自认的风险）。
+- `meta` **本版未实现**：它需要宿主侧拦截「模型回调元函数要 schema」那一轮，是独立的一整块能力。
+  声明 `meta` 时**安全降级到等价去重**（语义相同、只是省得更少）并记一次日志 —— 不静默假装做了。
+- 新增收益度量 `tool_drawer_deduped_requests_total` / `tool_drawer_saved_bytes_total`，
+  并**兑现**在「实验功能」页与 /metrics（只在真的移除了内容时才计数）。
+
+## 四、验收证据
+
+```
+go build ./... / go vet（common model service middleware controller）  → 干净
+common:    TestLoopHeartbeat*                     6 用例 PASS（含 16 goroutine 并发）
+service:   TestSSRFCache* / TestResolveToolDrawerMode* / TestDedupToolDefs* / TestToolDrawerSavings*  PASS
+middleware: TestTokenQBS*                         3 用例 PASS
+controller: 反伪闭环守卫 TestFeatureSwitchDeclaredMetricsAreActuallyProduced PASS
+真实 E2E（mock 上游，零付费调用）                  → 28/28 PASS
+  · 不带请求头 → 上游收到 **3** 个工具（原样透传）
+  · 带 dedupe   → 上游收到 **2** 个工具，且被移除的正是重复的 weather
+  · 全局开关**开着**时带 off → 上游仍收到 **3** 个（请求头确实能覆盖全局）
+  · /metrics 输出 process_* / db_* / 5 个 loop 心跳 / 工具抽屉收益（saved_bytes=296，非死指标）
+```
+
+**E2E 纠正的两处"我的断言写错"**（不是产品 bug）：指标真名是 `process_memory_heap_objects`；
+`task_artifact_cleanup` 的心跳在默认配置下**本就应当缺席**（图床模式为 `upstream` 时该 loop 不启动）
+—— 现已把这两条写进断言，使"缺席"也成为被验证的行为。

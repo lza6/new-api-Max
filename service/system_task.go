@@ -150,6 +150,8 @@ func StartSystemTaskRunner() {
 				runSystemTaskScheduler()
 			}
 			runSystemTaskClaimPass(runnerID)
+			// G10 §12.2.2：一轮 pass 结束打时间戳，/metrics 可见调度器是否卡死。
+			common.RecordLoopHeartbeat("system_task_runner")
 		}
 
 		runPass()
