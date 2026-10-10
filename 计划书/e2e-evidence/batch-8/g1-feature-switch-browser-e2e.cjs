@@ -15,8 +15,10 @@ const { chromium } = require(path.join(WEB, 'node_modules', 'playwright'))
 
 const BASE = process.argv[2] || 'http://127.0.0.1:3099'
 const OUT = __dirname
-const USER = 'e2eadmin' // ≤12 字符：/api/setup 的用户名校验上限
-const PASS = 'B8e2e!Passw0rd'
+// 生产验收：用环境变量覆盖账号并跳过 /api/setup（生产实例早已初始化）。
+const USER = process.env.E2E_USER || 'e2eadmin' // ≤12 字符：/api/setup 的用户名校验上限
+const PASS = process.env.E2E_PASS || 'B8e2e!Passw0rd'
+const IS_PROD = process.env.E2E_PROD === '1'
 
 const results = []
 function check(name, ok, detail) {
@@ -39,24 +41,37 @@ async function apiJson(url, options) {
 ;(async () => {
   // 1) 初始化实例：POST /api/setup 建 root 账号并把 constant.Setup 置真。
   //    若实例已初始化（返回 false + "系统已经初始化完成"），视为通过 —— 重复跑用例时不阻塞。
-  const setup = await apiJson(`${BASE}/api/setup`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username: USER,
-      password: PASS,
-      confirmPassword: PASS,
-    }),
-  })
-  const setupOk =
-    setup.status === 200 &&
-    (setup.json?.success === true ||
-      (setup.json?.message || '').includes('已经初始化完成'))
-  check('instance initialized (POST /api/setup)', setupOk,
-    `status=${setup.status} body=${setup.text.slice(0, 140)}`)
+  //    生产验收（E2E_PROD=1）跳过这一步：生产实例早已初始化，不该打这个接口。
+  if (IS_PROD) {
+    check('production mode: /api/setup skipped', true, 'E2E_PROD=1')
+  } else {
+    const setup = await apiJson(`${BASE}/api/setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username: USER,
+        password: PASS,
+        confirmPassword: PASS,
+      }),
+    })
+    const setupOk =
+      setup.status === 200 &&
+      (setup.json?.success === true ||
+        (setup.json?.message || '').includes('已经初始化完成'))
+    check('instance initialized (POST /api/setup)', setupOk,
+      `status=${setup.status} body=${setup.text.slice(0, 140)}`)
+  }
 
   const browser = await chromium.launch({
-    args: ['--no-proxy-server', '--proxy-bypass-list=*'],
+    args: [
+      '--no-proxy-server',
+      '--proxy-bypass-list=*',
+      // 生产验收走 HTTPS 隧道：把真实域名解析到本地隧道端口，保持 SNI/Host 正确
+      // （生产 SESSION_COOKIE_SECURE=true，HTTP 下 Cookie 不会发送）。
+      ...(process.env.E2E_HOST_MAP
+        ? [`--host-resolver-rules=MAP ${process.env.E2E_HOST_MAP} 127.0.0.1`]
+        : []),
+    ],
     proxy: { server: 'direct://' },
   })
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 1100 } })
@@ -64,28 +79,40 @@ async function apiJson(url, options) {
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)))
 
-  // 2) 在**浏览器上下文内**登录（这样会话 Cookie 才落在浏览器里）。
-  await page.goto(`${BASE}/login`, { waitUntil: 'domcontentloaded', timeout: 60000 })
-  const login = await page.evaluate(
-    async (creds) => {
-      const r = await fetch('/api/user/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(creds),
-      })
-      const text = await r.text()
-      let json = null
-      try {
-        json = JSON.parse(text)
-      } catch {
-        json = null
-      }
-      return { status: r.status, json, text }
-    },
-    { username: USER, password: PASS }
-  )
-  check('login', login.status === 200 && login.json && login.json.success === true,
-    `status=${login.status} msg=${login.json && login.json.message}`)
+  // 2) 登录。
+  //    - 本地：走 API 直登（快，且本地无 SPA 会话引导差异）。
+  //    - 生产（E2E_PROD=1）：必须走**真实 UI 登录** —— API 直登绕过了 SPA 自己建立
+  //      内存态 access token + 刷新引导的流程，整页导航后 bootstrap 拿不到会话会跳 /sign-in。
+  await page.goto(`${BASE}/sign-in`, { waitUntil: 'domcontentloaded', timeout: 60000 })
+  if (IS_PROD) {
+    await page.waitForSelector('input[name="username"]', { timeout: 30000 })
+    await page.fill('input[name="username"]', USER)
+    await page.fill('input[name="password"]', PASS)
+    await page.click('button[type="submit"]')
+    await page.waitForTimeout(8000)
+    check('login (UI form)', !page.url().includes('/sign-in'), page.url())
+  } else {
+    const login = await page.evaluate(
+      async (creds) => {
+        const r = await fetch('/api/user/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(creds),
+        })
+        const text = await r.text()
+        let json = null
+        try {
+          json = JSON.parse(text)
+        } catch {
+          json = null
+        }
+        return { status: r.status, json, text }
+      },
+      { username: USER, password: PASS }
+    )
+    check('login', login.status === 200 && login.json && login.json.success === true,
+      `status=${login.status} msg=${login.json && login.json.message}`)
+  }
 
   // 3) 直接进新管理页
   await page.goto(`${BASE}/system-settings/feature-switches/switches`, {

@@ -157,6 +157,22 @@ reset   → configured=false
 
 > 为什么必须单独做：浏览器刷新只证明**内存态**还在（服务进程没重启）。
 
+### 2.7 生产部署与生产验收（**已上线**）
+
+- 蓝绿零停机上线 `v1.3.124`（`[deploy] 完成：new-api:v1.3.124 在端口 3000`）；
+  容器 healthy、`healthz/readyz=200`、Caddy 上游已切 3000、
+  经公网域名 + 真实 TLS 访问 **200** 且版本头 `v1.3.124`、新接口无凭据 **401**。
+- **生产真实浏览器验收 20/20 PASS**（`e2e-evidence/batch-8/prod-*.png`、`prod-RESULTS.md`、
+  `prod-acceptance.md`）。最有分量的一条：开关打开期间，**线上真实流量让
+  `relay_audit_findings_total` 从 4 → 11** —— 证明开关在生产链路里真的生效，不是 UI 假象。
+- 验收结束已通过 UI「重置为默认」把开关复位，**生产行为与部署前一致**。
+- **压测**（经生产实例）：新增接口 `/api/option/feature-switches` 并发 30×5 **150/150 全 200，
+  p95 293ms**；并发 60×4 **0 个 5xx**。压测后容器 **mem 126.1 MiB / 900 MiB、restarts 0**。
+  `/v1/pricing` 的 429 是既有限流器（60/min/IP）在单 IP 高频下的正常工作。
+- 发布：tag `v1.3.124` + GitHub Release
+  <https://github.com/lza6/new-api-Max/releases/tag/v1.3.124>（`gh release create` 缺
+  `workflow` scope，改用 `gh api … /releases` 创建成功）。
+
 ---
 
 ## 3. Batch-9 / G2 — 实际改动与结论
