@@ -34,20 +34,19 @@ var relayAuditCounters = struct {
 	m map[string]int64
 }{m: make(map[string]int64)}
 
-// relayAuditEnabled 开关：RELAY_AUDIT_ENABLED=true 开启。默认关（零行为变化）。
-var relayAuditEnabled = common.GetEnvOrDefaultBool("RELAY_AUDIT_ENABLED", false)
+// RelayAuditEnabled 开关：RELAY_AUDIT_ENABLED=true 开启。默认关（零行为变化）。
+// 值来源：管理端「实验功能」页持久化配置 > env RELAY_AUDIT_ENABLED（默认 false）。
+var relayAuditEnvDefault = common.GetEnvOrDefaultBool(common.FlagRelayAuditEnabled, false)
 
 // SetRelayAuditEnabled 测试用覆盖；nil 恢复 env 默认。
 func SetRelayAuditEnabled(v *bool) {
-	if v == nil {
-		relayAuditEnabled = common.GetEnvOrDefaultBool("RELAY_AUDIT_ENABLED", false)
-		return
-	}
-	relayAuditEnabled = *v
+	common.SetFeatureFlagOverride(common.FlagRelayAuditEnabled, common.BoolFeatureFlagOverride(v))
 }
 
 // RelayAuditEnabled 报告中继自检开关状态。
-func RelayAuditEnabled() bool { return relayAuditEnabled }
+func RelayAuditEnabled() bool {
+	return common.FeatureFlagValue(common.FlagRelayAuditEnabled, relayAuditEnvDefault)
+}
 
 var relayAuditTotal atomic.Int64
 

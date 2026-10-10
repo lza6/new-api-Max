@@ -226,8 +226,12 @@ type catalogSyncHandler struct{}
 
 func (catalogSyncHandler) Type() string { return model.SystemTaskTypeCatalogSync }
 
+// catalogSyncEnvDefault 目录同步的 env 默认值（CATALOG_SYNC_TASK_ENABLED，默认关）。
+// 值来源：管理端「实验功能」页持久化配置 > env。管理端改动**下一次调度判定即生效**。
+var catalogSyncEnvDefault = common.GetEnvOrDefaultBool(common.FlagCatalogSyncTaskEnabled, false)
+
 func (catalogSyncHandler) Enabled() bool {
-	return common.GetEnvOrDefaultBool("CATALOG_SYNC_TASK_ENABLED", false)
+	return common.FeatureFlagValue(common.FlagCatalogSyncTaskEnabled, catalogSyncEnvDefault)
 }
 
 func (catalogSyncHandler) Interval() time.Duration {

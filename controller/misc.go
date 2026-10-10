@@ -98,7 +98,7 @@ func GetStatus(c *gin.Context) {
 		"password_register_enabled":     common.PasswordRegisterEnabled,
 		"default_use_auto_group":        setting.DefaultUseAutoGroup,
 
-		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabled,
+		"password_login_encryption_enabled": common.PasswordLoginEncryptionEnabledValue(),
 
 		// T8 记忆注入是否在本部署开启（前端据此决定是否显示「我的记忆」配置项；
 		// 未开启时保存无效，不应给用户一个看起来能用的开关）。

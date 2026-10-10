@@ -51,8 +51,10 @@ func SetUpLogger(server *gin.Engine) {
 		}
 
 		// §4.1.4 指标：请求量 + 延迟直方图（Prometheus 文本，/metrics 输出）。
+		// method 必须归一化：它直接来自请求行，任意 token 都能成为标签值，
+		// 不归一化会让 http_requests_total 的时间序列无界增长。
 		common.MetricsInc("http_requests_total", map[string]string{
-			"method": param.Method,
+			"method": common.NormalizeHTTPMethodLabel(param.Method),
 			"status": strconv.Itoa(param.StatusCode),
 			"route":  tag,
 		}, 1)

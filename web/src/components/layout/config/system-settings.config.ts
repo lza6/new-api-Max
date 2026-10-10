@@ -20,6 +20,7 @@ import type { TFunction } from 'i18next'
 import {
   Box,
   CreditCard,
+  FlaskConical,
   Layout,
   Settings,
   Shield,
@@ -30,6 +31,7 @@ import {
 import { getAuthSectionNavItems } from '@/features/system-settings/auth/section-registry.tsx'
 import { getBillingSectionNavItems } from '@/features/system-settings/billing/section-registry.tsx'
 import { getContentSectionNavItems } from '@/features/system-settings/content/section-registry.tsx'
+import { getFeatureSwitchSectionNavItems } from '@/features/system-settings/feature-switches/section-registry.tsx'
 import { getModelsSectionNavItems } from '@/features/system-settings/models/section-registry.tsx'
 import { getOperationsSectionNavItems } from '@/features/system-settings/operations/section-registry.tsx'
 import { getSecuritySectionNavItems } from '@/features/system-settings/security/section-registry.tsx'
@@ -84,6 +86,11 @@ function getSystemSettingsNavGroups(t: TFunction): NavGroup[] {
           title: t('Operations'),
           icon: Wrench,
           items: getOperationsSectionNavItems(t),
+        },
+        {
+          title: t('Feature Switches'),
+          icon: FlaskConical,
+          items: getFeatureSwitchSectionNavItems(t),
         },
       ],
     },

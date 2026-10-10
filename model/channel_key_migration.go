@@ -19,7 +19,7 @@ import (
 //
 // 通过读取原始 key 列 + 显式加密回写完成迁移（不触发 GORM 钩子，避免二次加密）。
 func migrateChannelKeyEncryption() error {
-	if !common.ChannelKeyEncryptionEnabled {
+	if !common.ChannelKeyEncryptionEnabledValue() {
 		return nil
 	}
 	// 逐行读**原始 key 列**（Model+Select+Scan 不触发 AfterFind 解密），
@@ -79,7 +79,7 @@ func AssertChannelKeyEncryptionState() {
 	if encryptedCount == 0 {
 		return
 	}
-	if !common.ChannelKeyEncryptionEnabled {
+	if !common.ChannelKeyEncryptionEnabledValue() {
 		common.SysError("channel key state mismatch: " +
 			strconv.FormatInt(encryptedCount, 10) +
 			" encrypted channel keys found in DB but CHANNEL_KEY_ENCRYPTION is disabled; " +

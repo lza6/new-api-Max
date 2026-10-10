@@ -1,6 +1,7 @@
 package common
 
 import (
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -106,4 +107,40 @@ func TestMetricsGaugeProviderInvoked(t *testing.T) {
 	out := RenderPrometheusMetrics()
 	assert.Equal(t, 1, called)
 	assert.Contains(t, out, "channel_circuit_state{channel_id=3} 2")
+}
+
+// Batch-9 / G10：标签空间必须有硬上界，且 HTTP 方法必须归一化为有限集合。
+// 这两条一起构成「外部输入不能把计数器 map 撑爆」的防线。
+func TestNormalizeHTTPMethodLabel(t *testing.T) {
+	cases := map[string]string{
+		"GET":         "GET",
+		"post":        "POST",
+		"  Put ":      "PUT",
+		"PATCH":       "PATCH",
+		"DELETE":      "DELETE",
+		"HEAD":        "HEAD",
+		"OPTIONS":     "OPTIONS",
+		"":            "OTHER",
+		"FOOBAR123":   "OTHER",
+		"get<script>": "OTHER",
+	}
+	for in, want := range cases {
+		assert.Equal(t, want, NormalizeHTTPMethodLabel(in), "input=%q", in)
+	}
+}
+
+func TestMetricsIncCapsSeriesCount(t *testing.T) {
+	const name = "test_series_cap_total"
+	// 灌入远超上限的「外部驱动」标签值，模拟攻击者用任意 HTTP method 撑爆计数器。
+	for i := range maxMetricLabelSeries * 3 {
+		MetricsInc(name, map[string]string{"method": "M" + strconv.Itoa(i)}, 1)
+	}
+
+	metricsState.Lock()
+	series := len(metricsState.counters[name])
+	overflow := metricsState.counters[name+metricSeriesOverflowSuffix][""]
+	metricsState.Unlock()
+
+	assert.LessOrEqual(t, series, maxMetricLabelSeries, "单个指标的序列数必须有硬上界")
+	assert.Positive(t, overflow, "被丢弃的样本必须计入溢出计数器（保持可见，不静默丢数据）")
 }

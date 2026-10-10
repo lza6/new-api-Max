@@ -362,7 +362,7 @@ func InitResources() error {
 		common.FatalLog("failed to initialize authorization: " + err.Error())
 		return err
 	}
-	if common.PasswordLoginEncryptionEnabled {
+	if common.PasswordLoginEncryptionEnabledValue() {
 		if err = model.InitPasswordEncryption(); err != nil {
 			common.FatalLog("failed to initialize password encryption: " + err.Error())
 			return err

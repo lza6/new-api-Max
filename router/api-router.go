@@ -228,6 +228,10 @@ func SetApiRouter(router *gin.Engine) {
 			optionRoute.POST("/payment_compliance", controller.ConfirmPaymentCompliance)
 			optionRoute.GET("/channel_affinity_cache", controller.GetChannelAffinityCacheStats)
 			optionRoute.DELETE("/channel_affinity_cache", controller.ClearChannelAffinityCache)
+			// Batch-8 / G1：能力开关注册表（读 + 单开关热更新）。改的是全局能力，
+			// 已由本组统一的 middleware.RootAuth() 保护。
+			optionRoute.GET("/feature-switches", controller.GetFeatureSwitches)
+			optionRoute.PUT("/feature-switches", controller.UpdateFeatureSwitch)
 			optionRoute.POST("/rest_model_ratio", controller.ResetModelRatio)
 			optionRoute.GET("/waffo-pancake/catalog", controller.ListWaffoPancakeCatalog)
 			optionRoute.POST("/waffo-pancake/pair", controller.CreateWaffoPancakePair)

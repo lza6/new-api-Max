@@ -157,7 +157,8 @@ func ChannelHealthRoutingEnabled() bool {
 
 // T6 健康加权负载均衡开关：CHANNEL_HEALTH_WEIGHTED_LB=on|true 开启。默认关。
 // 开启后渠道选择按「基础权重 × 健康系数」加权，健康渠道更常被选中。
-var channelHealthWeightedLBEnabled = common.GetEnvOrDefaultBool("CHANNEL_HEALTH_WEIGHTED_LB", false)
+// 值来源：管理端「实验功能」页持久化配置 > env CHANNEL_HEALTH_WEIGHTED_LB。
+var channelHealthWeightedLBEnvDefault = common.GetEnvOrDefaultBool(common.FlagChannelHealthWeightedLB, false)
 
 // channelHealthMinWeightFactor 健康分为 0 的渠道保留的最小权重比例（避免饿死，
 // 保留探测恢复机会）。env CHANNEL_HEALTH_MIN_WEIGHT_FACTOR，默认 0.05。
@@ -171,12 +172,10 @@ var channelHealthMinWeightFactor = func() float64 {
 
 // SetChannelHealthWeightedLBEnabled 测试用覆盖；nil 恢复 env 默认。
 func SetChannelHealthWeightedLBEnabled(v *bool) {
-	if v == nil {
-		channelHealthWeightedLBEnabled = common.GetEnvOrDefaultBool("CHANNEL_HEALTH_WEIGHTED_LB", false)
-		return
-	}
-	channelHealthWeightedLBEnabled = *v
+	common.SetFeatureFlagOverride(common.FlagChannelHealthWeightedLB, common.BoolFeatureFlagOverride(v))
 }
 
 // ChannelHealthWeightedLBEnabled 报告健康加权 LB 开关状态。
-func ChannelHealthWeightedLBEnabled() bool { return channelHealthWeightedLBEnabled }
+func ChannelHealthWeightedLBEnabled() bool {
+	return common.FeatureFlagValue(common.FlagChannelHealthWeightedLB, channelHealthWeightedLBEnvDefault)
+}

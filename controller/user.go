@@ -36,7 +36,7 @@ type LoginRequest struct {
 }
 
 func GetPasswordEncryptionKey(c *gin.Context) {
-	if !common.PasswordLoginEncryptionEnabled {
+	if !common.PasswordLoginEncryptionEnabledValue() {
 		common.ApiSuccess(c, gin.H{"enabled": false})
 		return
 	}
@@ -66,7 +66,7 @@ func Login(c *gin.Context) {
 	}
 	username := loginRequest.Username
 	password := loginRequest.Password
-	if common.PasswordLoginEncryptionEnabled {
+	if common.PasswordLoginEncryptionEnabledValue() {
 		if loginRequest.PasswordEncrypted == "" || loginRequest.EncryptionKeyID == "" {
 			recordLoginFailureAudit(c, username, nil, "invalid_params", http.StatusBadRequest)
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)

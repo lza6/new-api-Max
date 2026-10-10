@@ -22,20 +22,19 @@ import (
 // 本模块**只做分析与变换**，不解析/改写完整 JSON 结构；调用方在既有 DTO 上
 // 应用结果。默认全关（TOOL_DRAWER_ENABLED=false），零行为变化。
 
-// toolDrawerEnabled 全局开关：TOOL_DRAWER_ENABLED=on|true。默认关。
-var toolDrawerEnabled = common.GetEnvOrDefaultBool("TOOL_DRAWER_ENABLED", false)
+// ToolDrawerEnabled 全局开关：TOOL_DRAWER_ENABLED=on|true。默认关。
+// 值来源：管理端「实验功能」页持久化配置 > env TOOL_DRAWER_ENABLED（默认 false）。
+var toolDrawerEnvDefault = common.GetEnvOrDefaultBool(common.FlagToolDrawerEnabled, false)
 
 // SetToolDrawerEnabled 测试用覆盖；nil 恢复 env 默认。
 func SetToolDrawerEnabled(v *bool) {
-	if v == nil {
-		toolDrawerEnabled = common.GetEnvOrDefaultBool("TOOL_DRAWER_ENABLED", false)
-		return
-	}
-	toolDrawerEnabled = *v
+	common.SetFeatureFlagOverride(common.FlagToolDrawerEnabled, common.BoolFeatureFlagOverride(v))
 }
 
 // ToolDrawerEnabled 报告工具抽屉开关状态。
-func ToolDrawerEnabled() bool { return toolDrawerEnabled }
+func ToolDrawerEnabled() bool {
+	return common.FeatureFlagValue(common.FlagToolDrawerEnabled, toolDrawerEnvDefault)
+}
 
 // ToolDef 工具定义的抽象视图（供分析与去重）。
 type ToolDef struct {

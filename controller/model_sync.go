@@ -83,6 +83,13 @@ var (
 	cacheMutex sync.RWMutex
 )
 
+// syncHTTPTotalTimeout 是模型目录同步的**整体**请求上限（连接 + 等响应头 + 读完 body）。
+//
+// 为什么必须有：下面的 Dialer/TLSHandshake/ResponseHeader 三个超时都**不覆盖读完 body**
+// —— 上游持续以极慢速率吐字节时，请求会永久挂住（goroutine 与连接一起泄漏）。
+// 120s 足以覆盖最大的 /models 列表（含重定向与慢链路）。
+const syncHTTPTotalTimeout = 120 * time.Second
+
 func newHTTPClient() *http.Client {
 	timeoutSec := common.GetEnvOrDefault("SYNC_HTTP_TIMEOUT_SECONDS", 10)
 	dialer := &net.Dialer{Timeout: time.Duration(timeoutSec) * time.Second}
@@ -109,7 +116,9 @@ func newHTTPClient() *http.Client {
 		}
 		return dialer.DialContext(ctx, network, addr)
 	}
-	return &http.Client{Transport: transport}
+	// 自定义 Transport 是**有意保留**的（github.io 需要 IPv4 优先，见上面的 DialContext），
+	// 因此这里只补 client 级整体 Timeout，不改成共享池。
+	return &http.Client{Transport: transport, Timeout: syncHTTPTotalTimeout}
 }
 
 var (

@@ -23,14 +23,21 @@ import (
 //   - **不可绕过分组计费**：覆盖发生在选择渠道之前，后续计费/倍率仍按最终分组的既有逻辑走。
 //
 // 配置（env，逗号分隔 `tag:group`）：`DOMAIN_ROUTE_MAP=medical:medical-group,legal:legal-group`
+//
+// 开关值走能力开关注册表：值来源为「管理端『实验功能』页持久化配置 > env
+// DOMAIN_ROUTE_ENABLED（默认 false）」。标签映射表仍是 env（属配置数据而非能力灰度）。
 var (
-	domainRouteOnce    sync.Once
-	domainRouteEnabled bool
-	domainRouteMap     map[string]string
+	domainRouteOnce       sync.Once
+	domainRouteMap        map[string]string
+	domainRouteEnvDefault = common.GetEnvOrDefaultBool(common.FlagDomainRouteEnabled, false)
 )
 
+// domainRouteEnabledValue 报告领域路由开关当前值（管理端可热更新）。
+func domainRouteEnabledValue() bool {
+	return common.FeatureFlagValue(common.FlagDomainRouteEnabled, domainRouteEnvDefault)
+}
+
 func loadDomainRouteConfig() {
-	domainRouteEnabled = common.GetEnvOrDefaultBool("DOMAIN_ROUTE_ENABLED", false)
 	raw := strings.TrimSpace(common.GetEnvOrDefaultString("DOMAIN_ROUTE_MAP", ""))
 	domainRouteMap = map[string]string{}
 	if raw == "" {
@@ -58,7 +65,7 @@ func ResolveDomainRoute(c *gin.Context, userGroup string) (string, bool) {
 		return "", false
 	}
 	domainRouteOnce.Do(loadDomainRouteConfig)
-	if !domainRouteEnabled || len(domainRouteMap) == 0 {
+	if !domainRouteEnabledValue() || len(domainRouteMap) == 0 {
 		return "", false
 	}
 	tag := strings.ToLower(strings.TrimSpace(c.Request.Header.Get("X-Route-Tag")))
@@ -80,7 +87,7 @@ func ResolveDomainRoute(c *gin.Context, userGroup string) (string, bool) {
 // 避免随后 ResolveDomainRoute 触发 loadDomainRouteConfig 把测试值覆盖回 env 默认。
 func SetDomainRouteForTest(enabled bool, mapping map[string]string) {
 	domainRouteOnce.Do(func() {})
-	domainRouteEnabled = enabled
+	common.SetFeatureFlagOverride(common.FlagDomainRouteEnabled, common.BoolFeatureFlagOverride(&enabled))
 	if mapping == nil {
 		domainRouteMap = map[string]string{}
 		return
@@ -91,6 +98,6 @@ func SetDomainRouteForTest(enabled bool, mapping map[string]string) {
 // resetDomainRouteForTest 恢复为「已加载、禁用」状态。
 func resetDomainRouteForTest() {
 	domainRouteOnce.Do(func() {})
-	domainRouteEnabled = false
+	common.SetFeatureFlagOverride(common.FlagDomainRouteEnabled, nil)
 	domainRouteMap = map[string]string{}
 }

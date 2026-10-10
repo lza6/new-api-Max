@@ -87,7 +87,7 @@ func getImageToken(c *gin.Context, fileMeta *types.FileMeta, model string, strea
 		return 3 * baseTokens, nil
 	}
 
-	if !constant.GetMediaTokenNotStream && !stream {
+	if !common.MediaTokenNotStreamValue() && !stream {
 		return 3 * baseTokens, nil
 	}
 	// Normalize detail
@@ -259,7 +259,7 @@ func CountRequestToken(c *gin.Context, meta *types.TokenCountMeta, info *relayco
 	}
 
 	// 是否在非流模式下本地计算媒体token数量
-	if !constant.GetMediaTokenNotStream && !info.IsStream {
+	if !common.MediaTokenNotStreamValue() && !info.IsStream {
 		shouldFetchFiles = false
 	}
 

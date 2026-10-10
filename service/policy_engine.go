@@ -77,8 +77,9 @@ type PolicyDecision struct {
 	Enforced bool         `json:"enforced"` // 是否真的拦截（enforce 模式且 block）
 }
 
-// policyMode 全局模式（env POLICY_ENGINE_MODE）。
-var policyMode = parsePolicyMode(common.GetEnvOrDefaultString("POLICY_ENGINE_MODE", "off"))
+// policyModeEnvDefault 策略模式 env 默认值（POLICY_ENGINE_MODE=off|shadow|enforce）。
+// 值来源：管理端「实验功能」页持久化配置 > env POLICY_ENGINE_MODE（默认 "off"）。
+var policyModeEnvDefault = common.GetEnvOrDefaultString(common.FlagPolicyEngineMode, "off")
 
 func parsePolicyMode(s string) PolicyMode {
 	switch strings.ToLower(strings.TrimSpace(s)) {
@@ -94,17 +95,20 @@ func parsePolicyMode(s string) PolicyMode {
 // SetPolicyMode 测试用覆盖；nil 恢复 env 默认。
 func SetPolicyMode(m *PolicyMode) {
 	if m == nil {
-		policyMode = parsePolicyMode(common.GetEnvOrDefaultString("POLICY_ENGINE_MODE", "off"))
+		common.SetFeatureFlagOverride(common.FlagPolicyEngineMode, nil)
 		return
 	}
-	policyMode = *m
+	raw := string(*m)
+	common.SetFeatureFlagOverride(common.FlagPolicyEngineMode, &raw)
 }
 
 // PolicyModeValue 返回当前策略模式。
-func PolicyModeValue() PolicyMode { return policyMode }
+func PolicyModeValue() PolicyMode {
+	return parsePolicyMode(common.FeatureFlagString(common.FlagPolicyEngineMode, policyModeEnvDefault))
+}
 
 // PolicyEngineEnabled 报告策略引擎是否启用（非 off）。
-func PolicyEngineEnabled() bool { return policyMode != PolicyModeOff }
+func PolicyEngineEnabled() bool { return PolicyModeValue() != PolicyModeOff }
 
 // policyCounters 策略命中计数（进程内观测）。
 var policyCounters = struct {
@@ -147,7 +151,7 @@ func Evaluate(in PolicyInput) PolicyDecision {
 
 	// 按「护栏 → 预算 → 限流」顺序评估，命中 block 立即返回（短路）。
 	if d := evalGuardrail(in); d.Action != PolicyAllow {
-		d.Enforced = policyMode == PolicyModeEnforce && d.Action == PolicyBlock
+		d.Enforced = PolicyModeValue() == PolicyModeEnforce && d.Action == PolicyBlock
 		recordPolicyHit(d.Kind, d.Action)
 		if d.Action == PolicyBlock {
 			return d
@@ -155,7 +159,7 @@ func Evaluate(in PolicyInput) PolicyDecision {
 		decision = d
 	}
 	if d := evalBudget(in); d.Action != PolicyAllow {
-		d.Enforced = policyMode == PolicyModeEnforce && d.Action == PolicyBlock
+		d.Enforced = PolicyModeValue() == PolicyModeEnforce && d.Action == PolicyBlock
 		recordPolicyHit(d.Kind, d.Action)
 		if d.Action == PolicyBlock {
 			return d
@@ -165,7 +169,7 @@ func Evaluate(in PolicyInput) PolicyDecision {
 		}
 	}
 	if d := evalRate(in); d.Action != PolicyAllow {
-		d.Enforced = policyMode == PolicyModeEnforce && d.Action == PolicyBlock
+		d.Enforced = PolicyModeValue() == PolicyModeEnforce && d.Action == PolicyBlock
 		recordPolicyHit(d.Kind, d.Action)
 		if d.Action == PolicyBlock {
 			return d

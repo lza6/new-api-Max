@@ -288,7 +288,7 @@ func GetVerificationRequirements(identity AuthIdentity, scope string) (*Verifica
 	if err != nil {
 		return nil, err
 	}
-	requirements := &VerificationRequirements{Scope: scope, Methods: methods, OAuthProviders: []VerificationOAuthProvider{}, PasswordEncryptionEnabled: common.PasswordLoginEncryptionEnabled}
+	requirements := &VerificationRequirements{Scope: scope, Methods: methods, OAuthProviders: []VerificationOAuthProvider{}, PasswordEncryptionEnabled: common.PasswordLoginEncryptionEnabledValue()}
 	for i := range methods {
 		if methods[i].Method == VerificationMethodPassword && !common.PasswordLoginEnabled {
 			switch scope {
@@ -472,7 +472,7 @@ func VerifySecurityInput(identity AuthIdentity, input VerificationInput) (*Secur
 	switch input.Method {
 	case VerificationMethodPassword:
 		password := input.Password
-		if common.PasswordLoginEncryptionEnabled {
+		if common.PasswordLoginEncryptionEnabledValue() {
 			var err error
 			password, err = common.DecryptPassword(input.PasswordEncrypted, input.EncryptionKeyID)
 			if err != nil {

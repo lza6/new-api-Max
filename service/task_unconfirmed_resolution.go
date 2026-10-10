@@ -3,9 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
-	"io"
 	"time"
 
+	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/model"
@@ -110,8 +110,10 @@ func resolveWithUpstreamID(ctx context.Context, adaptor TaskPollingAdaptor, task
 		// 查询端点明确拒绝(4xx)/服务端故障(5xx): 本次不推进, 保持 unconfirmed。
 		return ""
 	}
-	body, err := io.ReadAll(resp.Body)
+	body, err := common.ReadAllLimited(resp.Body, common.MaxUpstreamTaskResponseBytes)
 	if err != nil {
+		// 超限/读失败都属「本次无法判定」→ 保持 unconfirmed，但必须留痕（不得静默）。
+		common.SysError("unconfirmed task query read failed: " + err.Error())
 		return ""
 	}
 	taskResult, err := adaptor.ParseTaskResult(task, resp, body)

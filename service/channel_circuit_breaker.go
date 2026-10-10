@@ -39,10 +39,13 @@ import (
 
 // 熔断参数（可用 env 覆盖）。连续失败 N 次 → Open；Open 时长内不选；
 // 时长到期 → 半开（放行一次探测），探测成功 → Closed，失败 → 重新 Open。
+//
+// 开关本身走能力开关注册表（值来源：管理端「实验功能」页 > env），
+// 阈值/时长仍是 env（属调参而非能力灰度，不纳入注册表）。
 var (
-	circuitBreakerEnabled   = common.GetEnvOrDefaultBool("CHANNEL_CIRCUIT_BREAKER", false)
-	circuitFailureThreshold = common.GetEnvOrDefault("CHANNEL_CIRCUIT_FAILURE_THRESHOLD", 5)
-	circuitOpenDuration     = time.Duration(common.GetEnvOrDefault("CHANNEL_CIRCUIT_OPEN_SECONDS", 120)) * time.Second
+	circuitBreakerEnvDefault = common.GetEnvOrDefaultBool(common.FlagChannelCircuitBreaker, false)
+	circuitFailureThreshold  = common.GetEnvOrDefault("CHANNEL_CIRCUIT_FAILURE_THRESHOLD", 5)
+	circuitOpenDuration      = time.Duration(common.GetEnvOrDefault("CHANNEL_CIRCUIT_OPEN_SECONDS", 120)) * time.Second
 )
 
 // CircuitState 熔断器状态。
@@ -67,20 +70,18 @@ var (
 
 // SetCircuitBreakerEnabled 测试用覆盖；nil 恢复 env 默认。
 func SetCircuitBreakerEnabled(v *bool) {
-	if v == nil {
-		circuitBreakerEnabled = common.GetEnvOrDefaultBool("CHANNEL_CIRCUIT_BREAKER", false)
-		return
-	}
-	circuitBreakerEnabled = *v
+	common.SetFeatureFlagOverride(common.FlagChannelCircuitBreaker, common.BoolFeatureFlagOverride(v))
 }
 
 // CircuitBreakerEnabled 报告熔断器开关状态。
-func CircuitBreakerEnabled() bool { return circuitBreakerEnabled }
+func CircuitBreakerEnabled() bool {
+	return common.FeatureFlagValue(common.FlagChannelCircuitBreaker, circuitBreakerEnvDefault)
+}
 
 // RegisterChannelCircuitSuccess 记录一次渠道成功（探测或正常）：重置连续失败、
 // 关闭熔断。Relay 成功路径调用（fail-open，nil 安全）。
 func RegisterChannelCircuitSuccess(channelId int) {
-	if !circuitBreakerEnabled || channelId <= 0 {
+	if !CircuitBreakerEnabled() || channelId <= 0 {
 		return
 	}
 	circuitMu.Lock()
@@ -98,7 +99,7 @@ func RegisterChannelCircuitSuccess(channelId int) {
 // RegisterChannelCircuitFailure 记录一次「应触发熔断」的渠道失败（鉴权/限流/5xx/
 // 超时类）。连续失败达阈值 → Open。返回是否刚进入 Open（供日志/观测）。
 func RegisterChannelCircuitFailure(channelId int, class RelayErrorClass) bool {
-	if !circuitBreakerEnabled || channelId <= 0 {
+	if !CircuitBreakerEnabled() || channelId <= 0 {
 		return false
 	}
 	// 仅「上游/渠道不可用」类失败累计；参数错误（我方问题）不计。
@@ -145,7 +146,7 @@ func RegisterChannelCircuitFailure(channelId int, class RelayErrorClass) bool {
 // 在此消费探测令牌，否则未最终选中/被过滤的候选会静默烧掉令牌，使渠道在 Open 窗口内
 // 永不恢复。令牌消费在 AcquireCircuitProbe（真正发请求前）完成。
 func ChannelCircuitAllows(channelId int) bool {
-	if !circuitBreakerEnabled || channelId <= 0 {
+	if !CircuitBreakerEnabled() || channelId <= 0 {
 		return true
 	}
 	circuitMu.Lock()
@@ -167,7 +168,7 @@ func ChannelCircuitAllows(channelId int) bool {
 //
 // 关键：与 ChannelCircuitAllows 分离，保证过滤阶段的多次纯判定不消耗令牌。
 func AcquireCircuitProbe(channelId int) bool {
-	if !circuitBreakerEnabled || channelId <= 0 {
+	if !CircuitBreakerEnabled() || channelId <= 0 {
 		return true
 	}
 	circuitMu.Lock()

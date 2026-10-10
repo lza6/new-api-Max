@@ -183,7 +183,7 @@ func (c *ChannelInfo) Scan(value any) error {
 // §B1-2 渠道密钥加密 GORM 钩子（默认关，开启才生效；明文/密文以 enc:v1: 前缀区分）。
 // 写入前加密（幂等），读取后解密（旧明文 fail-open）。
 func (channel *Channel) BeforeSave(_ *gorm.DB) error {
-	if channel == nil || !common.ChannelKeyEncryptionEnabled || channel.Key == "" {
+	if channel == nil || !common.ChannelKeyEncryptionEnabledValue() || channel.Key == "" {
 		return nil
 	}
 	enc, err := common.EncryptChannelKey(channel.Key)
@@ -195,7 +195,7 @@ func (channel *Channel) BeforeSave(_ *gorm.DB) error {
 }
 
 func (channel *Channel) AfterFind(_ *gorm.DB) error {
-	if channel == nil || !common.ChannelKeyEncryptionEnabled || channel.Key == "" {
+	if channel == nil || !common.ChannelKeyEncryptionEnabledValue() || channel.Key == "" {
 		return nil
 	}
 	dec, err := common.DecryptChannelKey(channel.Key)
@@ -449,7 +449,7 @@ func UpdateChannelKeyColumn(channelId int, key string) error {
 		return errors.New("channel ID is 0")
 	}
 	value := key
-	if common.ChannelKeyEncryptionEnabled && value != "" {
+	if common.ChannelKeyEncryptionEnabledValue() && value != "" {
 		enc, err := common.EncryptChannelKey(value)
 		if err != nil {
 			return err

@@ -22,23 +22,22 @@ import (
 //
 // 设计原则：纯函数构建注入片段，调用方决定插入位置；不在此处改 DTO。
 
-// memoryInjectionEnabled 全局开关：MEMORY_INJECTION_ENABLED=on|true。默认关。
-var memoryInjectionEnabled = common.GetEnvOrDefaultBool("MEMORY_INJECTION_ENABLED", false)
+// MemoryInjectionEnabled 全局开关：MEMORY_INJECTION_ENABLED=on|true。默认关。
+// 值来源：管理端「实验功能」页持久化配置 > env MEMORY_INJECTION_ENABLED（默认 false）。
+var memoryInjectionEnvDefault = common.GetEnvOrDefaultBool(common.FlagMemoryInjectionEnabled, false)
 
 // memoryInjectionMaxBytes 注入片段上限（字节），防用户塞超长内容撑爆请求。
 const memoryInjectionMaxBytes = 4096
 
 // SetMemoryInjectionEnabled 测试用覆盖；nil 恢复 env 默认。
 func SetMemoryInjectionEnabled(v *bool) {
-	if v == nil {
-		memoryInjectionEnabled = common.GetEnvOrDefaultBool("MEMORY_INJECTION_ENABLED", false)
-		return
-	}
-	memoryInjectionEnabled = *v
+	common.SetFeatureFlagOverride(common.FlagMemoryInjectionEnabled, common.BoolFeatureFlagOverride(v))
 }
 
 // MemoryInjectionEnabled 报告记忆注入开关状态。
-func MemoryInjectionEnabled() bool { return memoryInjectionEnabled }
+func MemoryInjectionEnabled() bool {
+	return common.FeatureFlagValue(common.FlagMemoryInjectionEnabled, memoryInjectionEnvDefault)
+}
 
 // BuildMemoryInjection 构建要注入的 system 片段（纯函数）。
 //   - userMemory：用户配置的记忆片段（来自 UserSetting；空则不注入）。
@@ -46,7 +45,7 @@ func MemoryInjectionEnabled() bool { return memoryInjectionEnabled }
 //
 // 返回空串表示不注入。调用方据返回非空决定是否插入 system。
 func BuildMemoryInjection(userMemory string) string {
-	if !memoryInjectionEnabled {
+	if !MemoryInjectionEnabled() {
 		return ""
 	}
 	userMemory = strings.TrimSpace(userMemory)
@@ -80,7 +79,7 @@ func MergeMemoryIntoSystem(existingSystem, userMemory string) string {
 // 是同一种东西（用户自定义的 system 片段），没有必要引入第二个开关让运维困惑。
 // 开关关闭时返回空串（零行为变化）。
 func BuildUserContextBlock(memory string, skills []dto.UserSkill) string {
-	if !memoryInjectionEnabled {
+	if !MemoryInjectionEnabled() {
 		return ""
 	}
 	block := BuildMemoryInjection(memory)

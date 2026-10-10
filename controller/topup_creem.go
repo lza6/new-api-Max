@@ -440,8 +440,8 @@ func genCreemLink(ctx context.Context, referenceId string, product *CreemProduct
 	}
 	defer resp.Body.Close()
 
-	// 读取响应
-	body, err := io.ReadAll(resp.Body)
+	// 读取响应（支付网关响应体上限 1 MiB：正常响应只有几百字节，超限说明异常）
+	body, err := common.ReadAllLimited(resp.Body, common.MaxUpstreamErrorResponseBytes)
 	if err != nil {
 		return "", fmt.Errorf("读取响应失败: %v", err)
 	}

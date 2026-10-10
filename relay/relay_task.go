@@ -362,7 +362,9 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		responseBody, _ := io.ReadAll(resp.Body)
+		// 非 2xx 的错误体只用于分类与日志：加上限，超限时按「无 body」继续分类
+		// （下游 ClassifySubmitFailure 支持空 body），不因为读不下而丢弃整个判定。
+		responseBody, _ := common.ReadAllLimited(resp.Body, common.MaxUpstreamErrorResponseBytes)
 		unconfirmedInfo := service.ClassifySubmitFailure(resp.StatusCode, responseBody, nil)
 		// 非 2xx 响应体里若仍带 task_id（远端实际已受理），尽力提取供轮询兜底直查。
 		if unconfirmedInfo.Unconfirmed && unconfirmedInfo.RemoteTaskIDHint == "" {
@@ -547,7 +549,7 @@ func tryRealtimeFetch(task *model.Task, isOpenAIVideoAPI bool) []byte {
 		return nil
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	body, err := common.ReadAllLimited(resp.Body, common.MaxUpstreamTaskResponseBytes)
 	if err != nil {
 		return nil
 	}

@@ -80,19 +80,19 @@ const (
 )
 
 // ComplexityRoutingEnabled 全局开关：COMPLEXITY_ROUTING=on|true 开启。默认关。
-var complexityRoutingEnabled = common.GetEnvOrDefaultBool("COMPLEXITY_ROUTING", false)
+// 值来源：管理端「实验功能」页持久化配置 > env COMPLEXITY_ROUTING（默认 false）。
+// 读侧查 common 的原子快照，不持有可变包级变量 —— 管理端热更新与热路径读取无竞争。
+var complexityRoutingEnvDefault = common.GetEnvOrDefaultBool(common.FlagComplexityRouting, false)
 
 // SetComplexityRoutingEnabled 测试用覆盖；nil 恢复 env 默认。
 func SetComplexityRoutingEnabled(v *bool) {
-	if v == nil {
-		complexityRoutingEnabled = common.GetEnvOrDefaultBool("COMPLEXITY_ROUTING", false)
-		return
-	}
-	complexityRoutingEnabled = *v
+	common.SetFeatureFlagOverride(common.FlagComplexityRouting, common.BoolFeatureFlagOverride(v))
 }
 
 // ComplexityRoutingEnabled 报告复杂度路由开关状态。
-func ComplexityRoutingEnabled() bool { return complexityRoutingEnabled }
+func ComplexityRoutingEnabled() bool {
+	return common.FeatureFlagValue(common.FlagComplexityRouting, complexityRoutingEnvDefault)
+}
 
 // ScoreComplexity 对请求信号打 7 维分并映射 tier（纯函数，无副作用，<1ms）。
 func ScoreComplexity(s ComplexitySignals) ComplexityScore {

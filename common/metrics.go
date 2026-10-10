@@ -48,17 +48,59 @@ func labelKey(labels map[string]string) string {
 	return b.String()
 }
 
+// maxMetricLabelSeries 是**单个**指标名允许的最大时间序列（标签组合）数。
+// 超出后新组合不再新建序列，转而累加 `<name>_label_series_overflow_total`（无标签）。
+//
+// 为什么必须有：只要标签值里有一个来自**外部输入**，攻击者就能用天文数字个不同值把
+// 计数器 map 撑爆 —— 最典型的就是 HTTP method（Gin 会原样接受请求行里的任意 token）。
+// 原实现（只有 `counters[name][labelKey] += delta`）**没有任何淘汰**，属真实的无界
+// 增长点。上限 + 溢出计数是「既不丢可见性、又有硬上界」的折中。
+const maxMetricLabelSeries = 2000
+
+// metricSeriesOverflowSuffix 溢出计数器的名字后缀。
+const metricSeriesOverflowSuffix = "_label_series_overflow_total"
+
+// NormalizeHTTPMethodLabel 把 HTTP 方法归一化到有限集合。
+//
+// 未知/畸形方法一律归入 "OTHER"：既保住「有人在发怪方法」这条可观测性，
+// 又不让标签空间随外部输入无限膨胀。
+func NormalizeHTTPMethodLabel(method string) string {
+	normalized := strings.ToUpper(strings.TrimSpace(method))
+	switch normalized {
+	case "GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS", "CONNECT", "TRACE":
+		return normalized
+	default:
+		return "OTHER"
+	}
+}
+
 // MetricsInc 增加带标签的计数器。
+//
+// 标签组合数受 maxMetricLabelSeries 约束；超限后新组合被计入溢出计数器，
+// 不再新建序列（防止外部输入驱动的无界增长）。
 func MetricsInc(name string, labels map[string]string, delta int64) {
 	if delta == 0 {
 		return
 	}
+	key := labelKey(labels)
 	metricsState.Lock()
 	defer metricsState.Unlock()
-	if metricsState.counters[name] == nil {
-		metricsState.counters[name] = make(map[string]int64)
+	series, ok := metricsState.counters[name]
+	if !ok {
+		series = make(map[string]int64)
+		metricsState.counters[name] = series
 	}
-	metricsState.counters[name][labelKey(labels)] += delta
+	if _, known := series[key]; !known && len(series) >= maxMetricLabelSeries {
+		overflowName := name + metricSeriesOverflowSuffix
+		overflow, ok := metricsState.counters[overflowName]
+		if !ok {
+			overflow = make(map[string]int64)
+			metricsState.counters[overflowName] = overflow
+		}
+		overflow[""] += delta
+		return
+	}
+	series[key] += delta
 }
 
 // MetricsObserve 记录一次耗时观测到直方图（固定桶；le 桶为累计观测数）。

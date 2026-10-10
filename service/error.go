@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -87,7 +86,9 @@ func ClaudeErrorWrapperLocal(err error, code string, statusCode int) *dto.Claude
 func RelayErrorHandler(ctx context.Context, resp *http.Response, showBodyWhenFail bool) (newApiErr *types.NewAPIError) {
 	newApiErr = types.InitOpenAIError(types.ErrorCodeBadResponseStatusCode, resp.StatusCode)
 
-	responseBody, err := io.ReadAll(resp.Body)
+	// 上游错误体只用于日志与透传：必须有上限，否则一次异常响应就能把内存吃穿。
+	// 超限时返回已读到的部分交给上层（错误路径不需要完整 body），但不静默膨胀。
+	responseBody, err := common.ReadAllLimited(resp.Body, common.MaxUpstreamErrorResponseBytes)
 	if err != nil {
 		return
 	}

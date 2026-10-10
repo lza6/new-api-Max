@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
@@ -247,4 +248,18 @@ func TestPricingSyncTaskSkippedWithoutConfig(t *testing.T) {
 	summary := runPricingSyncTaskOnce(context.Background())
 	require.True(t, summary.Skipped)
 	require.Empty(t, summary.Errors)
+}
+
+// Batch-9 / G2：出站同步客户端必须设置**整体** Timeout。
+//
+// Dialer / TLSHandshake / ResponseHeader 三个超时都**不覆盖读完 body**；
+// 缺失 client.Timeout 时，上游持续慢速吐字节会让请求永久挂住（goroutine + 连接泄漏）。
+func TestOutboundSyncClientsHaveTotalTimeout(t *testing.T) {
+	modelSyncClient := newHTTPClient()
+	ratioSyncClient := newRatioSyncHTTPClient()
+
+	assert.Greater(t, modelSyncClient.Timeout, time.Duration(0), "model_sync 出站客户端必须有整体超时")
+	assert.Greater(t, ratioSyncClient.Timeout, time.Duration(0), "ratio_sync 出站客户端必须有整体超时")
+	assert.NotNil(t, modelSyncClient.Transport)
+	assert.NotNil(t, ratioSyncClient.Transport)
 }

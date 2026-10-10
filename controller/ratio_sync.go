@@ -208,6 +208,44 @@ func modelPricingSyncValues(data map[string]any, name string) map[string]any {
 	return values
 }
 
+// ratioSyncHTTPTotalTimeout 是汇率同步的**整体**请求上限（连接 + 等响应头 + 读完 body）。
+// ResponseHeaderTimeout 不覆盖「读完 body」——上游慢速吐字节时请求会永久挂住。
+const ratioSyncHTTPTotalTimeout = 60 * time.Second
+
+// newRatioSyncHTTPClient 构造汇率同步用的出站客户端。
+//
+// 自定义 Transport 是**有意保留**的：github.io 需要 IPv4 优先（见 DialContext），
+// 与共享池的拨号策略不同，因此不改为 common.GetOutboundTransport()，只补整体 Timeout。
+// 独立成函数是为了让「必须设置 Timeout」这条不变量可被单测锁死。
+func newRatioSyncHTTPClient() *http.Client {
+	dialer := &net.Dialer{Timeout: 10 * time.Second}
+	transport := &http.Transport{
+		MaxIdleConns:          100,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Second,
+	}
+	if common.TLSInsecureSkipVerify {
+		transport.TLSClientConfig = common.InsecureTLSConfig
+	}
+	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			host = addr
+		}
+		// 对 github.io 优先尝试 IPv4，失败则回退 IPv6
+		if strings.HasSuffix(host, "github.io") {
+			if conn, err := dialer.DialContext(ctx, "tcp4", addr); err == nil {
+				return conn, nil
+			}
+			return dialer.DialContext(ctx, "tcp6", addr)
+		}
+		return dialer.DialContext(ctx, network, addr)
+	}
+	return &http.Client{Transport: transport, Timeout: ratioSyncHTTPTotalTimeout}
+}
+
 func FetchUpstreamRatios(c *gin.Context) {
 	var req dto.UpstreamRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -265,26 +303,7 @@ func FetchUpstreamRatios(c *gin.Context) {
 
 	sem := make(chan struct{}, maxConcurrentFetches)
 
-	dialer := &net.Dialer{Timeout: 10 * time.Second}
-	transport := &http.Transport{MaxIdleConns: 100, IdleConnTimeout: 90 * time.Second, TLSHandshakeTimeout: 10 * time.Second, ExpectContinueTimeout: 1 * time.Second, ResponseHeaderTimeout: 10 * time.Second}
-	if common.TLSInsecureSkipVerify {
-		transport.TLSClientConfig = common.InsecureTLSConfig
-	}
-	transport.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
-		host, _, err := net.SplitHostPort(addr)
-		if err != nil {
-			host = addr
-		}
-		// 对 github.io 优先尝试 IPv4，失败则回退 IPv6
-		if strings.HasSuffix(host, "github.io") {
-			if conn, err := dialer.DialContext(ctx, "tcp4", addr); err == nil {
-				return conn, nil
-			}
-			return dialer.DialContext(ctx, "tcp6", addr)
-		}
-		return dialer.DialContext(ctx, network, addr)
-	}
-	client := &http.Client{Transport: transport}
+	client := newRatioSyncHTTPClient()
 
 	for _, chn := range upstreams {
 		wg.Add(1)
