@@ -1,4 +1,4 @@
-// v1.3.132 生产验收：/pricing 的服务端 SEO 注入块必须对用户不可见，
+// 生产验收（版本无关）：/pricing 的服务端 SEO 注入块必须对用户不可见，
 // 且不得在页面上留下爬虫专用的文案。
 //
 // 复现的缺陷（用户截图确认）：价目表被拼在 `#spa-seo-content` 之外，
@@ -80,7 +80,7 @@ const state = (p) =>
   const errors = []
   p.on('pageerror', (e) => errors.push(String(e)))
 
-  console.log(`\n=== v1.3.132 SEO 注入可见性验收 @ ${BASE} ===\n`)
+  console.log(`\n=== SEO 注入可见性验收 @ ${BASE} ===\n`)
 
   console.log('[1] 直接访问 /pricing（全新加载）')
   await p.goto(`${BASE}/pricing`, { waitUntil: 'domcontentloaded', timeout: 90000 })
