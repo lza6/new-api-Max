@@ -51,6 +51,9 @@ type spaRouteMeta struct {
 	// Summary 内容块的正文摘要。**必须描述页面真实内容**，不得填充关键词。
 	Summary string
 	// Caveat 一条诚实的边界/限制说明（对应"helpful content 缺少 caveat"的信号）。
+	//
+	// 渲染时它会被提升为一个**显式小节**（`<h2>限制与边界</h2>` + 本字段原文）。
+	// 内容不得因提升为小节而扩充 —— 仍然是这一句话。
 	Caveat string
 	// NavLabel 站内导航里的短文案（不含 {site} 展开后的长标题，避免导航条过长）。
 	// 为空时回退到 H1。
@@ -166,22 +169,54 @@ func absoluteSEOURL(base, path string) string {
 	return base + strings.TrimRight(path, "/")
 }
 
+// spaPolicyNavLinks 是内容块站内导航里额外给出的「用户协议 / 隐私政策」链接。
+//
+// 为什么**不**把它们放进 `seoPublicPaths`：这两个前端路由确实存在
+// （`web/src/routes/user-agreement.tsx`、`web/src/routes/privacy-policy.tsx`），
+// 但它们的正文来自后端配置项 `setting/system_setting/legal.go`，其默认值是**空字符串** ——
+// 纳入 `seoPublicPaths` 会让 sitemap.xml 收录两个可能为空的页面。而在站内导航里给出
+// 可跟随的 `<a href>` 既不承诺页面有内容，又让爬虫能发现、用户能点。
+//
+// 文案取自页面自己的可见标题（`t('User Agreement')` / `t('Privacy Policy')`），
+// 与 `web/src/components/layout/components/footer.tsx` 的页脚链接一致 —— 不用
+// "Terms of Service" 这类页面标题里并不存在的说法。
+var spaPolicyNavLinks = []struct{ Path, LabelEn, LabelZh string }{
+	{"/user-agreement", "User Agreement", "用户协议"},
+	{"/privacy-policy", "Privacy Policy", "隐私政策"},
+}
+
 // spaInternalLinksHTML 生成内容块里的站内链接。
 //
 // 这是修「5 页不可达 / 内部深度 0」的关键：不执行 JS 的爬虫只有拿到真实的
 // `<a href>` 才能发现这些页面。链接文案优先用短的 NavLabel，而不是 "click here"
 // 之类的泛化锚文本；语言跟随访问者。
 func spaInternalLinksHTML(currentPath, siteName, language string) string {
+	current := strings.TrimRight(currentPath, "/")
 	var b strings.Builder
 	b.WriteString("<nav aria-label=\"Public pages\"><ul>")
 	for _, p := range seoPublicPaths {
-		if strings.TrimRight(p.Path, "/") == strings.TrimRight(currentPath, "/") {
+		if strings.TrimRight(p.Path, "/") == current {
 			continue // 不给自己加自链接
 		}
 		b.WriteString("<li><a href=\"")
 		b.WriteString(html.EscapeString(p.Path))
 		b.WriteString("\">")
 		b.WriteString(html.EscapeString(spaLinkLabel(p, siteName, language)))
+		b.WriteString("</a></li>")
+	}
+	// 用户协议与隐私政策：不参与 sitemap，但必须在导航里可达（见 spaPolicyNavLinks 注释）。
+	for _, l := range spaPolicyNavLinks {
+		if l.Path == current {
+			continue
+		}
+		label := l.LabelEn
+		if language == "zh" {
+			label = l.LabelZh
+		}
+		b.WriteString("<li><a href=\"")
+		b.WriteString(html.EscapeString(l.Path))
+		b.WriteString("\">")
+		b.WriteString(html.EscapeString(label))
 		b.WriteString("</a></li>")
 	}
 	b.WriteString("</ul></nav>")
@@ -327,6 +362,9 @@ func BuildSPAIndexHTML(c *gin.Context, indexPage []byte) []byte {
 		extraHTML = spaPricingTableHTML(c, language)
 	}
 	block := spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, extraHTML)
+	// 结构化数据（JSON-LD）刻意留在容器**外**：它是 `<script>`、不渲染给用户，
+	// 而移除脚本会在 React 挂载后删掉整个 `#spa-seo-content` —— 放进容器里会连它一起删掉。
+	block += spaJSONLDScript(meta, requestPath, siteName, language, description, !spaCustomHomeContentConfigured())
 	if loc := reSPABodyOpenTag.FindStringIndex(page); loc != nil {
 		page = page[:loc[1]] + block + page[loc[1]:]
 	}
@@ -477,6 +515,9 @@ func spaOGLocale(language string) string {
 // 放在 `#root` **之前**、`<body>` 之后：React 挂载进 `#root` 不会碰到它，
 // 再由 `spaSEORemoverScript` 在挂载完成后移除 —— 用户看不到，爬虫看得到。
 //
+// 结构：`<h1>` → 摘要 → 限制与边界小节 → `extraHTML`（可见的附加内容，如价目表）→
+// 站内导航 → 上游官方文档外链。
+//
 // `extraHTML` 是**可见**的附加内容（目前只有 /pricing 的价目表），必须写在
 // `</div>` 之前：移除脚本删的是整个 `#spa-seo-content`，落在容器外的可见内容
 // 不会被删掉，会一直留在页面上（生产事故，见 spaSEORemoverScript 注释）。
@@ -491,7 +532,9 @@ func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, 
 	b.WriteString(esc(summary))
 	b.WriteString("</p>")
 	if caveat != "" {
-		b.WriteString("<p>")
+		b.WriteString("<h2>")
+		b.WriteString(spaLimitationHeading(language))
+		b.WriteString("</h2><p>")
 		b.WriteString(esc(caveat))
 		b.WriteString("</p>")
 	}
@@ -503,10 +546,203 @@ func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, 
 	return b.String()
 }
 
+// spaLimitationHeading 是「限制与边界」小节的标题。
+//
+// 把现有的 `Meta.Caveat`（本来就是准确的边界说明）提升为一个显式小节标题，
+// 使正文里出现 limitation/caveat 类语义锚点，便于读者与机器识别页面边界。
+// **内容仍然只是 Caveat 原文，一个字都不新增。**
+func spaLimitationHeading(language string) string {
+	if language == "zh" {
+		return "限制与边界"
+	}
+	return "Limitations"
+}
+
 // spaExpandSite 把 `{site}` 占位替换为运行时站点名。
 func spaExpandSite(s, siteName string) string {
 	if s == "" {
 		return ""
 	}
 	return strings.ReplaceAll(s, "{site}", siteName)
+}
+
+// ---- 结构化数据（Batch-13 / GEO）----
+//
+// 为什么在**服务端**注入：首页 FAQ 的 `FAQPage` 目前由前端在运行时用 JS 追加
+// （`web/src/features/home/components/sections/faq.tsx` 的 `landing-faq-jsonld`），
+// 不执行 JS 的爬虫看不到；其余路由则完全没有结构化数据。
+//
+// 纪律：**只声明页面上真实存在、且我们能证明的事实**。因此：
+//   - 首页 → `WebSite`（站点身份）；`/about` → `AboutPage`；其余 → `WebPage`。
+//   - 首页 FAQ → 与页面上**用户可见**的 FAQ accordion 逐条同文案
+//     （见 spaFAQItems*，来源是 faq.tsx + i18n 语言包，另有测试锁住不漂移）。
+//   - **不写** `aggregateRating` / `review` / `author` —— 我们既没有评分或评价数据，
+//     也不是模型作者；声明它们等于向搜索引擎提供不实信息。
+//
+// 位置：`<script>` 本身不渲染给用户，因此放在 `#spa-seo-content` **容器外**，
+// 不会被 `spaSEORemoverScript` 在 React 挂载后一并删除。
+
+// spaJSONLDContext 是所有结构化数据共用的 @context。
+const spaJSONLDContext = "https://schema.org"
+
+// spaRouteSchemaType 返回路由对应的 schema.org 页面类型。
+//
+// 首页是站点入口，用 `WebSite` 正确。**刻意不加 `SearchAction`** —— 本站没有
+// 站点级搜索端点，声明它等于挂一个不存在的功能。
+func spaRouteSchemaType(path string) string {
+	switch strings.TrimRight(path, "/") {
+	case "":
+		return "WebSite"
+	case "/about":
+		return "AboutPage"
+	default:
+		return "WebPage"
+	}
+}
+
+// spaJSONLDScript 生成页面底部的 JSON-LD（首页会多出一条 FAQPage）。
+//
+// `includeFAQ` 为真时才写入 FAQPage —— 调用方必须先确认首页**确实**渲染了那个
+// FAQ accordion（见 spaCustomHomeContentConfigured）。
+//
+// 序列化失败（理论上不会）时跳过该条：宁可少一段结构化数据，也不把坏 JSON 送上页面。
+func spaJSONLDScript(meta spaRouteMeta, requestPath, siteName, language, description string, includeFAQ bool) string {
+	base := spaSiteBaseForSEO()
+	schemaType := spaRouteSchemaType(requestPath)
+
+	var graph map[string]any
+	if schemaType == "WebSite" {
+		// 首页声明的是**站点身份**（站点名 + 站点地址），不是某个页面的标题。
+		graph = map[string]any{
+			"@context":   spaJSONLDContext,
+			"@type":      schemaType,
+			"name":       siteName,
+			"url":        absoluteSEOURL(base, "/"),
+			"inLanguage": spaHTMLLang(language),
+		}
+	} else {
+		graph = map[string]any{
+			"@context":    spaJSONLDContext,
+			"@type":       schemaType,
+			"name":        spaExpandSite(meta.Title, siteName),
+			"description": description,
+			"url":         absoluteSEOURL(base, requestPath),
+			"inLanguage":  spaHTMLLang(language),
+		}
+	}
+
+	var b strings.Builder
+	writeScript := func(v any) {
+		raw, err := common.Marshal(v)
+		if err != nil {
+			return
+		}
+		b.WriteString(`<script type="application/ld+json">`)
+		b.Write(raw)
+		b.WriteString("</script>")
+	}
+	writeScript(graph)
+	if schemaType == "WebSite" && includeFAQ {
+		writeScript(spaFAQJSONLD(language))
+	}
+	return b.String()
+}
+
+// spaCustomHomeContentConfigured 报告本部署是否配置了自定义首页内容。
+//
+// 配置后首页渲染的是那段内容（`web/src/features/home/index.tsx` 在 `content` 非空时
+// 提前返回，不再渲染 `<FAQ />`），页面上**根本没有** FAQ accordion —— 此时注入
+// `FAQPage` 就是在描述页面上不存在的内容。因此 FAQ 结构化数据只在本部署使用
+// 默认落地页时注入。判断与前端同源：同一个 `HomePageContent` 选项。
+func spaCustomHomeContentConfigured() bool {
+	common.OptionMapRWMutex.RLock()
+	defer common.OptionMapRWMutex.RUnlock()
+	return strings.TrimSpace(common.OptionMap["HomePageContent"]) != ""
+}
+
+// spaFAQItemsEN / spaFAQItemsZH 是首页 FAQ accordion 的问答对，**逐字复制**自页面文案。
+//
+// 来源（必须保持一致，否则再修改前端文案时此处的服务端 JSON-LD 会与用户所见漂移）：
+//   - 英文：`web/src/features/home/components/sections/faq.tsx` 的 `FAQ_ITEMS` 原文；
+//   - 中文：`web/src/i18n/locales/zh.json` 中同一批键对应的值。
+//
+// 之所以在 Go 侧复录一份而不是运行时读取前端语言包：服务端注入必须**跟随访问者语言**，
+// 而语言包是构建产物。测试 TestSPASEOHomeFAQStructuredData 锁住条数与首条问句。
+var spaFAQItemsEN = [][2]string{
+	{
+		"What is an AI API gateway?",
+		"An AI API gateway is a single endpoint that routes your requests to many upstream model providers. Instead of integrating OpenAI, Claude, Gemini, and others separately, you call one OpenAI-compatible API and the gateway handles authentication, protocol translation, load balancing, and billing.",
+	},
+	{
+		"Which AI models and providers are supported?",
+		"It aggregates 40+ upstream providers, including OpenAI, Anthropic Claude, Google Gemini, Azure OpenAI, AWS Bedrock, DeepSeek, and Qwen, behind one unified protocol. New channels can be added as providers ship.",
+	},
+	{
+		"Is it OpenAI API compatible?",
+		"Yes. Requests and responses follow the OpenAI-compatible format, so existing SDKs and tools work by changing only the base URL and API key. Native Claude and Gemini endpoints are also exposed for clients that need them.",
+	},
+	{
+		"How is usage billed?",
+		"Billing is pay-as-you-go and transparent: every request records prompt and completion tokens, latency, and cost. You can review usage in real time, set quotas and rate limits per user or token, and see the cost of each request before you commit.",
+	},
+	{
+		"Can I self-host the gateway?",
+		"Yes. The gateway is self-hostable and open source, with SQLite, MySQL, or PostgreSQL for the primary database and optional Redis and ClickHouse for caching and logs. You keep control of your keys, data, and deployment.",
+	},
+	{
+		"How does it handle reliability and failover?",
+		"Requests are routed to the healthiest upstream based on live channel status. Unhealthy channels are taken out of rotation automatically, and load balancing spreads traffic across the providers you configure so a single outage does not take you down.",
+	},
+}
+
+// spaFAQItemsZH 是同一批问答的中文文案（取自 zh.json，与页面实际渲染一致）。
+var spaFAQItemsZH = [][2]string{
+	{
+		"什么是 AI API 网关？",
+		"AI API 网关是一个统一入口，把你的请求路由到众多上游模型服务商。你无需分别对接 OpenAI、Claude、Gemini 等，只需调用一个兼容 OpenAI 的 API，网关自动处理鉴权、协议转换、负载均衡与计费。",
+	},
+	{
+		"支持哪些 AI 模型和服务商？",
+		"它把 40+ 上游服务商聚合到一套统一协议之下，包括 OpenAI、Anthropic Claude、Google Gemini、Azure OpenAI、AWS Bedrock、DeepSeek 和 Qwen。随服务商上线可持续新增渠道。",
+	},
+	{
+		"兼容 OpenAI API 吗？",
+		"兼容。请求与响应遵循 OpenAI 兼容格式，现有 SDK 和工具只需修改 base URL 与 API Key 即可使用。同时提供原生 Claude 与 Gemini 端点，供有需要的客户端调用。",
+	},
+	{
+		"如何计费？",
+		"按量计费、透明可查：每次请求都会记录 prompt 与 completion tokens、延迟和费用。你可以实时查看用量，按用户或令牌设置额度与速率限制，并在提交前了解每次请求的费用。",
+	},
+	{
+		"可以自行部署吗？",
+		"可以。网关支持自部署且开源，主数据库可用 SQLite、MySQL 或 PostgreSQL，缓存与日志可选 Redis 和 ClickHouse。密钥、数据与部署都由你掌控。",
+	},
+	{
+		"如何保障可靠性与故障转移？",
+		"请求会根据渠道实时状态路由到最健康的上游。异常渠道会被自动移出轮询，负载均衡在你配置的服务商之间分摊流量，单点故障不会导致服务中断。",
+	},
+}
+
+// spaFAQJSONLD 生成首页的 FAQPage 结构化数据（与页面上的 FAQ accordion 同文案）。
+func spaFAQJSONLD(language string) map[string]any {
+	items := spaFAQItemsEN
+	if language == "zh" {
+		items = spaFAQItemsZH
+	}
+	entities := make([]map[string]any, 0, len(items))
+	for _, qa := range items {
+		entities = append(entities, map[string]any{
+			"@type": "Question",
+			"name":  qa[0],
+			"acceptedAnswer": map[string]any{
+				"@type": "Answer",
+				"text":  qa[1],
+			},
+		})
+	}
+	return map[string]any{
+		"@context":   spaJSONLDContext,
+		"@type":      "FAQPage",
+		"mainEntity": entities,
+	}
 }
