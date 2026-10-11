@@ -12,6 +12,7 @@ import (
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/service"
 )
 
 // Batch-13 站点统计端点的契约测试。
@@ -21,6 +22,8 @@ import (
 //  2. 结构完整 —— 前端渲染任何一项都不能拿到 undefined（否则主页会显示空数字）。
 func TestGetSiteVisitorSummaryShape(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	// 统计缓存是**进程级**的：不重置会让本用例读到上一个用例算出的数据。
+	service.ResetSiteVisitorCachesForTest()
 	require.NoError(t, model.DB.Where("1 = 1").Delete(&model.SiteDailyVisitor{}).Error)
 
 	today := serviceVisitorCurrentDay()
@@ -93,6 +96,8 @@ func TestGetSiteVisitorSummaryShape(t *testing.T) {
 // 但空数据时必须返回**空数组而不是 null**，否则前端 `.map` 会抛错。
 func TestGetSiteVisitorSummaryEmptyData(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	// 统计缓存是**进程级**的：不重置会让本用例读到上一个用例算出的数据。
+	service.ResetSiteVisitorCachesForTest()
 	require.NoError(t, model.DB.Where("1 = 1").Delete(&model.SiteDailyVisitor{}).Error)
 
 	response := httptest.NewRecorder()

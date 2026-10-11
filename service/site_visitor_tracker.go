@@ -46,9 +46,6 @@ const (
 	visitorFlushEvery       = 30 * time.Second
 	visitorDedupMaxEntries  = 200_000
 	visitorBufferMaxEntries = 50_000
-	// visitorStatsCacheTTL 是公开统计端点的短缓存：主页统计不需要秒级实时，
-	// 而短缓存能把「匿名爬虫反复请求统计接口」变成一次查询。
-	visitorStatsCacheTTL = 60 * time.Second
 	// visitorRetentionDays 是访客明细的保留天数。本表逐日累积，必须有保留策略。
 	visitorRetentionDays = 400
 )
@@ -440,6 +437,13 @@ func StartSiteVisitorLoop() {
 		if err := RunSiteVisitorMaintenance(); err != nil {
 			logger.LogError(context.Background(), fmt.Sprintf("site visitor maintenance failed: %v", err))
 		}
+		// 预热统计缓存：聚合一次要数秒（DAU/MAU 扫 logs 大表），放在后台先算好，
+		// 让第一个真实请求走缓存而不是承担这段延迟。失败只告警 —— 请求路径上
+		// 仍会按需重试（见 siteVisitorCache.get 的冷启动分支）。
+		go func() {
+			WarmSiteVisitorSummary()
+			common.RecordLoopHeartbeat("site_visitor_summary_warm")
+		}()
 		for {
 			select {
 			case <-ctx.Done():
@@ -481,66 +485,244 @@ type SiteVisitorSummary struct {
 	Sources []model.TrafficSourceCount `json:"sources"`
 	// GeneratedAt 是本次统计的生成时刻（unix 秒），让读者知道数据新鲜度。
 	GeneratedAt int64 `json:"generated_at"`
+	// Day 是「今日」对应的自然日（YYYYMMDD，服务器本地时区）。
+	// 跨时区的读者据此判断 today 指哪一天，而不是拿自己的本地日期去猜。
+	Day int `json:"day"`
 }
 
-// GetSiteVisitorSummary 生成站点统计（带 60s 缓存）。
+// siteVisitorCache 是带 **stale-while-revalidate** 的单值缓存（Batch-13 压测修复）。
 //
-// 缓存的意义不只是提速：这些端点挂在公开路由上，匿名爬虫可以高频请求。
-// 60s 缓存把任意请求频率折叠成每分钟一次查询。Redis 不可用时静默降级为实时查询
-// （查询本身都是小表索引扫描，可接受）。
-func GetSiteVisitorSummary() (*SiteVisitorSummary, error) {
-	const cacheKey = "site_visitor_summary:v1"
-	if common.RedisEnabled {
-		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
-			var hit SiteVisitorSummary
-			if common.Unmarshal([]byte(cached), &hit) == nil && hit.GeneratedAt > 0 {
-				return &hit, nil
+// ## 为什么不能用「读缓存 → 未命中就同步查库」这种朴素写法
+//
+// 生产压测（12 并发 × 20 请求）实测：`/api/site/visitors` 出现 **11 次 30s 超时**。
+// 原因有两个，缺一不可：
+//  1. 整个聚合（访客+PV+注册用户+DAU+MAU+来源）一次要 **6.3 秒** ——
+//     其中 DAU/MAU 是对大表 `logs` 做 `COUNT(DISTINCT user_id)`；
+//  2. 缓存一过期，并发的 N 个请求会**同时**未命中并各自跑一遍这 6.3 秒的聚合
+//     （缓存击穿），互相争抢 DB，于是少数请求直接撞上 30s 超时。
+//
+// 因此这里同时解决两件事：
+//   - **后台刷新（SWR）**：只要手里有值，就**立即返回旧值**并让一个后台 goroutine
+//     去刷新，请求路径上**永远不会**阻塞在聚合上。冷启动（进程内还没有值）才会同步算一次。
+//   - **单飞（singleflight）**：`refreshing` 标志保证同一时刻只有一个刷新在跑，
+//     无论来多少并发请求。
+//
+// 代价是数据可能比 TTL 旧一轮 —— 对"站点访客有多少"这类展示量完全可接受，
+// 换来的是这个**公开端点**在任何请求频率下都不会拖垮 DB 或自身超时。
+type siteVisitorCache[T any] struct {
+	mu         sync.Mutex
+	value      *T
+	computedAt time.Time
+	refreshing bool
+	// inflight 在有一次计算进行中时非 nil，并在该次计算结束时 close。
+	// 冷启动时让并发调用**等在飞的这次计算**，而不是各算一遍 —— 这是防击穿的关键：
+	// 没有它时，压测里 16 个并发请求会在缓存为空时全部跑一遍 6 秒的聚合。
+	inflight chan struct{}
+	ttl      time.Duration
+	// now 可在测试中替换，避免用 sleep 验证 TTL。
+	now func() time.Time
+}
+
+func newSiteVisitorCache[T any](ttl time.Duration) *siteVisitorCache[T] {
+	return &siteVisitorCache[T]{ttl: ttl, now: time.Now}
+}
+
+// get 取缓存值。三种情形：
+//   - 未过期  → 直接返回；
+//   - 已过期且有旧值 → **立即返回旧值**，并在后台刷新（不阻塞）；
+//   - 无值     → 单飞一次同步计算（并发调用共享同一次计算）。
+func (c *siteVisitorCache[T]) get(compute func() (*T, error)) (*T, error) {
+	for {
+		c.mu.Lock()
+		if c.value != nil {
+			if c.now().Sub(c.computedAt) < c.ttl {
+				v := c.value
+				c.mu.Unlock()
+				return v, nil
 			}
+			stale := c.value
+			if !c.refreshing {
+				c.refreshing = true
+				ch := make(chan struct{})
+				c.inflight = ch
+				go c.runAndStore(compute, ch)
+			}
+			c.mu.Unlock()
+			return stale, nil
 		}
+		if c.refreshing {
+			// 已有人在算：等它结束再重新读缓存，不要自己也跑一遍。
+			ch := c.inflight
+			c.mu.Unlock()
+			<-ch
+			continue
+		}
+		c.refreshing = true
+		ch := make(chan struct{})
+		c.inflight = ch
+		c.mu.Unlock()
+		// 冷启动：本次调用承担同步计算。每个调用最多算一次，不会无限循环。
+		return c.runAndStore(compute, ch)
 	}
+}
 
+// runAndStore 执行一次计算并写回缓存，最后 close(ch) 唤醒等待者。
+func (c *siteVisitorCache[T]) runAndStore(compute func() (*T, error), ch chan struct{}) (*T, error) {
+	v, err := compute()
+
+	c.mu.Lock()
+	c.refreshing = false
+	if c.inflight == ch {
+		c.inflight = nil
+	}
+	if err == nil && v != nil {
+		c.value = v
+		c.computedAt = c.now()
+	} else {
+		// 失败：保留旧值（若有）。同时把 computedAt 推到当前时刻，
+		// 避免「过期 + 持续失败」时每个请求都立刻再起一个后台刷新形成忙循环。
+		c.computedAt = c.now()
+	}
+	c.mu.Unlock()
+	close(ch)
+	return v, err
+}
+
+// store 直接写入缓存（测试与预热用）。
+func (c *siteVisitorCache[T]) store(v *T) {
+	c.mu.Lock()
+	c.value = v
+	c.computedAt = c.now()
+	c.mu.Unlock()
+}
+
+// peek 读取当前值（可能为 nil），不触发刷新。仅供测试与观测。
+func (c *siteVisitorCache[T]) peek() *T {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.value
+}
+
+// visitorSummaryCacheTTL 是访客/页面浏览/注册用户/来源的缓存时长。
+// 这几项查的都是小表（`site_daily_visitors`、`users`），秒级刷新成本可接受。
+const visitorSummaryCacheTTL = 60 * time.Second
+
+// activeUsersCacheTTL 是 DAU/MAU 的缓存时长，**刻意远长于上面那组**。
+//
+// 原因：DAU/MAU 要在大表 `logs` 上做 `COUNT(DISTINCT user_id)`，是整个聚合里
+// 唯一昂贵（秒级）的部分；同时这两个数字本身变化极慢（日活/月活不会以秒为单位变动）。
+// 花 30 分钟一次的后台计算换来请求路径彻底无阻塞，是这个端点最合适的取舍。
+const activeUsersCacheTTL = 30 * time.Minute
+
+var (
+	siteVisitorStatsCache = newSiteVisitorCache[model.SiteVisitorStats](visitorSummaryCacheTTL)
+	siteActiveUsersCache  = newSiteVisitorCache[siteActiveUsers](activeUsersCacheTTL)
+	siteSourcesCache      = newSiteVisitorCache[[]model.TrafficSourceCount](visitorSummaryCacheTTL)
+	siteRegUsersCache     = newSiteVisitorCache[int64](visitorSummaryCacheTTL)
+)
+
+// siteActiveUsers 是 DAU / MAU 两个计数（贵的那个查询）。
+type siteActiveUsers struct {
+	Last24h int64
+	Last30d int64
+}
+
+// GetSiteVisitorSummary 生成站点统计。
+//
+// 全部经由 SWR 缓存（见 siteVisitorCache 的说明），因此**请求路径上不做同步聚合**
+// （除进程启动后的第一次）。返回的错误只表示"冷启动时的首次计算失败"。
+func GetSiteVisitorSummary() (*SiteVisitorSummary, error) {
 	today := VisitorCurrentDay()
-	stats, err := model.GetSiteVisitorStats(today)
-	if err != nil {
-		return nil, err
-	}
-	users, err := model.CountRegisteredUsers()
-	if err != nil {
-		return nil, err
-	}
-	now := common.GetTimestamp()
-	active24h, err := model.CountActiveUsers(now - 24*3600)
-	if err != nil {
-		return nil, err
-	}
-	active30d, err := model.CountActiveUsers(now - 30*24*3600)
-	if err != nil {
-		return nil, err
-	}
-	sources, err := model.GetTrafficSourceCounts(today, 30)
+
+	stats, err := siteVisitorStatsCache.get(func() (*model.SiteVisitorStats, error) {
+		s, e := model.GetSiteVisitorStats(VisitorCurrentDay())
+		return s, e
+	})
 	if err != nil {
 		return nil, err
 	}
 
-	// 站内跳转（internal）与直接访问合并为「直接访问」：站内跳转不构成新来源，
-	// 但把两类分开列会让「直接访问」看起来偏低。
-	sources = mergeInternalIntoDirect(sources)
-
-	summary := &SiteVisitorSummary{
-		Visitors:        *stats,
-		RegisteredUsers: users,
-		ActiveUsers24h:  active24h,
-		ActiveUsers30d:  active30d,
-		Sources:         sources,
-		GeneratedAt:     now,
+	users, err := siteRegUsersCache.get(func() (*int64, error) {
+		n, e := model.CountRegisteredUsers()
+		return &n, e
+	})
+	if err != nil {
+		return nil, err
 	}
 
-	if common.RedisEnabled {
-		if payload, err := common.Marshal(summary); err == nil {
-			_ = common.RedisSet(cacheKey, string(payload), visitorStatsCacheTTL)
+	// DAU/MAU 放在一个 compute 里一起算：两者都扫 logs 表，合并在同一轮刷新中完成，
+	// 避免把一个昂贵查询拆成两次触发。
+	active, err := siteActiveUsersCache.get(func() (*siteActiveUsers, error) {
+		now := common.GetTimestamp()
+		dau, e := model.CountActiveUsers(now - 24*3600)
+		if e != nil {
+			return nil, e
 		}
+		mau, e := model.CountActiveUsers(now - 30*24*3600)
+		if e != nil {
+			return nil, e
+		}
+		return &siteActiveUsers{Last24h: dau, Last30d: mau}, nil
+	})
+	if err != nil {
+		return nil, err
 	}
-	return summary, nil
+
+	sources, err := siteSourcesCache.get(func() (*[]model.TrafficSourceCount, error) {
+		s, e := model.GetTrafficSourceCounts(VisitorCurrentDay(), 30)
+		if e != nil {
+			return nil, e
+		}
+		// 站内跳转（internal）与直接访问合并为「直接访问」：站内跳转不构成新来源，
+		// 但把两类分开列会让「直接访问」看起来偏低。
+		merged := mergeInternalIntoDirect(s)
+		return &merged, nil
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	mergedSources := []model.TrafficSourceCount{}
+	if sources != nil {
+		mergedSources = *sources
+	}
+	activeUsers := siteActiveUsers{}
+	if active != nil {
+		activeUsers = *active
+	}
+	regUsers := int64(0)
+	if users != nil {
+		regUsers = *users
+	}
+	visitorStats := model.SiteVisitorStats{}
+	if stats != nil {
+		visitorStats = *stats
+	}
+
+	return &SiteVisitorSummary{
+		Visitors:        visitorStats,
+		RegisteredUsers: regUsers,
+		ActiveUsers24h:  activeUsers.Last24h,
+		ActiveUsers30d:  activeUsers.Last30d,
+		Sources:         mergedSources,
+		GeneratedAt:     common.GetTimestamp(),
+		Day:             today,
+	}, nil
+}
+
+// WarmSiteVisitorSummary 预热缓存（启动时调用，避免第一个真实请求承担冷启动的同步聚合）。
+func WarmSiteVisitorSummary() { _, _ = GetSiteVisitorSummary() }
+
+// ResetSiteVisitorCachesForTest 清空统计缓存。
+//
+// 缓存是**进程级**的，而测试在同一个进程里跑 —— 不重置就会让后一个用例读到
+// 前一个用例算出的数据（本地实测：controller 包的访客端点用例因此拿到空数据）。
+// 生产代码没有任何调用方。
+func ResetSiteVisitorCachesForTest() {
+	siteVisitorStatsCache.store(nil)
+	siteActiveUsersCache.store(nil)
+	siteSourcesCache.store(nil)
+	siteRegUsersCache.store(nil)
 }
 
 // mergeInternalIntoDirect 把 internal 来源并入 direct（见调用处说明）。

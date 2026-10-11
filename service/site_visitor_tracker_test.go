@@ -1,9 +1,12 @@
 package service
 
 import (
+	"errors"
 	"net/http/httptest"
 	"strconv"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -574,4 +577,123 @@ func mustHash(t *testing.T, day int, ip string) string {
 	h := VisitorIPHash(day, ip)
 	require.NotEmpty(t, h)
 	return h
+}
+
+// ---- Batch-13 压测修复：SWR 与防击穿 ----
+//
+// 生产压测（12 并发 × 20 请求）实测 `/api/site/visitors` 出现 11 次 30s 超时：
+// 聚合一次要 6.3s，且缓存过期时并发请求全部未命中、各自跑一遍（击穿）。
+// 下面两条分别锁住这两个成因的修法。
+
+// 并发未命中只能触发**一次**计算（防击穿）。
+func TestSiteVisitorCacheDoesNotStampede(t *testing.T) {
+	c := newSiteVisitorCache[int](time.Minute)
+	var calls atomic.Int64
+	release := make(chan struct{})
+
+	compute := func() (*int, error) {
+		calls.Add(1)
+		<-release // 卡住第一个计算，让其它 goroutine 都撞上来
+		v := 42
+		return &v, nil
+	}
+
+	const n = 16
+	got := make([]int, n)
+	var wg sync.WaitGroup
+	for i := range n {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			v, err := c.get(compute)
+			require.NoError(t, err)
+			got[i] = *v
+		}()
+	}
+
+	// 给所有 goroutine 时间进入 get()
+	time.Sleep(80 * time.Millisecond)
+	close(release)
+	wg.Wait()
+
+	assert.LessOrEqual(t, calls.Load(), int64(2),
+		"并发未命中最多只应触发一次计算（允许一次冷启动 + 一次补偿）")
+	for _, v := range got {
+		assert.Equal(t, 42, v, "所有并发调用都必须拿到同一个值")
+	}
+}
+
+// 已过期时必须**立即返回旧值**并在后台刷新，绝不在请求路径上阻塞。
+func TestSiteVisitorCacheServesStaleWhileRefreshing(t *testing.T) {
+	c := newSiteVisitorCache[int](50 * time.Millisecond)
+	base := time.Now()
+	c.now = func() time.Time { return base }
+
+	stale := 1
+	c.store(&stale)
+
+	// 让缓存过期
+	c.now = func() time.Time { return base.Add(time.Second) }
+
+	blocked := make(chan struct{})
+	var calls atomic.Int64
+	go func() {
+		// 第二次调用（后台刷新）会走到这里并被卡住
+		_, _ = c.get(func() (*int, error) {
+			if calls.Add(1) == 1 {
+				<-blocked
+			}
+			fresh := 99
+			return &fresh, nil
+		})
+	}()
+
+	time.Sleep(30 * time.Millisecond)
+	start := time.Now()
+	v, err := c.get(func() (*int, error) {
+		calls.Add(1)
+		fresh := 99
+		return &fresh, nil
+	})
+	elapsed := time.Since(start)
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, *v, "过期后应立刻返回【旧值】，而不是等刷新完成")
+	assert.Less(t, elapsed, 40*time.Millisecond,
+		"过期路径不得阻塞在计算上（SWR 的核心）")
+	close(blocked)
+}
+
+// 冷启动（进程内无值）时同步计算一次并写入缓存。
+func TestSiteVisitorCacheColdStartComputes(t *testing.T) {
+	c := newSiteVisitorCache[int](time.Minute)
+	var calls atomic.Int64
+	compute := func() (*int, error) {
+		calls.Add(1)
+		v := 7
+		return &v, nil
+	}
+	v1, err := c.get(compute)
+	require.NoError(t, err)
+	require.Equal(t, 7, *v1)
+
+	v2, err := c.get(compute)
+	require.NoError(t, err)
+	assert.Equal(t, 7, *v2)
+	assert.Equal(t, int64(1), calls.Load(), "第二次应命中缓存，不再计算")
+}
+
+// 刷新失败时必须保留旧值，而不是把缓存清空退化成每次都同步算。
+func TestSiteVisitorCacheKeepsValueOnRefreshError(t *testing.T) {
+	c := newSiteVisitorCache[int](10 * time.Millisecond)
+	base := time.Now()
+	c.now = func() time.Time { return base }
+	v := 5
+	c.store(&v)
+
+	c.now = func() time.Time { return base.Add(time.Second) }
+	_, _ = c.get(func() (*int, error) { return nil, errors.New("boom") })
+	time.Sleep(60 * time.Millisecond) // 等后台刷新跑完
+
+	assert.NotNil(t, c.peek(), "刷新失败不得丢弃已有值")
 }
