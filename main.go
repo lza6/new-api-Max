@@ -140,6 +140,10 @@ func main() {
 	// 站内图床清理：每 5 分钟清理超过保留期的已完成任务产物/参考素材（仅 local 模式生效）。
 	service.StartTaskArtifactCleanup()
 
+	// 响应缓存磁盘后端的周期清理：过期清理 + 配额兜底 + 宿主盘剩余空间紧急回收。
+	// 非磁盘后端时为 no-op（不为不用的东西常驻 goroutine）。
+	service.StartResponseCacheCleanup()
+
 	// 按模型压缩统计周期落库（重启不丢统计）。
 	service.StartModelCompressionStatFlush()
 
@@ -256,6 +260,7 @@ func main() {
 	service.StopSubscriptionQuotaResetTask()
 	service.StopSystemInstanceReporter()
 	service.StopTaskArtifactCleanup()
+	service.StopResponseCacheCleanup()
 	service.StopModelCompressionStatFlush()
 	service.StopAuthArtifactCleanup()
 	service.StopTaskEventCleanup()

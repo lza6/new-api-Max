@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"time"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
@@ -224,18 +223,93 @@ func GetHomePageContent(c *gin.Context) {
 	serveRevalidatedJSON(c, homePageContent)
 }
 
-// seoPublicPaths 列出可被搜索引擎收录的公开路由（不含登录后页面）。
-// 与 web/src/routes 下的公开路由保持一致；新增公开页时同步此表。
-var seoPublicPaths = []struct {
+// seoPublicPath 是一个可被收录的公开路由及其**服务端渲染元数据**。
+//
+// 为什么带 Meta：本前端是纯 CSR，`index.html` 是所有路由共用的一份壳，
+// 不执行 JS 的爬虫看不到任何路由级内容（实测 6 个页面返回完全相同的字节、
+// 零个 `<h1>`、且把 canonical 一律写死为首页）。因此路由级 meta 与一份
+// 准确的内容摘要必须在**服务端**注入 —— 见 `controller/spa_seo.go`。
+//
+// `Title` / `Summary` / `H1` / `Caveat` 里可用 `{site}` 占位，替换为运行时站点名。
+// **内容必须与页面真实呈现一致**（注入块在 React 挂载后会被移除，写不实内容即构成 cloaking）。
+type seoPublicPath struct {
 	Path     string
 	Priority string
-}{
-	{"/", "1.0"},
-	{"/pricing", "0.9"},
-	{"/rankings", "0.7"},
-	{"/model-test", "0.6"},
-	{"/tool-setup", "0.6"},
-	{"/about", "0.5"},
+	Meta     spaRouteMeta
+}
+
+// seoPublicPaths 列出可被搜索引擎收录的公开路由（不含登录后页面）。
+// 与 web/src/routes 下的公开路由保持一致；新增公开页时同步此表。
+//
+// 这张表是 **sitemap、robots 与 SPA 服务端注入**三者的唯一真相源 ——
+// 不允许在别处再抄一份路由清单（抄一份就会分叉一份）。
+var seoPublicPaths = []seoPublicPath{
+	{
+		Path: "/", Priority: "1.0",
+		Meta: spaRouteMeta{
+			Title:       "{site} — one API endpoint for many AI models",
+			Description: "An AI API gateway: OpenAI-, Claude- and Gemini-compatible endpoints behind one base URL, with a per-model price list and usage rankings.",
+			H1:          "{site}: one API endpoint for many AI models",
+			NavLabel:    "Overview",
+			Summary:     "{site} is an AI API gateway. It exposes OpenAI-compatible, Claude-compatible and Gemini-compatible endpoints from a single base URL, so an existing SDK only needs its base URL and key changed. This page is the entry point; the public pages below cover model pricing, usage rankings, the model test console and client setup.",
+			Caveat:      "Model coverage and availability depend on the upstream channels configured for this deployment, and may change over time.",
+		},
+	},
+	{
+		Path: "/pricing", Priority: "0.9",
+		Meta: spaRouteMeta{
+			Title:       "Model pricing — {site}",
+			Description: "Per-model price list for this gateway: what one call to each model costs, with the billing mode shown for every model.",
+			H1:          "Model pricing",
+			NavLabel:    "Model pricing",
+			Summary:     "This page lists the models available on this gateway together with the price applied to each one. Each entry shows the billing mode in effect for that model and the resulting cost, so you can compare models before sending a request. Prices shown here are the ones this deployment actually applies.",
+			Caveat:      "Prices are per this deployment's configuration and can be changed by its operator at any time; the price in effect when a request is handled is the one charged.",
+		},
+	},
+	{
+		Path: "/rankings", Priority: "0.7",
+		Meta: spaRouteMeta{
+			Title:       "Usage rankings — {site}",
+			Description: "Model and usage rankings aggregated from this gateway's request statistics.",
+			H1:          "Usage rankings",
+			NavLabel:    "Usage rankings",
+			Summary:     "This page aggregates request statistics collected by the gateway and ranks models by usage. It is a view over this deployment's own traffic, not a third-party benchmark.",
+			Caveat:      "Rankings reflect only traffic that passed through this deployment; they are not an independent evaluation of model quality.",
+		},
+	},
+	{
+		Path: "/model-test", Priority: "0.6",
+		Meta: spaRouteMeta{
+			Title:       "Model test console — {site}",
+			Description: "Send a test request to a model through this gateway and inspect the response.",
+			H1:          "Model test console",
+			NavLabel:    "Model test console",
+			Summary:     "This page sends a request through the gateway to a chosen model and shows the reply, which is useful for checking that a key, a group or an upstream channel works before wiring it into an application.",
+			Caveat:      "Test requests are real requests: they consume quota and are subject to the same routing and rate limits as application traffic.",
+		},
+	},
+	{
+		Path: "/tool-setup", Priority: "0.6",
+		Meta: spaRouteMeta{
+			Title:       "Client setup — {site}",
+			Description: "How to point common AI clients and SDKs at this gateway's base URL.",
+			H1:          "Client setup",
+			NavLabel:    "Client setup",
+			Summary:     "This page shows how to point common desktop clients and SDKs at this gateway, including the base URL to use and the environment variables or configuration keys that carry it.",
+			Caveat:      "Client versions and configuration screens change; if an option name differs in your version, the equivalent setting is the one that overrides the API base URL.",
+		},
+	},
+	{
+		Path: "/about", Priority: "0.5",
+		Meta: spaRouteMeta{
+			Title:       "About — {site}",
+			Description: "What this gateway is, what it depends on, and what it does not do.",
+			H1:          "About this gateway",
+			NavLabel:    "About",
+			Summary:     "This page describes what {site} is and how it is operated. It is an API gateway: it forwards requests to upstream model providers that the operator configures, applies the deployment's billing and access rules, and returns the provider's response.",
+			Caveat:      "As a gateway, this deployment does not train or host the models it serves; correctness and availability of a model's output remain the upstream provider's responsibility.",
+		},
+	},
 }
 
 // seoSiteBase 返回当前实例的站点根地址（无尾斜杠）。优先取系统设置的
@@ -276,9 +350,13 @@ func GetRobotsTxt(c *gin.Context) {
 }
 
 // GetSitemapXml 动态生成 sitemap.xml，loc 前缀使用当前实例域名。
+//
+// **刻意不输出 `<lastmod>`。** 此前它取 `time.Now()`，于是每次抓取时**所有** URL 都
+// 写着"今天刚改过" —— 而 Google 明确表示会忽略不可信的 lastmod，持续给出假的
+// "最新时间"会让整张 sitemap 的时间戳失去参考价值（连同真实变更一起被忽略）。
+// 缺省比错误安全：等有真实的按页变更时间可用时再加回来。
 func GetSitemapXml(c *gin.Context) {
 	base := seoSiteBase()
-	lastmod := time.Now().Format("2006-01-02")
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
@@ -286,9 +364,7 @@ func GetSitemapXml(c *gin.Context) {
 		b.WriteString("  <url><loc>")
 		b.WriteString(base)
 		b.WriteString(p.Path)
-		b.WriteString("</loc><lastmod>")
-		b.WriteString(lastmod)
-		b.WriteString("</lastmod><priority>")
+		b.WriteString("</loc><priority>")
 		b.WriteString(p.Priority)
 		b.WriteString("</priority></url>\n")
 	}

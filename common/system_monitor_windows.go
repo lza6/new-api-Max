@@ -14,7 +14,11 @@ func GetDiskSpaceInfo() DiskSpaceInfo {
 	if cachePath == "" {
 		cachePath = os.TempDir()
 	}
+	return diskSpaceInfoAt(cachePath)
+}
 
+// diskSpaceInfoAt 获取**指定路径**所在卷的空间信息（参数化版本，供写前检查使用）。
+func diskSpaceInfoAt(path string) DiskSpaceInfo {
 	info := DiskSpaceInfo{}
 
 	kernel32 := syscall.NewLazyDLL("kernel32.dll")
@@ -22,7 +26,7 @@ func GetDiskSpaceInfo() DiskSpaceInfo {
 
 	var freeBytesAvailable, totalBytes, totalFreeBytes uint64
 
-	pathPtr, err := syscall.UTF16PtrFromString(cachePath)
+	pathPtr, err := syscall.UTF16PtrFromString(path)
 	if err != nil {
 		return info
 	}

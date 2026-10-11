@@ -19,15 +19,25 @@ import (
 //  2. **不缓存不该缓存的东西** —— 流式、非白名单模型、无 usage 的响应一律不进缓存。
 
 // enableResponseCacheForTest 打开总开关并复位缓存与统计。
+//
+// 默认把后端固定为 **memory**：本文件测的是进程内 LRU 的契约（命中/淘汰/TTL/隔离），
+// 磁盘后端的契约在 `response_cache_disk_test.go` 里单独测。
+// 显式指定后端是必要的 —— 生产默认后端已改为 disk，不指定就会测错对象。
 func enableResponseCacheForTest(t *testing.T) {
+	enableResponseCacheForTestWithBackend(t, "memory")
+}
+
+func enableResponseCacheForTestWithBackend(t *testing.T, backend string) {
 	t.Helper()
 	enabled := "true"
 	common.SetFeatureFlagOverride(common.FlagResponseCacheEnabled, &enabled)
 	response_cache_setting.ResetStatsForTest()
+	response_cache_setting.SetBackendForTest(backend)
 	ResponseCacheClear()
 	t.Cleanup(func() {
 		common.ClearFeatureFlagOverrides()
 		response_cache_setting.ResetStatsForTest()
+		response_cache_setting.SetBackendForTest("memory")
 		response_cache_setting.SetForTest(0, 0, []string{}, []string{}, nil)
 		ResponseCacheClear()
 	})
@@ -259,7 +269,10 @@ func TestResponseCacheIsConcurrencySafe(t *testing.T) {
 	// 容量上界在并发下也不能被突破
 	assert.LessOrEqual(t, ResponseCacheLiveEntries(), 64, "并发写入下容量上界必须仍然成立")
 	stats := response_cache_setting.Stats()
-	assert.EqualValues(t, stats.Stores, int64(ResponseCacheLiveEntries())-stats.Evictions+stats.Evictions,
-		"stores 与 live+evictions 的关系应自洽（此处仅确保计数无负数/无溢出）")
-	assert.GreaterOrEqual(t, stats.Stores, int64(0))
+	// 并发下计数只要求：单调、非负、且"写入数 >= 命中数"（命中必然有先前的写入，
+	// 除非该条目已被淘汰 —— 所以只断言非负与写入数为正，不构造脆弱的等式）。
+	assert.Greater(t, stats.Stores, int64(0), "并发下应有成功的写入")
+	assert.GreaterOrEqual(t, stats.Hits, int64(0))
+	assert.GreaterOrEqual(t, stats.Misses, int64(0))
+	assert.GreaterOrEqual(t, stats.Evictions, int64(0))
 }

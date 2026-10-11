@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"hash"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -265,22 +266,40 @@ func ResponseCacheLookup(userID int, model, relayFormat string, rawBody []byte) 
 	}
 	ttl := time.Duration(response_cache_setting.TTLSeconds()) * time.Second
 
-	if response_cache_setting.Backend() == "redis" && common.RedisEnabled {
+	switch response_cache_setting.Backend() {
+	case "redis":
+		if !common.RedisEnabled {
+			break
+		}
 		if entry, ok := redisResponseCacheGet(key); ok {
 			response_cache_setting.RecordCacheHit(entry.totalTokens)
 			return &CachedResponse{Body: entry.body, TotalTokens: entry.totalTokens, StoredAt: entry.storedAt}, true
 		}
-		response_cache_setting.RecordCacheMiss()
-		return nil, false
+	case "disk":
+		if body, storedAt, ok := responseCacheDiskGet(key); ok {
+			if time.Since(storedAt) > ttl {
+				// 过期就地删除，不等清理 loop —— 否则"读到过期数据"与"还占着空间"同时发生。
+				responseCacheDiskDelete(key)
+				break
+			}
+			// 磁盘不单独存 token 数：usage 就在响应体里，按需提取即可
+			// （少存一份就少一个可能与 body 不一致的真相来源）。
+			var tokens int64
+			if usage := ExtractUsageFromResponseBody(body); usage != nil {
+				tokens = int64(usage.TotalTokens)
+			}
+			response_cache_setting.RecordCacheHit(tokens)
+			return &CachedResponse{Body: body, TotalTokens: tokens, StoredAt: storedAt}, true
+		}
+	default:
+		if entry, ok := responseCacheStore.get(key, time.Now(), ttl); ok {
+			response_cache_setting.RecordCacheHit(entry.totalTokens)
+			return &CachedResponse{Body: entry.body, TotalTokens: entry.totalTokens, StoredAt: entry.storedAt}, true
+		}
 	}
 
-	entry, ok := responseCacheStore.get(key, time.Now(), ttl)
-	if !ok {
-		response_cache_setting.RecordCacheMiss()
-		return nil, false
-	}
-	response_cache_setting.RecordCacheHit(entry.totalTokens)
-	return &CachedResponse{Body: entry.body, TotalTokens: entry.totalTokens, StoredAt: entry.storedAt}, true
+	response_cache_setting.RecordCacheMiss()
+	return nil, false
 }
 
 // ResponseCacheStore 写入一条缓存。调用方必须先确认：
@@ -299,24 +318,61 @@ func ResponseCacheStore(userID int, model, relayFormat string, rawBody, response
 		totalTokens: totalTokens,
 		storedAt:    time.Now(),
 	}
-	if response_cache_setting.Backend() == "redis" && common.RedisEnabled {
+	switch response_cache_setting.Backend() {
+	case "redis":
+		if !common.RedisEnabled {
+			return
+		}
 		if err := redisResponseCacheSet(key, entry, time.Duration(response_cache_setting.TTLSeconds())*time.Second); err != nil {
 			// 写 Redis 失败不算错误路径：降级为不缓存（下一次请求走上游）。
 			common.SysError("response cache redis set failed: " + err.Error())
 			return
 		}
 		response_cache_setting.RecordCacheStore()
-		return
+	case "disk":
+		// 磁盘后端：单条上限、总量配额、剩余空间守卫都在 put 内部判定；
+		// 未写入不是错误（缓存写失败从来不是请求失败的理由）。
+		responseCacheDiskPut(key, entry.body)
+	default:
+		responseCacheStore.put(key, entry, response_cache_setting.MaxEntries(), time.Now(),
+			time.Duration(response_cache_setting.TTLSeconds())*time.Second)
 	}
-	responseCacheStore.put(key, entry, response_cache_setting.MaxEntries(), time.Now(),
-		time.Duration(response_cache_setting.TTLSeconds())*time.Second)
 }
 
-// ResponseCacheLiveEntries 返回进程内当前条目数（供 /metrics 与效果度量）。
-func ResponseCacheLiveEntries() int { return responseCacheStore.len() }
+// ResponseCacheLiveEntries 返回当前后端的活跃条目数
+// （供 /metrics 与效果度量；磁盘后端的计数由清理 loop 校正，不实时扫目录）。
+func ResponseCacheLiveEntries() int {
+	switch response_cache_setting.Backend() {
+	case "disk":
+		return int(ResponseCacheDiskEntryCount())
+	case "redis":
+		return 0 // Redis 端不统计（跨实例共享，单实例计数无意义）
+	default:
+		return responseCacheStore.len()
+	}
+}
 
-// ResponseCacheClear 清空进程内缓存（管理端清理与测试使用），返回被清掉的条目数。
-func ResponseCacheClear() int { return responseCacheStore.reset() }
+// ResponseCacheClear 清空缓存（管理端清理与测试使用），返回被清掉的条目数。
+// 磁盘/Redis 后端也会被清（磁盘按目录递归删，Redis 不逐个删 —— 由 TTL 自然过期）。
+func ResponseCacheClear() int {
+	switch response_cache_setting.Backend() {
+	case "disk":
+		entries := scanResponseCacheFiles(responseCacheDiskRoot())
+		removed := 0
+		for _, e := range entries {
+			if err := os.Remove(e.path); err == nil {
+				removed++
+			}
+		}
+		responseCacheDiskUsage.Store(0)
+		responseCacheDiskEntries.Store(0)
+		return removed
+	case "redis":
+		return 0
+	default:
+		return responseCacheStore.reset()
+	}
+}
 
 // responseCacheMaxFingerprintBytes 是构建键时读取请求体的上限。
 // 我们只需要一个稳定的指纹，不需要完整大 body；超过此值直接放弃缓存（不缓存超大请求）。

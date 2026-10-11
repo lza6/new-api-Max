@@ -241,11 +241,21 @@ var responseCacheMetricKeys = []string{
 // ResponseCacheMetrics 返回响应缓存的效果度量（与 /metrics 同名指标同源）。
 func ResponseCacheMetrics() map[string]float64 {
 	stats := response_cache_setting.Stats()
-	return map[string]float64{
+	out := map[string]float64{
 		"response_cache_hits_total":   float64(stats.Hits),
 		"response_cache_misses_total": float64(stats.Misses),
 		"response_cache_live_entries": float64(service.ResponseCacheLiveEntries()),
 	}
+	// 磁盘后端的资源占用：让管理员能一眼看到「缓存占了多大盘、还剩多少配额」，
+	// 而不是等磁盘爆满才发现。
+	if response_cache_setting.Backend() == "disk" {
+		out["response_cache_disk_bytes"] = float64(service.ResponseCacheDiskUsageBytes())
+		out["response_cache_disk_budget_bytes"] = float64(response_cache_setting.DiskMaxBytes())
+		if free, ok := common.AvailableDiskBytes(service.ResponseCacheDiskRootDir()); ok {
+			out["response_cache_host_disk_free_bytes"] = float64(free)
+		}
+	}
+	return out
 }
 
 // ToolDrawerMetrics 返回工具抽屉的效果度量（去重次数与被移除的字节量）。

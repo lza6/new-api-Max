@@ -14,11 +14,18 @@ func GetDiskSpaceInfo() DiskSpaceInfo {
 	if cachePath == "" {
 		cachePath = os.TempDir()
 	}
+	return diskSpaceInfoAt(cachePath)
+}
 
+// diskSpaceInfoAt 获取**指定路径**所在文件系统的空间信息。
+//
+// 参数化版本供「写前检查剩余空间」使用：缓存/图床各有自己的目录，
+// 只查缓存目录所在盘是不够的（它们可能在不同挂载点）。
+func diskSpaceInfoAt(path string) DiskSpaceInfo {
 	info := DiskSpaceInfo{}
 
 	var stat unix.Statfs_t
-	err := unix.Statfs(cachePath, &stat)
+	err := unix.Statfs(path, &stat)
 	if err != nil {
 		return info
 	}

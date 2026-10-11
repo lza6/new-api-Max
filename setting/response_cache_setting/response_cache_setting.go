@@ -27,6 +27,20 @@ const (
 	DefaultMaxEntries = 1000  // 进程内最多 1000 条
 	MaxTTLSeconds     = 86400 // 上限 24 小时（防管理员配出"永久缓存"）
 	MaxMaxEntries     = 20000 // 上限 2 万条
+
+	// 磁盘后端默认值。
+	//
+	// 为什么默认走磁盘：生产是 4 核 4G / 容器 900MB 上限的机器，而磁盘有 78G 富余；
+	// 缓存条目是**整个上游响应体**（可达数百 KB），放进程内是与内存抢资源，
+	// 放磁盘才是「合理利用现有资源」。
+	DefaultDiskMaxBytes       int64 = 512 << 20 // 缓存目录总量上限 512 MB
+	MaxDiskMaxBytes           int64 = 8 << 30   // 上限 8 GB（防管理员配出"吃掉整块盘"）
+	DefaultDiskMaxEntryBytes  int64 = 1 << 20   // 单条上限 1 MB
+	MaxDiskMaxEntryBytes      int64 = 64 << 20  // 单条上限 64 MB
+	DefaultMinFreeDiskBytes   int64 = 2 << 30   // 宿主剩余空间低于 2 GB 就停止写入
+	MinMinFreeDiskBytes       int64 = 64 << 20  // 该下限最小可配 64 MB
+	DefaultDiskCleanupSeconds       = 300       // 磁盘清理周期 5 分钟
+	MinDiskCleanupSeconds           = 30
 )
 
 // ResponseCacheSetting 响应缓存参数。
@@ -44,8 +58,20 @@ type ResponseCacheSetting struct {
 	AllowCrossUser bool `json:"allow_cross_user"`
 	// ChargeOnHit 命中缓存时是否照常计费。默认 true（不改变商业口径）。
 	ChargeOnHit bool `json:"charge_on_hit"`
-	// Backend 后端类型：memory | redis。默认 memory。
+	// Backend 后端类型：memory | disk | redis。默认 **disk**（见上面的默认值说明）。
 	Backend string `json:"backend"`
+	// DiskDir 磁盘后端的根目录；留空用 `<工作目录>/data/response-cache`。
+	DiskDir string `json:"disk_dir"`
+	// DiskMaxBytes 磁盘缓存目录的**总量上限**；<=0 回退 DefaultDiskMaxBytes。
+	// 超出时按「最旧优先」自动淘汰 —— 这是"不允许无限增长"的硬保证。
+	DiskMaxBytes int64 `json:"disk_max_bytes"`
+	// DiskMaxEntryBytes **单条**响应体上限；超过则不缓存该条（大响应落盘也不值得）。
+	DiskMaxEntryBytes int64 `json:"disk_max_entry_bytes"`
+	// MinFreeDiskBytes 宿主文件系统**剩余空间下限**：低于它立即停止写入并清理。
+	// 这是"不要让磁盘爆满"的兜底 —— 缓存永远不能把宿主盘写满。
+	MinFreeDiskBytes int64 `json:"min_free_disk_bytes"`
+	// DiskCleanupSeconds 磁盘清理 loop 的周期（秒）。
+	DiskCleanupSeconds int `json:"disk_cleanup_seconds"`
 
 	// mu 保护上面的字段（热更新写入 vs 并发读取）。**不导出**，不参与
 	// `setting/config` 的反射序列化。
@@ -57,20 +83,29 @@ type ResponseCacheSetting struct {
 // 单独定义一个类型而不是直接返回 `ResponseCacheSetting`：后者含 `sync.RWMutex`，
 // 拷贝/返回带锁的值会被 `go vet` 判定为 `copylocks`（真实隐患）。
 type responseCacheConfig struct {
-	TTLSeconds     int
-	MaxEntries     int
-	AllowModels    []string
-	DenyModels     []string
-	AllowCrossUser bool
-	ChargeOnHit    bool
-	Backend        string
+	TTLSeconds         int
+	MaxEntries         int
+	AllowModels        []string
+	DenyModels         []string
+	AllowCrossUser     bool
+	ChargeOnHit        bool
+	Backend            string
+	DiskDir            string
+	DiskMaxBytes       int64
+	DiskMaxEntryBytes  int64
+	MinFreeDiskBytes   int64
+	DiskCleanupSeconds int
 }
 
 var setting = ResponseCacheSetting{
-	TTLSeconds:  DefaultTTLSeconds,
-	MaxEntries:  DefaultMaxEntries,
-	ChargeOnHit: true,
-	Backend:     "memory",
+	TTLSeconds:         DefaultTTLSeconds,
+	MaxEntries:         DefaultMaxEntries,
+	ChargeOnHit:        true,
+	Backend:            "disk",
+	DiskMaxBytes:       DefaultDiskMaxBytes,
+	DiskMaxEntryBytes:  DefaultDiskMaxEntryBytes,
+	MinFreeDiskBytes:   DefaultMinFreeDiskBytes,
+	DiskCleanupSeconds: DefaultDiskCleanupSeconds,
 }
 
 // featureCacheEnabledDefault 总开关的 env 默认（RESPONSE_CACHE_ENABLED，默认 false）。
@@ -95,13 +130,18 @@ func snapshot() responseCacheConfig {
 	setting.mu.RLock()
 	defer setting.mu.RUnlock()
 	return responseCacheConfig{
-		TTLSeconds:     setting.TTLSeconds,
-		MaxEntries:     setting.MaxEntries,
-		AllowModels:    append([]string(nil), setting.AllowModels...),
-		DenyModels:     append([]string(nil), setting.DenyModels...),
-		AllowCrossUser: setting.AllowCrossUser,
-		ChargeOnHit:    setting.ChargeOnHit,
-		Backend:        setting.Backend,
+		TTLSeconds:         setting.TTLSeconds,
+		MaxEntries:         setting.MaxEntries,
+		AllowModels:        append([]string(nil), setting.AllowModels...),
+		DenyModels:         append([]string(nil), setting.DenyModels...),
+		AllowCrossUser:     setting.AllowCrossUser,
+		ChargeOnHit:        setting.ChargeOnHit,
+		Backend:            setting.Backend,
+		DiskDir:            setting.DiskDir,
+		DiskMaxBytes:       setting.DiskMaxBytes,
+		DiskMaxEntryBytes:  setting.DiskMaxEntryBytes,
+		MinFreeDiskBytes:   setting.MinFreeDiskBytes,
+		DiskCleanupSeconds: setting.DiskCleanupSeconds,
 	}
 }
 
@@ -140,15 +180,68 @@ func AllowCrossUser() bool { return snapshot().AllowCrossUser }
 // ChargeOnHit 报告命中缓存时是否照常计费（默认 true）。
 func ChargeOnHit() bool { return snapshot().ChargeOnHit }
 
-// Backend 返回缓存后端名（normalize 后只可能是 memory / redis）。
+// Backend 返回缓存后端名（normalize 后只可能是 memory / disk / redis）。
+//
+// 默认 **disk**：生产内存紧张（容器 900MB）而磁盘富余（78G），缓存条目又是整个
+// 上游响应体（可达数百 KB）—— 放进程内是与内存抢资源。
 func Backend() string {
 	v := strings.ToLower(strings.TrimSpace(snapshot().Backend))
 	switch v {
 	case "redis":
 		return "redis"
-	default:
+	case "memory":
 		return "memory"
+	default:
+		return "disk"
 	}
+}
+
+// DiskDir 返回磁盘缓存根目录（留空由调用方回退到默认路径）。
+func DiskDir() string { return strings.TrimSpace(snapshot().DiskDir) }
+
+// DiskMaxBytes 返回磁盘缓存**总量上限**（带上限保护，防配出"吃掉整块盘"）。
+func DiskMaxBytes() int64 {
+	v := snapshot().DiskMaxBytes
+	if v <= 0 {
+		return DefaultDiskMaxBytes
+	}
+	if v > MaxDiskMaxBytes {
+		return MaxDiskMaxBytes
+	}
+	return v
+}
+
+// DiskMaxEntryBytes 返回**单条**响应体上限（超限不缓存该条）。
+func DiskMaxEntryBytes() int64 {
+	v := snapshot().DiskMaxEntryBytes
+	if v <= 0 {
+		return DefaultDiskMaxEntryBytes
+	}
+	if v > MaxDiskMaxEntryBytes {
+		return MaxDiskMaxEntryBytes
+	}
+	return v
+}
+
+// MinFreeDiskBytes 返回宿主剩余空间下限（低于它停止写入）。
+func MinFreeDiskBytes() int64 {
+	v := snapshot().MinFreeDiskBytes
+	if v <= 0 {
+		return DefaultMinFreeDiskBytes
+	}
+	if v < MinMinFreeDiskBytes {
+		return MinMinFreeDiskBytes
+	}
+	return v
+}
+
+// DiskCleanupSeconds 返回磁盘清理 loop 周期（秒），带下限保护。
+func DiskCleanupSeconds() int {
+	v := snapshot().DiskCleanupSeconds
+	if v < MinDiskCleanupSeconds {
+		return DefaultDiskCleanupSeconds
+	}
+	return v
 }
 
 // ModelCacheable 判定某个模型是否允许缓存。
@@ -286,5 +379,37 @@ func SetForTest(ttl, maxEntries int, allow, deny []string, crossUser *bool) {
 	}
 	if crossUser != nil {
 		setting.AllowCrossUser = *crossUser
+	}
+}
+
+// SetBackendForTest 覆盖后端类型（仅测试使用）。
+//
+// 之所以需要它：生产默认后端是 **disk**，而进程内 LRU 的契约测试必须显式指定
+// memory —— 否则会「测错对象」（用例看起来通过，实际测的是另一条路径）。
+func SetBackendForTest(backend string) {
+	setting.mu.Lock()
+	setting.Backend = backend
+	setting.mu.Unlock()
+}
+
+// SetDiskDirForTest 覆盖磁盘目录（仅测试使用，测试应传 t.TempDir()）。
+func SetDiskDirForTest(dir string) {
+	setting.mu.Lock()
+	setting.DiskDir = dir
+	setting.mu.Unlock()
+}
+
+// SetDiskLimitsForTest 覆盖磁盘限额（仅测试使用；<=0 表示不改该项）。
+func SetDiskLimitsForTest(maxBytes, maxEntryBytes, minFreeBytes int64) {
+	setting.mu.Lock()
+	defer setting.mu.Unlock()
+	if maxBytes > 0 {
+		setting.DiskMaxBytes = maxBytes
+	}
+	if maxEntryBytes > 0 {
+		setting.DiskMaxEntryBytes = maxEntryBytes
+	}
+	if minFreeBytes > 0 {
+		setting.MinFreeDiskBytes = minFreeBytes
 	}
 }
