@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	relaychannel "github.com/lza6/new-api-Max/relay/channel"
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/system_setting"
+	"github.com/lza6/new-api-Max/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -65,7 +67,9 @@ func allowPrivateTaskMediaTest(t *testing.T) {
 		fetchSetting.AllowPrivateIp = true
 		fetchSetting.AllowedPorts = []string{"1-65535"}
 	})
-	t.Cleanup(func() { system_setting.UpdateFetchSetting(func(fetchSetting *system_setting.FetchSetting) { *fetchSetting = originalFetchSetting }) })
+	t.Cleanup(func() {
+		system_setting.UpdateFetchSetting(func(fetchSetting *system_setting.FetchSetting) { *fetchSetting = originalFetchSetting })
+	})
 	service.InitHttpClient()
 }
 
@@ -592,4 +596,92 @@ func TestSelfTaskMediaURLGuard(t *testing.T) {
 	assert.False(t, isSelfTaskMediaURL(c, remoteURL))
 	assert.True(t, isTaskMediaFallbackLoop(remoteURL.String(), "task-1"))
 	assert.False(t, isTaskMediaFallbackLoop(remoteURL.String(), "task-2"))
+}
+
+// Batch-13 / G6-5：产物文件在 Resolve 与 Serve 之间被清理时，**不得**返回 200 空体。
+//
+// 锁的是一个真实缺陷（`controller/task.go`）：原实现是
+//
+//	_ = artifactStore.Serve(c, task, ref)
+//	return
+//
+// 而 localArtifactStore.Serve 在文件缺失时返回 os.ErrNotExist **且不写任何响应头/体**
+// （其注释明确写着「交回上层回退」）。错误被 `_ =` 丢弃后直接 return，客户端于是
+// 拿到「200 + 空响应体」，而且不会回退到上游代理 —— 清理 loop（5 分钟一轮）与
+// Resolve 之间的竞态窗口里，该路由彻底不可用。
+//
+// 修复后：os.ErrNotExist / 存储被禁用 视为「继续往下走」，由上游代理分支接管。
+func TestTaskArtifactMissingFileFallsBackInsteadOfEmpty200(t *testing.T) {
+	task := setupGenericTaskTest(t)
+	allowPrivateTaskMediaTest(t)
+
+	// 上游代理分支会返回这个标记，用来证明「确实回退了」
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "video/mp4")
+		_, _ = w.Write([]byte("upstream-fallback"))
+	}))
+	defer upstream.Close()
+
+	previousMemoryCache := common.MemoryCacheEnabled
+	common.MemoryCacheEnabled = false
+	t.Cleanup(func() { common.MemoryCacheEnabled = previousMemoryCache })
+
+	require.NoError(t, model.DB.Model(&model.Channel{}).Where("id = ?", task.ChannelId).Updates(map[string]any{
+		"type":     constant.ChannelTypeGemini,
+		"key":      "provider-key",
+		"base_url": upstream.URL,
+	}).Error)
+	task.Platform = constant.TaskPlatform("google")
+	task.PrivateData.Execution = &model.TaskExecutionSnapshot{TaskPlugin: &model.TaskPluginSnapshot{
+		Key: "google", Name: "Google Veo (Gemini API)", Version: "1.0.0", APIVersion: 1,
+	}}
+	task.SetData(map[string]any{"response": map[string]any{
+		"generateVideoResponse": map[string]any{
+			"generatedVideos": []any{map[string]any{"video": map[string]any{"uri": upstream.URL}}},
+		},
+	}})
+	require.NoError(t, model.DB.Save(task).Error)
+
+	// 注入一个「已启用、能 Resolve、但 Serve 时文件已不在」的 store
+	restore := service.SetTaskArtifactStoreForTest(staleArtifactStore{ref: &service.StoredArtifactRef{
+		ObjectKey: "task_generic/video", MimeType: "video/mp4",
+	}})
+	t.Cleanup(restore)
+	require.True(t, service.GetTaskArtifactStore().Enabled())
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Set(middleware.TaskArtifactAccessContextKey, true)
+	c.Params = gin.Params{
+		{Key: "key", Value: task.TaskID},
+		{Key: "artifact_key", Value: "video"},
+	}
+	c.Request = httptest.NewRequest(http.MethodGet, "/v1/tasks/"+task.TaskID+"/artifacts/video/content", nil)
+
+	TaskArtifactContent(c)
+
+	// 关键断言是**响应体非空**：回退到上游代理后返回 200 + 真实内容是正确行为，
+	// 缺陷是「200 + 空体」。因此不能断言状态码不是 200（那会误伤正常的代理响应）。
+	assert.NotEmpty(t, recorder.Body.String(), "绝不能返回空响应体（那正是原缺陷：200 + 空体）")
+	assert.Equal(t, "upstream-fallback", recorder.Body.String(), "应回退到上游代理分支并返回其内容")
+	assert.Equal(t, http.StatusOK, recorder.Code, "回退成功应为 200（带内容，不是空体）")
+}
+
+// staleArtifactStore 模拟「图床条目还在元数据里，但文件已被清理」的状态。
+type staleArtifactStore struct {
+	ref *service.StoredArtifactRef
+}
+
+func (staleArtifactStore) Enabled() bool { return true }
+
+func (s staleArtifactStore) Resolve(*model.Task, string) (*service.StoredArtifactRef, error) {
+	return s.ref, nil
+}
+
+func (staleArtifactStore) Persist(context.Context, *model.Task, types.TaskArtifact, io.Reader) (*service.StoredArtifactRef, error) {
+	return nil, service.ErrTaskArtifactStoreDisabled
+}
+
+func (staleArtifactStore) Serve(*gin.Context, *model.Task, *service.StoredArtifactRef) error {
+	return os.ErrNotExist
 }

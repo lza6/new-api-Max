@@ -52,6 +52,18 @@ func (disabledArtifactStore) Serve(*gin.Context, *model.Task, *StoredArtifactRef
 
 var taskArtifactStore TaskArtifactStore = buildTaskArtifactStore()
 
+// SetTaskArtifactStoreForTest 替换进程级产物存储后端，返回恢复函数。
+//
+// 仅供测试：`taskArtifactStore` 由环境变量在包初始化时构建一次，而涉及
+// 「已启用 local 图床 + 文件恰好被清理」这条竞态分支的用例必须能注入一个
+// 启用的 store，否则那条分支永远测不到（这也正是它曾经带着 200 空体缺陷
+// 上线的原因）。生产代码没有任何调用方。
+func SetTaskArtifactStoreForTest(s TaskArtifactStore) func() {
+	previous := taskArtifactStore
+	taskArtifactStore = s
+	return func() { taskArtifactStore = previous }
+}
+
 func init() {
 	_ = system_setting.LoadTaskArtifactStoreConfig()
 }

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -328,8 +329,23 @@ func TaskArtifactContent(c *gin.Context) {
 	}
 	artifactStore := service.GetTaskArtifactStore()
 	if ref, resolveErr := artifactStore.Resolve(task, artifactKey); resolveErr == nil && ref != nil {
-		_ = artifactStore.Serve(c, task, ref)
-		return
+		// 本地存储可能在 `Resolve` 与 `Serve` 之间被清理 loop 删掉文件
+		// （`service/task_artifact_cleanup.go` 每 5 分钟一次），此时 Serve 返回
+		// `os.ErrNotExist` **且不写任何响应头/体**。
+		//
+		// 关键：这里**不能**把错误丢掉直接 return —— 那会让客户端拿到
+		// 「200 + 空响应体」，而且**不会**回退到下面的上游代理分支，
+		// 即产物文件恰好被清理时该路由彻底不可用。Serve 的设计意图正是
+		// 「文件不在就交回上层去回退」（见 localArtifactStore.Serve 的注释），
+		// 所以失败时继续往下走 adaptor 投影路径。
+		if serveErr := artifactStore.Serve(c, task, ref); serveErr == nil {
+			return
+		} else if !errors.Is(serveErr, os.ErrNotExist) && !errors.Is(serveErr, service.ErrTaskArtifactStoreDisabled) {
+			// 非「文件缺失/存储不可用」的错误（如路径非法）应当如实上报，
+			// 不要静默落到上游代理去拿一份语义不同的内容。
+			writeTaskArtifactError(c, http.StatusInternalServerError, "artifact_serve_failed", "Failed to serve the stored artifact")
+			return
+		}
 	}
 
 	adaptor, err := initTaskArtifactAdaptor(task)
