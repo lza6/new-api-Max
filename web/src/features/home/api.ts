@@ -18,7 +18,11 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
 
-import type { HomePageContentResponse, SiteStatsResponse } from './types'
+import type {
+  HomePageContentResponse,
+  SiteStatsResponse,
+  SiteVisitorSummaryResponse,
+} from './types'
 
 // ============================================================================
 // Home Page APIs
@@ -44,5 +48,18 @@ export async function getHomePageContent(): Promise<HomePageContentResponse> {
  */
 export async function getSiteStats(): Promise<SiteStatsResponse> {
   const res = await api.get('/api/site/stats')
+  return res.data
+}
+
+/**
+ * Get visitor / activity statistics (aggregates only, no PII).
+ * Today / 7d / 30d / total unique visitors, page views, registered users,
+ * active users and the 30-day traffic-source breakdown.
+ *
+ * The backend deduplicates one IP per calendar day and excludes crawlers, so
+ * these numbers are real visitor counts rather than raw request counts.
+ */
+export async function getSiteVisitorSummary(): Promise<SiteVisitorSummaryResponse> {
+  const res = await api.get('/api/site/visitors')
   return res.data
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/controller"
 	"github.com/lza6/new-api-Max/middleware"
+	"github.com/lza6/new-api-Max/service"
 )
 
 // WebAssets holds the embedded dashboard frontend assets.
@@ -35,6 +36,14 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 		gzip.Gzip(gzip.DefaultCompression),
 		middleware.AccessTokenAudit(),
 		middleware.GlobalWebRateLimit(),
+		// 站点访客统计（Batch-13）：只对**公开页面文档请求**计数，
+		// 内存去重（一 IP 一天一次）后批量落库，绝不阻塞请求。见 service/site_visitor_tracker.go。
+		// 位置刻意放在 static.Serve **之前**：此时路径尚未被静态资源命中，
+		// 且 TrackSiteVisit 自身会过滤掉 API/静态资源，因此不会把资源请求计入访客。
+		func(c *gin.Context) {
+			service.TrackSiteVisit(c)
+			c.Next()
+		},
 		middleware.Cache(),
 		func(c *gin.Context) {
 			// 文档路由（无文件扩展名）不缓存：每次部署后浏览器重新获取最新

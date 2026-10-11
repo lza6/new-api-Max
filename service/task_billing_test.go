@@ -61,6 +61,8 @@ func TestMain(m *testing.M) {
 		&model.SystemTask{},
 		&model.SystemTaskLock{},
 		&model.EventDelivery{},
+		// Batch-13：站点访客统计表（service 包的访客追踪测试直接用 model.DB）。
+		&model.SiteDailyVisitor{},
 	); err != nil {
 		panic("failed to migrate: " + err.Error())
 	}

@@ -53,3 +53,41 @@ export interface SiteStatsResponse {
     total_quota: number
   }
 }
+
+/** Visitor counts (deduplicated per IP per day, bots excluded). */
+export interface VisitorCounts {
+  today: number
+  last_7d: number
+  last_30d: number
+  total: number
+  page_views_today: number
+  page_views_total: number
+  page_views_last_30d: number
+}
+
+/** One row of the 30-day traffic-source breakdown. */
+export interface TrafficSource {
+  source: string
+  count: number
+}
+
+/**
+ * Site statistics from GET /api/site/visitors.
+ *
+ * Every field is an aggregate count — the endpoint returns no IPs, no hashes
+ * and no user identifiers (see the backend's `model.SiteDailyVisitor`).
+ */
+export interface SiteVisitorSummary {
+  visitors: VisitorCounts
+  registered_users: number
+  active_users_24h: number
+  active_users_30d: number
+  sources: TrafficSource[]
+  generated_at: number
+}
+
+export interface SiteVisitorSummaryResponse {
+  success: boolean
+  message?: string
+  data?: SiteVisitorSummary
+}

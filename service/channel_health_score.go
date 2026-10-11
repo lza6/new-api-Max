@@ -92,6 +92,21 @@ func getHealthRing(channelId int) *channelHealthRing {
 	return r
 }
 
+// ForgetChannelHealth 丢弃某个渠道的健康样本环与快照缓存（Batch-13 / G10）。
+//
+// 为什么需要：`channelHealthTable` 的键是渠道 id，本身有界，但**渠道删除后不会释放**
+// —— 删除并重建渠道在同一个进程生命周期里是常见操作（换 key、换上游、修错配置），
+// 每次都会留下一条永不使用的条目与它 32 个样本槽。这里提供显式清理，
+// 由渠道删除路径调用（与既有的 `InvalidateProxyClient` 等失效动作放在一起）。
+//
+// 幂等：渠道不存在时是 no-op。
+func ForgetChannelHealth(channelId int) {
+	channelHealthMu.Lock()
+	delete(channelHealthTable, channelId)
+	delete(healthSnapshotCache, channelId)
+	channelHealthMu.Unlock()
+}
+
 // RecordChannelOutcome 渠道请求结果统一记录入口（成功/失败都走这里）。
 // latency 为本次上游调用耗时；失败时 class 为 B2-1 错误类，成功传 ErrClassOK。
 func RecordChannelOutcome(channelId int, success bool, latency time.Duration, class RelayErrorClass) {

@@ -35,7 +35,8 @@ export function Home() {
   const { resolvedTheme } = useTheme()
   const { auth } = useAuthStore()
   const isAuthenticated = !!auth.user
-  const { content, isLoaded, isUrl } = useHomePageContent()
+  // 不消费 isLoaded：自定义首页内容不再是渲染门（见下方注释）。
+  const { content, isUrl } = useHomePageContent()
 
   const syncIframePreferences = useCallback(() => {
     try {
@@ -58,16 +59,11 @@ export function Home() {
     }
   }, [isUrl, syncIframePreferences])
 
-  if (!isLoaded) {
-    return (
-      <PublicLayout showMainContainer={false}>
-        <main className='flex min-h-screen items-center justify-center'>
-          <div className='text-muted-foreground'>{t('Loading...')}</div>
-        </main>
-      </PublicLayout>
-    )
-  }
-
+  // 渲染门只认「内容已到达（含 localStorage 命中）且非空」。
+  // 关键：自定义首页内容不再阻塞默认落地页 —— 首访 / 响应空串 / 请求失败时，
+  // 直接渲染 Hero 系列，而不是等 XHR 返回才从 spinner 切过来。
+  // 代价是「管理端确实配置了自定义首页」时会先看到默认页再切换：路由层的
+  // beforeLoad 预热（routes/index.tsx）让这次切换通常发生在首帧之前。
   if (content) {
     if (isUrl) {
       return (

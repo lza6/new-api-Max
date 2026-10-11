@@ -36,6 +36,10 @@ func SetApiRouter(router *gin.Engine) {
 		// 公共只读聚合（无 PII）：首页/模型广场公开展示，未登录可访问。
 		// 不能用登录型限流（SearchRateLimit 对匿名请求 401）——保持无认证。
 		apiRouter.GET("/site/stats", controller.GetSiteOverview)
+		// Batch-13：站点访客统计（UV/页面访问/注册用户/DAU-MAU/流量来源）。
+		// 与上面的 /site/stats 同级公开：均为**无 PII 的聚合量**，不返回任何
+		// 用户标识、IP 或单访客行（IP 入库前已 HMAC 匿名化）。见 controller/site_visitor.go。
+		apiRouter.GET("/site/visitors", controller.GetSiteVisitorSummary)
 		apiRouter.GET("/model/stats", controller.GetModelStats)
 		apiRouter.GET("/pricing", middleware.HeaderNavModuleAuth("pricing"), controller.GetPricing)
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")

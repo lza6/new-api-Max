@@ -19,7 +19,14 @@ For commercial licensing, please contact support@quantumnous.com
 import { createFileRoute } from '@tanstack/react-router'
 
 import { Home } from '@/features/home'
+import { homePageContentQueryOptions } from '@/features/home/hooks'
 
 export const Route = createFileRoute('/')({
+  // 只预热、不 await：XHR 与路由解析/Hero 渲染并发启动，缩短数据到达时间，
+  // 但绝不把自定义首页内容重新变成首屏阻塞点。即使管理端配置了自定义首页，
+  // 内容也通常在这棵组件树首次渲染前就已 settled，从而避免默认页闪现。
+  beforeLoad: ({ context }) => {
+    void context.queryClient.prefetchQuery(homePageContentQueryOptions)
+  },
   component: Home,
 })

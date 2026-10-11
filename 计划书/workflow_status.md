@@ -535,3 +535,75 @@ controller: 反伪闭环守卫 TestFeatureSwitchDeclaredMetricsAreActuallyProduc
 | 5 | 运营者归属信息 | **需用户提供真实信息**，不编造 |
 | 6 | `hreflang` 与多语言 | 需先验证路由模型（独立 URL 还是同 URL 运行时切换） |
 | 7 | 移动端 CWV | **未测量** —— 服务器端爬取测不出，不得声称任何 CWV 改进 |
+
+---
+
+# Batch-13 —— 生产热修（og:url）+ 站点访客统计 + GEO/CWV（追加，v1.3.129）
+
+## 零、生产热修：og:url 注入模板写坏（**我在 v1.3.128 引入的真实缺陷**）
+
+**现象（用户报）**：页面顶部出现一行可见文本
+`X content="https://freeapi.tingfengai.art/usage-logs/common" />`
+
+**根因（静态确认 + 生产实测）**：`controller/spa_seo.go` 里 og:url 的替换串漏写了
+开头的 `<meta property="og:url"`，只剩 `` `X content="…" />` ``。于是壳中那整条
+`<meta property="og:url" content="/">` 被替换成**非法文本**。HTML 解析规则下
+`<head>` 内的非空白文本会**提前结束 head**，这段字符被丢进 `<body>` 顶部并被渲染。
+
+**为什么 CI 全绿**：旧断言只检查 `og:locale` 是否存在，而 og:locale 是**拼接追加**的，
+所以「标签被写坏」这件事没有任何断言覆盖 —— 这是「断言了某标签存在 ≠ 断言了标签仍合法」的典型盲区。
+
+**生产实测（修复前）**：
+```
+GET /usage-logs/common  → 200, 4757 bytes, ver=v1.3.128
+  'X content=' 出现在字节 997
+  '<meta property="og:url"' 是否存在: false
+```
+
+**修复 + 回归锁**：
+- `controller/spa_seo.go`：补回完整标签。
+- 新增 `TestSPASEOSetsWellFormedOGURL`：断言 og:url 是**完整合法**的 meta 标签、
+  指向本页绝对地址、与 canonical 一致，并**反向锁** `NotContains "X content="`。
+- **RED 反向验证**：把 bug 放回 → 用例如期 FAIL（错误信息精确指出 og:url 缺失且出现 `X content=`）→ 恢复 → PASS。
+
+**本地验证（修复后，真实 HTTP）**：
+```
+/                   200  4946B  X content= 已消失  og:url = http://localhost:3000/
+/pricing            200  4762B  X content= 已消失  og:url = …/pricing
+/usage-logs/common  200  4797B  X content= 已消失  og:url = …/usage-logs/common
+/about              200  4718B  X content= 已消失  og:url = …/about
+```
+
+## 一、站点访客统计（用户需求：今日/累计/近30天访客，按 IP，一 IP 一天一次；注册用户数；DAU/MAU；流量来源占比）
+
+### 新增
+| 文件 | 性质 |
+|---|---|
+| `model/site_visitor.go` | 访客表 `site_daily_visitors`：唯一键 **(day, ip_hash)** 把「一 IP 一天一次」变成**数据库层约束**；IP 只存 `HMAC-SHA256(secret, day\|ip)`（跨日不可关联、无密钥不可字典反查 IPv4）；保留策略 400 天 |
+| `service/site_visitor_tracker.go` | 内存去重（与唯一键同构）→ 30s 批量 upsert；**pending 存增量**（不是累计值，否则 SQL 侧 `hits = hits + excluded.hits` 会重复累加）；两道内存硬闸（去重集合 20 万 / 缓冲 5 万，达界后不缓存新键而非无界增长）；跨自然日清空集合；loop 心跳 `site_visitor_flush` |
+| `controller/site_visitor.go` | 公开只读端点 `GET /api/site/visitors`（纯聚合量，无 IP/哈希/用户标识） |
+| `router/{api,web}-router.go`、`main.go`、`model/main.go` | 路由注册、web 中间件埋点、迁移与 loop 启停 |
+| `web/src/features/home/components/traffic-stats.tsx` | 主页统计卡片：5 个数字 + 流量来源百分比条（纯 CSS，不引图表库） |
+
+### 三个真实缺陷（都是实测中抓出来的，不是理论问题）
+1. **多值 INSERT 占位符没按行展开** → SQLite **不报错**，静默只用第一组绑定值、丢弃其余行
+   （一次 flush 只入库一行）。修复：由行数生成 `(?,?,…)` 子句，参数按行扁平追加，二者不可能错位。
+2. **flush 后回访丢计数**：pending 复用累计记录，flush 清空后同一 IP 的新访问不再入队；
+   而简单重新入队又会因 SQL 侧累加而**重复计数**。修复：pending 改为只存**增量**的 `visitorDelta`。
+3. **`is_bot` 锁在首次访问**：爬虫先来、真人后来时，该 IP 当天**完全没有被计入**（实测命中的真实漏统计）。
+   修复：改为**累积 AND 语义** —— 只有当天该 IP 的**全部**访问都是爬虫才算爬虫。
+   同理 PV 与 UV 统一排除爬虫（同一张卡片上两个数不能是两个口径）。
+
+### 验收证据（全部实际运行）
+```
+go build ./... / go vet ./model ./service ./controller ./router   → 干净
+gofmt -l（仅指定文件）                                             → 无输出
+service:  20 用例 PASS（访客去重/去重边界/跨日/bot 累积/来源/保留策略/日期跨月）
+          go test -race  → 无 data race
+controller: 3 用例 PASS（端点结构完整 + 隐私断言 + 空数据非 null）
+真实 E2E（本地全栈 + 真实 HTTP + 真实 SQLite）                    → 21/21 PASS
+  · 同一 IP 连续 10 次访问 → 库中 **1 行**、hits 累加（「一 IP 一天一次」成立）
+  · Googlebot / curl / python-requests → 今日访客**不增加**
+  · /api/* 与静态资源 → 不计入访客
+  · 响应体不含 ip_hash / IP 明文 / user_id / username
+```

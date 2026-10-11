@@ -380,6 +380,7 @@ func migrateDB() error {
 		&AuthzRole{},
 		&BannedIP{},
 		&WebRequestLog{},
+		&SiteDailyVisitor{},
 		&EventDelivery{},
 		&WebhookEndpoint{},
 	}
@@ -429,7 +430,7 @@ func BackupTables() []any {
 		&SubscriptionPlanGrant{},
 		&CustomOAuthProvider{}, &UserOAuthBinding{}, &PerfMetric{},
 		&SystemInstance{}, &SystemTask{}, &SystemTaskLock{}, &CasbinRule{},
-		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &EventDelivery{},
+		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &SiteDailyVisitor{}, &EventDelivery{},
 		&WebhookEndpoint{},
 	}
 }

@@ -57,6 +57,8 @@ func TestMain(m *testing.M) {
 		&model.SystemInstance{}, &model.SystemTask{}, &model.SystemTaskLock{},
 		&model.CasbinRule{}, &model.AuthzRole{}, &model.BannedIP{},
 		&model.WebRequestLog{}, &model.EventDelivery{}, &model.AuditLog{},
+		// Batch-13：站点访客统计表（站点统计端点测试要用）。
+		&model.SiteDailyVisitor{},
 	); err != nil {
 		panic("failed to migrate controller test db: " + err.Error())
 	}

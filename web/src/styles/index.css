@@ -514,8 +514,25 @@ For commercial licensing, please contact support@quantumnous.com
   }
 }
 
+/* Landings LCP 元素（hero 的 <h1>）专用：只做位移，不做透明度。
+ * LCP 取「元素最后一次 significant 呈现变化」的时刻，opacity 0→1 的入场动画
+ * 会把 LCP 推迟整个动画时长（实测约 0.9s）。位移不改变元素的可见性，因此
+ * 首帧即可被记录为 LCP，同时保留「向上滑入」的观感。
+ * 其它区块继续用 landing-animate-fade-up（它们不在首屏 LCP 路径上）。 */
+@keyframes landing-rise-in {
+  from {
+    transform: translateY(24px);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
 .landing-animate-fade-up {
   animation: landing-fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.landing-animate-rise-up {
+  animation: landing-rise-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .landing-animate-fade-in {
   animation: landing-fade-in 0.6s ease-out both;
@@ -532,6 +549,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 @media (prefers-reduced-motion: reduce) {
   .landing-animate-fade-up,
+  .landing-animate-rise-up,
   .landing-animate-fade-in,
   .landing-animate-scale-in,
   .landing-animate-fade-left,

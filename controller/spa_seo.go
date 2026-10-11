@@ -308,7 +308,7 @@ func BuildSPAIndexHTML(c *gin.Context, indexPage []byte) []byte {
 	page = reSPAOGDesc.ReplaceAllString(page, `<meta property="og:description" content="`+esc(description)+`" />`)
 	// og:locale 壳里**没有** —— 与 og:url 一起追加（否则要单独插一条无从匹配的正则）。
 	page = reSPAOGURL.ReplaceAllString(page,
-		`X content="`+esc(canonical)+`" />`+
+		`<meta property="og:url" content="`+esc(canonical)+`" />`+
 			"\n    "+`<meta property="og:locale" content="`+esc(spaOGLocale(language))+`" />`)
 	page = reSPATwTitle.ReplaceAllString(page, `<meta name="twitter:title" content="`+esc(title)+`" />`)
 	page = reSPATwDesc.ReplaceAllString(page, `<meta name="twitter:description" content="`+esc(description)+`" />`)

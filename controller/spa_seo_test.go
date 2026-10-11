@@ -223,6 +223,38 @@ func TestSPASEOSetsOGLocale(t *testing.T) {
 	assert.Contains(t, enPage, `<meta property="og:locale" content="en_US" />`)
 }
 
+// og:url 必须是**结构完整**的 meta 标签，且指向本页的绝对地址。
+//
+// 这条是给一个真实事故补的回归锁：og:url 的替换串曾被写成 `X content="…"`（漏了
+// 开头的 `<meta property="og:url"`），于是生产页面上的 og:url 整条标签被替换成
+// 一段非法文本 `X content="https://…" />`。当时的断言只检查 og:locale 是否存在，
+// 所以 CI 全绿而线上是坏的 —— 断言"某标签存在"不等于断言"标签仍然合法"。
+func TestSPASEOSetsWellFormedOGURL(t *testing.T) {
+	previousBase := system_setting.ServerAddress
+	system_setting.ServerAddress = "https://example.test"
+	t.Cleanup(func() { system_setting.ServerAddress = previousBase })
+
+	for _, path := range []string{"/", "/pricing", "/about"} {
+		page := buildFixture(t, path)
+
+		want := "https://example.test" + path
+		if path == "/" {
+			want = "https://example.test/"
+		}
+		assert.Contains(t, page,
+			`<meta property="og:url" content="`+want+`" />`,
+			"%s 的 og:url 必须是完整的 meta 标签并指向本页", path)
+
+		// 反向锁：替换串写坏时会留下 `X content=`。这条断言让它无从遁形。
+		assert.NotContains(t, page, `X content=`, "og:url 替换串写坏了（出现 X content=）")
+
+		// og:url 与 canonical 必须一致，否则分享卡片与收录指向会分叉。
+		canon := regexp.MustCompile(`<link rel="canonical" href="([^"]*)"`).FindStringSubmatch(page)
+		require.Len(t, canon, 2)
+		assert.Equal(t, canon[1], want)
+	}
+}
+
 // 中文页的站内导航与外链标签也必须是中文 —— 只翻译标题会显得半成品。
 func TestSPASEOLocalizesNavAndOutboundLabels(t *testing.T) {
 	page := buildFixtureLang(t, "/pricing", "zh-CN")

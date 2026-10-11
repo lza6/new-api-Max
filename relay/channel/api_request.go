@@ -112,6 +112,17 @@ var passthroughSkipHeaderNamesLower = map[string]struct{}{
 
 var headerPassthroughRegexCache sync.Map // map[string]*regexp.Regexp
 
+// headerPassthroughRegexCacheMaxEntries 是这张缓存的**硬条目上界**（Batch-13 / G10）。
+//
+// 键来自渠道配置里的 header passthrough 规则串 —— 属于**配置驱动**而非流量驱动，
+// 因此正常量级是个位数。但没有上界时，反复改配置会留下永久残留（编译结果永不淘汰）；
+// 键本身有界（= 历史上出现过的不同规则串数量）所以不是严重泄漏，这里补上界是为了
+// 让它**在任何配置变更节奏下都有确定的上界**，而不依赖「运维不会频繁改规则」这个假设。
+//
+// 达上界后**不缓存**：`regexp.Compile` 的结果是确定性的，不缓存只是多一次编译，
+// 正确性完全不受影响。
+const headerPassthroughRegexCacheMaxEntries = 2048
+
 func getHeaderPassthroughRegex(pattern string) (*regexp.Regexp, error) {
 	pattern = strings.TrimSpace(pattern)
 	if pattern == "" {
@@ -127,11 +138,24 @@ func getHeaderPassthroughRegex(pattern string) (*regexp.Regexp, error) {
 	if err != nil {
 		return nil, err
 	}
+	if headerPassthroughRegexCacheSize() >= headerPassthroughRegexCacheMaxEntries {
+		return compiled, nil
+	}
 	actual, _ := headerPassthroughRegexCache.LoadOrStore(pattern, compiled)
 	if re, ok := actual.(*regexp.Regexp); ok {
 		return re, nil
 	}
 	return compiled, nil
+}
+
+// headerPassthroughRegexCacheSize 数一遍缓存条目数（仅在未命中路径调用，成本可接受）。
+func headerPassthroughRegexCacheSize() int {
+	n := 0
+	headerPassthroughRegexCache.Range(func(_, _ any) bool {
+		n++
+		return true
+	})
+	return n
 }
 
 func IsHeaderPassthroughRuleKey(key string) bool {

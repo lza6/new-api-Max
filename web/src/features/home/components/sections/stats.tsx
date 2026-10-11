@@ -20,6 +20,7 @@ import { useRef, useEffect, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SiteStats } from '../site-stats'
+import { TrafficStats } from '../traffic-stats'
 
 interface CounterProps {
   end: number
@@ -109,6 +110,12 @@ export function Stats(_props: StatsProps) {
   return (
     <div className='border-border/40 bg-muted/10 relative z-10 border-y'>
       <div className='mx-auto max-w-6xl px-6 py-10 md:py-12'>
+        {/*
+          真实运营数据（访客/用户/流量来源）排在静态能力计数**之前**：
+          前者是随站点成长而变化的事实，后者是产品能力清单，前者更值得访客先看到。
+          两块都由各自的数据源独立决定是否渲染 —— 一块拿不到数据不影响另一块显示。
+        */}
+        <TrafficStats />
         <SiteStats />
         <div className='grid grid-cols-2 gap-8 md:grid-cols-4 md:gap-12'>
           {stats.map((s) => (

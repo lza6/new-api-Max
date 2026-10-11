@@ -65,6 +65,10 @@ const MoreIcon = () => (
 // every locale intact (we animate words, not characters) and the wrapper layers
 // a stagger on top of the section's own entrance. No overflow mask is used, so
 // descenders in any script are never clipped. Reduced motion renders plain text.
+//
+// 只做位移、不做透明度：<h1> 是落地页的 LCP 元素，opacity 0→1 会让 LCP 被推迟到
+// 动画结束（实测每个词的错峰延迟叠加后约 0.9s）。位移不改变可见性，首帧即可被
+// 记录为 LCP，视觉上仍是逐词上浮。
 function HeroHeadline(props: { children: string; delay?: number }) {
   const shouldReduce = useReducedMotion()
   // Tokenise once, tagging each word with how many times it has already appeared
@@ -85,8 +89,8 @@ function HeroHeadline(props: { children: string; delay?: number }) {
         <span key={token.id}>
           <motion.span
             className='inline-block'
-            initial={{ y: '0.5em', opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
+            initial={{ y: '0.5em' }}
+            animate={{ y: 0 }}
             transition={{
               duration: 0.6,
               delay: (props.delay ?? 0) + i * 0.05,
@@ -174,8 +178,10 @@ export function Hero(props: HeroProps) {
             <span>{t('AI Application Infrastructure Foundation')}</span>
           </div>
 
+          {/* LCP 元素：用只做位移的 rise-up（见 styles/index.css 注释），
+              避免 opacity 入场把 LCP 推迟整个动画时长。 */}
           <h1
-            className='landing-animate-fade-up font-serif text-[clamp(2.4rem,4.6vw,3.5rem)] leading-[1.12] font-medium tracking-[-0.02em]'
+            className='landing-animate-rise-up font-serif text-[clamp(2.4rem,4.6vw,3.5rem)] leading-[1.12] font-medium tracking-[-0.02em]'
             style={{ animationDelay: '60ms' }}
           >
             <HeroHeadline delay={0.1}>

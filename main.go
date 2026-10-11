@@ -266,6 +266,8 @@ func main() {
 	service.StopTaskEventCleanup()
 	service.StopDiskCacheMaintenanceLoop()
 	service.StopWebProtectionMaintenanceLoop()
+	// 停止前会把内存里未落库的访客写下去，避免重启丢计数（见 StartSiteVisitorLoop）。
+	service.StopSiteVisitorLoop()
 
 	// 零停机关键：先停 keep-alive（新连接不再复用空闲连接，旧空闲连接关闭），
 	// 再 Shutdown 等待活跃请求/SSE 流自然结束（最多 shutdownTimeout），
@@ -427,6 +429,8 @@ func InitResources() error {
 	service.StartDiskCacheMaintenanceLoop()
 	model.StartConsumeLogFlusher()
 	service.StartWebProtectionMaintenanceLoop()
+	// Batch-13：站点访客统计落库 + 每日保留策略清理（一 IP 一天一次）。
+	service.StartSiteVisitorLoop()
 
 	return nil
 }
