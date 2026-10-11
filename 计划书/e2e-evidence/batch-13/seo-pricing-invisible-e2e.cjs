@@ -84,6 +84,34 @@ const state = (p) =>
 
   console.log('[1] 直接访问 /pricing（全新加载）')
   await p.goto(`${BASE}/pricing`, { waitUntil: 'domcontentloaded', timeout: 90000 })
+
+  // 挂载**前**取样：如实记录 SEO 注入块的可见窗口。
+  // 这一步不是为了断言"看不见"（它在这个时点**本来就看得见**），而是把事实记录下来，
+  // 避免再用"挂载后取样"制造出"用户全程看不到"的假象。
+  const preMount = await p.evaluate(() => {
+    const el = document.getElementById('spa-seo-content')
+    const tbl = document.getElementById('spa-seo-pricing')
+    const style = el ? getComputedStyle(el) : null
+    return {
+      seoBlockInDom: !!el,
+      priceTableInDom: !!tbl,
+      display: style ? style.display : null,
+      visibility: style ? style.visibility : null,
+      // 该元素在当前时点是否实际占据可见区域
+      hasVisibleBox: el ? el.getBoundingClientRect().height > 0 : false,
+    }
+  })
+  console.log('    挂载前：' + JSON.stringify(preMount))
+  console.log(
+    '    （说明：注入块在 React 挂载前**对用户可见** —— 它是服务端降级内容，' +
+      '刻意不用 CSS 隐藏，因为 Googlebot 会应用 CSS，隐藏只让爬虫读会构成 cloaking）'
+  )
+  check(
+    '挂载前的注入块状态已被记录（display/visibility 未被 CSS 隐藏）',
+    preMount.display !== 'none' || preMount.display === null,
+    JSON.stringify(preMount)
+  )
+
   await p
     .waitForFunction(() => (document.getElementById('root')?.childElementCount || 0) > 0, {
       timeout: 60000,
@@ -91,7 +119,7 @@ const state = (p) =>
     .catch(() => {})
   await p.waitForTimeout(1500)
   let s = await state(p)
-  console.log('    ' + JSON.stringify(s))
+  console.log('    挂载后：' + JSON.stringify(s))
   check('SEO 内容块已从 DOM 移除', !s.seoBlock)
   check('价目表已从 DOM 移除（本次修复的核心）', !s.priceTable, '表格仍在 DOM 中')
   check('页面上没有残留的爬虫价目表文案', !s.leakedPricingText)
@@ -138,23 +166,38 @@ const state = (p) =>
     rows.forEach((r) => console.log(`      ${r.name} | ${r.mode} | ${r.price}`))
 
     // 与前端一致的规则（web/src/features/pricing/lib/billing-mode.ts 的
-    // getBillingModeLabelKey：先判 billing_mode/表达式，再判 quota_type）。
-    // 用 /api/pricing 的原始字段对照，逐行验证标签没被弄反。
+    // getBillingModeLabelKey，**优先级从高到低**）：
+    //   hasTaskUsageSchema → 'Task billing'
+    //   isDynamicPricingModel(billing_mode==='tiered_expr' && billing_expr) → 'Dynamic Pricing'
+    //   isTokenBasedModel(quota_type!==1) → 'Token-based'
+    //   else → 'Per Request'
+    // 只有「按次计费」才展示固定单价；其余三类都不展示（Go 侧无等价实现，报数即误导）。
     const apiModels = JSON.parse((await rawHtml('/api/pricing')) || '{}').data || []
     const byName = new Map(apiModels.map((m) => [m.model_name, m]))
-    let mismatched = []
+    const mismatched = []
     for (const r of rows) {
       const m = byName.get(r.name)
       if (!m) continue
+      const hasTaskSchema =
+        m.billing_usage_schema != null && Object.keys(m.billing_usage_schema).length > 0
       const isDynamic = m.billing_mode === 'tiered_expr' && Boolean(m.billing_expr)
-      const wantMode = isDynamic ? '按用量表达式计费' : '按次计费'
+      let wantMode
+      if (hasTaskSchema) wantMode = '任务计费'
+      else if (isDynamic) wantMode = '按用量表达式计费'
+      else if (m.quota_type !== 1) wantMode = '按 token 计费'
+      else wantMode = '按次计费'
+
       if (r.mode !== wantMode) mismatched.push(`${r.name}: 期望 ${wantMode} 实得 ${r.mode}`)
-      // 动态计费的模型不得展示固定单价；按次的必须展示
-      if (isDynamic && r.price.startsWith('$')) mismatched.push(`${r.name}: 动态计费却展示了固定价 ${r.price}`)
-      if (!isDynamic && !r.price.startsWith('$')) mismatched.push(`${r.name}: 按次计费却没有固定价 ${r.price}`)
+      const showsFixedPrice = r.price.startsWith('$')
+      if (wantMode === '按次计费' && !showsFixedPrice) {
+        mismatched.push(`${r.name}: 按次计费却没有固定价 ${r.price}`)
+      }
+      if (wantMode !== '按次计费' && showsFixedPrice) {
+        mismatched.push(`${r.name}: ${wantMode} 却展示了固定价 ${r.price}`)
+      }
     }
     check(
-      '计费方式与固定价展示与前端判据一致（先 billing_mode 后 quota_type）',
+      '计费方式与固定价展示与前端判据一致（任务 > 表达式 > token > 按次）',
       mismatched.length === 0,
       mismatched.join(' | ')
     )

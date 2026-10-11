@@ -92,19 +92,25 @@ func getHealthRing(channelId int) *channelHealthRing {
 	return r
 }
 
-// ForgetChannelHealth 丢弃某个渠道的健康样本环与快照缓存（Batch-13 / G10）。
+// ForgetChannelHealth 丢弃某个渠道的**全部进程内状态**：健康样本环、健康快照缓存、
+// 以及熔断表条目（Batch-13 / G10）。
 //
-// 为什么需要：`channelHealthTable` 的键是渠道 id，本身有界，但**渠道删除后不会释放**
-// —— 删除并重建渠道在同一个进程生命周期里是常见操作（换 key、换上游、修错配置），
-// 每次都会留下一条永不使用的条目与它 32 个样本槽。这里提供显式清理，
-// 由渠道删除路径调用（与既有的 `InvalidateProxyClient` 等失效动作放在一起）。
+// 为什么需要：这些表的键都是渠道 id，本身有界，但**渠道删除后不会释放** ——
+// 「删了再建同名渠道」是常见操作（换 key、换上游、修错配置），不清理会有两个后果：
+//  1. 每次删除都留下一条永不使用的条目与它 32 个样本槽；
+//  2. **新渠道会继承旧渠道的熔断状态**（连续失败数 / 半开探测计数），
+//     可能一开始就被拦或被误判为不健康。
 //
+// 刻意只暴露**一个**入口来释放渠道级状态：调用方（渠道删除路径）只需记住这一个函数，
+// 将来新增同类表也在这里扩展，不必去改每个删除点。
 // 幂等：渠道不存在时是 no-op。
 func ForgetChannelHealth(channelId int) {
 	channelHealthMu.Lock()
 	delete(channelHealthTable, channelId)
 	delete(healthSnapshotCache, channelId)
 	channelHealthMu.Unlock()
+
+	ForgetChannelCircuit(channelId)
 }
 
 // RecordChannelOutcome 渠道请求结果统一记录入口（成功/失败都走这里）。

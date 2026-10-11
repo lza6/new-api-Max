@@ -751,6 +751,10 @@ func DeleteChannel(c *gin.Context) {
 		return
 	}
 	model.InitChannelCache()
+	// 释放该渠道的进程内状态：健康样本环 + 熔断表条目 + 快照缓存。
+	// 与下面两条代理客户端失效放在一起 —— 渠道删除后这些条目再无用途，
+	// 而「删了再建同名渠道」是常见操作，不释放就会残留（键是渠道 id，有界但会泄漏）。
+	service.ForgetChannelHealth(id)
 	if channelLookupFailed {
 		service.ResetProxyClientCache()
 	} else {
@@ -933,6 +937,10 @@ func DeleteChannelBatch(c *gin.Context) {
 		return
 	}
 	model.InitChannelCache()
+	// 批量删除同样要释放每个渠道的进程内状态（见 DeleteChannel 的同名调用）。
+	for _, id := range channelBatch.Ids {
+		service.ForgetChannelHealth(id)
+	}
 	if deletedCount > 0 {
 		service.ResetProxyClientCache()
 	}

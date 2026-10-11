@@ -91,23 +91,40 @@ type SiteDailyVisitorRow struct {
 // 这是「统计要真实」这条要求在去重场景下的正确语义。
 //
 // 分方言实现：SQLite / PostgreSQL 用 `ON CONFLICT (col) DO UPDATE`，
-// MySQL 用 `ON DUPLICATE KEY UPDATE`。不用 GORM 的 clause.OnConflict 是因为
-// 它在 MySQL 上生成的 `VALUES(col)` 已被 8.0.20 弃用，且目标列写法三库不通用。
+// MySQL 用 `ON DUPLICATE KEY UPDATE ... VALUES(col)`。
+//
+// 关于 MySQL 的 `VALUES(col)`：该写法自 MySQL 8.0.20 起被标记弃用（替代写法是
+// `AS new` 行别名），**但本项目要求兼容 MySQL ≥ 5.7.8**（见 AGENTS.md），
+// 而 `AS new` 需要 8.0.19+。因此这里**刻意保留 `VALUES(col)`** ——
+// 它在 5.7 与 8.x 上都能工作，只是 8.0.20+ 会在错误日志里留一条弃用告警。
+// 若将来放弃 5.7，再换成行别名写法。
+//
+// 不用 GORM 的 `clause.OnConflict`：它在 MySQL 上生成的片段无法与 SQLite/Postgres
+// 的目标列语义共用一套代码，且会在 8.0.20+ 触发同样的弃用路径却不便说明原因 ——
+// 直接写清楚更可控。
 func UpsertSiteDailyVisitors(rows []SiteDailyVisitorRow) error {
 	if len(rows) == 0 {
 		return nil
 	}
-	if len(rows) > siteVisitorMaxBatch {
-		rows = rows[:siteVisitorMaxBatch]
-	}
 	rows = dedupeSiteVisitorRows(rows)
+	// **必须分批循环写完，不能截断。** 调用方（tracker 的 flush）在取出待写行后
+	// 会立刻清空自己的缓冲区，所以这里截断 = 那些行**永久丢失**（不是"下次再写"）。
+	// 30 秒窗口内出现超过 siteVisitorMaxBatch 个新 IP 就会触发（例如换源 IP 洪泛）。
 	return DB.Transaction(func(tx *gorm.DB) error {
-		switch DB.Dialector.Name() {
-		case "mysql":
-			return upsertSiteDailyVisitorsMySQL(tx, rows)
-		default:
-			return upsertSiteDailyVisitorsConflict(tx, rows)
+		for start := 0; start < len(rows); start += siteVisitorMaxBatch {
+			end := min(start+siteVisitorMaxBatch, len(rows))
+			batch := rows[start:end]
+			var err error
+			if DB.Dialector.Name() == "mysql" {
+				err = upsertSiteDailyVisitorsMySQL(tx, batch)
+			} else {
+				err = upsertSiteDailyVisitorsConflict(tx, batch)
+			}
+			if err != nil {
+				return err
+			}
 		}
+		return nil
 	})
 }
 
@@ -235,7 +252,11 @@ type SiteVisitorStats struct {
 // 只是不参与任何对外展示的口径。）
 func GetSiteVisitorStats(today int) (*SiteVisitorStats, error) {
 	stats := &SiteVisitorStats{}
-	dayFloor := today - 10000 // 安全下界，避免极端 day 值
+	// 累计口径的下界必须与**保留策略**一致（`service.visitorRetentionDays`，400 天）。
+	// 原实现写 `today - 10000`（等于"去年同日"，约 366 天），导致第 366~400 天的行
+	// 被保留却**不计入 Total** —— 与该字段"自本表启用以来的累计"的语义不符。
+	// 这里用同一套自然日算术，跨月/跨年也正确。
+	dayFloor := DayOffset(today, -siteVisitorTotalWindowDays)
 
 	countUV := func(from, to int) (int64, error) {
 		var n int64
@@ -365,3 +386,11 @@ func CountActiveUsers(fromUnix int64) (int64, error) {
 func (s SiteVisitorStats) String() string {
 	return fmt.Sprintf("uv today=%d 7d=%d 30d=%d total=%d", s.Today, s.Last7d, s.Last30d, s.Total)
 }
+
+// siteVisitorTotalWindowDays 是「累计」口径的回溯窗口。
+//
+// 必须 **≥** 保留策略的天数（`service.visitorRetentionDays`，400 天），否则
+// 被保留下来的行会有一段窗口不计入 Total。取 4000 天（约 11 年）是为了让
+// 「累计」在可预见的运行期内等价于「全部保留行」—— 这个查询走 day 索引的范围扫描，
+// 窗口放宽不增加成本（表里本来就只有保留期内的行）。
+const siteVisitorTotalWindowDays = 4000

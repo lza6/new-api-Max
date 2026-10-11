@@ -16,6 +16,7 @@ import (
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
+	"github.com/lza6/new-api-Max/pkg/jsplugin"
 	"github.com/lza6/new-api-Max/setting/system_setting"
 )
 
@@ -336,6 +337,15 @@ func TestSPAPricingLabels(t *testing.T) {
 			pricing:   model.Pricing{QuotaType: 1, ModelPrice: 0.006, BillingMode: "tiered_expr", BillingExpr: `tier("a", p*1)`},
 			wantModeZ: "按用量表达式计费", wantValZ: "见本页交互界面（按用量计算）",
 			wantModeE: "Usage-based (billing expression)", wantValE: "see the interactive view (computed from usage)",
+		},
+		{
+			// 前端 getBillingModeLabelKey 的**最高优先级**分支是 hasTaskUsageSchema
+			// （billing_usage_schema 非空 → 'Task billing'）。Go 侧此前缺这个分支，
+			// 会把任务型模型错标成表达式/按次/按 token，与前端的 badge 不一致。
+			name:      "任务型计费（billing_usage_schema 非空）：必须优先标为任务计费",
+			pricing:   model.Pricing{QuotaType: 1, ModelPrice: 0.5, BillingUsageSchema: map[string]jsplugin.UsageFieldSchema{"seconds": {Type: "number"}}},
+			wantModeZ: "任务计费", wantValZ: "见本页交互界面（按用量单位计费）",
+			wantModeE: "Task billing", wantValE: "see the interactive view (billed per usage unit)",
 		},
 		{
 			name:      "按 token + billing_mode=fixed：给倍率，不当作表达式计费",

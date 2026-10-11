@@ -455,6 +455,15 @@ func spaPricingTableHTML(c *gin.Context, language string) string {
 // 计费表达式**（见 `service/tiered_settle.go` 的 BillingMode 判定），
 // 因此展示 `model_price` 会误导读者以为每次固定收那个价。
 func spaPricingModeLabel(p model.Pricing, zh bool) string {
+	// 任务型计费是前端 `getBillingModeLabelKey` 的**最高优先级**分支
+	// （`hasTaskUsageSchema` = billing_usage_schema 非空），必须先判，
+	// 否则这类模型会落到下面的分支而与前端的 badge 不一致。
+	if len(p.BillingUsageSchema) > 0 {
+		if zh {
+			return "任务计费"
+		}
+		return "Task billing"
+	}
 	switch {
 	case strings.TrimSpace(p.BillingExpr) != "" || strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed":
 		if zh {
@@ -477,6 +486,13 @@ func spaPricingModeLabel(p model.Pricing, zh bool) string {
 // spaPricingValueLabel 描述价格。上面注释解释了为什么这里**不给阶梯/表达式模型编数字**：
 // 表达式可能按上下文长度/缓存分档计费，Go 侧没有等价实现，报一个数就是误导。
 func spaPricingValueLabel(p model.Pricing, zh bool) string {
+	// 任务型计费按用量单位（$/秒、$/张…）结算，Go 侧同样没有等价实现。
+	if len(p.BillingUsageSchema) > 0 {
+		if zh {
+			return "见本页交互界面（按用量单位计费）"
+		}
+		return "see the interactive view (billed per usage unit)"
+	}
 	switch {
 	case strings.TrimSpace(p.BillingExpr) != "" || (strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed"):
 		if zh {
@@ -513,7 +529,17 @@ func spaOGLocale(language string) string {
 // spaBuildContentBlock 构造给爬虫看的内容块。
 //
 // 放在 `#root` **之前**、`<body>` 之后：React 挂载进 `#root` 不会碰到它，
-// 再由 `spaSEORemoverScript` 在挂载完成后移除 —— 用户看不到，爬虫看得到。
+// 再由 `spaSEORemoverScript` 在挂载完成后移除。
+//
+// **关于用户可见性的事实（必须如实描述，避免"宣称与事实不一致"）**：
+// 容器**没有任何 CSS 隐藏**。因此在「文档送达 → React 首次渲染出子节点」
+// 这段窗口内，这段内容**对用户是可见的**（`/pricing` 上还包含最多 120 行价目表）。
+// 它是**服务端渲染的降级内容**，描述与 React 渲染的是同一件事 ——
+// 这正是它不构成 cloaking 的前提。
+//
+// 刻意**不**用 CSS 隐藏它：Googlebot 会应用 CSS，用 `display:none` /
+// `visibility:hidden` 把内容藏起来只让爬虫读到，恰恰构成 cloaking。
+// 所以这里选择"短暂可见"而非"隐藏"。
 //
 // 结构：`<h1>` → 摘要 → 限制与边界小节 → `extraHTML`（可见的附加内容，如价目表）→
 // 站内导航 → 上游官方文档外链。

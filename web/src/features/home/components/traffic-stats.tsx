@@ -91,13 +91,25 @@ function TrafficStatsBody({ data, label }: TrafficStatsBodyProps) {
       title: label('Registered users'),
       hint: label('Accounts registered on this site'),
     },
+    {
+      key: 'dau',
+      value: data.active_users_24h,
+      title: label('Active users (24h)'),
+      hint: label('Users with API usage in the last 24 hours'),
+    },
+    {
+      key: 'mau',
+      value: data.active_users_30d,
+      title: label('Active users (30d)'),
+      hint: label('Users with API usage in the last 30 days'),
+    },
   ]
 
   const sourceRows = normalizeSources(data.sources)
 
   return (
     <div className='pt-10'>
-      <div className='grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-5 md:gap-x-8'>
+      <div className='grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 md:gap-x-8'>
         {cards.map((c) => (
           <div
             key={c.key}
@@ -212,8 +224,8 @@ function sourceLabelKey(source: string): string {
 function TrafficStatsSkeleton() {
   return (
     <div className='pt-10'>
-      <div className='grid grid-cols-2 gap-x-6 gap-y-8 md:grid-cols-5 md:gap-x-8'>
-        {[0, 1, 2, 3, 4].map((i) => (
+      <div className='grid grid-cols-2 gap-x-6 gap-y-8 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 md:gap-x-8'>
+        {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className='flex flex-col items-center gap-1.5'>
             <Skeleton className='h-8 w-20 rounded-md' />
             <Skeleton className='h-4 w-24 rounded-md' />

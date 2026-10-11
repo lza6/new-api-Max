@@ -697,3 +697,71 @@ func TestSiteVisitorCacheKeepsValueOnRefreshError(t *testing.T) {
 
 	assert.NotNil(t, c.peek(), "刷新失败不得丢弃已有值")
 }
+
+// Batch-13 审查修复 P1-1：单次 flush 超过 siteVisitorMaxBatch 时**不得丢行**。
+//
+// 锁一个真实缺陷：`UpsertSiteDailyVisitors` 原先直接 `rows[:500]` 截断，
+// 而调用方 `collectRowsLocked` 取出后已清空自己的缓冲区 —— 于是超出的行
+// **永久丢失**（不是"下次再写"）。30 秒窗口内出现 >500 个新 IP 即触发。
+func TestUpsertSiteDailyVisitorsDoesNotDropRowsBeyondBatch(t *testing.T) {
+	require.NoError(t, model.DB.Where("1 = 1").Delete(&model.SiteDailyVisitor{}).Error)
+	day := VisitorCurrentDay()
+
+	const total = 1201 // 刻意跨过 2 个批次边界
+	rows := make([]model.SiteDailyVisitorRow, 0, total)
+	for i := range total {
+		rows = append(rows, model.SiteDailyVisitorRow{
+			Day: day, IPHash: hashOfIndex(i), FirstSeenAt: 1, LastSeenAt: 1,
+			Hits: 1, Source: "direct", Path: "/",
+		})
+	}
+	require.NoError(t, model.UpsertSiteDailyVisitors(rows))
+
+	var got int64
+	require.NoError(t, model.DB.Model(&model.SiteDailyVisitor{}).Where("day = ?", day).Count(&got).Error)
+	assert.Equal(t, int64(total), got,
+		"超过单批上限的行也必须写入 —— 丢弃会永久失去这些访客")
+
+	stats, err := model.GetSiteVisitorStats(day)
+	require.NoError(t, err)
+	assert.Equal(t, int64(total), stats.Today, "今日访客应等于全部写入行数")
+}
+
+// hashOfIndex 生成 64 位十六进制、彼此不重复的 ip_hash（形状与生产一致）。
+func hashOfIndex(i int) string {
+	const hexdigits = "0123456789abcdef"
+	b := make([]byte, 64)
+	for j := range b {
+		b[j] = '0'
+	}
+	// 低 8 位放索引，其余补零；不同 i 必得不同串
+	for j := 0; j < 8; j++ {
+		b[63-j] = hexdigits[(i>>(4*j))&0xf]
+	}
+	return string(b)
+}
+
+// Batch-13 审查修复 P1-3：渠道删除必须释放**健康表与熔断表**两处状态。
+func TestForgetChannelHealthClearsHealthAndCircuit(t *testing.T) {
+	const chID = 987654
+
+	// 熔断器默认关，先显式启用（否则 RegisterChannelCircuitFailure 是 no-op）
+	enabled := true
+	SetCircuitBreakerEnabled(&enabled)
+	t.Cleanup(func() { SetCircuitBreakerEnabled(nil) })
+
+	// 造出两处状态
+	RecordChannelOutcome(chID, true, 12*time.Millisecond, ErrClassOK)
+	RegisterChannelCircuitFailure(chID, ErrClassServerError)
+
+	// 确认状态确实存在（否则下面的断言是空跑）
+	_ = GetChannelHealthSnapshot(chID)
+	_, failures := GetChannelCircuitState(chID)
+	require.Greater(t, failures, 0, "前置条件：熔断表应有该渠道条目")
+
+	ForgetChannelHealth(chID)
+
+	_, failuresAfter := GetChannelCircuitState(chID)
+	assert.Zero(t, failuresAfter,
+		"渠道删除后熔断状态必须释放 —— 否则「删了再建」的新渠道会继承旧渠道的失败计数")
+}

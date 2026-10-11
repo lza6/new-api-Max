@@ -212,3 +212,13 @@ func resetCircuitTableForTest() {
 	circuitTable = map[int]*circuitEntry{}
 	circuitMu.Unlock()
 }
+
+// ForgetChannelCircuit 丢弃某个渠道的熔断状态（渠道删除时调用，幂等）。
+//
+// 渠道删除后该条目再无用途；「删了再建同名渠道」会让新渠道**继承旧渠道的熔断状态**
+// （半开探测计数 / 连续失败数），这既不符合预期也可能让新渠道一开始就被拦。
+func ForgetChannelCircuit(channelId int) {
+	circuitMu.Lock()
+	delete(circuitTable, channelId)
+	circuitMu.Unlock()
+}
