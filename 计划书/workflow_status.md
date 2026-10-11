@@ -677,3 +677,35 @@ glm-5.3-flash             | 按用量表达式计费 | 见本页交互界面（�
 **判定「用户会看到什么」时，权威来源是承载该展示的组件，不是同一个字段在别处的用法。**
 我按 `price.ts`（token 价格格式化）推断计费方式标签，而标签真正的来源是
 `billing-mode.ts` + `model-price-cell.tsx`。同一字段在不同组件里可能承载不同语义。
+
+## v1.3.133 —— 压测抓出的真实缺陷：统计端点并发超时（**本批最有价值的一条**）
+
+**压测本身怎么发现它的**：对新增公开端点做 `12 并发 × 20 请求`，
+结果 `/api/site/visitors` 出现 **11 次 30s 超时**，而同期 `/pricing` 与 `/` 全部正常
+—— 说明是这条路径自身的设计问题，不是环境。
+
+```
+修复前：{"200":229,"TIMEOUT":11}  p50=206ms  p95=30146ms  p99=30837ms
+```
+
+**逐层定位**（不猜）：
+- 缓存命中 ~200-400ms；**缓存未命中一次 6274ms**；
+- 所以是「秒级聚合放在公开端点的请求路径上」+「缓存过期时并发全部未命中、各自跑一遍」。
+
+**修法**：进程内 **SWR**（有旧值就立即返回、后台刷新）+ **单飞**（done-channel 让并发
+共享在飞计算）+ **TTL 分层**（小表 60s；唯一昂贵的 DAU/MAU 30min）+ 启动预热。
+
+**我第一版写错了**：只用 `refreshing` 标志，测试当场抓到**冷启动 16 并发仍各算一遍**
+（16 次计算）。必须加"等待在飞计算"才是真单飞。**这就是并发测试不可省的原因。**
+
+```
+修复后：{"200":240}              p50=214ms  p95=368ms  p99=864ms  max=880ms
+```
+p95 **30146ms → 368ms（约 82×）**，超时归零。
+
+**新增测试**：`TestSiteVisitorCacheDoesNotStampede`（16 并发共享 1 次计算）、
+`TestSiteVisitorCacheServesStaleWhileRefreshing`（过期路径不阻塞）、
+`ColdStartComputes`、`KeepsValueOnRefreshError`；`-race` 全绿。
+
+**交付物**：变更报告 `计划书/reports/batch-13-change-report.html`（含 8 题必须通过的测验）；
+压测脚本 `计划书/e2e-evidence/batch-13/stress-site-visitors.cjs`。
