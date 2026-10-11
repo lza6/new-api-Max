@@ -408,50 +408,51 @@ func spaPricingTableHTML(c *gin.Context, language string) string {
 }
 
 // spaPricingModeLabel 描述计费方式。
-// quota_type 是前端使用的主判据；billing_mode 只补充表达式/阶梯信息。
+//
+// **判据顺序必须与前端 `getBillingModeLabelKey` 一致：先判 billing_mode/表达式，
+// 再判 quota_type。**（`web/src/features/pricing/lib/billing-mode.ts`）
+// 前端对「billing_mode==='tiered_expr' 且有 billing_expr」的模型显示
+// 「动态计费」，价格列也走动态阶梯分支（`model-price-cell.tsx` 的
+// `getDynamicPricingSummary`）。这类模型即便 `quota_type=1`，**实际扣费也来自
+// 计费表达式**（见 `service/tiered_settle.go` 的 BillingMode 判定），
+// 因此展示 `model_price` 会误导读者以为每次固定收那个价。
 func spaPricingModeLabel(p model.Pricing, zh bool) string {
-	if p.QuotaType == 1 {
-		if zh {
-			return "按次计费"
-		}
-		return "Per request"
-	}
-	if strings.TrimSpace(p.BillingExpr) != "" || (strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed") {
+	switch {
+	case strings.TrimSpace(p.BillingExpr) != "" || strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed":
 		if zh {
 			return "按用量表达式计费"
 		}
 		return "Usage-based (billing expression)"
+	case p.QuotaType == 1:
+		if zh {
+			return "按次计费"
+		}
+		return "Per request"
+	default:
+		if zh {
+			return "按 token 计费"
+		}
+		return "Per token"
 	}
-	if zh {
-		return "按 token 计费"
-	}
-	return "Per token"
 }
 
-// spaPricingValueLabel 描述价格，按 quota_type 先于 billing_mode 判断。
+// spaPricingValueLabel 描述价格。上面注释解释了为什么这里**不给阶梯/表达式模型编数字**：
+// 表达式可能按上下文长度/缓存分档计费，Go 侧没有等价实现，报一个数就是误导。
 func spaPricingValueLabel(p model.Pricing, zh bool) string {
-	hasExpr := strings.TrimSpace(p.BillingExpr) != "" ||
-		(strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed")
-	if p.QuotaType == 1 {
-		base := "$" + trimFloat(p.ModelPrice) + " " + map[bool]string{true: "/ 次", false: "/ request"}[zh]
-		if hasExpr {
-			if zh {
-				return base + "（另有按用量阶梯，见本页交互界面）"
-			}
-			return base + " (also has usage-based tiers; see the interactive view)"
-		}
-		return base
-	}
-	if hasExpr {
+	switch {
+	case strings.TrimSpace(p.BillingExpr) != "" || (strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed"):
 		if zh {
 			return "见本页交互界面（按用量计算）"
 		}
 		return "see the interactive view (computed from usage)"
+	case p.QuotaType == 1:
+		return "$" + trimFloat(p.ModelPrice) + " " + map[bool]string{true: "/ 次", false: "/ request"}[zh]
+	default:
+		if zh {
+			return "倍率 " + trimFloat(p.ModelRatio) + "（实际费用 = 倍率 × 用量）"
+		}
+		return "ratio " + trimFloat(p.ModelRatio) + " (actual cost = ratio x usage)"
 	}
-	if zh {
-		return "倍率 " + trimFloat(p.ModelRatio) + "（实际费用 = 倍率 × 用量）"
-	}
-	return "ratio " + trimFloat(p.ModelRatio) + " (actual cost = ratio x usage)"
 }
 
 // trimFloat 去掉浮点数的尾随零（避免 "0.500000" 这种难读的输出）。

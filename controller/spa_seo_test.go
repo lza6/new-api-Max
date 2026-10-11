@@ -320,20 +320,17 @@ func TestSPAPricingLabels(t *testing.T) {
 			wantModeE: "Usage-based (billing expression)", wantValE: "see the interactive view (computed from usage)",
 		},
 		{
-			// 锁一个真实生产缺陷：本部署的 deepseek-v4.1-flash 与 glm-5.3-flash 都是
-			// quota_type=1 + billing_mode=tiered_expr。原实现先判 billing_mode 就短路，
-			// 把这两个模型标成"按用量表达式计费"，并**丢掉它们真实存在的固定单次价**。
-			// 判据顺序必须与前端一致：quota_type 优先。
-			name:      "按次 + 叠加阶梯：必须先报按次价，再补充阶梯说明",
+			// 判据顺序必须与前端 `getBillingModeLabelKey` 一致：**先判表达式/billing_mode**。
+			// 生产数据形态：deepseek-v4.1-flash 与 glm-5.3-flash 都是
+			// quota_type=1 + billing_mode=tiered_expr + billing_expr。
+			// 前端对这类模型显示「动态计费」，价格列走动态阶梯分支
+			// （`model-price-cell.tsx` 的 getDynamicPricingSummary），实际扣费来自
+			// 计费表达式（`service/tiered_settle.go`）。因此这里必须标成表达式计费、
+			// 且**不得**展示 model_price —— 展示它会让读者以为每次固定收那个价。
+			name:      "按次 + 有表达式：必须优先判为表达式计费（与前端一致）",
 			pricing:   model.Pricing{QuotaType: 1, ModelPrice: 0.006, BillingMode: "tiered_expr", BillingExpr: `tier("a", p*1)`},
-			wantModeZ: "按次计费", wantValZ: "$0.006 / 次（另有按用量阶梯，见本页交互界面）",
-			wantModeE: "Per request", wantValE: "$0.006 / request (also has usage-based tiers; see the interactive view)",
-		},
-		{
-			name:      "按次 + billing_mode=tiered_expr（无表达式）",
-			pricing:   model.Pricing{QuotaType: 1, ModelPrice: 0.002, BillingMode: "tiered_expr"},
-			wantModeZ: "按次计费", wantValZ: "$0.002 / 次（另有按用量阶梯，见本页交互界面）",
-			wantModeE: "Per request", wantValE: "$0.002 / request (also has usage-based tiers; see the interactive view)",
+			wantModeZ: "按用量表达式计费", wantValZ: "见本页交互界面（按用量计算）",
+			wantModeE: "Usage-based (billing expression)", wantValE: "see the interactive view (computed from usage)",
 		},
 		{
 			name:      "按 token + billing_mode=fixed：给倍率，不当作表达式计费",
