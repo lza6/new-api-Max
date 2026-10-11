@@ -243,10 +243,15 @@ func spaOutboundLinksHTML(language string) string {
 // i18n 语言包加载等异步步骤，定时器要么早（内容被删、界面空白）要么晚
 // （用户看到一段不属于本页顶部的文字）。观察 `#root` 首次出现子节点才是
 // 与框架无关的正确时机；另有 4s 兜底，避免异常时内容块永久滞留。
+//
+// 按 id 兜底清理所有 SEO 注入元素：即使未来某个可见附加块被拼在根容器外，
+// 也不会在 SPA 路由切换后残留在页面上。
 const spaSEORemoverScript = `<script>(function(){` +
-	`var seo=document.getElementById('spa-seo-content');if(!seo)return;` +
-	`var root=document.getElementById('root');if(!root){seo.remove();return}` +
-	`var done=false;function rm(){if(done)return;if(root.childElementCount>0){done=true;seo.remove();if(obs)obs.disconnect()}}` +
+	`var ids=['spa-seo-content','spa-seo-pricing'];` +
+	`function rmAll(){for(var i=0;i<ids.length;i++){var e=document.getElementById(ids[i]);if(e&&e.parentNode)e.parentNode.removeChild(e)}}` +
+	`var seo=document.getElementById('spa-seo-content');if(!seo){rmAll();return}` +
+	`var root=document.getElementById('root');if(!root){rmAll();return}` +
+	`var done=false;function rm(){if(done)return;if(root.childElementCount>0){done=true;rmAll();if(obs)obs.disconnect()}}` +
 	`var obs=window.MutationObserver?new MutationObserver(rm):null;` +
 	`if(obs)obs.observe(root,{childList:true});setTimeout(rm,4000)})();</script>`
 
@@ -316,12 +321,12 @@ func BuildSPAIndexHTML(c *gin.Context, indexPage []byte) []byte {
 	page = reSPAHTMLTag.ReplaceAllString(page, `<html lang="`+esc(spaHTMLLang(language))+`">`)
 
 	// ---- 内容块注入 ----
-	block := spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language)
-	// /pricing 额外附一张服务端渲染的价目表：
-	// 页面上的价格是 JS 拉取后渲染的，爬虫看不到；这是把「定价透明」变成可索引内容。
+	// 可见的附加内容必须放进 `#spa-seo-content`，否则移除脚本不会删掉它。
+	extraHTML := ""
 	if strings.TrimRight(requestPath, "/") == "/pricing" {
-		block += spaPricingTableHTML(c, language)
+		extraHTML = spaPricingTableHTML(c, language)
 	}
+	block := spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, extraHTML)
 	if loc := reSPABodyOpenTag.FindStringIndex(page); loc != nil {
 		page = page[:loc[1]] + block + page[loc[1]:]
 	}
@@ -402,43 +407,51 @@ func spaPricingTableHTML(c *gin.Context, language string) string {
 	return b.String()
 }
 
-// spaPricingModeLabel 描述计费方式（与 model.Pricing 的字段语义一一对应）。
+// spaPricingModeLabel 描述计费方式。
+// quota_type 是前端使用的主判据；billing_mode 只补充表达式/阶梯信息。
 func spaPricingModeLabel(p model.Pricing, zh bool) string {
-	switch {
-	case strings.TrimSpace(p.BillingExpr) != "" || strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed":
-		if zh {
-			return "按用量表达式计费"
-		}
-		return "Usage-based (billing expression)"
-	case p.QuotaType == 1:
+	if p.QuotaType == 1 {
 		if zh {
 			return "按次计费"
 		}
 		return "Per request"
-	default:
-		if zh {
-			return "按 token 计费"
-		}
-		return "Per token"
 	}
+	if strings.TrimSpace(p.BillingExpr) != "" || (strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed") {
+		if zh {
+			return "按用量表达式计费"
+		}
+		return "Usage-based (billing expression)"
+	}
+	if zh {
+		return "按 token 计费"
+	}
+	return "Per token"
 }
 
-// spaPricingValueLabel 描述价格。上面注释解释了为什么这里**不给阶梯/表达式模型编数字**。
+// spaPricingValueLabel 描述价格，按 quota_type 先于 billing_mode 判断。
 func spaPricingValueLabel(p model.Pricing, zh bool) string {
-	switch {
-	case strings.TrimSpace(p.BillingExpr) != "" || (strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed"):
+	hasExpr := strings.TrimSpace(p.BillingExpr) != "" ||
+		(strings.TrimSpace(p.BillingMode) != "" && p.BillingMode != "fixed")
+	if p.QuotaType == 1 {
+		base := "$" + trimFloat(p.ModelPrice) + " " + map[bool]string{true: "/ 次", false: "/ request"}[zh]
+		if hasExpr {
+			if zh {
+				return base + "（另有按用量阶梯，见本页交互界面）"
+			}
+			return base + " (also has usage-based tiers; see the interactive view)"
+		}
+		return base
+	}
+	if hasExpr {
 		if zh {
 			return "见本页交互界面（按用量计算）"
 		}
 		return "see the interactive view (computed from usage)"
-	case p.QuotaType == 1:
-		return "$" + trimFloat(p.ModelPrice) + " " + map[bool]string{true: "/ 次", false: "/ request"}[zh]
-	default:
-		if zh {
-			return "倍率 " + trimFloat(p.ModelRatio) + "（实际费用 = 倍率 × 用量）"
-		}
-		return "ratio " + trimFloat(p.ModelRatio) + " (actual cost = ratio x usage)"
 	}
+	if zh {
+		return "倍率 " + trimFloat(p.ModelRatio) + "（实际费用 = 倍率 × 用量）"
+	}
+	return "ratio " + trimFloat(p.ModelRatio) + " (actual cost = ratio x usage)"
 }
 
 // trimFloat 去掉浮点数的尾随零（避免 "0.500000" 这种难读的输出）。
@@ -462,7 +475,11 @@ func spaOGLocale(language string) string {
 //
 // 放在 `#root` **之前**、`<body>` 之后：React 挂载进 `#root` 不会碰到它，
 // 再由 `spaSEORemoverScript` 在挂载完成后移除 —— 用户看不到，爬虫看得到。
-func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language string) string {
+//
+// `extraHTML` 是**可见**的附加内容（目前只有 /pricing 的价目表），必须写在
+// `</div>` 之前：移除脚本删的是整个 `#spa-seo-content`，落在容器外的可见内容
+// 不会被删掉，会一直留在页面上（生产事故，见 spaSEORemoverScript 注释）。
+func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, extraHTML string) string {
 	esc := html.EscapeString
 	var b strings.Builder
 	b.WriteString(`<div id="spa-seo-content">`)
@@ -479,6 +496,7 @@ func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language s
 	}
 	b.WriteString(spaInternalLinksHTML(requestPath, siteName, language))
 	b.WriteString(spaOutboundLinksHTML(language))
+	b.WriteString(extraHTML)
 	b.WriteString("</div>")
 	b.WriteString(spaSEORemoverScript)
 	return b.String()

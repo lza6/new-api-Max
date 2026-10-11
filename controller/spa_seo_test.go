@@ -148,6 +148,7 @@ func TestSPASEOInjectsCrawlableContentBlock(t *testing.T) {
 	// 移除脚本必须在场：否则用户会一直看到这段文字。
 	assert.Contains(t, page, "spa-seo-content", "必须带移除脚本")
 	assert.Contains(t, page, "MutationObserver", "移除时机必须等 React 真正渲染（否则会闪空白）")
+	assert.Contains(t, page, "spa-seo-pricing", "移除脚本必须覆盖价目表 id")
 }
 
 func TestSPASEOExpandsSitePlaceholder(t *testing.T) {
@@ -318,6 +319,28 @@ func TestSPAPricingLabels(t *testing.T) {
 			wantModeZ: "按用量表达式计费", wantValZ: "见本页交互界面（按用量计算）",
 			wantModeE: "Usage-based (billing expression)", wantValE: "see the interactive view (computed from usage)",
 		},
+		{
+			// 锁一个真实生产缺陷：本部署的 deepseek-v4.1-flash 与 glm-5.3-flash 都是
+			// quota_type=1 + billing_mode=tiered_expr。原实现先判 billing_mode 就短路，
+			// 把这两个模型标成"按用量表达式计费"，并**丢掉它们真实存在的固定单次价**。
+			// 判据顺序必须与前端一致：quota_type 优先。
+			name:      "按次 + 叠加阶梯：必须先报按次价，再补充阶梯说明",
+			pricing:   model.Pricing{QuotaType: 1, ModelPrice: 0.006, BillingMode: "tiered_expr", BillingExpr: `tier("a", p*1)`},
+			wantModeZ: "按次计费", wantValZ: "$0.006 / 次（另有按用量阶梯，见本页交互界面）",
+			wantModeE: "Per request", wantValE: "$0.006 / request (also has usage-based tiers; see the interactive view)",
+		},
+		{
+			name:      "按次 + billing_mode=tiered_expr（无表达式）",
+			pricing:   model.Pricing{QuotaType: 1, ModelPrice: 0.002, BillingMode: "tiered_expr"},
+			wantModeZ: "按次计费", wantValZ: "$0.002 / 次（另有按用量阶梯，见本页交互界面）",
+			wantModeE: "Per request", wantValE: "$0.002 / request (also has usage-based tiers; see the interactive view)",
+		},
+		{
+			name:      "按 token + billing_mode=fixed：给倍率，不当作表达式计费",
+			pricing:   model.Pricing{QuotaType: 0, ModelRatio: 3, BillingMode: "fixed"},
+			wantModeZ: "按 token 计费", wantValZ: "倍率 3（实际费用 = 倍率 × 用量）",
+			wantModeE: "Per token", wantValE: "ratio 3 (actual cost = ratio x usage)",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -335,6 +358,36 @@ func TestSPAPricingTableOnlyOnPricingRoute(t *testing.T) {
 		page := buildFixtureLang(t, path, "zh-CN")
 		assert.NotContains(t, page, `id="spa-seo-pricing"`, "%s 不应有价目表", path)
 	}
+}
+
+// 可见的附加内容（价目表）必须在 `#spa-seo-content` **容器内部**。
+//
+// 锁一个真实生产缺陷：价目表原先被拼在整块之后（`</div>` 之外），而移除脚本
+// 只处理根容器 —— 表格因此**永远不会被移除**，用户在生产 `/pricing` 页顶部
+// 一直看到这张爬虫用的表；又因为 SPA 客户端路由切换不重载文档，它还会跟着
+// 走到其它页面上（用户实测截图确认）。
+func TestSPASEOVisibleExtrasStayInsideContainer(t *testing.T) {
+	// 直接驱动内容块构造函数，验证它对 extraHTML 的容器边界契约。
+	page := spaBuildContentBlock(
+		"Pricing", "summary", "caveat", "/pricing", "Example", "en",
+		`<table id="spa-seo-pricing"><tr><td>model</td></tr></table>`,
+	)
+
+	contentStart := strings.Index(page, `id="spa-seo-content"`)
+	require.GreaterOrEqual(t, contentStart, 0, "必须输出内容块")
+	contentEnd := strings.Index(page[contentStart:], "</div>")
+	require.Greater(t, contentEnd, 0, "内容块必须有闭合的 </div>")
+	contentEnd += contentStart
+
+	tableStart := strings.Index(page, `id="spa-seo-pricing"`)
+	require.GreaterOrEqual(t, tableStart, 0, "附加内容必须被输出")
+	assert.Less(t, tableStart, contentEnd,
+		"附加内容必须在 #spa-seo-content 容器内部，否则移除脚本删不掉它")
+
+	// 移除脚本必须在容器之后（否则它自己会被删掉）。
+	scriptStart := strings.Index(page, "<script>")
+	require.GreaterOrEqual(t, scriptStart, 0)
+	assert.Greater(t, scriptStart, contentEnd, "移除脚本必须在容器闭合之后")
 }
 
 func TestSPATrimFloat(t *testing.T) {
