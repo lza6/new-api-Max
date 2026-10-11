@@ -607,3 +607,73 @@ controller: 3 用例 PASS（端点结构完整 + 隐私断言 + 空数据非 nul
   · /api/* 与静态资源 → 不计入访客
   · 响应体不含 ip_hash / IP 明文 / user_id / username
 ```
+
+---
+
+# Batch-13 续 —— 生产热修 v1.3.130 / v1.3.131 / v1.3.132
+
+## v1.3.130 —— 产物清理竞态返回 200 空响应（G6-5 的审计结论落地）
+
+`controller/task.go` 的 `TaskArtifactContent` 在 `Resolve` 成功、`Serve` 因清理 loop
+（每 5 分钟一轮）删掉文件而失败时，原先 `_ = Serve(...); return` 丢弃错误，
+客户端拿到 **200 + 空响应体**，且**不会**回退上游代理 —— 该路由在竞态窗口内不可用。
+修复：文件缺失/存储禁用继续走上游回退；其它存储错误返回明确 500。
+新增回归测试 `TestTaskArtifactMissingFileFallsBackInsteadOfEmpty200`，
+含 `SetTaskArtifactStoreForTest` 注入点（否则这条分支永远测不到）。
+**RED 反向验证**：还原 `_ = Serve; return` → 用例精确报「空响应体」→ 恢复 → PASS。
+
+## v1.3.131 —— 价目表残留（**用户实测上报**）
+
+**现象**：页面上一直显示一张「模型 / 计费方式 / 价格」表（用户截图，出现在用量日志页顶部）。
+
+**根因**：`BuildSPAIndexHTML` 把服务端渲染的价目表拼在 `#spa-seo-content` **之外**，
+而清理脚本只删根容器 → 表格永远不会被移除；SPA 客户端路由切换不重载文档，
+残留还会跟着走到其它页面。
+
+**修复**：可见附加内容由 `spaBuildContentBlock` 放进容器内部；清理脚本按 id 兜底
+移除所有 SEO 注入元素。JSON-LD 仍留在容器外（`<script>`，放进容器会在 React
+挂载后被一并删掉）。
+
+**生产验收（真实浏览器，修复前 → 修复后）**：
+```
+/pricing 加载后 priceTable:  true → false
+页面上残留爬虫文案:          true → false
+其它路由 + 客户端路由切换:    全部无残留
+```
+脚本：`计划书/e2e-evidence/batch-13/seo-pricing-invisible-e2e.cjs`（15/15 PASS）
+
+## v1.3.132 —— 回退我在 v1.3.131 里改错的计费标签判据（**自我纠错**）
+
+v1.3.131 里我把 `spaPricingModeLabel` / `spaPricingValueLabel` 的判据顺序改成
+「先 `quota_type` 后 `billing_mode`」，理由是 `price.ts` 的 `quota_type === REQUEST` 分支。
+**那个理由是错的**：前端权威判据是 `web/src/features/pricing/lib/billing-mode.ts`
+的 `getBillingModeLabelKey`，其顺序是 **先 `billing_mode`/表达式**：
+
+```
+hasTaskUsageSchema → 'Task billing'
+isDynamicPricingModel (billing_mode==='tiered_expr' && billing_expr) → 'Dynamic Pricing'
+isTokenBasedModel → 'Token-based'
+else → 'Per Request'
+```
+
+价格列同样走动态分支（`model-price-cell.tsx` 的 `getDynamicPricingSummary`，
+不是 `formatRequestPrice`）。而这类模型的**实际扣费来自计费表达式**
+（`service/tiered_settle.go` 的 BillingMode 判定），展示 `model_price`
+会让读者以为每次固定收那个价。
+
+v1.3.132 回退两个纯函数到原逻辑，并**补一条用例**锁住「必须优先判表达式」这一顺序
+（此前该顺序无用例覆盖 —— 正是我改错却没被测出来的原因）。
+
+**生产验收（修复后）**：
+```
+deepseek-v4.1-flash-pojia | 按次计费 | $0.003 / 次
+gpt-6-luna                | 按次计费 | $0.002 / 次
+deepseek-v4.1-flash       | 按用量表达式计费 | 见本页交互界面（按用量计算）
+glm-5.3-flash             | 按用量表达式计费 | 见本页交互界面（按用量计算）
+```
+并新增断言：逐行用 `/api/pricing` 原始字段对照，标签与固定价展示必须与前端判据一致。
+
+### 教训（写下来避免重犯）
+**判定「用户会看到什么」时，权威来源是承载该展示的组件，不是同一个字段在别处的用法。**
+我按 `price.ts`（token 价格格式化）推断计费方式标签，而标签真正的来源是
+`billing-mode.ts` + `model-price-cell.tsx`。同一字段在不同组件里可能承载不同语义。
