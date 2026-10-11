@@ -312,6 +312,74 @@ var seoPublicPaths = []seoPublicPath{
 	},
 }
 
+// spaRouteMetaZh 是同一批公开路由的**中文**文案（zh-CN / zh-TW 共用）。
+//
+// 为什么需要：本站面向中文用户，而前端的 `<title>`/description 与路由级 meta 都是
+// 运行时由 JS 写入的 —— 不执行 JS 的爬虫只会看到壳里的英文默认值。服务端注入必须
+// 跟随**访问者的语言**（`Accept-Language`），否则等于把中文站推荐给爬虫当英文站。
+//
+// 优先级与默认：能识别出中文 → 中文；明确是英文 → 英文；**其它/无法识别 → 中文**
+// （本站主要受众是中文用户）。见 `spaResolveLanguage`。
+//
+// 文案纪律：与英文表同源同义，只描述"这页是什么"，**不写任何未经证实的数字或评价**。
+var spaRouteMetaZh = map[string]spaRouteMeta{
+	"/": {
+		Title:       "{site} — 一个接口调用多种 AI 模型",
+		Description: "AI API 网关：用同一个基础地址提供 OpenAI、Claude、Gemini 兼容接口，并给出按模型的价目表与用量排行。",
+		H1:          "{site}：一个接口调用多种 AI 模型",
+		NavLabel:    "首页",
+		Summary:     "{site} 是一个 AI API 网关。它用同一个基础地址同时提供 OpenAI、Claude、Gemini 兼容接口，已有的 SDK 通常只需改基础地址与密钥即可接入。本页是入口，下面的公开页分别介绍模型价格、用量排行、模型测试台与客户端配置。",
+		Caveat:      "可用的模型与可用性取决于本部署所配置的上游渠道，并可能随时间变化。",
+	},
+	"/pricing": {
+		Title:       "模型价格 — {site}",
+		Description: "本站按模型的价目表：每个模型一次调用的费用，以及该模型当前适用的计费方式。",
+		H1:          "模型价格",
+		NavLabel:    "模型价格",
+		Summary:     "本页列出本站已启用的模型及其对应价格。每条记录给出该模型当前适用的计费方式与实际费用，便于在发请求之前比较模型。此处显示的价格就是本部署实际执行的价格。",
+		Caveat:      "价格由本部署的配置决定，运营方可能调整；计费以请求被处理时生效的价格为准。",
+	},
+	"/rankings": {
+		Title:       "用量排行 — {site}",
+		Description: "基于本站请求统计聚合出的模型与用量排行。",
+		H1:          "用量排行",
+		NavLabel:    "用量排行",
+		Summary:     "本页把网关收集到的请求统计聚合起来，按用量对模型排序。它反映的是本部署自身的流量，不是第三方评测。",
+		Caveat:      "排行只包含经过本部署的流量，不构成对模型质量的独立评价。",
+	},
+	"/model-test": {
+		Title:       "模型测试台 — {site}",
+		Description: "通过本站向模型发一次测试请求并查看返回结果。",
+		H1:          "模型测试台",
+		NavLabel:    "模型测试台",
+		Summary:     "本页通过网关向所选模型发一次请求并显示回复，适合在把密钥、分组或上游渠道接入应用之前，先确认它们能正常工作。",
+		Caveat:      "测试请求是真实请求：会消耗额度，并受与应用流量相同的路由与限流规则约束。",
+	},
+	"/tool-setup": {
+		Title:       "客户端配置 — {site}",
+		Description: "如何把常见 AI 客户端与 SDK 指向本站的基础地址。",
+		H1:          "客户端配置",
+		NavLabel:    "客户端配置",
+		Summary:     "本页说明如何把常见的桌面客户端与 SDK 指向本站，包括应使用的基础地址，以及承载该地址的环境变量或配置项名称。",
+		Caveat:      "客户端版本与配置界面会变化；若你所用版本中的选项名称不同，对应的就是那个覆盖 API 基础地址的设置项。",
+	},
+	"/about": {
+		Title:       "关于 — {site}",
+		Description: "本站是什么、依赖什么，以及它不做什么。",
+		H1:          "关于本站",
+		NavLabel:    "关于",
+		Summary:     "本页说明 {site} 是什么以及如何运营。它是一个 API 网关：把请求转发给运营方配置的上游模型服务商，套用本部署的计费与访问规则，再把服务商的响应返回给你。",
+		Caveat:      "作为网关，本部署不训练也不托管它所服务的模型；模型输出的正确性与可用性仍由上游服务商负责。",
+	},
+}
+
+// spaExternalDocLinks 是内容块里的上游官方文档外链（两种语言共用，地址不翻译）。
+var spaExternalDocLinks = []struct{ Href, LabelEn, LabelZh string }{
+	{"https://platform.openai.com/docs/api-reference", "OpenAI API reference", "OpenAI API 参考"},
+	{"https://docs.anthropic.com/en/api/overview", "Anthropic (Claude) API overview", "Anthropic（Claude）API 概览"},
+	{"https://ai.google.dev/gemini-api/docs", "Google Gemini API docs", "Google Gemini API 文档"},
+}
+
 // seoSiteBase 返回当前实例的站点根地址（无尾斜杠）。优先取系统设置的
 // ServerAddress——它按站点各自配置（主站/副站不同），因此同一份二进制在
 // 两台机器上会生成各自域名的 robots/sitemap，避免跨站指向。

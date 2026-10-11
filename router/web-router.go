@@ -53,11 +53,12 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 			}
 			c.Header("Cache-Control", "no-cache")
 			// SEO：把路由级 meta（title/description/canonical/OG）与一份**准确**的
-			// 内容块注入 SPA 壳。不执行 JS 的爬虫因此能看到每个页面各自的内容与
-			// 可跟随的站内链接，而不是 6 份一模一样的空壳、也不是所有子页都
-			// 声明 canonical 指向首页。详见 controller/spa_seo.go。
+			// 内容块注入 SPA 壳，语言跟随访问者的 Accept-Language（默认中文）。
+			// 不执行 JS 的爬虫因此能看到每个页面各自的内容与可跟随的站内链接，
+			// 而不是 6 份一模一样的空壳、也不是所有子页都声明 canonical 指向首页。
+			// 详见 controller/spa_seo.go。
 			c.Data(http.StatusOK, "text/html; charset=utf-8",
-				controller.BuildSPAIndexHTML(assets.IndexPage, c.Request.URL.Path))
+				controller.BuildSPAIndexHTML(c, assets.IndexPage))
 		},
 	)
 }
