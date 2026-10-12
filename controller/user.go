@@ -84,12 +84,31 @@ func Login(c *gin.Context) {
 		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		return
 	}
+	// accountLockout 是只读判定，必须在任何昂贵或带副作用的工作（bcrypt 校验、
+	// 失败计数写入）之前执行，否则锁定只拦得住"慢爆破"。
+	accountLockout := service.AccountLockoutStatus(username)
+	if accountLockout.Locked {
+		// 账号级锁定命中。审计里如实记录（供运营回答"用户说登不上"的工单），
+		// 但**面向调用方仍返回与"密码错误/账号不存在"逐字节一致的通用响应**
+		// （本项目的业务错误统一是 HTTP 200 + success:false，见 common.ApiErrorI18n；
+		// 关键是 success/HTTP 状态/文案三者都不得有差异，否则锁定状态本身会成为
+		// 账号枚举的新判定因子 —— OWASP Authentication Cheat Sheet,
+		// Authentication and Error Messages）。锁定期内不重复累加失败计数
+		// （见 service/account_lockout.go 的 recordFailure）。
+		recordLoginFailureAudit(c, username, nil, "account_locked", http.StatusUnauthorized)
+		common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
+		return
+	}
 	user := model.User{
 		Username: username,
 		Password: password,
 	}
 	err = user.ValidateAndFill()
 	if err != nil {
+		// countAsFailure 只对**凭证校验失败**为真（密码错误、账号无密码）。
+		// 数据库错误与参数错误不得计入：一次数据库抖动若被记成失败，
+		// 会在故障窗口里把大量正常账号推到阈值上——锁定绝不能由基础设施故障触发。
+		countAsFailure := false
 		switch {
 		case errors.Is(err, model.ErrDatabase):
 			common.SysLog(fmt.Sprintf("Login database error for user %s: %v", username, err))
@@ -117,14 +136,56 @@ func Login(c *gin.Context) {
 			}
 			recordLoginFailureAudit(c, username, &user, reason, http.StatusUnauthorized)
 			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
+			countAsFailure = true
 		default:
 			recordLoginFailureAudit(c, username, nil, "invalid_credentials", http.StatusUnauthorized)
 			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
+			countAsFailure = true
+		}
+		if countAsFailure {
+			// 计入账号级失败台账。user.ValidateAndFill 需要查库才能定位账号，
+			// 因此这一步在它之后执行；而锁定判定（上面的 AccountLockoutStatus）
+			// 在最前面，保证锁定状态下不会发生任何昂贵工作（bcrypt 比对）。
+			service.RecordPasswordAuthFailure(refreshLoginLockoutKeys(username, &user)...)
 		}
 		return
 	}
 
 	setupLogin(&user, c)
+}
+
+// refreshLoginLockoutKeys 返回本次失败需要计入的账号键（去重）。
+//
+// 锁定必须同时按**输入的账号串**（用户名有时就是邮箱）与**账号自身的规范键**
+// （用户名 + 邮箱）记账，否则攻击者可以拿同一账号的两种写法各自累积失败次数，
+// 把「20 次阈值」放大成「40 次」。账号不存在时只有输入串可用——这在意料之中：
+// 不存在的账号被"锁定"没有副作用，但它让针对不存在账号的枚举尝试同样受限。
+//
+// **必须去重**：常见情形是用户直接输用户名，此时输入串与 user.Username 完全相同，
+// 重复记账会让一次失败被算作两次，把生效阈值悄悄砍半（配置的阈值就成了假话）。
+//
+// 台账有界（见 service/account_lockout.go 的 loginLockoutMaxTrackedAccounts），
+// 因此不存在"用随机用户名打爆内存"的风险。
+func refreshLoginLockoutKeys(submitted string, user *model.User) []string {
+	keys := make([]string, 0, 3)
+	seen := make(map[string]struct{}, 3)
+	appendKey := func(account string) {
+		normalized := service.NormalizeAccountKey(account)
+		if normalized == "" {
+			return
+		}
+		if _, dup := seen[normalized]; dup {
+			return
+		}
+		seen[normalized] = struct{}{}
+		keys = append(keys, account)
+	}
+	appendKey(submitted)
+	if user != nil && user.Id > 0 {
+		appendKey(user.Username)
+		appendKey(user.Email)
+	}
+	return keys
 }
 
 // loginMethodFromContext 根据请求路径推导登录方式，用于登录审计日志。
@@ -214,6 +275,12 @@ func recordLoginFailureAudit(c *gin.Context, exposedUsername string, user *model
 // setupLogin evaluates the shared login policy after primary authentication.
 // Only a completed Passkey ceremony may go directly to session issuance.
 func setupLogin(user *model.User, c *gin.Context) {
+	// 主认证（密码）已通过：清零账号级失败台账。
+	//
+	// 这一步是「攻击者无法把自己的账号锁定强加给受害者」的核心保证 ——
+	// 失败计数只为**认证失败方**累积，任何一次成功的凭证校验都会立刻作废
+	// 计数、锁定与退避级别（详见 service/account_lockout.go）。
+	clearAccountLockout(user)
 	challenge, err := service.StartLoginVerification(user, loginMethodFromContext(c))
 	if err != nil {
 		writeSecurityOperationError(c, err)
@@ -225,6 +292,29 @@ func setupLogin(user *model.User, c *gin.Context) {
 		return
 	}
 	setupLoginAtAuthVersion(user, user.AuthVersion, c)
+}
+
+// clearAccountLockout 作废某账号的全部失败计数与锁定。
+func clearAccountLockout(user *model.User) {
+	if user == nil || user.Id <= 0 {
+		return
+	}
+	service.RecordPasswordAuthSuccess(user.Username)
+	if user.Email != "" {
+		service.RecordPasswordAuthSuccess(user.Email)
+	}
+}
+
+// recordAccountLockoutFailure 为一次失败的凭证校验记账（服务端解析出的账号为权威键）。
+func recordAccountLockoutFailure(user *model.User) {
+	if user == nil || user.Id <= 0 {
+		return
+	}
+	accounts := []string{user.Username}
+	if user.Email != "" {
+		accounts = append(accounts, user.Email)
+	}
+	service.RecordPasswordAuthFailure(accounts...)
 }
 
 func setupLoginAtAuthVersion(user *model.User, expectedAuthVersion int64, c *gin.Context) {

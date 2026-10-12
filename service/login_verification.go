@@ -105,6 +105,18 @@ func requireLoginVerificationMethod(state *model.UserVerificationState, method s
 	return ErrProofMethod
 }
 
+// ResolveLoginFlowUser looks up the account a one-time login flow belongs to.
+// It reads the flow without consuming it, so callers may still use the token for
+// the real ceremony afterwards. Used to attribute account-level failed-password
+// counters to the account rather than to the source IP (OWASP Account Lockout).
+func ResolveLoginFlowUser(token string) (*model.User, error) {
+	flow, err := model.GetAuthFlow(token, model.AuthFlowMatch{Purpose: model.AuthFlowPurposeLoginVerification})
+	if err != nil {
+		return nil, err
+	}
+	return model.GetUserById(flow.UserId, false)
+}
+
 func VerifyLoginCode(token, code, ip, userAgent string) (*AuthBundle, error) {
 	verification, err := RequireLoginVerification(token, VerificationMethodTwoFA)
 	if err != nil {
