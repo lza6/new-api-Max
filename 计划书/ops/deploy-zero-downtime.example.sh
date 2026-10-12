@@ -28,6 +28,9 @@ echo "[deploy] tag=$TAG old=$OLD_PORT new=$NEW_PORT"
 
 # 起新容器
 docker rm -f new-api-new 2>/dev/null || true
+# 容器以非 root（uid/gid 10001）运行，因此挂载进去的宿主目录必须归属该用户，
+# 否则进程无法落盘（日志/本地图床/SQLite）。这一步幂等。
+chown -R 10001:10001 "${PROD_DIR}/data" "${PROD_DIR}/logs"
 docker run -d --name new-api-new \
   --network "${NETWORK}" \
   --env-file "${PROD_DIR}/.env" \
@@ -38,7 +41,10 @@ docker run -d --name new-api-new \
   -p "${NEW_PORT}:3000" \
   -v "${PROD_DIR}/data:/data" -v "${PROD_DIR}/logs:/app/logs" \
   --restart unless-stopped \
-  --memory 900m --memory-swap 900m "new-api:${TAG}"
+  --memory 900m --memory-swap 900m \
+  --cap-drop=ALL \
+  --security-opt=no-new-privileges=true \
+  "new-api:${TAG}"
 
 # 等健康
 echo "[deploy] 等新容器健康（<=90s）..."

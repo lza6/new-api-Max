@@ -32,12 +32,21 @@ FROM debian:bookworm-slim@sha256:f06537653ac770703bc45b4b113475bd402f451e85223f0
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata libasan8 wget \
     && rm -rf /var/lib/apt/lists/* \
-    && update-ca-certificates
+    && update-ca-certificates \
+    && groupadd --gid 10001 app \
+    && useradd --uid 10001 --gid 10001 --no-create-home --shell /usr/sbin/nologin app
 
 COPY --from=builder2 /build/new-api /
 COPY LICENSE NOTICE THIRD-PARTY-LICENSES.md /licenses/
+# 挂载点预先建好并归属运行用户：即使宿主目录首次为空（或将来由别的工具创建），
+# 容器内的进程也不会因为没有写权限而无法落盘。
+RUN mkdir -p /data /app/logs && chown -R 10001:10001 /data /app/logs
 EXPOSE 3000
 WORKDIR /data
+# 纵深防御：进程不以 root 运行。uid/gid 固定为 10001，部署脚本在宿主侧把
+# 数据/日志目录 chown 给它（见 计划书/ops/deploy-zero-downtime.example.sh）。
+USER app
+
 ENTRYPOINT ["/new-api"]
 
 # T11：容器健康检查（Caddy/编排依赖 /api/status 探活；v1.3.41 起该路径豁免 GA 限流）
