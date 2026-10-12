@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Batch-13 变更报告 — v1.3.129 → v1.3.133</title>
+<title>Batch-13 变更报告 — v1.3.129 → v1.3.140</title>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --panel2:#1c2129; --line:#2b3138;
@@ -12,16 +12,16 @@
   }
   *{box-sizing:border-box}
   body{margin:0;background:var(--bg);color:var(--fg);
-    font:16px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif;}
-  .wrap{max-width:860px;margin:0 auto;padding:56px 24px 120px}
+    font:16px/1.75 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:56px 24px 140px}
   header{border-bottom:1px solid var(--line);padding-bottom:28px;margin-bottom:40px}
   .eyebrow{font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin:0 0 10px}
-  h1{font-size:clamp(28px,4vw,40px);line-height:1.15;margin:0 0 12px;letter-spacing:-.02em}
-  h2{font-size:22px;margin:52px 0 16px;padding-top:20px;border-top:1px solid var(--line);letter-spacing:-.01em}
-  h3{font-size:17px;margin:28px 0 10px}
+  h1{font-size:clamp(27px,4vw,39px);line-height:1.16;margin:0 0 12px;letter-spacing:-.02em}
+  h2{font-size:22px;margin:54px 0 16px;padding-top:20px;border-top:1px solid var(--line)}
+  h3{font-size:17px;margin:26px 0 10px}
   p{margin:0 0 14px}
   .lede{color:var(--dim);font-size:17px}
-  code{font-family:var(--mono);font-size:.9em;background:var(--panel2);padding:2px 6px;border-radius:5px;border:1px solid var(--line)}
+  code{font-family:var(--mono);font-size:.89em;background:var(--panel2);padding:2px 6px;border-radius:5px;border:1px solid var(--line)}
   pre{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:16px;overflow:auto;font-family:var(--mono);font-size:13px;line-height:1.6}
   pre code{background:none;border:none;padding:0}
   .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:20px 22px;margin:18px 0}
@@ -31,7 +31,7 @@
   table{width:100%;border-collapse:collapse;margin:18px 0;font-size:14.5px}
   th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
   th{color:var(--dim);font-weight:600;font-size:12.5px;letter-spacing:.06em;text-transform:uppercase}
-  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px;letter-spacing:.04em}
+  .tag{display:inline-block;font-size:11px;font-weight:700;padding:2px 8px;border-radius:99px}
   .tag.ok{background:rgba(63,185,80,.15);color:var(--ok)}
   .tag.bad{background:rgba(248,81,73,.15);color:var(--bad)}
   .tag.warn{background:rgba(210,153,34,.15);color:var(--warn)}
@@ -39,12 +39,11 @@
   li{margin:6px 0}
   .muted{color:var(--dim)}
   .quote{border-left:3px solid var(--accent);padding:4px 0 4px 16px;color:var(--dim);margin:18px 0}
-  /* quiz */
   .quiz{margin-top:64px;border:1px solid var(--line);border-radius:14px;padding:26px;background:linear-gradient(180deg,var(--panel2),var(--panel))}
   .q{padding:16px 0;border-bottom:1px dashed var(--line)}
   .q:last-of-type{border-bottom:none}
   .q p{font-weight:600;margin:0 0 10px}
-  .opt{display:block;padding:9px 12px;margin:6px 0;border:1px solid var(--line);border-radius:9px;cursor:pointer;background:var(--panel);transition:.15s}
+  .opt{display:block;padding:9px 12px;margin:6px 0;border:1px solid var(--line);border-radius:9px;cursor:pointer;background:var(--panel)}
   .opt:hover{border-color:var(--accent)}
   .opt input{margin-right:10px}
   .opt.right{border-color:var(--ok);background:rgba(63,185,80,.10)}
@@ -52,224 +51,276 @@
   .why{font-size:14px;color:var(--dim);margin-top:8px;display:none}
   .why.show{display:block}
   button{margin-top:20px;background:var(--accent);color:#08111f;border:none;border-radius:9px;padding:12px 22px;font-size:15px;font-weight:700;cursor:pointer}
-  button:hover{filter:brightness(1.1)}
   #score{margin-top:16px;font-weight:700;display:none}
   #score.show{display:block}
-  a{color:var(--accent)}
 </style>
 </head>
 <body>
 <div class="wrap">
 
 <header>
-  <p class="eyebrow">变更报告 · 生产热修批次</p>
-  <h1>Batch-13：从「页面上一行坏掉的文字」查到 3 个根因</h1>
+  <p class="eyebrow">变更报告 · Batch-13 · 12 个版本已上生产</p>
+  <h1>从一个用户可见的坏标签，查到一整批根因</h1>
   <p class="lede">
-    版本区间 <code>v1.3.129</code> → <code>v1.3.133</code>，全部已上生产
+    区间 <code>v1.3.129</code> → <code>v1.3.140</code>，全部已部署到
     <code>freeapi.tingfengai.art</code>（<code>154.37.208.171</code>）。
-    本页说明：发生了什么、为什么这么改、验证证据是什么、哪些还没做。
-    底部测验必须全部答对才算读完。
+    本页说明：发生了什么、为什么这么改、证据是什么、哪些还没做。底部测验必须全部答对。
   </p>
 </header>
 
-<h2>1. 起点：一个看起来很小的现象</h2>
-<p>
-  你在浏览器里看到页面顶部多出一行字：
-</p>
-<pre><code>X content="https://freeapi.tingfengai.art/usage-logs/common" /></code></pre>
-<p>
-  直觉上这像"某个模板变量没渲染"。但它其实是一个 <strong><code>&lt;meta&gt;</code> 标签被写坏了</strong>。
-</p>
-
-<h2>2. 直觉与推理链</h2>
-<div class="card">
-  <h3>第一层：为什么这行字会<i>显示</i>出来？</h3>
-  <p>
-    HTML 解析规则里，<code>&lt;head&gt;</code> 内的<strong>非空白文本会提前结束 head</strong>。
-    所以只要有一个"裸露的文本节点"落在 head 里，浏览器就会把 head 关掉，
-    把它当成 body 开头的内容渲染出来。
-  </p>
-  <h3>第二层：为什么 head 里会有裸露文本？</h3>
-  <p>
-    服务端给 SPA 注入 SEO 元数据时，用正则替换壳里的标签。其中 <code>og:url</code>
-    的替换串漏写了开头的 <code>&lt;meta property="og:url"</code>，只剩
-    <code>`X content="…" /&gt;`</code>。于是整条标签被替换成了一段非法文本。
-  </p>
-  <h3>第三层：为什么测试没拦住？</h3>
-  <p>
-    当时的断言只检查 <code>og:locale</code> <strong>是否存在</strong>。而 <code>og:locale</code>
-    是"拼接追加"的，不受影响 —— 所以 CI 全绿，线上是坏的。
-  </p>
-  <p class="quote">
-    这条推理得出一个可复用的判据：<strong>"断言了某标签存在" ≠ "断言了标签仍然合法"</strong>。
-    这也是后面几个 bug 的共同形状。
-  </p>
-</div>
-
-<h2>3. 顺着同一类形状，又找出两个真实缺陷</h2>
-<table>
-  <tr><th>现象</th><th>根因</th><th>状态</th></tr>
-  <tr>
-    <td>页面顶部一直显示一张「模型 / 计费方式 / 价格」表</td>
-    <td>那张表是给爬虫看的，被拼在 <code>#spa-seo-content</code> <strong>容器之外</strong>；
-        清理脚本只删容器 → 表格永不被移除。SPA 路由切换不重载文档，残留还会跟着走到别的页面</td>
-    <td><span class="tag ok">已修 v1.3.131/132</span></td>
-  </tr>
-  <tr>
-    <td>产物文件恰好被清理时，客户端拿到 <strong>200 但响应体是空的</strong></td>
-    <td>代码把 <code>Serve</code> 的错误 <code>_ =</code> 丢掉后直接 return —— 既返回空体，
-        又<strong>不</strong>回退到上游代理（而 store 的设计意图正是"文件不在就回退"）</td>
-    <td><span class="tag ok">已修 v1.3.130</span></td>
-  </tr>
-</table>
-
-<h2>4. 我自己犯的错，以及怎么发现的</h2>
-<div class="card bad">
-  <h3>v1.3.131 我改错了计费标签的判据顺序，v1.3.132 回退</h3>
-  <p>
-    我看到模型数据是 <code>quota_type=1</code>（按次）却显示成「按用量表达式计费」，
-    就去查前端。我在 <code>price.ts</code> 里看到按 <code>quota_type</code> 分支，
-    于是判定"应该先看 <code>quota_type</code>"，改了服务端的判据顺序。
-  </p>
-  <p>
-    <strong>这个推理是错的。</strong>用户真正看到的计费方式标签由另一个组件决定：
-    <code>billing-mode.ts</code> 的 <code>getBillingModeLabelKey</code>，它的顺序是
-    <strong>先看 <code>billing_mode</code></strong>。价格列同理走
-    <code>model-price-cell.tsx</code> 的动态阶梯分支。而这类模型的<strong>实际扣费来自计费表达式</strong>
-    （<code>tiered_settle.go</code>），所以展示固定单价会误导。
-  </p>
-  <p>
-    结果：我制造了一处<strong>新的</strong>前后端不一致（前端「动态计费」、我的表「按次计费 $0.006」）。
-  </p>
-  <p class="quote">
-    教训（已写进项目记忆）：<strong>判定"用户会看到什么"，权威来源是渲染它的那个组件，
-    不是同一个字段在别处的用法。</strong>同一字段在不同组件里可能承载不同语义。
-  </p>
-</div>
-
-<h2>5. 压测抓到的问题（这一条最有价值）</h2>
-<p>
-  对新增的公开统计端点做 <strong>12 并发 × 20 请求</strong> 压测，结果：
-</p>
-<pre><code>新增统计端点  /api/site/visitors
-  状态码分布: {"200":229,"TIMEOUT":11}
-  延迟 p50=206ms  p95=30146ms  p99=30837ms</code></pre>
-<p>
-  240 个请求里 <strong>11 个 30 秒超时</strong>，而同期 <code>/pricing</code> 与 <code>/</code> 全部正常。
-  逐层定位后是两个原因叠加：
-</p>
+<h2>1. 起点：三个"看起来很小"的用户上报</h2>
 <ol>
-  <li><strong>聚合本身 6.3 秒</strong> —— 其中 DAU/MAU 是对大表 <code>logs</code> 做 <code>COUNT(DISTINCT user_id)</code>；</li>
-  <li><strong>缓存击穿</strong> —— 缓存一过期，并发的请求<strong>同时</strong>未命中、各自跑一遍这 6 秒的聚合。</li>
+  <li>页面顶部多出一行字 <code>X content="…" /></code></li>
+  <li>页面顶部一直显示一张「模型 / 计费方式 / 价格」表</li>
+  <li>主页要显示真实的访客数、日活月活、流量来源</li>
 </ol>
-<p>修法（v1.3.133）：</p>
-<ul>
-  <li><strong>SWR</strong>：手里有值就<strong>立即返回旧值</strong>，后台刷新 —— 请求路径永不阻塞在聚合上；</li>
-  <li><strong>单飞</strong>：并发调用共享同一次在飞计算（用 done-channel 等待，而不是各算一遍）；</li>
-  <li><strong>TTL 分层</strong>：小表 60 秒；唯一昂贵的 DAU/MAU <strong>30 分钟</strong>（这两个数字本来变化就慢）。</li>
-</ul>
-<p class="muted">
-  注：我先用"<code>refreshing</code> 标志"写了一版，测试当场抓到冷启动仍是 <strong>16 次</strong>计算
-  （16 个并发各跑一遍）—— 说明标志只挡住了"重复后台刷新"，没挡住"冷启动同时进入"。
-  这正是必须写并发测试的原因。
-</p>
+<p>前两个的根因都不是"模板没渲染"，而是<strong>服务端 SEO 注入的边界问题</strong>。</p>
 
-<h2>6. 验证证据</h2>
+<h2>2. 直觉：这些 bug 有共同的形状</h2>
+<div class="card">
+  <h3>形状一：断言"存在" ≠ 断言"合法"</h3>
+  <p>
+    <code>og:url</code> 的替换串漏写了开头的 <code>&lt;meta property="og:url"</code>，
+    整条标签被替换成非法文本。而 <code>&lt;head&gt;</code> 内的非空白文本会<strong>提前结束 head</strong>，
+    于是那行字被当成 body 内容<strong>渲染出来</strong>。
+    当时的测试只检查 <code>og:locale</code> <em>是否存在</em>（它是拼接追加的，不受影响）——
+    <strong>CI 全绿，线上是坏的</strong>。
+  </p>
+  <h3>形状二：清理的边界没对齐</h3>
+  <p>
+    价目表是给爬虫看的，清理脚本只删 <code>#spa-seo-content</code> 容器 ——
+    而那张表被拼在<strong>容器之外</strong>，于是永远不会被删。
+    SPA 路由切换不重载文档，残留还会跟着走到别的页面。
+  </p>
+  <p class="quote">
+    这两条推出一个可复用判据：<strong>凡"替换/注入/清理"，必须断言结果的合法性与边界归属</strong>，
+    并加反向锁（如 <code>NotContains("X content=")</code>）。
+  </p>
+</div>
+
+<h2>3. 完整版本清单</h2>
 <table>
-  <tr><th>验证</th><th>结果</th></tr>
-  <tr><td>修复前基线（真实浏览器，生产）</td><td><code>priceTable: true</code>、页面上残留爬虫文案 <code>true</code> —— 精确复现你看到的现象</td></tr>
-  <tr><td>修复后（真实浏览器，生产）</td><td><strong>15/15 PASS</strong>：价目表与 SEO 块均已从 DOM 移除；客户端路由切换无残留；服务端 HTML 侧仍保留内容（爬虫能看到）</td></tr>
-  <tr><td>访客统计 E2E（本地全栈，真实 SQLite）</td><td><strong>21/21 PASS</strong>：同一 IP 连续 10 次访问 → 库中仅 <strong>1 行</strong>；爬虫与静态资源不计入；响应体无 IP/哈希/用户标识</td></tr>
-  <tr><td>缓存并发测试（<code>-race</code>）</td><td>16 并发共享 1 次计算；过期路径立即返回旧值不阻塞；刷新失败保留旧值</td></tr>
-  <tr><td>RED → GREEN 反向验证</td><td>每个修复都做过"故意改坏 → 用例失败 → 恢复 → 通过"</td></tr>
-  <tr><td>生产健康</td><td>容器 <code>healthy</code>、内存 109.8 MiB / 900 MiB、磁盘 8.6G / 78G (12%)</td></tr>
+  <tr><th>版本</th><th>性质</th><th>内容</th></tr>
+  <tr><td>v1.3.129</td><td><span class="tag ok">修用户上报</span></td><td>og:url 可见文本 + 站点访客统计 + 落地页首屏（LCP 7104→5432ms）</td></tr>
+  <tr><td>v1.3.130</td><td><span class="tag ok">修 P1</span></td><td>产物清理竞态返回 <strong>200 空响应</strong>（且不回退上游）</td></tr>
+  <tr><td>v1.3.131</td><td><span class="tag ok">修用户上报</span></td><td>价目表残留（容器边界）</td></tr>
+  <tr><td>v1.3.132</td><td><span class="tag warn">自我纠错</span></td><td><strong>回退我改错的计费判据</strong>（详见 §5）</td></tr>
+  <tr><td>v1.3.133</td><td><span class="tag ok">修压测缺陷</span></td><td>访客端点并发超时：p95 <strong>30146ms → 368ms</strong></td></tr>
+  <tr><td>v1.3.134</td><td><span class="tag ok">新能力</span></td><td>GEO 安全增强（首页 FAQ 结构化数据 + 限制小节），<strong>无 cloaking</strong></td></tr>
+  <tr><td>v1.3.135</td><td><span class="tag ok">修审查发现</span></td><td>独立审查的 3 P1 + 4 P2/P3（含我的两个错）</td></tr>
+  <tr><td>v1.3.136</td><td><span class="tag ok">安全加固</span></td><td>容器<strong>非 root</strong> + <code>cap-drop=ALL</code> + <code>no-new-privileges</code></td></tr>
+  <tr><td>v1.3.137</td><td><span class="tag ok">安全</span></td><td>登录失败不再泄露账号是否存在（OWASP 账号枚举）</td></tr>
+  <tr><td>v1.3.138</td><td><span class="tag ok">安全</span></td><td>改密/重置后<strong>作废长期 PAT</strong>；修正我自己的告警误报</td></tr>
+  <tr><td>v1.3.139</td><td><span class="tag ok">新能力</span></td><td>公开状态页 <code>/status</code> + 报表 user/group/token 维度</td></tr>
+  <tr><td>v1.3.140</td><td><span class="tag ok">修用户可见</span></td><td>任务日志「操作类型」全显示 <code>Unknown</code>（前后端枚举不对齐）</td></tr>
 </table>
 
-<h2>7. 没做完的（诚实清单）</h2>
+<h2>4. 压测抓出的最有价值缺陷</h2>
+<p>对新增的公开统计端点做 <strong>12 并发 × 20 请求</strong>：</p>
+<pre><code>修复前：{"200":229,"TIMEOUT":11}  p50=206ms  p95=30146ms
+修复后：{"200":240}              p50=214ms  p95=368ms</code></pre>
+<p>两个成因叠加：① 聚合本身 <strong>6.3 秒</strong>（DAU/MAU 是对大表 <code>logs</code> 做 <code>COUNT(DISTINCT user_id)</code>）；
+② 缓存一过期，并发请求<strong>同时</strong>未命中、各跑一遍（缓存击穿）。</p>
+<p>
+  修法：进程内 <strong>SWR</strong>（有旧值立即返回 + 后台刷新）+ <strong>单飞</strong>（done-channel 让并发共享在飞计算）
+  + TTL 分层（小表 60s；昂贵的 DAU/MAU 30min）+ 启动预热。
+</p>
+<p class="muted">
+  注意：第一版只用 <code>refreshing</code> 标志，<strong>测试当场抓到冷启动 16 并发仍各算一遍</strong>。
+  这正是并发测试不可省的原因。
+</p>
+
+<h2>5. 我犯的错（写在这里，避免淡忘）</h2>
+<div class="card bad">
+  <h3>错一：改错了计费标签判据（v1.3.131 引入 → v1.3.132 回退）</h3>
+  <p>
+    我看到模型 <code>quota_type=1</code> 却显示成「按用量表达式计费」，去
+    <code>price.ts</code> 看到按 <code>quota_type</code> 分支，就据此改了服务端判据顺序。
+    <strong>错了</strong>：用户真正看到的标签由 <code>billing-mode.ts</code> 的
+    <code>getBillingModeLabelKey</code> 决定（<strong>先判 billing_mode</strong>），
+    价格列走 <code>model-price-cell.tsx</code> 的动态阶梯分支；且这类模型实际扣费来自计费表达式。
+    我因此制造了一处<em>新的</em>前后端不一致。
+  </p>
+  <h3>错二：定义了清理函数却零调用</h3>
+  <p>
+    <code>ForgetChannelHealth</code> 写完没接线（注释还写着"由渠道删除路径调用"），
+    正是本项目记录过的「库全绿、生产零调用」模式；而且删除路径有<strong>两条</strong>，
+    我最初只想到一条。
+  </p>
+  <h3>错三：把「秒级聚合」放在公开端点的请求路径上</h3>
+  <p>且无单飞 —— 这就是 §4 那个超时的成因。</p>
+  <h3>错四：写了会误报的告警</h3>
+  <p>
+    我判 <code>CryptoSecret == SessionSecret</code> 就告警，但生产是「未设 CRYPTO_SECRET、
+    已设 SESSION_SECRET」——此时密钥<strong>稳定</strong>，去重完全正常，却会每次启动报错。
+    误报会让真实告警被无视。
+  </p>
+  <p class="quote">
+    <strong>共同教训</strong>：判定"用户会看到什么"或"是否真的生效"时，
+    权威来源是<strong>承载该行为的那个组件/调用点</strong>，不是同一字段在别处的用法。
+  </p>
+</div>
+
+<h2>6. 安全加固（v1.3.136–138）</h2>
+<table>
+  <tr><th>项</th><th>改动</th><th>验证方式</th></tr>
+  <tr>
+    <td>容器非 root</td>
+    <td>Dockerfile 建 uid 10001 用户、<code>USER app</code>；部署脚本 chown 挂载目录；
+        <code>--cap-drop=ALL</code> + <code>no-new-privileges</code></td>
+    <td>服务器<strong>一次性容器接生产 PG</strong> 实测：<code>uid=10001</code>、<code>/api/status</code> 200、
+        端口可达、写盘属主 10001；并做<strong>对照实验</strong>证明同场景 root 镜像行为一致</td>
+  </tr>
+  <tr>
+    <td>账号枚举</td>
+    <td>无密码账号登录失败改为返回<strong>通用文案</strong>；精确原因与 provider 只进审计日志</td>
+    <td>生产实测：两个不同的不存在用户名 → 响应<strong>逐字相同</strong>；且文案仍含第三方登录引导（<strong>零可用性损失</strong>）</td>
+  </tr>
+  <tr>
+    <td>长期凭据</td>
+    <td><code>RevokeAllUserSessions</code> 一并作废 dashboard PAT</td>
+    <td>双向用例：全撤 → PAT 失效；只踢其它设备 → PAT 保留</td>
+  </tr>
+</table>
+
+<h2>7. 生产配置事实（省得你以后反复查）</h2>
+<table>
+  <tr><th>项</th><th>值</th><th>含义</th></tr>
+  <tr><td><code>topup_enabled</code> / <code>redemption_enabled</code></td><td><strong>false / false</strong></td><td>当前不通过在线支付或兑换码收款</td></tr>
+  <tr><td>Stripe / Creem 密钥</td><td><strong>完全未配置</strong></td><td>审计报的 Stripe 额度口径缺陷<strong>当前不可达</strong></td></tr>
+  <tr><td><code>CHANNEL_KEY_ENCRYPTION</code></td><td><strong>false</strong></td><td>渠道密钥未加密（无 <code>enc:v1:</code> 数据）</td></tr>
+  <tr><td><code>SESSION_SECRET</code></td><td>已设置（96 字符）</td><td>⇒ 派生密钥稳定；审计报的"密钥不可逆丢失"<strong>不成立</strong></td></tr>
+</table>
+
+<h2>8. 状态页的首个真实信号</h2>
+<p>
+  v1.3.139 的 <code>/status</code> 首次把真实数字摆上台面（<strong>页面明写"不发布可用率/SLA——那都无法被证实"</strong>）：
+</p>
+<pre><code>近 24h：40632 请求 / 962 错误 → 成功率 97.69%</code></pre>
+<p>
+  2.3% 的错误率<strong>值得排查</strong>（上游渠道失败？限流？参数错误？）。
+  已知其中一部分是某客户端在 <code>/v1/responses</code> 上持续拿到 503（无可用上游）。
+  <strong>未做</strong>：按渠道/错误码拆分这 962 条错误的分布。
+</p>
+
+<h2>9. 还没做的（诚实清单）</h2>
 <ul>
-  <li><span class="tag warn">受阻</span> <strong>GEO 内容增强</strong>：做完的那版<strong>不能上线</strong> ——
-      它把问答小节只注入给爬虫、前端没有对应内容，构成 <strong>cloaking</strong>。已改为
-      "只注入页面上真实存在的内容"（首页那份用户可见的 FAQ 才是安全的）。</li>
-  <li><span class="tag bad">未做</span> 改进指南的大项：G4 路由决策、G5 动作审批、G6 <code>Persist</code> 接线、
-      G7 报表 v2 / 公开状态页、G8 前端巨石拆分与体积、G9 容器非 root、G11 契约补全。</li>
-  <li><span class="tag warn">待确认</span> 你同事报的 SEO 项：标题短（你说先不管）、描述偏短、robots AI 训练（你选允许）。
-      其中"分析脚本在 body"经实测是<strong>误报</strong> —— 生产根本没装分析工具。</li>
+  <li><span class="tag bad">未做</span> G4 路由决策化、G5 动作审批、G9 渠道密钥加密<strong>启用方案</strong>、G11 契约（<code>/v1/files</code> 等）</li>
+  <li><span class="tag warn">受阻/需你决策</span> Stripe 口径修复（需先定 <code>StripeUnitPrice</code> 语义）；注册用户名枚举（已有 CAPTCHA+限流缓解，属权衡）</li>
+  <li><span class="tag warn">未做</span> 登录限流仅按 IP（账号级锁定正在做）、登录时序侧信道</li>
+  <li><span class="tag warn">未验证</span> MySQL/PostgreSQL 三库矩阵、真实浏览器移动端 CWV 长时观测</li>
 </ul>
 
-<h2>8. 测验（必须全部答对）</h2>
+<h2>10. 测验（必须全部答对）</h2>
 <div class="quiz" id="quiz">
   <p class="muted">选完点"提交"查看对错与解释。全部答对才算通过。</p>
 
   <div class="q" data-answer="b">
-    <p>Q1. 页面顶部那行 <code>X content="…" /&gt;</code> 为什么会被<i>显示</i>出来？</p>
-    <label class="opt"><input type="radio" name="q1" value="a" />它是前端某个组件的正常输出，只是没加样式</label>
-    <label class="opt"><input type="radio" name="q1" value="b" />因为它是一段非法文本，落在 <code>&lt;head&gt;</code> 里；head 内的非空白文本会提前结束 head，于是它被当成 body 内容渲染</label>
-    <label class="opt"><input type="radio" name="q1" value="c" />因为浏览器不支持 <code>&lt;meta&gt;</code> 标签</label>
-    <label class="opt"><input type="radio" name="q1" value="d" />因为 CSS 没隐藏它</label>
-    <p class="why">head 内的裸露文本会提前终止 head —— 这是它从"元数据"变成"可见文字"的关键。</p>
+    <p>Q1. 那行 <code>X content="…" /></code> 为什么会被<i>显示</i>出来？</p>
+    <label class="opt"><input type="radio" name="q1" value="a" />前端组件正常输出，只是没加样式</label>
+    <label class="opt"><input type="radio" name="q1" value="b" />它是非法文本、落在 <code>&lt;head&gt;</code> 里；head 内的非空白文本会提前结束 head，于是被当成 body 内容渲染</label>
+    <label class="opt"><input type="radio" name="q1" value="c" />浏览器不支持该 meta 标签</label>
+    <label class="opt"><input type="radio" name="q1" value="d" />CSS 没隐藏它</label>
+    <p class="why">head 内的裸露文本会提前终止 head —— 这是"元数据"变成"可见文字"的关键。</p>
   </div>
 
   <div class="q" data-answer="c">
     <p>Q2. 为什么这个 bug 当时 CI 是绿的？</p>
-    <label class="opt"><input type="radio" name="q2" value="a" />因为 CI 没跑这个包</label>
-    <label class="opt"><input type="radio" name="q2" value="b" />因为测试被跳过了</label>
-    <label class="opt"><input type="radio" name="q2" value="c" />断言只检查 <code>og:locale</code> 是否存在，而它是拼接追加的、不受影响；没人断言 <code>og:url</code> 标签仍然<strong>合法</strong></label>
-    <label class="opt"><input type="radio" name="q2" value="d" />因为那个版本没提交到仓库</label>
-    <p class="why">"断言某标签存在" ≠ "断言标签仍然合法"。这是本批次反复出现的 bug 形状。</p>
+    <label class="opt"><input type="radio" name="q2" value="a" />CI 没跑这个包</label>
+    <label class="opt"><input type="radio" name="q2" value="b" />测试被跳过了</label>
+    <label class="opt"><input type="radio" name="q2" value="c" />断言只检查 <code>og:locale</code> 是否存在，而它是拼接追加、不受影响；没人断言 <code>og:url</code> 标签仍然<b>合法</b></label>
+    <label class="opt"><input type="radio" name="q2" value="d" />该版本没提交到仓库</label>
+    <p class="why">"断言存在" ≠ "断言合法"。这是本批反复出现的 bug 形状。</p>
   </div>
 
   <div class="q" data-answer="a">
-    <p>Q3. 价目表为什么会一直显示在页面顶部？</p>
-    <label class="opt"><input type="radio" name="q3" value="a" />它被拼在 <code>#spa-seo-content</code> 容器<strong>之外</strong>，而清理脚本只删容器，所以它永远不会被移除</label>
-    <label class="opt"><input type="radio" name="q3" value="b" />价格数据算错了，Z-index 太高</label>
+    <p>Q3. 价目表为什么一直显示在页面顶部？</p>
+    <label class="opt"><input type="radio" name="q3" value="a" />它被拼在 <code>#spa-seo-content</code> 容器<b>之外</b>，清理脚本只删容器，所以永不消失</label>
+    <label class="opt"><input type="radio" name="q3" value="b" />价格算错了</label>
     <label class="opt"><input type="radio" name="q3" value="c" />浏览器缓存了旧页面</label>
     <label class="opt"><input type="radio" name="q3" value="d" />React 渲染失败</label>
-    <p class="why">可见的附加内容必须放进容器内部；同时清理脚本已改为按 id 兜底移除所有 SEO 注入元素。</p>
+    <p class="why">可见的附加内容必须在容器内；清理脚本已改为按 id 兜底移除。</p>
   </div>
 
   <div class="q" data-answer="d">
     <p>Q4. 我在 v1.3.131 改错计费标签判据，根本原因是什么？</p>
-    <label class="opt"><input type="radio" name="q4" value="a" />前端代码有 bug</label>
+    <label class="opt"><input type="radio" name="q4" value="a" />前端有 bug</label>
     <label class="opt"><input type="radio" name="q4" value="b" />数据库字段命名混乱</label>
     <label class="opt"><input type="radio" name="q4" value="c" />我忘了跑测试</label>
-    <label class="opt"><input type="radio" name="q4" value="d" />我用<strong>另一个组件</strong>（<code>price.ts</code>）的字段用法，去推断<strong>渲染该标签的组件</strong>（<code>billing-mode.ts</code>）的规则；同一字段在不同组件里语义不同</label>
-    <p class="why">权威来源是渲染它的那个组件。这条已写进项目记忆，避免重犯。</p>
+    <label class="opt"><input type="radio" name="q4" value="d" />我用<b>另一个组件</b>（<code>price.ts</code>）的字段用法，去推断<b>渲染该标签的组件</b>（<code>billing-mode.ts</code>）的规则；同一字段在不同组件里语义不同</label>
+    <p class="why">权威来源是渲染它的那个组件。已写进项目记忆。</p>
   </div>
 
   <div class="q" data-answer="b">
-    <p>Q5. 压测里 <code>/api/site/visitors</code> 出现 11 次 30 秒超时，两个原因是什么？</p>
-    <label class="opt"><input type="radio" name="q5" value="a" />服务器 CPU 不够 + 网络抖动</label>
-    <label class="opt"><input type="radio" name="q5" value="b" />聚合本身要 6.3 秒（DAU/MAU 扫 logs 大表）+ 缓存过期时并发请求<strong>同时</strong>未命中、各自跑一遍（缓存击穿）</label>
-    <label class="opt"><input type="radio" name="q5" value="c" />限流器误伤 + 数据库连接池太小</label>
+    <p>Q5. 压测里访客端点出现 11 次 30 秒超时，两个成因是什么？</p>
+    <label class="opt"><input type="radio" name="q5" value="a" />CPU 不够 + 网络抖动</label>
+    <label class="opt"><input type="radio" name="q5" value="b" />聚合本身 6.3 秒（DAU/MAU 扫大表）+ 缓存过期时并发请求<b>同时</b>未命中、各跑一遍（缓存击穿）</label>
+    <label class="opt"><input type="radio" name="q5" value="c" />限流器误伤</label>
     <label class="opt"><input type="radio" name="q5" value="d" />TLS 握手慢</label>
-    <p class="why">同期 <code>/pricing</code> 与 <code>/</code> 全部正常，说明是这条路径自身的设计问题，不是环境。</p>
+    <p class="why">同期 /pricing 与 / 全部正常 → 是这条路径自身的设计问题。</p>
   </div>
 
   <div class="q" data-answer="c">
     <p>Q6. 我的第一版 SWR 实现被测试抓出什么问题？</p>
-    <label class="opt"><input type="radio" name="q6" value="a" />缓存没有过期机制</label>
-    <label class="opt"><input type="radio" name="q6" value="b" />返回了错误的状态码</label>
-    <label class="opt"><input type="radio" name="q6" value="c" /><code>refreshing</code> 标志只挡住了"重复后台刷新"，<strong>冷启动时 16 个并发仍各算一遍</strong>（测试实测 16 次）</label>
+    <label class="opt"><input type="radio" name="q6" value="a" />缓存没有过期</label>
+    <label class="opt"><input type="radio" name="q6" value="b" />返回了错误状态码</label>
+    <label class="opt"><input type="radio" name="q6" value="c" /><code>refreshing</code> 标志只挡住"重复后台刷新"，<b>冷启动时 16 个并发仍各算一遍</b></label>
     <label class="opt"><input type="radio" name="q6" value="d" />忘了加锁导致 data race</label>
-    <p class="why">修法是用 done-channel 让并发调用等待在飞的计算，而不是各算一遍。</p>
+    <p class="why">修法是用 done-channel 让并发等待在飞的计算。</p>
   </div>
 
   <div class="q" data-answer="a">
     <p>Q7. 为什么那版 GEO 增强不能上线？</p>
-    <label class="opt"><input type="radio" name="q7" value="a" />它把问答小节只注入给爬虫、前端页面上用户看不到这些内容 —— 这构成 <strong>cloaking</strong>（向搜索引擎展示与用户不同的内容）</label>
-    <label class="opt"><input type="radio" name="q7" value="b" />因为文案是英文的</label>
-    <label class="opt"><input type="radio" name="q7" value="c" />因为会拖慢页面</label>
-    <label class="opt"><input type="radio" name="q7" value="d" />因为没有写测试</label>
-    <p class="why">注入块对用户不可见，因此它只能描述"这个页面真实是什么"。安全做法是只注入页面上确实存在、用户能看到的内容（例如首页那份可见的 FAQ）。</p>
+    <label class="opt"><input type="radio" name="q7" value="a" />它把问答小节只注入给爬虫、页面上用户看不到 → 构成 <b>cloaking</b></label>
+    <label class="opt"><input type="radio" name="q7" value="b" />文案是英文的</label>
+    <label class="opt"><input type="radio" name="q7" value="c" />会拖慢页面</label>
+    <label class="opt"><input type="radio" name="q7" value="d" />没写测试</label>
+    <p class="why">注入块对用户不可见，只能描述"页面真实是什么"。安全做法：只注入页面上确实存在且用户可见的内容。</p>
   </div>
 
   <div class="q" data-answer="b">
-    <p>Q8. 「一个 IP 一天只算一次」这条要求是怎么保证的？</p>
-    <label class="opt"><input type="radio" name="q8" value="a" />在代码里写注释提醒调用方不要重复记录</label>
-    <label class="opt"><input type="radio" name="q8" value="b" />数据库唯一键 <code>(day, ip_hash)</code> —— 把去重变成<strong>数据库层约束</strong>，即使写入端重复提交也只留一行</label>
-    <label class="opt"><input type="radio" name="q8" value="c" />每天凌晨手动清理重复数据</label>
-    <label class="opt"><input type="radio" name="q8" value="d" />用 Redis 的 SETNX</label>
-    <p class="why">"靠调用方记得"不是保证；schema 层的约束才是。这是本批次访客统计的核心设计决定。</p>
+    <p>Q8. 「一个 IP 一天只算一次」是怎么保证的？</p>
+    <label class="opt"><input type="radio" name="q8" value="a" />写注释提醒调用方不要重复记录</label>
+    <label class="opt"><input type="radio" name="q8" value="b" />数据库唯一键 <code>(day, ip_hash)</code> —— 把去重变成<b>数据库层约束</b></label>
+    <label class="opt"><input type="radio" name="q8" value="c" />每天凌晨手动清理</label>
+    <label class="opt"><input type="radio" name="q8" value="d" />用 Redis SETNX</label>
+    <p class="why">"靠调用方记得"不是保证；schema 层的约束才是。</p>
+  </div>
+
+  <div class="q" data-answer="c">
+    <p>Q9. 「撤销全部会话」为什么要连 dashboard PAT 一起作废？</p>
+    <label class="opt"><input type="radio" name="q9" value="a" />省数据库空间</label>
+    <label class="opt"><input type="radio" name="q9" value="b" />用户体验更好</label>
+    <label class="opt"><input type="radio" name="q9" value="c" />这些调用点（改密/重置/2FA/降权）正是"凭据可能已泄露"时的标准恢复动作，而 PAT 是<b>无 TTL 的长期凭据</b>；不一起作废，攻击者手里的 PAT 继续有效、恢复动作形同虚设</label>
+    <label class="opt"><input type="radio" name="q9" value="d" />为了减少日志量</label>
+    <p class="why">刻意放在一个函数里而不是改 8 个调用点 —— 调用点还会增加，逐个补必然漏一个。</p>
+  </div>
+
+  <div class="q" data-answer="d">
+    <p>Q10. 任务日志「操作类型」全显示 <code>Unknown</code>，根因是？</p>
+    <label class="opt"><input type="radio" name="q10" value="a" />后端没返回该字段</label>
+    <label class="opt"><input type="radio" name="q10" value="b" />数据库缺列</label>
+    <label class="opt"><input type="radio" name="q10" value="c" />前端组件崩溃</label>
+    <label class="opt"><input type="radio" name="q10" value="d" />后端已把 action 归一化为 canonical <code>image_to_video</code> 等，前端映射表仍只有 legacy <code>generate</code> 等，<b>两边零重叠</b> → 查不到即回退 <code>Unknown</code></label>
+    <p class="why">修法是 canonical 主键 + legacy 别名；并加跨语言契约测试（前端测试直接读后端 <code>constant/task.go</code>）。</p>
+  </div>
+
+  <div class="q" data-answer="a">
+    <p>Q11. 容器非 root 的改动，我是怎么在生产上线前验证的？</p>
+    <label class="opt"><input type="radio" name="q11" value="a" />在服务器上起<b>一次性容器</b>接生产 DB 实测 uid/写盘/接口，并做<b>对照实验</b>（同场景 root 镜像行为一致）</label>
+    <label class="opt"><input type="radio" name="q11" value="b" />直接改生产然后观察</label>
+    <label class="opt"><input type="radio" name="q11" value="c" />只跑单元测试</label>
+    <label class="opt"><input type="radio" name="q11" value="d" />凭经验判断没问题</label>
+    <p class="why">对照实验是关键：它证明那个 FATAL 与改动无关，而不是"看起来像"。</p>
+  </div>
+
+  <div class="q" data-answer="b">
+    <p>Q12. 状态页为什么<b>不</b>显示「99.9% 可用率」？</p>
+    <label class="opt"><input type="radio" name="q12" value="a" />懒得做</label>
+    <label class="opt"><input type="radio" name="q12" value="b" />本进程<b>没有采样过可用性历史</b>，任何百分比都是编的；页面明写"不发布可用率/SLA——那都无法被证实"</label>
+    <label class="opt"><input type="radio" name="q12" value="c" />技术上做不到</label>
+    <label class="opt"><input type="radio" name="q12" value="d" />怕被竞争对手看到</label>
+    <p class="why">它只报可证明的事实：真实探测、真实日志计数（带窗口与开关状态）、真实心跳；用 null 表达"不可用"而不是 0。</p>
   </div>
 
   <button id="submit" type="button">提交</button>
@@ -285,19 +336,14 @@
       var answer = q.getAttribute('data-answer');
       var picked = q.querySelector('input:checked');
       q.querySelectorAll('.opt').forEach(function(o){ o.classList.remove('right','wrong'); });
-      var why = q.querySelector('.why');
-      if (why) why.classList.add('show');
-      var correctOpt = q.querySelector('input[value="'+answer+'"]').closest('.opt');
-      if (correctOpt) correctOpt.classList.add('right');
-      if (picked) {
-        if (picked.value === answer) { right++; }
-        else { picked.closest('.opt').classList.add('wrong'); }
-      }
+      var why = q.querySelector('.why'); if (why) why.classList.add('show');
+      var correct = q.querySelector('input[value="'+answer+'"]').closest('.opt');
+      if (correct) correct.classList.add('right');
+      if (picked) { if (picked.value === answer) right++; else picked.closest('.opt').classList.add('wrong'); }
     });
     var el = document.getElementById('score');
     el.classList.add('show');
-    el.textContent = '得分：' + right + ' / ' + TOTAL +
-      (right === TOTAL ? '  ✅ 通过' : '  ❌ 未通过 —— 请重读上面相关小节后再试');
+    el.textContent = '得分：' + right + ' / ' + TOTAL + (right === TOTAL ? '  ✅ 通过' : '  ❌ 未通过 —— 请重读相关小节后再试');
     el.style.color = right === TOTAL ? 'var(--ok)' : 'var(--bad)';
   });
 })();
