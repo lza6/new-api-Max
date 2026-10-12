@@ -151,6 +151,9 @@ func resolveWithUpstreamID(ctx context.Context, adaptor TaskPollingAdaptor, task
 		// 保留预扣额度作为最终扣费；只有失败任务才补做全额退款。
 		settleTaskBillingOnComplete(ctx, adaptor, task, taskResult)
 		notifyTaskSettled(ctx, task)
+		// G6 产物落盘接线：unconfirmed 任务同样只在 CAS 胜出后抓取（上面 UpdateWithStatus
+		// 的 !won 分支已提前返回），且放在结算之后，抓取失败不影响计费。
+		captureTaskArtifacts(ctx, task)
 		return string(UnconfirmedResolvedSuccess)
 	case status == model.TaskStatusFailure:
 		won, _ := task.UpdateWithStatus(model.TaskStatusUnconfirmed)

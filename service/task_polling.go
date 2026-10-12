@@ -387,6 +387,10 @@ func updateBatchTasks(ctx context.Context, adaptor BatchTaskPollingAdaptor, chan
 				RefundTaskQuota(ctx, task, task.FailReason)
 			}
 			notifyTaskSettled(ctx, task)
+			// G6 产物落盘接线：与单任务路径同一契约（终态 + CAS 胜出 + 结算之后）。
+			if task.Status == model.TaskStatusSuccess {
+				captureTaskArtifacts(ctx, task)
+			}
 		}
 	}
 	return nil
@@ -652,6 +656,15 @@ func updateVideoSingleTask(ctx context.Context, adaptor TaskPollingAdaptor, ch *
 			RefundTaskQuota(ctx, task, task.FailReason)
 		}
 		notifyTaskSettled(ctx, task)
+	}
+
+	// G6 产物落盘接线：仅在任务**真正进入成功终态**且 CAS 胜出（未被其他进程推进）时抓取。
+	//   - 位置理由：`task.PrivateData.ResultURL` 只在本函数（与 unconfirmed 解析）被写入，
+	//     别处拿不到上游产物 URL；放在 CAS 之后可避免并发轮询重复下载同一产物。
+	//   - 放在结算之后：抓取失败绝不能反过来影响计费（见 captureTaskArtifacts 的不变量 2）。
+	//   - 默认 upstream 模式下为 no-op（零行为变化）。
+	if shouldFinalizeBilling && task.Status == model.TaskStatusSuccess {
+		captureTaskArtifacts(ctx, task)
 	}
 
 	return nil

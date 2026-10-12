@@ -269,10 +269,8 @@ func buildTaskArtifactStore() TaskArtifactStore {
 		common.SysError("cannot create task artifact dir: " + err.Error() + "; using upstream mode")
 		return &disabledArtifactStore{}
 	}
-	maxBytes := int64(common.GetEnvOrDefault("TASK_ARTIFACT_MAX_FILE_MB", defaultArtifactMaxFileBytes>>20)) << 20
-	if maxBytes <= 0 {
-		maxBytes = defaultArtifactMaxFileBytes
-	}
+	// 上限解析收口在 artifactMaxFileBytes（抓取侧也用同一函数），避免两处 env 解析漂移。
+	maxBytes := artifactMaxFileBytes()
 	common.SysLog("task artifact store: local disk at " + abs)
 	return &localArtifactStore{root: abs, maxBytes: maxBytes, enabled: true}
 }

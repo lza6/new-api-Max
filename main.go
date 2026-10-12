@@ -26,12 +26,15 @@ import (
 	"github.com/lza6/new-api-Max/pkg/jsplugin"
 	perfmetrics "github.com/lza6/new-api-Max/pkg/perf_metrics"
 	"github.com/lza6/new-api-Max/relay"
+	relaychannel "github.com/lza6/new-api-Max/relay/channel"
+	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	kitutil "github.com/lza6/new-api-Max/relaykit/relayconvert/kitutil"
 	"github.com/lza6/new-api-Max/router"
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/service/authz"
 	_ "github.com/lza6/new-api-Max/setting/performance_setting"
 	"github.com/lza6/new-api-Max/setting/ratio_setting"
+	"github.com/lza6/new-api-Max/types"
 
 	"github.com/bytedance/gopkg/util/gopool"
 	"github.com/gin-gonic/gin"
@@ -156,6 +159,77 @@ func main() {
 			return nil
 		}
 		return a
+	}
+
+	// Wire the plugin artifact fetch planner used by task artifact persistence (G6).
+	// Service cannot import relay (import cycle), so the planner is injected here the
+	// same way the polling adaptor factory is. It resolves exactly the artifact keys
+	// the read path (controller/task.go) later calls store.Resolve with; a task with
+	// no artifact-capable plugin yields no plans and capture stays a no-op.
+	service.TaskArtifactFetchPlanner = func(task *model.Task) ([]service.TaskArtifactFetchPlan, error) {
+		if task == nil {
+			return nil, nil
+		}
+		adaptor := relay.GetTaskAdaptor(task.Platform)
+		if adaptor == nil {
+			return nil, nil
+		}
+		provider, ok := adaptor.(relaychannel.TaskArtifactProvider)
+		if !ok {
+			return nil, nil
+		}
+		artifacts, err := provider.ListArtifacts(task)
+		if err != nil {
+			return nil, err
+		}
+		if len(artifacts) == 0 {
+			return nil, nil
+		}
+		contentProvider, ok := adaptor.(relaychannel.TaskContentRequestProvider)
+		if !ok {
+			return nil, nil
+		}
+		channelModel, err := model.CacheGetChannel(task.ChannelId)
+		if err != nil {
+			return nil, fmt.Errorf("artifact planner: channel unavailable: %w", err)
+		}
+		pluginKey := task.PrivateData.Key
+		if pluginKey == "" {
+			pluginKey = channelModel.Key
+		}
+		baseURL := channelModel.GetBaseURL()
+		if baseURL == "" {
+			baseURL = constant.GetChannelBaseURL(channelModel.Type)
+		}
+		adaptor.Init(&relaycommon.RelayInfo{
+			ChannelMeta: &relaycommon.ChannelMeta{
+				ChannelType:    channelModel.Type,
+				ChannelBaseUrl: baseURL,
+				ApiKey:         pluginKey,
+				ChannelSetting: channelModel.GetSetting(),
+			},
+		})
+		plans := make([]service.TaskArtifactFetchPlan, 0, len(artifacts))
+		for _, artifact := range artifacts {
+			descriptor, err := contentProvider.BuildContentRequest(task, artifact.Key, relaychannel.TaskArtifactClientRequest{
+				Method: http.MethodGet,
+			})
+			if err != nil || descriptor == nil {
+				continue
+			}
+			plans = append(plans, service.TaskArtifactFetchPlan{
+				Artifact: types.TaskArtifact{
+					Key:      artifact.Key,
+					Type:     artifact.Type,
+					MimeType: artifact.MimeType,
+				},
+				URL:     descriptor.URL,
+				Method:  descriptor.Method,
+				Headers: descriptor.Headers,
+				Body:    descriptor.Body,
+			})
+		}
+		return plans, nil
 	}
 
 	// Register the periodic channel test, upstream model update, and async task
