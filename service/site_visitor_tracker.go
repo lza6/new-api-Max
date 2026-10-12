@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -427,25 +428,27 @@ func shiftDay(day, delta int) int {
 	return t.Year()*10000 + int(t.Month())*100 + t.Day()
 }
 
-// checkVisitorHashSecret 在启动时检查匿名化密钥是否**稳定**。
+// checkVisitorHashSecret 在启动时检查匿名化密钥是否**不稳定**。
 //
-// 为什么必须查：`VisitorIPHash` 用 `common.CryptoSecret` 做 HMAC 密钥。
-// 若既没设 `CRYPTO_SECRET` 也没设 `SESSION_SECRET`，`CryptoSecret` 会回退成
-// **进程启动时随机生成**的 `SessionSecret`（见 `common/init.go`）。那样的话：
+// 只有一种情况真正危险：`CRYPTO_SECRET` 与 `SESSION_SECRET` **都没有**显式配置。
+// 此时 `CryptoSecret` 回落到 `SessionSecret`，而后者是**进程启动时随机生成**的
+// （见 `common/init.go`），于是：
 //   - 进程一重启，同一个 IP 在同一天会得到**不同的 hash**，
 //     `(day, ip_hash)` 唯一键挡不住 → 访客数虚高、表行数膨胀（去重静默失效）；
 //   - 多实例部署时每个实例各算一遍。
 //
-// 隐私侧的「不可字典反查」仍然成立（密钥仍是随机的），受影响的是**统计口径**，
-// 所以这里是告警而不是拒绝启动 —— 沿用 `model/channel_key_migration.go` 的同一判据。
+// **不能**只判 `CryptoSecret == SessionSecret`：在「只设了 SESSION_SECRET」这种
+// 常见且完全安全的配置下它同样成立，会天天误报 —— 误报会让真实告警被无视。
+// 这里直接判两个环境变量是否都为空（与 `common/init.go` 的赋值逻辑对应）。
 func checkVisitorHashSecret() {
-	if common.CryptoSecret == "" || common.CryptoSecret == common.SessionSecret {
-		common.SysError("site visitor stats: CRYPTO_SECRET is not explicitly set " +
-			"(falling back to SESSION_SECRET, which is randomly generated per process when unset). " +
-			"Visitor deduplication keys will change on every restart, so one IP can be counted " +
-			"more than once per day and the visitor table will grow. " +
-			"Set CRYPTO_SECRET (or SESSION_SECRET) to a fixed value to make the counts stable.")
+	if os.Getenv("CRYPTO_SECRET") != "" || os.Getenv("SESSION_SECRET") != "" {
+		return // 至少有一个显式配置 → 派生密钥跨重启稳定，去重成立
 	}
+	common.SysError("site visitor stats: neither CRYPTO_SECRET nor SESSION_SECRET is set, " +
+		"so the HMAC key for visitor IP hashing is randomly generated per process. " +
+		"Visitor deduplication keys will change on every restart, so one IP can be counted " +
+		"more than once per day and the visitor table will grow. " +
+		"Set CRYPTO_SECRET (or SESSION_SECRET) to a fixed value.")
 }
 
 // StartSiteVisitorLoop 启动常驻 loop：定时落库 + 每日清理。幂等（可重复调用）。

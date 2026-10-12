@@ -653,3 +653,49 @@ func TestPasswordResetBumpsAuthVersionAndRevokesSessions(t *testing.T) {
 	assert.Equal(t, UserSessionStatusRevoked, storedSession.Status)
 	assert.Equal(t, "password_reset", storedSession.RevokedReason)
 }
+
+// RevokeAllUserSessions 必须**同时作废长期凭据（PAT / access_token）**。
+//
+// 锁一个真实缺陷（独立安全审计发现）：改密、重置密码、2FA 开关、passkey 重置、
+// 降权、删号这些「凭据可能已泄露」的标准恢复动作原先只撤销会话，而 PAT 是无 TTL 的
+// 长期凭据 —— 攻击者手里的 PAT 会继续有效，恢复动作形同虚设。
+//
+// 反向约束同样重要：`RevokeOtherUserSessions`（只踢其它设备）**不得**作废 PAT，
+// 因为用户当前就在使用该凭据。
+func TestRevokeAllUserSessionsAlsoRevokesAccessToken(t *testing.T) {
+	setupUserSessionTest(t)
+	now := time.Now().Unix()
+
+	seed := func(id int, name string) {
+		u := User{Id: id, Username: name, Password: "password", AuthVersion: 1,
+			AffCode: fmt.Sprintf("af%d", id)} // aff_code 有唯一约束，测试用户必须各自唯一
+		require.NoError(t, DB.Create(&u).Error)
+		t.Cleanup(func() { _ = DB.Unscoped().Delete(&User{}, id).Error })
+		require.NoError(t, DB.Model(&User{}).Where("id = ?", id).Updates(map[string]any{
+			"access_token":            fmt.Sprintf("%032d", id),
+			"access_token_created_at": now,
+		}).Error)
+		require.NoError(t, CreateUserSession(newTestUserSession(fmt.Sprintf("pat-sess-%d", id), id, now)))
+	}
+	hasToken := func(id int) bool {
+		var u User
+		require.NoError(t, DB.Select("id", "access_token").First(&u, id).Error)
+		return u.GetAccessToken() != ""
+	}
+
+	// 1) 「撤销全部会话」必须连 PAT 一起作废
+	seed(3001, "pat-revoke-all")
+	require.True(t, hasToken(3001), "前置条件：该用户应有一个 PAT")
+	_, err := RevokeAllUserSessions(3001, "password_reset")
+	require.NoError(t, err)
+	assert.False(t, hasToken(3001),
+		"撤销全部会话后 PAT 必须失效 —— 否则「改密码」踢不掉已泄露的长期凭据")
+
+	// 2) 「只踢其它设备」不得作废 PAT
+	seed(3002, "pat-revoke-others")
+	require.True(t, hasToken(3002), "前置条件：该用户应有一个 PAT")
+	_, err = RevokeOtherUserSessions(3002, "current-sid", "logout_others")
+	require.NoError(t, err)
+	assert.True(t, hasToken(3002),
+		"只踢其它设备时用户正在使用该凭据，不应作废 PAT")
+}

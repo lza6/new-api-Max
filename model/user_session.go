@@ -713,8 +713,35 @@ func RevokeOtherUserSessions(userID int, currentSID, reason string) (int64, erro
 	return revokeUserSessions(userID, currentSID, reason)
 }
 
+// RevokeAllUserSessions 撤销该用户的全部会话，**并同时作废长期凭据**
+// （dashboard PAT / `access_token`）。
+//
+// 为什么必须连 PAT 一起作废：本函数的调用点全部是安全敏感动作 ——
+// 改密、重置密码、2FA 开关、passkey 重置、管理员降权、账号删除
+// （见 `controller/user.go`、`controller/twofa.go`、`controller/passkey.go`、
+// `model/user.go` 的 8 处调用）。这些正是「凭据可能已泄露」时的标准恢复动作，
+// 而 PAT 是**无 TTL 的长期凭据** —— 只踢会话的话，攻击者手里的 PAT 继续有效，
+// 恢复动作形同虚设。（OWASP Session Management Cheat Sheet：任何权限级别变更后
+// 都必须更新/销毁旧会话标识。）
+//
+// 刻意放在这一个函数里、而不是去改 8 个调用点：调用点还会增加，逐个补必然漏一个
+// —— 本项目已有「定义了清理函数却零调用」的教训。
+//
+// `RevokeOtherUserSessions`（只踢其它设备）**不**这么做：用户当前正在使用该设备，
+// 不该把他的长期凭据一起作废。
 func RevokeAllUserSessions(userID int, reason string) (int64, error) {
-	return revokeUserSessions(userID, "", reason)
+	affected, err := revokeUserSessions(userID, "", reason)
+	if err != nil {
+		return affected, err
+	}
+	if _, tokenErr := RevokeUserAccessToken(userID); tokenErr != nil {
+		// 会话已经撤销成功，不能让「PAT 作废失败」把整个安全动作报成失败
+		// （否则调用方可能重试，或误判成"什么都没做"）。但必须留痕。
+		common.SysError(fmt.Sprintf(
+			"revoke all sessions: user #%d sessions revoked but access-token revocation failed: %v",
+			userID, tokenErr))
+	}
+	return affected, nil
 }
 
 func revokeUserSessions(userID int, excludedSID, reason string) (int64, error) {
