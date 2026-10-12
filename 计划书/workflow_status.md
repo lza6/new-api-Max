@@ -709,3 +709,38 @@ p95 **30146ms → 368ms（约 82×）**，超时归零。
 
 **交付物**：变更报告 `计划书/reports/batch-13-change-report.html`（含 8 题必须通过的测验）；
 压测脚本 `计划书/e2e-evidence/batch-13/stress-site-visitors.cjs`。
+
+---
+
+# 改进指南闭环判定（2026-10-12 实测核对，**结论：未闭环，不可删除**）
+
+以 `计划书/下一步改进指南.md` 的 G1–G12 为纲，逐组给出**实测结论**与证据
+（命令均为本轮实际执行）。
+
+| 组 | 状态 | 实测证据 |
+|---|---|---|
+| G1 灰度闭环 | ✅ 已闭环 | 14 个开关入注册表、管理端页可切换、Guard 用例锁「声明指标真被产出」 |
+| G2 自耗削减 | ◐ 部分 | 读取收口 18 处 + 出站 Timeout 已做；**§4.2.1 压缩参数调优未做**（台账已披露） |
+| G3 成本跃迁 | ✅ 已闭环 | 响应缓存磁盘化 + 工具抽屉请求级 opt-in（`X-NewAPI-Tool-Drawer`）真接线 |
+| G4 路由决策 | ❌ **未闭环** | `grep ContextKeyComplexityScore`：只在 `controller/relay.go:211` **写**、`service/log_info_generate.go:113` **读来记日志** —— **不参与选渠道**；`routing_policy.go` 不存在；`X-NewAPI-Actual-Model` 全仓零命中（G4-3 未开工） |
+| G5 治理 | ◐ 部分 | 策略引擎 enforce 已接线（可拦截）；**实施的是插件级内容寻址审批**，非指南要求的**动作级 deny-by-default**；`service/action_registry.go` **不存在**（G5-3 未闭环）；无待审批动作队列 UI |
+| G6 任务与媒体 | ❌ **未闭环** | `TaskArtifactStore.Persist` 在生产代码**零调用**（只有定义 + disabled 实现）；本批已派 agent 接线（见下） |
+| G7 商业与运营 | ✅ 本批补齐 | 续费提醒/一键续费**早已存在**（v1.3.57，早于指南 —— 指南 §9.1 结论过时）；本批 v1.3.139 补**公开状态页** + **报表 user/group/token 维度** |
+| G8 前端体验 | ❌ **未闭环** | 本批实测 `dist/static/js` 约 **59–63 MB raw**；`channel-mutate-drawer.tsx` 仍 **5054 行**；`react-icons` 整包引入；已派 agent（见下） |
+| G9 安全纵深 | ◐ 部分 | **容器非 root 本批已落地并验证**（v1.3.136）；**渠道密钥加密仍是默认关且无启用方案文档**；审计覆盖盘点未产出 |
+| G10 可靠性 | ✅ 已闭环 | 资源 gauge + loop 心跳（v1.3.126）+ 4 处无界点修复（v1.3.126）+ 本批再修 3 处（正则缓存上界、渠道健康/熔断表清理、flush 丢行） |
+| G11 API 契约 | ❌ **未闭环** | `router/relay-router.go:185-195`：`/v1/images/variations`、`/v1/files`(5 条)、`/v1/fine-tunes`(5 条) 全是 `controller.RelayNotImplemented`（**显式 501**，非静默）；无 MCP Gateway |
+| G12 工程质量 | ◐ 部分 | 本批修掉**自有**测试的顺序依赖（访客端点用例改为自持数据库）；既有 9 项 controller 噪声仍在；死码门禁基线未清 |
+
+## 判定
+**未闭环的组：G4（0/2）、G6（正在做）、G8（正在做）、G11（0/3）；部分闭环：G2、G5、G9、G12。**
+因此 `计划书/下一步改进指南.md` **不能删除**。
+
+## 下一轮建议顺序（按 ROI）
+1. **G11 契约补全**：`/v1/files` 是 OpenAI 客户端常用面，`/v1/batches` 缺失最易被调用方投诉。
+2. **G4-1 路由决策化**：分数已算好却没用于选渠道 —— 把已有数据兑现为成本收益，改动集中在
+   `middleware/distributor.go` 的选渠道处 + 一个 shadow 开关。
+3. **G9 密钥加密启用**：需**用户决策**（开了就不可逆，且要求 `CRYPTO_SECRET` 稳定）。
+   ⚠️ 生产当前 `CHANNEL_KEY_ENCRYPTION=false` —— 启用前必须先确认 `CRYPTO_SECRET` 显式配置。
+4. **G5-3 动作级审批**：形态与现状（插件级）不同，需先定设计。
+5. **G12 死码/噪声清理**：低风险但需逐项确认。
