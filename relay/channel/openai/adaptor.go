@@ -616,7 +616,7 @@ func (a *Adaptor) ConvertAudioRequest(c *gin.Context, info *relaycommon.RelayInf
 
 func (a *Adaptor) ConvertImageRequest(c *gin.Context, info *relaycommon.RelayInfo, request dto.ImageRequest) (any, error) {
 	switch info.RelayMode {
-	case relayconstant.RelayModeImagesEdits:
+	case relayconstant.RelayModeImagesEdits, relayconstant.RelayModeImagesVariations:
 		if isJSONRequest(c) {
 			return request, nil
 		}
@@ -846,7 +846,8 @@ func (a *Adaptor) ConvertOpenAIResponsesRequest(c *gin.Context, info *relaycommo
 func (a *Adaptor) DoRequest(c *gin.Context, info *relaycommon.RelayInfo, requestBody io.Reader) (any, error) {
 	if info.RelayMode == relayconstant.RelayModeAudioTranscription ||
 		info.RelayMode == relayconstant.RelayModeAudioTranslation ||
-		(info.RelayMode == relayconstant.RelayModeImagesEdits && !isJSONRequest(c)) {
+		((info.RelayMode == relayconstant.RelayModeImagesEdits ||
+			info.RelayMode == relayconstant.RelayModeImagesVariations) && !isJSONRequest(c)) {
 		return channel.DoFormRequest(a, c, info, requestBody)
 	} else if info.RelayMode == relayconstant.RelayModeRealtime {
 		return channel.DoWssRequest(a, c, info, requestBody)
@@ -865,7 +866,7 @@ func (a *Adaptor) DoResponse(c *gin.Context, resp *http.Response, info *relaycom
 		fallthrough
 	case relayconstant.RelayModeAudioTranscription:
 		err, usage = OpenaiSTTHandler(c, resp, info, a.ResponseFormat)
-	case relayconstant.RelayModeImagesGenerations, relayconstant.RelayModeImagesEdits:
+	case relayconstant.RelayModeImagesGenerations, relayconstant.RelayModeImagesEdits, relayconstant.RelayModeImagesVariations:
 		if info.IsStream {
 			usage, err = OpenaiImageStreamHandler(c, info, resp)
 		} else {

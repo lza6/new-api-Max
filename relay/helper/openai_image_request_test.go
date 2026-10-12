@@ -158,3 +158,81 @@ func TestGetAndValidOpenAIImageRequestNBounds(t *testing.T) {
 		require.Contains(t, err.Error(), boundErr)
 	})
 }
+
+// TestGetAndValidImageVariationsRequest 回归：`/v1/images/variations` 的 multipart
+// 校验必须与 images/edits 同族生效，尤其是 `n` 的**上界**。
+//
+// 为什么这条上界是计费安全问题（AGENTS.md「Billing safety invariants」）：
+// `n` 直接作为计费乘数，无界时用户可以传 `n=1e9` 让单次请求的计费算术溢出，
+// 而 quita 转换对非负整数是"合法"输入——必须在校验层就拒掉。
+func TestGetAndValidImageVariationsRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	newVariationsContext := func(t *testing.T, fields map[string]string) *gin.Context {
+		var body bytes.Buffer
+		writer := multipart.NewWriter(&body)
+		for k, v := range fields {
+			require.NoError(t, writer.WriteField(k, v))
+		}
+		part, err := writer.CreateFormFile("image", "source.png")
+		require.NoError(t, err)
+		_, err = part.Write([]byte("variation source"))
+		require.NoError(t, err)
+		require.NoError(t, writer.Close())
+
+		c, _ := gin.CreateTestContext(httptest.NewRecorder())
+		c.Request = httptest.NewRequest(http.MethodPost, "/v1/images/variations", &body)
+		c.Request.Header.Set("Content-Type", writer.FormDataContentType())
+		return c
+	}
+
+	t.Run("parses multipart fields and defaults n to 1", func(t *testing.T) {
+		c := newVariationsContext(t, map[string]string{
+			"model": "dall-e-2",
+			"size":  "1024x1024",
+		})
+		req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesVariations)
+		require.NoError(t, err)
+		require.Equal(t, "dall-e-2", req.Model)
+		require.Equal(t, "1024x1024", req.Size)
+		require.NotNil(t, req.N)
+		require.Equal(t, uint(1), *req.N, "未提供 n 时应默认 1，而不是 nil 或 0")
+	})
+
+	t.Run("accepts n at the inclusive upper bound", func(t *testing.T) {
+		c := newVariationsContext(t, map[string]string{
+			"model": "dall-e-2",
+			"n":     fmt.Sprintf("%d", dto.MaxImageN),
+		})
+		req, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesVariations)
+		require.NoError(t, err)
+		require.Equal(t, uint(dto.MaxImageN), *req.N)
+	})
+
+	t.Run("rejects n above the bound", func(t *testing.T) {
+		c := newVariationsContext(t, map[string]string{
+			"model": "dall-e-2",
+			"n":     fmt.Sprintf("%d", dto.MaxImageN+1),
+		})
+		_, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesVariations)
+		require.Error(t, err, "n 超上界必须在校验层拒绝，不能进入计费算术")
+	})
+
+	t.Run("rejects absurd n that would overflow quota math", func(t *testing.T) {
+		c := newVariationsContext(t, map[string]string{
+			"model": "dall-e-2",
+			"n":     "1000000000",
+		})
+		_, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesVariations)
+		require.Error(t, err)
+	})
+
+	t.Run("rejects non-numeric n", func(t *testing.T) {
+		c := newVariationsContext(t, map[string]string{
+			"model": "dall-e-2",
+			"n":     "two",
+		})
+		_, err := GetAndValidOpenAIImageRequest(c, relayconstant.RelayModeImagesVariations)
+		require.Error(t, err)
+	})
+}

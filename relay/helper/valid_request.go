@@ -183,7 +183,7 @@ func GetAndValidOpenAIImageRequest(c *gin.Context, relayMode int) (*dto.ImageReq
 	imageRequest := &dto.ImageRequest{}
 
 	switch relayMode {
-	case relayconstant.RelayModeImagesEdits:
+	case relayconstant.RelayModeImagesEdits, relayconstant.RelayModeImagesVariations:
 		if strings.Contains(c.Request.Header.Get("Content-Type"), "multipart/form-data") {
 			form, err := common.ParseMultipartFormReusable(c)
 			if err != nil {

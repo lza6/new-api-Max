@@ -12,6 +12,10 @@ const (
 	RelayModeModerations
 	RelayModeImagesGenerations
 	RelayModeImagesEdits
+	// RelayModeImagesVariations 是 `POST /v1/images/variations`（基于已有图片生成变体）。
+	// 请求是 multipart（image + n/size/response_format），与 images/edits 同族，
+	// 但上游若不支持该端点会自行返回 404——网关不替上游决定能力，只如实转发。
+	RelayModeImagesVariations
 	RelayModeEdits
 
 	RelayModeMidjourneyImagine
@@ -67,6 +71,8 @@ func Path2RelayMode(path string) int {
 		relayMode = RelayModeImagesGenerations
 	} else if strings.HasPrefix(path, "/v1/images/edits") {
 		relayMode = RelayModeImagesEdits
+	} else if strings.HasPrefix(path, "/v1/images/variations") {
+		relayMode = RelayModeImagesVariations
 	} else if strings.HasPrefix(path, "/v1/edits") {
 		relayMode = RelayModeEdits
 	} else if strings.HasPrefix(path, "/v1/responses/compact") {

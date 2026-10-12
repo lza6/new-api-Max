@@ -146,6 +146,12 @@ func SetRelayRouter(router *gin.Engine) {
 		httpRouter.POST("/images/edits", func(c *gin.Context) {
 			controller.Relay(c, types.RelayFormatOpenAIImage)
 		})
+		// /v1/images/variations 与 images/edits 同族（multipart：image + n/size/response_format），
+		// 复用同一 relay format 与 image adaptor。上游不支持该端点时由其自行返回 404，
+		// 网关只如实转发——不替上游判断能力。
+		httpRouter.POST("/images/variations", func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIImage)
+		})
 
 		// embedding related routes
 		httpRouter.POST("/embeddings", func(c *gin.Context) {
@@ -182,7 +188,6 @@ func SetRelayRouter(router *gin.Engine) {
 		})
 
 		// not implemented
-		httpRouter.POST("/images/variations", controller.RelayNotImplemented)
 		httpRouter.GET("/files", controller.RelayNotImplemented)
 		httpRouter.POST("/files", controller.RelayNotImplemented)
 		httpRouter.DELETE("/files/:id", controller.RelayNotImplemented)
