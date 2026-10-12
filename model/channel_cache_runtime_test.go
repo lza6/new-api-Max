@@ -24,6 +24,42 @@ func setupChannelRuntimeTest(t *testing.T) {
 	})
 }
 
+// TestInitChannelCacheHandlesGroupWithoutAbilityRows 回归：渠道声明的分组
+// 在 abilities 表里还没有任何行时，InitChannelCache 不得 panic。
+//
+// 真实故障（本地 E2E 实测复现）：内层 map 只按 abilities 的组预置，随后按
+// channel.Group 写入时命中 nil map → `assignment to entry in nil map`，
+// 直接把 SyncChannelCache goroutine（main 每 60s 拉起）打死，进程反复崩溃。
+// 「渠道已配分组、但该组还没有 ability 行」是新加分组的常见中间状态。
+func TestInitChannelCacheHandlesGroupWithoutAbilityRows(t *testing.T) {
+	setupChannelRuntimeTest(t)
+
+	// 关键：只建渠道，**不**调用 AddAbilities —— abilities 表保持为空。
+	ch := &Channel{
+		Name:   "group-without-abilities",
+		Key:    "no-ability-key",
+		Status: common.ChannelStatusEnabled,
+		Group:  "超低价备用渠道",
+		Models: "deepseek-v4.1-flash",
+	}
+	ch.SetSetting(dto.ChannelSettings{})
+	ch.SetOtherSettings(dto.ChannelOtherSettings{})
+	require.NoError(t, DB.Create(ch).Error)
+
+	var abilityCount int64
+	require.NoError(t, DB.Model(&Ability{}).Count(&abilityCount).Error)
+	require.Zero(t, abilityCount, "前置条件：abilities 必须为空")
+
+	require.NotPanics(t, func() { InitChannelCache() },
+		"渠道分组没有 ability 行时不得 panic（nil map 赋值）")
+
+	// 索引必须真的建起来，而不是靠 recover 掩盖。
+	channelSyncLock.RLock()
+	ids := group2model2channels["超低价备用渠道"]["deepseek-v4.1-flash"]
+	channelSyncLock.RUnlock()
+	require.Contains(t, ids, ch.Id, "该渠道必须出现在 group2model2channels 索引中")
+}
+
 // TestChannelRuntimeSnapshotParsedOnce：预计算快照与 Channel 方法解析结果一致，
 // 且快照命中时不重新解析（快照 map 非空即可证明已预计算）。
 func TestChannelRuntimeSnapshotParsedOnce(t *testing.T) {

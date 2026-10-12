@@ -53,6 +53,18 @@ func channelCompressionEnabled(channelId int, setting *bool) bool {
 	return true
 }
 
+// HasUsedOutboundCompression 报告本次请求的出站体是否**确实被网关压缩过**。
+//
+// 判据是 RequestOriginalBytes>0 —— 该字段仅由 MaybeCompressOutboundBody 在压缩
+// 成功时写入；未达阈值、压缩无收益、存储失败等回退明文的情形都保持 0。
+//
+// 为什么需要这个判据：压缩熔断必须只对「与压缩有关的失败」生效，否则会把与该
+// 渠道压缩能力无关的普通错误（如上游整体宕机导致的空流）也归因成「不接受 gzip」，
+// 白白关掉一个其实支持压缩的渠道的优化。
+func HasUsedOutboundCompression(info *RelayInfo) bool {
+	return info != nil && info.RequestOriginalBytes > 0
+}
+
 // TripChannelCompressionBreaker 当某渠道的压缩请求收到疑似"上游不接受 gzip"的
 // 错误时调用：临时禁用本渠道压缩。安全幂等（重复调用只刷新截止时刻）。
 //

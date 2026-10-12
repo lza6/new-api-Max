@@ -500,6 +500,16 @@ streamFinished:
 		}
 	}
 	if emptyStream.Load() {
+		// [修复防御] 请求体被网关压缩（Content-Encoding: gzip）却收到「零 data 事件」
+		// 的空流，是「上游不接受 gzip 请求体」的典型形态之一：上游把压缩体当普通
+		// JSON 解析失败后回落到非流式分支或直接给出空的流式壳。既有的压缩熔断只认
+		// 400/415/422，此类 200 形态永远不触发，渠道故障会无限持续（生产渠道 #59
+		// 实测持续两天、145 次 500）。这里在**确实用过压缩**时补上这条判据，让该
+		// 渠道自动隔离出压缩路径；到期自动恢复重试，上游修好即自愈。
+		if relaycommon.HasUsedOutboundCompression(info) {
+			relaycommon.TripChannelCompressionBreaker(info.ChannelId,
+				"upstream returned an empty stream for a gzip-compressed request body")
+		}
 		logger.LogWarn(c, "stream empty (no data events at all), failover to next channel")
 		fatalErr = types.NewError(
 			fmt.Errorf("upstream stream empty (no data received)"),

@@ -75,14 +75,20 @@ func InitChannelCache() {
 		if channel.Status != common.ChannelStatusEnabled {
 			continue // skip disabled channels
 		}
-		groups := strings.SplitSeq(channel.Group, ",")
-		for group := range groups {
-			models := channel.GetModels()
-			for _, model := range models {
-				if _, ok := newGroup2model2channels[group][model]; !ok {
-					newGroup2model2channels[group][model] = make([]int, 0)
-				}
-				newGroup2model2channels[group][model] = append(newGroup2model2channels[group][model], channel.Id)
+		for group := range strings.SplitSeq(channel.Group, ",") {
+			// [修复防御] 组的全集是「abilities 里的组」∪「channels 里声明的组」。
+			// 只按 abilities 预置内层 map 会漏掉「渠道已配 group、但该组还没有
+			// 任何 ability 行」的组（新加分组的常见中间状态），此时写入
+			// newGroup2model2channels[group][model] 会命中 nil map 直接 panic
+			// (assignment to entry in nil map)，把 SyncChannelCache 同步
+			// goroutine 打死，而它由 main 每 60s 拉起一次——表现为进程反复崩溃。
+			model2channels, ok := newGroup2model2channels[group]
+			if !ok {
+				model2channels = make(map[string][]int)
+				newGroup2model2channels[group] = model2channels
+			}
+			for _, model := range channel.GetModels() {
+				model2channels[model] = append(model2channels[model], channel.Id)
 			}
 		}
 	}

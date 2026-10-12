@@ -44,3 +44,31 @@ func TestChannelCompressionBreakerTrip(t *testing.T) {
 	assert.False(t, IsChannelCompressionTrippedForTest(7))
 	assert.True(t, channelCompressionEnabled(7, &tr))
 }
+
+// TestStreamEmptyOnCompressedRequestTripsBreaker 回归：空壳流（零 data 事件）在
+// **请求体确实被压缩过**时也必须触发压缩熔断。
+//
+// 真实故障：渠道 #59（hebox.net）对 gzip 请求体返回 HTTP 200 +
+// application/json（非流式），scanner 读不到任何 data 事件。既有熔断只认
+// 400/415/422，这类 200 形态永远不触发 → 该渠道持续 500 两天、145 次，
+// 且上游侧无任何失败记录。这条用例锁死「200 + 空壳 + 用过压缩 → 熔断」。
+func TestStreamEmptyOnCompressedRequestTripsBreaker(t *testing.T) {
+	ResetCompressionBreakerForTest()
+	assert.False(t, IsChannelCompressionTrippedForTest(59))
+
+	// 未用过压缩（RequestOriginalBytes 为 0）不得触发：避免把与压缩无关的
+	// 上游空流问题错误归因到压缩上。
+	assert.False(t, HasUsedOutboundCompression(&RelayInfo{}))
+	assert.False(t, HasUsedOutboundCompression(nil))
+
+	compressed := &RelayInfo{}
+	compressed.RequestOriginalBytes = 62070
+	assert.True(t, HasUsedOutboundCompression(compressed),
+		"RequestOriginalBytes>0 表示本次请求体确实走了压缩")
+
+	TripChannelCompressionBreaker(59, "upstream returned an empty stream for a gzip-compressed request body")
+	assert.True(t, IsChannelCompressionTrippedForTest(59), "渠道 59 应被隔离出压缩路径")
+	tr := true
+	assert.False(t, channelCompressionEnabled(59, &tr), "熔断中该渠道不再压缩")
+	assert.True(t, channelCompressionEnabled(58, &tr), "其他渠道不受影响")
+}

@@ -623,7 +623,7 @@ func processChannelError(c *gin.Context, channelError types.ChannelError, err *t
 	// [修复防御] 4.2.6：压缩失败熔断。渠道压缩默认开启；若上游不接受 gzip 请求体
 	// （常表现为 400/415/422），本渠道临时禁用压缩避免持续报错——仅在请求**确实用过
 	// 压缩**（RequestOriginalBytes>0）时触发，避免误伤普通 400。
-	if relayInfo != nil && relayInfo.RequestOriginalBytes > 0 {
+	if relaycommon.HasUsedOutboundCompression(relayInfo) {
 		switch err.StatusCode {
 		case http.StatusBadRequest, http.StatusUnsupportedMediaType, http.StatusUnprocessableEntity:
 			relaycommon.TripChannelCompressionBreaker(channelError.ChannelId,

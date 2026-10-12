@@ -214,6 +214,14 @@ func TextHelper(c *gin.Context, info *relaycommon.RelayInfo) (newAPIError *types
 			service.ResetStatusCode(newApiErr, statusCodeMappingStr)
 			return newApiErr
 		}
+		// [修复防御] 客户端要流式、上游却回了非流式 JSON：把上游这次真实的成功响应
+		// 合成为 SSE 交给流式处理器，而不是让 SSE scanner 读不到 data 事件后误判
+		// 「upstream stream empty」并最终 500。详见 relay/stream_downgrade.go。
+		if info.IsStream && adaptorWantsStreamingDowngrade(info) {
+			if downgradeUpstreamStreamToSSE(c, httpResp, info) {
+				info.IsStream = true
+			}
+		}
 	}
 
 	usage, newApiErr := adaptor.DoResponse(c, httpResp, info)
