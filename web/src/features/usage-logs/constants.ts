@@ -177,19 +177,33 @@ export const MJ_SUBMIT_RESULT_CODES = {
 
 /**
  * Task action types
- * Must match backend constants in constant/task.go
+ *
+ * **键必须等于后端 `constant/task.go` 的 canonical 值**（snake_case）。
+ * `/api/task` 返回的 action 由 `relay.TaskModel2Dto` 经
+ * `constant.NormalizeTaskAction` 归一化后再下发，因此前端拿到的一定是 canonical 值。
+ *
+ * 历史包袱：这里曾只有 legacy camelCase 键，而后端已改发 canonical →
+ * 两边零重叠，任务日志的「操作类型」整列退化成 `Unknown`（真实缺陷）。
+ * 现在 canonical 为**主键**，legacy 仅作兼容别名保留（旧缓存/旧数据仍可能出现）。
  */
 export const TASK_ACTIONS = {
   // Suno (uppercase)
   MUSIC: 'MUSIC', // 生成音乐
   LYRICS: 'LYRICS', // 生成歌词
 
-  // Video generation (camelCase)
-  GENERATE: 'generate', // 图生视频
-  TEXT_GENERATE: 'textGenerate', // 文生视频
-  FIRST_TAIL_GENERATE: 'firstTailGenerate', // 首尾生视频
-  REFERENCE_GENERATE: 'referenceGenerate', // 参照生视频
-  REMIX_GENERATE: 'remixGenerate', // 视频 Remix
+  // Video generation —— canonical（与 constant/task.go 一致）
+  IMAGE_TO_VIDEO: 'image_to_video', // 图生视频
+  TEXT_TO_VIDEO: 'text_to_video', // 文生视频
+  FIRST_TAIL_TO_VIDEO: 'first_tail_to_video', // 首尾生视频
+  REFERENCE_TO_VIDEO: 'reference_to_video', // 参照生视频
+  REMIX: 'remix', // 视频 Remix
+
+  // legacy 别名（后端 NormalizeTaskAction 的输入侧；仅为兼容旧数据保留）
+  GENERATE: 'generate',
+  TEXT_GENERATE: 'textGenerate',
+  FIRST_TAIL_GENERATE: 'firstTailGenerate',
+  REFERENCE_GENERATE: 'referenceGenerate',
+  REMIX_GENERATE: 'remixGenerate',
 } as const
 
 /**
@@ -289,24 +303,44 @@ export const MJ_SUBMIT_RESULT_MAPPINGS: Record<string, StatusMapping> = {
 
 /**
  * Task action type mappings
+ *
+ * canonical 与 legacy 两组键指向**同一份** label/variant —— 写成展开而不是抄两遍，
+ * 避免将来改文案时只改了一边（那正是这个 bug 的成因）。
  */
-export const TASK_ACTION_MAPPINGS: Record<string, StatusMapping> = {
-  [TASK_ACTIONS.MUSIC]: { label: 'Generate Music', variant: 'neutral' },
-  [TASK_ACTIONS.LYRICS]: { label: 'Generate Lyrics', variant: 'pink' },
-  [TASK_ACTIONS.GENERATE]: { label: 'Image to Video', variant: 'blue' },
-  [TASK_ACTIONS.TEXT_GENERATE]: { label: 'Text to Video', variant: 'blue' },
-  [TASK_ACTIONS.FIRST_TAIL_GENERATE]: {
+const VIDEO_ACTION_LABELS = {
+  imageToVideo: { label: 'Image to Video', variant: 'blue' },
+  textToVideo: { label: 'Text to Video', variant: 'blue' },
+  firstTailToVideo: {
     label: 'First/Last Frame to Video',
     variant: 'blue',
   },
-  [TASK_ACTIONS.REFERENCE_GENERATE]: {
+  referenceToVideo: {
     label: 'Reference Video',
     variant: 'blue',
   },
-  [TASK_ACTIONS.REMIX_GENERATE]: {
+  remix: {
     label: 'Video Remix',
     variant: 'blue',
   },
+} as const
+
+export const TASK_ACTION_MAPPINGS: Record<string, StatusMapping> = {
+  [TASK_ACTIONS.MUSIC]: { label: 'Generate Music', variant: 'neutral' },
+  [TASK_ACTIONS.LYRICS]: { label: 'Generate Lyrics', variant: 'pink' },
+
+  // canonical（后端 /api/task 实际下发的值）
+  [TASK_ACTIONS.IMAGE_TO_VIDEO]: VIDEO_ACTION_LABELS.imageToVideo,
+  [TASK_ACTIONS.TEXT_TO_VIDEO]: VIDEO_ACTION_LABELS.textToVideo,
+  [TASK_ACTIONS.FIRST_TAIL_TO_VIDEO]: VIDEO_ACTION_LABELS.firstTailToVideo,
+  [TASK_ACTIONS.REFERENCE_TO_VIDEO]: VIDEO_ACTION_LABELS.referenceToVideo,
+  [TASK_ACTIONS.REMIX]: VIDEO_ACTION_LABELS.remix,
+
+  // legacy 别名（兼容旧数据）
+  [TASK_ACTIONS.GENERATE]: VIDEO_ACTION_LABELS.imageToVideo,
+  [TASK_ACTIONS.TEXT_GENERATE]: VIDEO_ACTION_LABELS.textToVideo,
+  [TASK_ACTIONS.FIRST_TAIL_GENERATE]: VIDEO_ACTION_LABELS.firstTailToVideo,
+  [TASK_ACTIONS.REFERENCE_GENERATE]: VIDEO_ACTION_LABELS.referenceToVideo,
+  [TASK_ACTIONS.REMIX_GENERATE]: VIDEO_ACTION_LABELS.remix,
 }
 
 /**
