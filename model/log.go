@@ -786,6 +786,38 @@ func SumUsedToken(logType int, startTimestamp int64, endTimestamp int64, modelNa
 	return token
 }
 
+// logTypeCountRow 是「按日志类型计数」的扫描结构（G7 公开状态页用）。
+type logTypeCountRow struct {
+	Type  int   `gorm:"column:log_type"`
+	Count int64 `gorm:"column:log_count"`
+}
+
+// CountLogsByTypeSince 统计 since（Unix 秒）之后、type ∈ types 的日志条数，
+// 返回 type -> count 的映射（缺失的类型不出现在结果里，调用方按 0 处理）。
+//
+// 用途：公开状态页的「近 24 小时请求量 / 错误数」。只做一次 GROUP BY，避免为每类
+// 日志各扫一遍大表；`type` + `created_at` 上有复合索引（idx_log_type_created_id）。
+// 三库兼容：GROUP BY/COUNT/IN 均为 SQL 标准。
+func CountLogsByTypeSince(since int64, types ...int) (map[int]int64, error) {
+	if len(types) == 0 {
+		return map[int]int64{}, nil
+	}
+	var rows []logTypeCountRow
+	err := LOG_DB.Model(&Log{}).
+		Select("type AS log_type, COUNT(*) AS log_count").
+		Where("created_at >= ? AND type IN ?", since, types).
+		Group("type").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	counts := make(map[int]int64, len(rows))
+	for _, r := range rows {
+		counts[r.Type] = r.Count
+	}
+	return counts, nil
+}
+
 func CountOldLog(ctx context.Context, targetTimestamp int64) (int64, error) {
 	var total int64
 	if err := LOG_DB.WithContext(ctx).Model(&Log{}).Where("created_at < ?", targetTimestamp).Count(&total).Error; err != nil {

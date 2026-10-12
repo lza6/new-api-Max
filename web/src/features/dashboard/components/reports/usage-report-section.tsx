@@ -48,6 +48,9 @@ const GROUP_BY_OPTIONS: { value: UsageReportGroupBy; labelKey: string }[] = [
   { value: 'model', labelKey: 'By Model' },
   { value: 'channel', labelKey: 'By Channel' },
   { value: 'day', labelKey: 'By Day' },
+  { value: 'user', labelKey: 'By User' },
+  { value: 'group', labelKey: 'By Group' },
+  { value: 'token', labelKey: 'By Token' },
 ]
 
 const RANGE_OPTIONS: { value: number; labelKey: string }[] = [
@@ -134,6 +137,9 @@ export function UsageReportSection() {
     model: t('Model'),
     channel: t('Channel'),
     day: t('Date'),
+    user: t('User'),
+    group: t('Group'),
+    token: t('Token'),
   }
   const keyLabel = KEY_LABEL[groupBy]
 

@@ -310,6 +310,19 @@ var seoPublicPaths = []seoPublicPath{
 			Caveat:      "As a gateway, this deployment does not train or host the models it serves; correctness and availability of a model's output remain the upstream provider's responsibility.",
 		},
 	},
+	{
+		// G7 公开状态页。文案只描述**页面上确实存在**的内容（与前端 /status 页同源），
+		// 且刻意不写任何数字：页面上那些数字来自运行时探测与日志统计。
+		Path: "/status", Priority: "0.4",
+		Meta: spaRouteMeta{
+			Title:       "Service status — {site}",
+			Description: "What this gateway can report about itself: dependency reachability, requests recorded in the last 24 hours, and background task activity.",
+			H1:          "Service status",
+			NavLabel:    "Service status",
+			Summary:     "This page reports what this deployment observes about itself: the reachability of its database, log database and cache; the requests and error entries recorded over the last 24 hours together with the resulting success share (shown only when error logging is enabled); the most recent heartbeat of each background task; and how long the process has been running. Every figure is measured on this instance; it is not a third-party monitoring service.",
+			Caveat:      "These are measurements of the gateway itself, not an uptime guarantee or a service-level commitment: availability history is not sampled or retained here, and the figures refresh at intervals rather than in real time.",
+		},
+	},
 }
 
 // spaRouteMetaZh 是同一批公开路由的**中文**文案（zh-CN / zh-TW 共用）。
@@ -370,6 +383,14 @@ var spaRouteMetaZh = map[string]spaRouteMeta{
 		NavLabel:    "关于",
 		Summary:     "本页说明 {site} 是什么以及如何运营。它是一个 API 网关：把请求转发给运营方配置的上游模型服务商，套用本部署的计费与访问规则，再把服务商的响应返回给你。",
 		Caveat:      "作为网关，本部署不训练也不托管它所服务的模型；模型输出的正确性与可用性仍由上游服务商负责。",
+	},
+	"/status": {
+		Title:       "服务状态 — {site}",
+		Description: "本站对自身的可观测结果：各依赖组件是否可达、近 24 小时记录的请求量，以及后台任务活动。",
+		H1:          "服务状态",
+		NavLabel:    "服务状态",
+		Summary:     "本页展示本部署对自身的观测结果：主库、日志库与缓存的探测状态；近 24 小时记录的请求量与错误条数及其得出的成功比例（仅在开启错误日志时给出）；各后台任务的最近一次心跳；以及进程已运行时长。所有数字均由本实例自身测得，不是第三方监控服务。",
+		Caveat:      "这些是对网关自身的测量，不构成可用性承诺或服务等级保证：本站不采样、也不保留可用性历史，数字按固定间隔刷新而非实时。",
 	},
 }
 

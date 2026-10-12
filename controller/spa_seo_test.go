@@ -512,7 +512,7 @@ func TestSPASEONonHomeRoutesHaveNoFAQPage(t *testing.T) {
 	isolateHomePageOption(t, "")
 
 	for _, path := range []string{
-		"/pricing", "/rankings", "/model-test", "/tool-setup", "/about",
+		"/pricing", "/rankings", "/model-test", "/tool-setup", "/about", "/status",
 		"/some/unknown/route", "/user-agreement", "/privacy-policy",
 	} {
 		for _, lang := range []string{"zh-CN", "en-US"} {
@@ -583,6 +583,7 @@ func TestSPASEORouteStructuredDataTypes(t *testing.T) {
 		"/rankings":   "WebPage",
 		"/model-test": "WebPage",
 		"/tool-setup": "WebPage",
+		"/status":     "WebPage",
 	}
 	for _, p := range seoPublicPaths {
 		page := buildFixture(t, p.Path)

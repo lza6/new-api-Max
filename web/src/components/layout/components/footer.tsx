@@ -76,13 +76,20 @@ function FooterLinkItem(props: { link: FooterLink }) {
   )
 }
 
-// Renders User Agreement / Privacy Policy links inline with the parent's
-// copyright row when either is configured in System Settings → Site. Emits
-// fragmented siblings so the parent flex container's gap controls spacing.
-function LegalLinks(props: { leadingSeparator?: boolean }) {
+// Renders the footer utility links (legal pages and the public status page)
+// inline with the parent's copyright row. Emits fragmented siblings so the
+// parent flex container's gap controls spacing.
+function FooterUtilityLinks(props: { leadingSeparator?: boolean }) {
   const { t } = useTranslation()
   const { status } = useStatus()
   const items: { key: string; label: string; href: string }[] = []
+  // The status page is always served, so it is always linkable — unlike the
+  // legal pages, which only exist once the operator configures their content.
+  items.push({
+    key: 'status',
+    label: t('Service status'),
+    href: '/status',
+  })
   if (status?.user_agreement_enabled) {
     items.push({
       key: 'user-agreement',
@@ -237,7 +244,7 @@ export function Footer(props: FooterProps) {
               dangerouslySetInnerHTML={{ __html: footerHtml }}
             />
             <div className='border-border/60 text-muted-foreground flex w-full flex-wrap items-center justify-center gap-x-3 gap-y-1 border-t pt-4 text-xs sm:w-auto sm:justify-end sm:border-t-0 sm:border-l sm:pt-0 sm:pl-5'>
-              <LegalLinks />
+              <FooterUtilityLinks />
               <ProjectAttribution currentYear={currentYear} inline />
             </div>
           </div>
@@ -298,7 +305,7 @@ export function Footer(props: FooterProps) {
               &copy; {currentYear} {displayName}.{' '}
               {props.copyright ?? t('footer.defaultCopyright')}
             </span>
-            <LegalLinks leadingSeparator />
+            <FooterUtilityLinks leadingSeparator />
           </div>
           <ProjectAttribution currentYear={currentYear} />
         </div>

@@ -232,6 +232,9 @@ func TestDBConformanceLogsTrafficIndexDropped(t *testing.T) {
 // arithmetic (created_at + offset) - ((created_at + offset) % 86400) buckets
 // rows into the correct local calendar day on SQLite, MySQL and PostgreSQL
 // (MySQL's `/` is decimal division, so the report deliberately uses `%`).
+//
+// The user/group/token dimensions are covered here too: `group` is a reserved
+// word, so this is also the cross-dialect proof that logGroupCol quotes it.
 func TestDBConformanceUsageReport(t *testing.T) {
 	for _, dialect := range conformanceDialects(t) {
 		t.Run(dialect.name, func(t *testing.T) {
@@ -249,12 +252,13 @@ func TestDBConformanceUsageReport(t *testing.T) {
 			yesterday := today - 86400
 
 			seed := []Log{
-				{UserId: 1, Type: LogTypeConsume, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 3600, PromptTokens: 100, CompletionTokens: 50, Quota: 7, RequestBytes: 1000, ResponseBytes: 2000},
-				{UserId: 1, Type: LogTypeConsume, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 7200, PromptTokens: 200, CompletionTokens: 10, Quota: 3, RequestBytes: 500, ResponseBytes: 500},
-				{UserId: 2, Type: LogTypeConsume, ModelName: "beta", ChannelId: 20, CreatedAt: today + 60, PromptTokens: 10, CompletionTokens: 5, Quota: 1, RequestBytes: 100, ResponseBytes: 100},
-				{UserId: 3, Type: LogTypeConsume, ModelName: "beta", ChannelId: 20, CreatedAt: yesterday + 3600, PromptTokens: 1, CompletionTokens: 1, Quota: 2, RequestBytes: 50, ResponseBytes: 50},
+				{UserId: 1, Username: "alice", TokenName: "prod", Group: "default", Type: LogTypeConsume, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 3600, PromptTokens: 100, CompletionTokens: 50, Quota: 7, RequestBytes: 1000, ResponseBytes: 2000},
+				{UserId: 1, Username: "alice", TokenName: "test", Group: "default", Type: LogTypeConsume, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 7200, PromptTokens: 200, CompletionTokens: 10, Quota: 3, RequestBytes: 500, ResponseBytes: 500},
+				{UserId: 2, Username: "bob", TokenName: "prod", Group: "vip", Type: LogTypeConsume, ModelName: "beta", ChannelId: 20, CreatedAt: today + 60, PromptTokens: 10, CompletionTokens: 5, Quota: 1, RequestBytes: 100, ResponseBytes: 100},
+				// 空 group：验证 `(unknown)` 回退（NULLIF 在三种方言上行为一致）。
+				{UserId: 3, Username: "carol", TokenName: "prod", Group: "", Type: LogTypeConsume, ModelName: "beta", ChannelId: 20, CreatedAt: yesterday + 3600, PromptTokens: 1, CompletionTokens: 1, Quota: 2, RequestBytes: 50, ResponseBytes: 50},
 				// A non-consume row must be excluded from the report.
-				{UserId: 4, Type: LogTypeTopup, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 100, Quota: 999},
+				{UserId: 4, Username: "dave", TokenName: "internal", Group: "vip", Type: LogTypeTopup, ModelName: "alpha", ChannelId: 10, CreatedAt: today + 100, Quota: 999},
 			}
 			require.NoError(t, db.Create(&seed).Error)
 
@@ -293,9 +297,56 @@ func TestDBConformanceUsageReport(t *testing.T) {
 			assert.EqualValues(t, 3, days[todayKey].Requests, "today bucket (%s)", dialect.name)
 			assert.EqualValues(t, 1, days[yesterdayKey].Requests, "yesterday bucket (%s)", dialect.name)
 
-			// Invalid dimension is rejected without touching the DB.
+			// By user (display identity recorded on the log row): alice 2 reqs / 4000 B,
+			// bob 1 / 200, carol 1 / 100.
+			byUser, err := GetUsageReport(UsageReportGroupByUser, yesterday, 0)
+			require.NoError(t, err)
+			require.Len(t, byUser, 3)
+			users := map[string]UsageReportRow{}
+			for _, r := range byUser {
+				users[r.Key] = r
+			}
+			assert.EqualValues(t, 2, users["alice"].Requests)
+			assert.EqualValues(t, 4000, users["alice"].TotalBytes)
+			assert.EqualValues(t, 1, users["bob"].Requests)
+			assert.EqualValues(t, 200, users["bob"].TotalBytes)
+			assert.EqualValues(t, 1, users["carol"].Requests)
+
+			// By group — reserved word, must be quoted through logGroupCol.
+			byGroup, err := GetUsageReport(UsageReportGroupByGroup, yesterday, 0)
+			require.NoError(t, err)
+			require.Len(t, byGroup, 3)
+			groups := map[string]UsageReportRow{}
+			for _, r := range byGroup {
+				groups[r.Key] = r
+			}
+			assert.EqualValues(t, 2, groups["default"].Requests, "default group (%s)", dialect.name)
+			assert.EqualValues(t, 4000, groups["default"].TotalBytes)
+			assert.EqualValues(t, 1, groups["vip"].Requests)
+			assert.EqualValues(t, 1, groups["(unknown)"].Requests, "empty group must fall back to (unknown)")
+
+			// By token: prod 3 reqs / 3300 B, test 1 / 1000.
+			byToken, err := GetUsageReport(UsageReportGroupByToken, yesterday, 0)
+			require.NoError(t, err)
+			require.Len(t, byToken, 2)
+			tokens := map[string]UsageReportRow{}
+			for _, r := range byToken {
+				tokens[r.Key] = r
+			}
+			assert.EqualValues(t, 3, tokens["prod"].Requests)
+			assert.EqualValues(t, 3300, tokens["prod"].TotalBytes)
+			assert.EqualValues(t, 1, tokens["test"].Requests)
+
+			// Invalid dimension is rejected without touching the DB, and the
+			// allowed-value list reported to callers (also used by the controller's
+			// 400 message) must cover every implemented dimension — otherwise a
+			// newly added dimension keeps telling callers the old allowed set.
 			_, err = GetUsageReport("bogus", yesterday, 0)
-			assert.Error(t, err)
+			require.Error(t, err)
+			options := UsageReportGroupByOptions()
+			for _, dim := range usageReportGroupByValues {
+				assert.Contains(t, options, dim, "allowed-value list must include %q", dim)
+			}
 		})
 	}
 }

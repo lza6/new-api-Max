@@ -24,7 +24,8 @@ var usageReportColumns = []string{
 func parseUsageReportParams(c *gin.Context) (groupBy string, start, end int64, ok bool) {
 	groupBy = c.DefaultQuery("group_by", model.UsageReportGroupByModel)
 	if !model.IsValidUsageReportGroupBy(groupBy) {
-		common.ApiErrorMsg(c, "invalid group_by (expected model|channel|day)")
+		// 允许值清单来自 model 侧的唯一真相源，避免新增维度后报错文案还在说旧的。
+		common.ApiErrorMsg(c, "invalid group_by (expected "+model.UsageReportGroupByOptions()+")")
 		return "", 0, 0, false
 	}
 	now := time.Now().Unix()
@@ -54,8 +55,8 @@ func parseUsageReportParams(c *gin.Context) (groupBy string, start, end int64, o
 	return groupBy, start, end, true
 }
 
-// GetUsageReport 管理端用量/成本聚合报表（按模型/渠道/日）。
-// GET /api/log/report?group_by=model|channel|day&start=&end=
+// GetUsageReport 管理端用量/成本聚合报表（按模型/渠道/日/用户/分组/令牌）。
+// GET /api/log/report?group_by=model|channel|day|user|group|token&start=&end=
 func GetUsageReport(c *gin.Context) {
 	groupBy, start, end, ok := parseUsageReportParams(c)
 	if !ok {

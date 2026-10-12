@@ -40,6 +40,10 @@ func SetApiRouter(router *gin.Engine) {
 		// 与上面的 /site/stats 同级公开：均为**无 PII 的聚合量**，不返回任何
 		// 用户标识、IP 或单访客行（IP 入库前已 HMAC 匿名化）。见 controller/site_visitor.go。
 		apiRouter.GET("/site/visitors", controller.GetSiteVisitorSummary)
+		// G7：公开状态页数据（组件状态 / 近 24h 请求量与成功率 / 后台心跳 / 运行时长）。
+		// 同样无 PII、无内网地址；数据经 SWR 缓存，见 controller.GetPublicStatus。
+		// 路径刻意与 /api/status（SPA 配置端点）分开，避免互相牵连。
+		apiRouter.GET("/status/page", controller.GetPublicStatus)
 		apiRouter.GET("/model/stats", controller.GetModelStats)
 		apiRouter.GET("/pricing", middleware.HeaderNavModuleAuth("pricing"), controller.GetPricing)
 		perfMetricsRoute := apiRouter.Group("/perf-metrics")

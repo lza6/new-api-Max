@@ -96,7 +96,13 @@ export async function getUptimeStatus() {
 // Usage / cost report
 // ----------------------------------------------------------------------------
 
-export type UsageReportGroupBy = 'model' | 'channel' | 'day'
+export type UsageReportGroupBy =
+  | 'model'
+  | 'channel'
+  | 'day'
+  | 'user'
+  | 'group'
+  | 'token'
 
 export interface UsageReportRow {
   key: string

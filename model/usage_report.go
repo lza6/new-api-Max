@@ -2,16 +2,33 @@ package model
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
-// 用量/成本报表分组维度（仅这三个白名单值会进入 SQL，无注入面）。
+// 用量/成本报表分组维度（**仅白名单值会进入 SQL**，无注入面）。
 const (
 	UsageReportGroupByModel   = "model"
 	UsageReportGroupByChannel = "channel"
 	UsageReportGroupByDay     = "day"
+	UsageReportGroupByUser    = "user"
+	UsageReportGroupByGroup   = "group"
+	UsageReportGroupByToken   = "token"
 )
+
+// usageReportGroupByValues 是全部合法维度（顺序 = 报错文案里的罗列顺序）。
+// 校验与错误文案共用这一份，避免"加了维度但报错还在说旧的允许值"。
+var usageReportGroupByValues = []string{
+	UsageReportGroupByModel, UsageReportGroupByChannel, UsageReportGroupByDay,
+	UsageReportGroupByUser, UsageReportGroupByGroup, UsageReportGroupByToken,
+}
+
+// UsageReportGroupByOptions 返回报错文案里使用的维度清单（`model|channel|...`）。
+func UsageReportGroupByOptions() string {
+	return strings.Join(usageReportGroupByValues, "|")
+}
 
 // UsageReportRow 是用量/成本报表的一行聚合结果（按维度分组）。
 type UsageReportRow struct {
@@ -28,11 +45,7 @@ type UsageReportRow struct {
 
 // IsValidUsageReportGroupBy 校验分组维度。
 func IsValidUsageReportGroupBy(groupBy string) bool {
-	switch groupBy {
-	case UsageReportGroupByModel, UsageReportGroupByChannel, UsageReportGroupByDay:
-		return true
-	}
-	return false
+	return slices.Contains(usageReportGroupByValues, groupBy)
 }
 
 // usageReportAggRow 是聚合查询的中间扫描结构（key 或 int_key 二者其一按维度填充）。
@@ -49,13 +62,21 @@ type usageReportAggRow struct {
 	TotalBytes       int64  `gorm:"column:total_bytes"`
 }
 
+// usageReportBytesOrder 是「按流量从大到小」的排序表达式（model/channel/user/group/token
+// 四个维度共用）。抽成常量是因为它同时出现在 SELECT 与 ORDER BY 的语义里，抄多份会分叉。
+const usageReportBytesOrder = "COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) DESC"
+
 // GetUsageReport 按维度聚合 consume 日志的用量/成本（报表展示与 CSV 导出共用）。
-// groupBy ∈ {model,channel,day}；start/end 为 Unix 秒（end<=0 表示不限上界）。
+// groupBy ∈ {model,channel,day,user,group,token}；start/end 为 Unix 秒（end<=0 表示不限上界）。
 //
 // 三库兼容：只按白名单维度拼 SQL；SUM/COUNT/COALESCE/NULLIF/GROUP BY 为 SQL 标准。
 // 日维度用整数运算取本地日期起点——`x - (x % 86400)`（x = created_at + 时区偏移），
 // MySQL/SQLite/PostgreSQL 结果一致；刻意不用 `x / 86400`，因为 MySQL 的 `/` 是小数
 // 除法（返回 20729.5 而非 20729），跨库不可靠。
+//
+// user/group/token 三维度按**日志里记录的展示身份**分组（username / group / token_name），
+// 与日志列表、SumUsedQuota 的筛选口径一致；`group` 是保留字，必须用 logGroupCol 引号包裹。
+// 已知口径：日志在写入时固化这些字段，因此改名后的用户/令牌会分成两行（历史行保留旧名）。
 func GetUsageReport(groupBy string, start, end int64) ([]UsageReportRow, error) {
 	if !IsValidUsageReportGroupBy(groupBy) {
 		return nil, fmt.Errorf("invalid group_by: %s", groupBy)
@@ -71,10 +92,22 @@ func GetUsageReport(groupBy string, start, end int64) ([]UsageReportRow, error) 
 	case UsageReportGroupByModel:
 		expr := "COALESCE(NULLIF(model_name, ''), '(unknown)')"
 		keyExpr, groupExpr = expr+" AS dim_key", expr
-		orderExpr = "COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) DESC"
+		orderExpr = usageReportBytesOrder
 	case UsageReportGroupByChannel:
 		keyExpr, groupExpr = "channel_id AS int_key", "channel_id"
-		orderExpr = "COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) DESC"
+		orderExpr = usageReportBytesOrder
+	case UsageReportGroupByUser:
+		expr := "COALESCE(NULLIF(username, ''), '(unknown)')"
+		keyExpr, groupExpr = expr+" AS dim_key", expr
+		orderExpr = usageReportBytesOrder
+	case UsageReportGroupByGroup:
+		expr := "COALESCE(NULLIF(" + logGroupCol + ", ''), '(unknown)')"
+		keyExpr, groupExpr = expr+" AS dim_key", expr
+		orderExpr = usageReportBytesOrder
+	case UsageReportGroupByToken:
+		expr := "COALESCE(NULLIF(token_name, ''), '(unknown)')"
+		keyExpr, groupExpr = expr+" AS dim_key", expr
+		orderExpr = usageReportBytesOrder
 	case UsageReportGroupByDay:
 		expr := fmt.Sprintf("(created_at + %d) - ((created_at + %d) %% 86400)", offset, offset)
 		keyExpr, groupExpr = expr+" AS int_key", expr
