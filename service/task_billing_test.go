@@ -67,6 +67,11 @@ func TestMain(m *testing.M) {
 		panic("failed to migrate: " + err.Error())
 	}
 
+	// 出站客户端（含拨号级 SSRF 校验的 `ssrfProtectedHTTPClient`）正常由 main() 的
+	// InitHttpClient 注入；测试不跑 main，需在此初始化，否则任何依赖
+	// GetSSRFProtectedHTTPClient 的用例都会拿到 nil（产物抓取用例即属此类）。
+	InitHttpClient()
+
 	os.Exit(m.Run())
 }
 

@@ -73,6 +73,7 @@
 
 ### 生产安全加固与报表（007 批次，2026-10-04，**未部署**）
 - **登录暴力破解防护**：登录限流默认开启（`login_rate_limit.enabled` 默认 true）；**失败登录写审计**（`audit_logs`，`success=false` + `status` + `reason`，去敏不含密码）——OWASP 反暴力破解基线
+- **账号级登录失败锁定**（OWASP Authentication Cheat Sheet — Account Lockout：失败计数必须归属**账号**而非来源 IP）：`login_lockout`（默认开启，`threshold`=20 次 / `window_seconds`=1200s，退避 `base_lock_seconds`=300s → `max_lock_seconds`=900s 封顶）。仅拒绝该账号的**密码**登录（OAuth/passkey/2FA 不受影响），锁定期内尝试不累加、不延长锁定，任意一次成功登录立即清零——因此**不能被用来永久锁死他人账号**。锁定写审计（`account_locked`，解锁由成功登录的既有审计体现），面向调用方的响应与"密码错误/账号不存在"完全一致（反枚举）
 - **私网判定一致**：`common.IsPrivateIP` 补齐 CGNAT `100.64.0.0/10`、link-local、保留段，与 SSRF 判定同集
 - **用量/成本报表**：`GET /api/log/report?group_by=model|channel|day&start=&end=`（管理员）+ `/api/log/report/export` CSV 流式导出；dashboard 新增「Usage Report」section
 - **CORS 合规**：`CORS_ALLOWED_ORIGINS` 白名单，消除 `*` + credentials 非法组合，默认仅同源
