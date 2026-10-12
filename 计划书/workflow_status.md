@@ -724,17 +724,27 @@ p95 **30146ms → 368ms（约 82×）**，超时归零。
 | G3 成本跃迁 | ✅ 已闭环 | 响应缓存磁盘化 + 工具抽屉请求级 opt-in（`X-NewAPI-Tool-Drawer`）真接线 |
 | G4 路由决策 | ❌ **未闭环** | `grep ContextKeyComplexityScore`：只在 `controller/relay.go:211` **写**、`service/log_info_generate.go:113` **读来记日志** —— **不参与选渠道**；`routing_policy.go` 不存在；`X-NewAPI-Actual-Model` 全仓零命中（G4-3 未开工） |
 | G5 治理 | ◐ 部分 | 策略引擎 enforce 已接线（可拦截）；**实施的是插件级内容寻址审批**，非指南要求的**动作级 deny-by-default**；`service/action_registry.go` **不存在**（G5-3 未闭环）；无待审批动作队列 UI |
-| G6 任务与媒体 | ❌ **未闭环** | `TaskArtifactStore.Persist` 在生产代码**零调用**（只有定义 + disabled 实现）；本批已派 agent 接线（见下） |
+| G6 任务与媒体 | ✅ **已闭环**（v1.3.143） | `captureTaskArtifacts` 接线到**三个**真实调用点：`service/task_polling.go:392`（批量）、`:667`（单任务）、`service/task_unconfirmed_resolution.go:154`（unconfirmed 解析）；`main.go:169` 注册 `TaskArtifactFetchPlanner`。`Persist` 现由 `service/task_artifact_capture.go:157` 调用，不再是零调用死码。不变量均有用例：CAS 后抓取（防并发重复下载）、结算后抓取（失败不影响计费）、默认 upstream 为 no-op。`go test ./service/ -run 'TestTaskArtifact\|TestCaptureTaskArtifact\|TestPersistTaskArtifact'` → **14/14 PASS**（含 SSRF 阻断、危险头拒绝、字节上限、真实写盘） |
 | G7 商业与运营 | ✅ 本批补齐 | 续费提醒/一键续费**早已存在**（v1.3.57，早于指南 —— 指南 §9.1 结论过时）；本批 v1.3.139 补**公开状态页** + **报表 user/group/token 维度** |
-| G8 前端体验 | ❌ **未闭环** | 本批实测 `dist/static/js` 约 **59–63 MB raw**；`channel-mutate-drawer.tsx` 仍 **5054 行**；`react-icons` 整包引入；已派 agent（见下） |
-| G9 安全纵深 | ◐ 部分 | **容器非 root 本批已落地并验证**（v1.3.136）；**渠道密钥加密仍是默认关且无启用方案文档**；审计覆盖盘点未产出 |
+| G8 前端体验 | ◐ **部分**（体积项已闭环） | 体积：`react-icons` 整包动态 import（31 个子包）改为固定 98 图标表 + 单次懒加载，`dist/static/js` 实测 **59.35MB → 20.90MB（−64.8%）**（`du -sb` 独立核验，非估算；构建产物 `Total: 23667.3 kB raw / 7389.9 kB gzip`）；阈值 70/30MB → 24/11MB、entry 1.5→1.2MB。功能不退化有**真实 DOM 断言**（`react-icon-by-name.test.tsx` 5/5：渲染出 `<svg>` 且 title 可解析），应用实际用的 `SiAlipay`/`SiWechat`/`LuCreditCard` 三图标已在包内并在构建产物中命中。**未闭环**：`channel-mutate-drawer.tsx` 仍 5054 行未拆分 |
+| G9 安全纵深 | ◐ 部分 | **容器非 root 本批已落地并验证**（v1.3.136）；**账号级登录失败锁定本批已闭环**（v1.3.142，补齐「只按 IP 限流」的 OWASP 缺口，10/10 用例含「锁定期不延长锁定」与存储有界）；**渠道密钥加密仍是默认关且无启用方案文档**；审计覆盖盘点未产出 |
 | G10 可靠性 | ✅ 已闭环 | 资源 gauge + loop 心跳（v1.3.126）+ 4 处无界点修复（v1.3.126）+ 本批再修 3 处（正则缓存上界、渠道健康/熔断表清理、flush 丢行） |
 | G11 API 契约 | ❌ **未闭环** | `router/relay-router.go:185-195`：`/v1/images/variations`、`/v1/files`(5 条)、`/v1/fine-tunes`(5 条) 全是 `controller.RelayNotImplemented`（**显式 501**，非静默）；无 MCP Gateway |
 | G12 工程质量 | ◐ 部分 | 本批修掉**自有**测试的顺序依赖（访客端点用例改为自持数据库）；既有 9 项 controller 噪声仍在；死码门禁基线未清 |
 
 ## 判定
-**未闭环的组：G4（0/2）、G6（正在做）、G8（正在做）、G11（0/3）；部分闭环：G2、G5、G9、G12。**
-因此 `计划书/下一步改进指南.md` **不能删除**。
+**未闭环的组：G4（0/2）、G11（0/3）；部分闭环：G2、G5、G8、G9、G12。**
+**已闭环：G1、G3、G6、G7、G10。**（G6 于 v1.3.143 闭环，G8 体积项于 v1.3.142 闭环）
+
+### 本轮新增闭环（2026-10-13，v1.3.141–143）
+| 项 | 版本 | 证据 |
+|---|---|---|
+| 超低价分组持续 500（上游把 gzip 请求降级为非流式） | v1.3.141 | 上游直连实测 gzip 14/14 非流式 vs plain 7/7 流式；本地端到端修复前后对照；**生产部署后** `synthesized SSE` 5 次、`upstream stream empty` 0 次 |
+| 账号级登录失败锁定（G9 缺口） | v1.3.142 | `TestLoginLockout*` 10/10 PASS；4 个导出函数均有真实调用点（无死码） |
+| G6 产物落盘接线 | v1.3.143 | 三个调用点 + `main.go` 注册；14/14 PASS |
+| G8 前端体积 59.35→20.90MB | v1.3.142 | `du -sb dist/static/js` 独立核验 + 真实构建输出 |
+| 前端测试本机无法启动 | 随 G8 | Vitest 4 移除 `poolOptions`；固定单 worker 后 `bun run test` 可用（setup 46s→3.5s） |
+| `model/channel_cache.go` nil map panic | v1.3.141 | 「渠道已配 group 但该组无 ability 行」打死同步 goroutine；RED 验证旧代码 panic |
 
 ## 下一轮建议顺序（按 ROI）
 1. **G11 契约补全**：`/v1/files` 是 OpenAI 客户端常用面，`/v1/batches` 缺失最易被调用方投诉。
