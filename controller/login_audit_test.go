@@ -134,3 +134,70 @@ func TestLoginDisabledUserIsAudited(t *testing.T) {
 		assert.Contains(t, toString(rows[0].Other.Op.Params["reason"]), "user_disabled")
 	}
 }
+
+// 反枚举（OWASP Authentication Cheat Sheet）：第三方注册（无密码）账号的登录失败，
+// 响应必须与「账号不存在 / 密码错误」**完全一致**。
+//
+// 锁一个真实缺陷：此前的实现对 `ErrUserNoPassword` 单独返回
+// 「该账号通过 {{Provider}} 注册，尚未设置密码…」，于是攻击者用
+// 「用户名 + 任意密码」即可判定「该账号存在，且用哪家 provider 注册」——
+// 这正是账号枚举的判定因子。
+//
+// 修法不是牺牲可用性：通用文案 `user.username_or_password_error` 本身已经包含
+// 「若通过第三方登录注册、可能尚未设置密码，请改用对应方式登录」的引导，
+// 所以用户得到的帮助没有减少，只是不再顺带确认账号是否存在。
+// 精确原因（含 provider）保留在**审计日志**里，供运营排查。
+func TestLoginDoesNotRevealAccountExistence(t *testing.T) {
+	db := useIsolatedAuditDB(t)
+
+	// 第三方注册的账号：有记录、无密码。
+	oauthUser := model.User{
+		Username: "oauth_only_" + common.GetRandomString(6),
+		Source:   "discord", // 刻意选一个**不**在通用文案示例(NoneLoc/GitHub)里的 provider，这样任何出现即代表泄露
+		Role:     common.RoleCommonUser,
+		Status:   common.UserStatusEnabled,
+		Group:    "default",
+	}
+	require.NoError(t, db.Create(&oauthUser).Error)
+	require.Empty(t, oauthUser.Password, "前置条件：该账号必须没有密码")
+
+	gin.SetMode(gin.TestMode)
+	attempt := func(username string) (int, string) {
+		rec := httptest.NewRecorder()
+		c, _ := gin.CreateTestContext(rec)
+		body := `{"username":"` + username + `","password":"any-wrong-password"}`
+		c.Request = httptest.NewRequest("POST", "/api/user/login", strings.NewReader(body))
+		c.Request.Header.Set("Content-Type", "application/json")
+		c.Set("login_method", "password")
+		Login(c)
+		var payload struct {
+			Message string `json:"message"`
+		}
+		_ = common.Unmarshal(rec.Body.Bytes(), &payload)
+		return rec.Code, payload.Message
+	}
+
+	codeExisted, msgExisted := attempt(oauthUser.Username)
+	codeGhost, msgGhost := attempt("ghost_" + common.GetRandomString(8))
+
+	assert.Equal(t, codeGhost, codeExisted,
+		"状态码必须一致 —— 否则同样可用于枚举账号是否存在")
+	assert.Equal(t, msgGhost, msgExisted,
+		"响应文案必须一致 —— 否则可据此判定账号是否存在（账号枚举）")
+	// 通用文案里本来就列了示例 provider（如 GitHub），所以只有**本例独有的** provider
+	// 出现在响应里才算泄露。这里用 discord。
+	assert.NotContains(t, strings.ToLower(msgExisted), "discord",
+		"响应不得透露该账号的注册来源")
+	assert.NotEmpty(t, msgExisted)
+
+	// 精确原因仍必须进审计（内部可排查），且带上 provider。
+	// 直接查原始 other 列：审计结构经 JSON 往返后 Op 可能为 nil，
+	// 按结构断言会得到一个「假通过」。
+	var otherTexts []string
+	require.NoError(t, db.Raw("SELECT other FROM audit_logs").Scan(&otherTexts).Error)
+	joined := strings.ToLower(strings.Join(otherTexts, " "))
+	assert.Contains(t, joined, "no_password_use_oauth",
+		"无密码账号的登录失败必须以 no_password_use_oauth 记入审计")
+	assert.Contains(t, joined, "discord",
+		"审计里应保留 provider，供运营判断是哪家 provider 的回调有问题")
+}

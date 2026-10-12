@@ -77,14 +77,12 @@ const (
 
 // User related messages
 const (
-	MsgUserPasswordLoginDisabled     = "user.password_login_disabled"
-	MsgUserRegisterDisabled          = "user.register_disabled"
-	MsgUserPasswordRegisterDisabled  = "user.password_register_disabled"
-	MsgUserUsernameOrPasswordEmpty   = "user.username_or_password_empty"
-	MsgUserUsernameOrPasswordError   = "user.username_or_password_error"
-	// MsgUserNoPasswordUseOAuth：账号未设置密码且由第三方登录注册时使用。
+	MsgUserPasswordLoginDisabled    = "user.password_login_disabled"
+	MsgUserRegisterDisabled         = "user.register_disabled"
+	MsgUserPasswordRegisterDisabled = "user.password_register_disabled"
+	MsgUserUsernameOrPasswordEmpty  = "user.username_or_password_empty"
+	MsgUserUsernameOrPasswordError  = "user.username_or_password_error"
 	// 参数 provider 为注册来源显示名（如 NodeLoc / GitHub）。
-	MsgUserNoPasswordUseOAuth = "user.no_password_use_oauth"
 	MsgUserEmailOrPasswordEmpty      = "user.email_or_password_empty"
 	MsgUserExists                    = "user.exists"
 	MsgUserNotExists                 = "user.not_exists"
@@ -290,21 +288,21 @@ const (
 
 // OAuth related messages
 const (
-	MsgOAuthInvalidCode     = "oauth.invalid_code"
-	MsgOAuthGetUserErr      = "oauth.get_user_error"
-	MsgOAuthAccountUsed     = "oauth.account_used"
-	MsgOAuthUnknownProvider = "oauth.unknown_provider"
-	MsgOAuthStateInvalid    = "oauth.state_invalid"
-	MsgOAuthNotEnabled      = "oauth.not_enabled"
-	MsgOAuthUserDeleted     = "oauth.user_deleted"
+	MsgOAuthInvalidCode        = "oauth.invalid_code"
+	MsgOAuthGetUserErr         = "oauth.get_user_error"
+	MsgOAuthAccountUsed        = "oauth.account_used"
+	MsgOAuthUnknownProvider    = "oauth.unknown_provider"
+	MsgOAuthStateInvalid       = "oauth.state_invalid"
+	MsgOAuthNotEnabled         = "oauth.not_enabled"
+	MsgOAuthUserDeleted        = "oauth.user_deleted"
 	MsgOAuthRegistrationFailed = "oauth.registration_failed"
-	MsgOAuthUserBanned      = "oauth.user_banned"
-	MsgOAuthBindSuccess     = "oauth.bind_success"
-	MsgOAuthAlreadyBound    = "oauth.already_bound"
-	MsgOAuthConnectFailed   = "oauth.connect_failed"
-	MsgOAuthTokenFailed     = "oauth.token_failed"
-	MsgOAuthUserInfoEmpty   = "oauth.user_info_empty"
-	MsgOAuthTrustLevelLow   = "oauth.trust_level_low"
+	MsgOAuthUserBanned         = "oauth.user_banned"
+	MsgOAuthBindSuccess        = "oauth.bind_success"
+	MsgOAuthAlreadyBound       = "oauth.already_bound"
+	MsgOAuthConnectFailed      = "oauth.connect_failed"
+	MsgOAuthTokenFailed        = "oauth.token_failed"
+	MsgOAuthUserInfoEmpty      = "oauth.user_info_empty"
+	MsgOAuthTrustLevelLow      = "oauth.trust_level_low"
 )
 
 // Model layer error messages (for translation in controller)

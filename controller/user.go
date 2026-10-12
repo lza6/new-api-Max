@@ -99,16 +99,24 @@ func Login(c *gin.Context) {
 			recordLoginFailureAudit(c, username, nil, "invalid_params", http.StatusBadRequest)
 			common.ApiErrorI18n(c, i18n.MsgInvalidParams)
 		case errors.Is(err, model.ErrUserNoPassword):
-			// 账号存在但从未设置密码（第三方登录注册）。给出「请用 X 登录」的精确
-			// 引导，而非笼统的「用户名或密码错误，或用户已被封禁」。
-			// 注意：这会透露「该账号存在且未设密码」，属于有意的可用性取舍（用户要求）。
-			provider := model.LoginProviderDisplayName(user.Source)
-			recordLoginFailureAudit(c, username, &user, "no_password_use_oauth", http.StatusUnauthorized)
-			if provider == "" {
-				common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
-			} else {
-				common.ApiErrorI18n(c, i18n.MsgUserNoPasswordUseOAuth, map[string]any{"Provider": provider})
+			// 账号存在但从未设置密码（第三方登录注册）。
+			//
+			// **返回通用文案，绝不透露账号是否存在**（OWASP Authentication Cheat Sheet：
+			// 无论「凭证错误 / 账号不存在 / 账号被锁」都必须给出同样的通用响应）。
+			// 通用文案 `MsgUserUsernameOrPasswordError` 本身已经包含第三方登录的引导
+			// （「若你的账号是通过第三方登录注册的，可能尚未设置密码，请改用对应的
+			// 第三方方式登录」），因此用户得到的帮助**没有减少**，只是不再顺带确认
+			// 「这个账号确实存在、且用的是哪家 provider」——那正是账号枚举的判定因子。
+			//
+			// 精确原因保留在**审计日志**里（`no_password_use_oauth`），供运营排查，
+			// 不进入面向调用方的响应。注册来源（哪家 provider）同样只进审计 ——
+			// 运营需要它来判断「是不是某个 provider 的回调出了问题」，而调用方不需要。
+			reason := "no_password_use_oauth"
+			if provider := model.LoginProviderDisplayName(user.Source); provider != "" {
+				reason += ":" + provider
 			}
+			recordLoginFailureAudit(c, username, &user, reason, http.StatusUnauthorized)
+			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
 		default:
 			recordLoginFailureAudit(c, username, nil, "invalid_credentials", http.StatusUnauthorized)
 			common.ApiErrorI18n(c, i18n.MsgUserUsernameOrPasswordError)
