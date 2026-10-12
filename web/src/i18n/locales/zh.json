@@ -2025,7 +2025,7 @@
     "Enter a new name": "输入新名称",
     "Enter a positive integer": "请输入正整数",
     "Enter a positive or negative amount to adjust the quota": "输入正数或负数以调整配额",
-    "Enter a react-icons component name. Invalid names show no icon.": "输入 react-icons 组件名。无法解析的名称不会显示图标。",
+    "Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.": "输入 react-icons 图标名。仅内置 si（如 SiAlipay、SiWechat）与 lu（如 LuCreditCard）两个图标集；其他名称不会显示图标。",
     "Enter a valid condition value.": "请输入有效的条件值。",
     "Enter a valid email or leave blank": "请输入有效的邮箱地址或留空",
     "Enter a value and press Enter": "输入值并按回车键",

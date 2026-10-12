@@ -2025,7 +2025,7 @@
     "Enter a new name": "Nhập tên mới",
     "Enter a positive integer": "Nhập một số nguyên dương",
     "Enter a positive or negative amount to adjust the quota": "Nhập một giá trị dương hoặc âm để điều chỉnh hạn ngạch",
-    "Enter a react-icons component name. Invalid names show no icon.": "Nhập tên component react-icons. Tên không hợp lệ sẽ không hiển thị biểu tượng.",
+    "Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.": "Nhập tên biểu tượng react-icons. Chỉ có bộ si (ví dụ: SiAlipay, SiWechat) và lu (ví dụ: LuCreditCard) được tích hợp; tên khác sẽ không hiển thị biểu tượng.",
     "Enter a valid condition value.": "Nhập giá trị điều kiện hợp lệ.",
     "Enter a valid email or leave blank": "Nhập email hợp lệ hoặc để trống",
     "Enter a value and press Enter": "Nhập giá trị và nhấn Enter",

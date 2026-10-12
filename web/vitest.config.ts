@@ -41,5 +41,16 @@ export default defineConfig({
     clearMocks: true,
     restoreMocks: true,
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    // Vitest 4 removed `poolOptions`; concurrency is now top-level. The default
+    // worker pool fails to start on this Windows machine: jsdom setup alone
+    // costs ~45s per worker, which trips vitest-pool-runner's
+    // "Timeout waiting for worker to respond" before any test file runs
+    // (`Test Files no tests / Errors N`). Pinning a single worker avoids the
+    // startup race at the cost of parallelism — correctness over speed for a
+    // suite that would otherwise report zero tests.
+    pool: 'forks',
+    maxWorkers: 1,
+    minWorkers: 1,
+    fileParallelism: false,
   },
 })

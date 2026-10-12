@@ -2025,7 +2025,7 @@
     "Enter a new name": "Entrez un nouveau nom",
     "Enter a positive integer": "Saisissez un entier positif",
     "Enter a positive or negative amount to adjust the quota": "Saisir un montant positif ou négatif pour ajuster le quota",
-    "Enter a react-icons component name. Invalid names show no icon.": "Saisissez le nom d’un composant react-icons. Les noms invalides n’affichent aucune icône.",
+    "Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.": "Saisissez un nom d’icône react-icons. Seuls les packs si (ex. SiAlipay, SiWechat) et lu (ex. LuCreditCard) sont embarqués ; les autres noms n’affichent aucune icône.",
     "Enter a valid condition value.": "Saisissez une valeur de condition valide.",
     "Enter a valid email or leave blank": "Entrez un e-mail valide ou laissez vide",
     "Enter a value and press Enter": "Saisir une valeur et appuyer sur Entrée",

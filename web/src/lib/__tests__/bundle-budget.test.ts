@@ -41,34 +41,44 @@ function gzipEstimate(sizeBytes: number): number {
 }
 
 describe('bundle budget (production build)', () => {
-  it('total JS stays under 70 MB raw / 30 MB gzip-estimated', () => {
+  it('total JS stays under 24 MB raw / 11 MB gzip-estimated', () => {
     const files = jsFiles()
     if (files.length === 0) {
       return // dist 未构建（CI 单测阶段），跳过
     }
     const totalRaw = files.reduce((s, f) => s + f.sizeBytes, 0)
-    expect(totalRaw).toBeLessThan(70 * 1024 * 1024)
-    // 总包大部分是**懒加载**的 async chunk（react-icons 全包 si/fa6/tb/md 约 20MB raw，
-    // 仅「支付方式图标」等管理页加载，进不了首屏）。gzipEstimate 用 0.45 保守上界，
-    // 真实 gzip 比远低于此。实测 raw ≈ 59MB → 估算 ≈ 27MB；上限设 30MB 以反映现实并
-    // 仍能拦截真正的依赖膨胀。首屏预算见下方 sync-chain 用例（那才是用户等待的字节）。
-    expect(gzipEstimate(totalRaw)).toBeLessThan(30 * 1024 * 1024)
+    // 2026-10-12 实测：react-icons 曾通过 `react-icon-by-name.tsx` 里的 31 个
+    // `import('react-icons/<pack>')` 动态整包加载把 gi/pi/si/tb/md/fa 等全部打进
+    // async chunk，`dist/static/js` 总 raw 达 59.35 MB。改为固定图标表 + 单次
+    // 懒加载（`components/payment-icons.ts`）后降到 20.88 MB（−64.8%）。
+    // 指南 G8 的目标是 ≤43 MB（59.35→降 ≥30%）；实测 20.88 MB 已明显低于该目标。
+    // 阈值取 24 MB（= 实测 +15% 缓冲）：远低于旧阈值 70 MB（旧值高于实测，形同虚设），
+    // 也低于旧实测 59.35 MB 与指南的 43 MB；而最小图标整包 gi 就有 6.5 MB，
+    // pi 5.1 / si 4.9 / tb 3.0 / md 1.9 / fa 2.9，重新引入任一个都会立刻顶破。
+    // 注意：**阈值必须高于当前实测值**，否则测试恒失败；24 MB 是"贴近实测 + 留少量
+    // 正常功能增长空间"的取法，不是"低于实测值"（那样无法通过）。
+    // 另：本用例守的是 dist/镜像体积，与首屏无关——首屏由下方 sync-chain 用例单独守
+    //（那是用户真正等待的字节，实测 721 KB gzip）。
+    expect(totalRaw).toBeLessThan(24 * 1024 * 1024)
+    // gzipEstimate 用 0.45 保守上界。实测 raw 20.88 MB → 估算 9.40 MB；上限 11 MB。
+    expect(gzipEstimate(totalRaw)).toBeLessThan(11 * 1024 * 1024)
   })
 
-  it('index entry chunk stays under 1.5 MB raw', () => {
+  it('index entry chunk stays under 1.2 MB raw', () => {
     const files = jsFiles()
     if (files.length === 0) return
     const index = files.find((f) => f.name.startsWith('index.'))
     expect(index).toBeTruthy()
     // no-non-null-assertion 禁止 `!`：前置 toBeTruthy 已保证存在，此处用可选链。
-    // 实测 index.js ≈ 0.9 MB raw；1.5 MB 上限可抓住真正回归，又不因正常页
-    // 面增长误报（旧值 5 MB 留有 5 倍余量，形同虚设）。
-    expect(index?.sizeBytes ?? 0).toBeLessThan(1.5 * 1024 * 1024)
+    // 2026-10-12 实测 index.js ≈ 0.88 MB raw（react-icons 整包治理前后基本持平，
+    // 因为图标数据本就在 async chunk）。1.2 MB 上限留 ~36% 缓冲，可抓住真正回归，
+    // 又不因正常页面增长误报（旧值 1.5 MB 余量偏松）。
+    expect(index?.sizeBytes ?? 0).toBeLessThan(1.2 * 1024 * 1024)
   })
 
   // 首屏 = index.html 里同步加载的 JS/CSS 链（不是「index chunk」）。
   // 这是用户真正等待的字节；旧测试只看 index chunk，漏掉了整条同步链。
-  it('first-paint sync chain (from dist/index.html) stays under 760 KB gzip', () => {
+  it('first-paint sync chain (from dist/index.html) stays under 740 KB gzip', () => {
     const htmlPath = path.resolve(process.cwd(), 'dist/index.html')
     if (!existsSync(htmlPath)) return // dist 未构建，跳过
 
@@ -85,16 +95,21 @@ describe('bundle budget (production build)', () => {
 
     // 至少含 index.js（同步入口）；否则 index.html 解析或构建异常。
     expect(assetCount).toBeGreaterThan(0)
-    // 实测 ≈ 717 KB；760 KB 留 ~6% 缓冲。任何把大库（three/react-icons 全包等）
-    // 误引入首屏的回归都会被此处拦截。
-    expect(totalGzip).toBeLessThan(760 * 1024)
+    // 2026-10-12 实测 ≈ 721 KB。此用例是「图标数据被误提升进首屏」的哨兵：
+    // 治理时先把图标改成静态引入，首屏立刻涨到 739 KB（react-icons 核心 +
+    // 49 个图标模块被拉进首个同步共享 chunk），改为单次懒加载后回到 721 KB。
+    // 740 KB 上限（+2.6%）正好能把那次 +18 KB 的回归拦下，又不因路由微调误报。
+    expect(totalGzip).toBeLessThan(740 * 1024)
   })
 
-  it('largest async chunk stays under 8 MB raw', () => {
+  it('largest async chunk stays under 4 MB raw', () => {
     const files = jsFiles()
     if (files.length === 0) return
     const maxChunk = Math.max(...files.filter((f) => !f.name.startsWith('index.')).map((f) => f.sizeBytes))
-    expect(maxChunk).toBeLessThan(8 * 1024 * 1024)
+    // 实测最大 async chunk = vendor-charts ≈ 2.2 MB（图表库，与图标治理无关）。
+    // 旧上限 8 MB 在治理后形同虚设；4 MB 仍给图表库留近一倍余量，同时能拦住
+    // 任何把图标整包或新重依赖塞进单个 async chunk 的回归。
+    expect(maxChunk).toBeLessThan(4 * 1024 * 1024)
   })
 
   it('routes are code-split into separate async chunks, not all bundled into index', () => {
@@ -110,15 +125,16 @@ describe('bundle budget (production build)', () => {
     expect(asyncRouteChunks.length).toBeGreaterThanOrEqual(10)
   })
 
-  it('known heavy vendor chunks stay under 8 MB raw', () => {
+  it('known heavy vendor chunks stay under 4 MB raw', () => {
     const files = jsFiles()
     if (files.length === 0) return
     // 已知重 vendor（charts/shiki/editor）各自独立成 chunk 时须在预算内；
     // 未独立成 chunk（未被引用）则跳过，避免对构建产物做硬性存在断言。
+    // 实测 vendor-charts ≈ 2.2 MB、vendor-editor ≈ 0.5 MB、vendor-shiki 未独立成块。
     for (const prefix of ['vendor-charts', 'vendor-shiki', 'vendor-editor']) {
       const chunk = files.find((f) => path.basename(f.name).startsWith(prefix))
       if (!chunk) continue
-      expect(chunk.sizeBytes).toBeLessThan(8 * 1024 * 1024)
+      expect(chunk.sizeBytes).toBeLessThan(4 * 1024 * 1024)
     }
   })
 })

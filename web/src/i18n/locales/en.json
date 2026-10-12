@@ -2025,7 +2025,7 @@
     "Enter a new name": "Enter a new name",
     "Enter a positive integer": "Enter a positive integer",
     "Enter a positive or negative amount to adjust the quota": "Enter a positive or negative amount to adjust the quota",
-    "Enter a react-icons component name. Invalid names show no icon.": "Enter a react-icons component name. Invalid names show no icon.",
+    "Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.": "Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.",
     "Enter a valid condition value.": "Enter a valid condition value.",
     "Enter a valid email or leave blank": "Enter a valid email or leave blank",
     "Enter a value and press Enter": "Enter a value and press Enter",

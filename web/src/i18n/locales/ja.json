@@ -2025,7 +2025,7 @@
     "Enter a new name": "新しい名前を入力してください",
     "Enter a positive integer": "正の整数を入力してください",
     "Enter a positive or negative amount to adjust the quota": "クォータを調整するために正または負の値を入力してください",
-    "Enter a react-icons component name. Invalid names show no icon.": "react-icons のコンポーネント名を入力してください。無効な名前はアイコンを表示しません。",
+    "Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.": "react-icons のアイコン名を入力してください。同梱されているセットは si（例: SiAlipay、SiWechat）と lu（例: LuCreditCard）のみで、それ以外の名前はアイコンを表示しません。",
     "Enter a valid condition value.": "有効な条件値を入力してください。",
     "Enter a valid email or leave blank": "有効なメールアドレスを入力するか空白にしてください",
     "Enter a value and press Enter": "値を入力してEnterを押してください",

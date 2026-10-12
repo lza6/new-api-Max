@@ -281,7 +281,7 @@ export function PaymentMethodDialog({
                 </FormControl>
                 <FormDescription>
                   {t(
-                    'Enter a react-icons component name. Invalid names show no icon.'
+                    'Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.'
                   )}
                 </FormDescription>
                 <FormMessage />

@@ -2025,7 +2025,7 @@
     "Enter a new name": "Введите новое имя",
     "Enter a positive integer": "Введите положительное целое число",
     "Enter a positive or negative amount to adjust the quota": "Введите положительную или отрицательную сумму для корректировки квоты",
-    "Enter a react-icons component name. Invalid names show no icon.": "Введите имя компонента react-icons. Недопустимые имена не отображают значок.",
+    "Enter a react-icons icon name. Only the si (e.g. SiAlipay, SiWechat) and lu (e.g. LuCreditCard) packs are bundled; other names show no icon.": "Введите имя иконки react-icons. Включены только наборы si (например, SiAlipay, SiWechat) и lu (например, LuCreditCard); другие имена не отображают значок.",
     "Enter a valid condition value.": "Введите допустимое значение условия.",
     "Enter a valid email or leave blank": "Введите действительный email или оставьте пустым",
     "Enter a value and press Enter": "Введите значение и нажмите Enter",
