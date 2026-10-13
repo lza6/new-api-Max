@@ -25,6 +25,7 @@ import {
 } from '@/components/ai-elements/code-block'
 import { Loader } from '@/components/ai-elements/loader'
 import { MessageContent } from '@/components/ai-elements/message'
+import { ChatImage } from '@/components/chat-image'
 import {
   Reasoning,
   ReasoningContent,
@@ -141,12 +142,12 @@ export function PlaygroundMessageContent({
         <>
           {userImages.length > 0 && (
             <div className='mb-2 flex flex-wrap gap-2'>
-              {userImages.map((url, index) => (
-                <img
-                  key={`${message.key}-img-${index}`}
+              {userImages.map((url) => (
+                <ChatImage
+                  key={`${message.key}-img-${url}`}
                   src={url}
                   alt={t('Attached image')}
-                  className='border-border/70 max-h-40 rounded-md border object-contain'
+                  imgClassName='max-h-40'
                 />
               ))}
             </div>

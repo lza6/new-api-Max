@@ -16,9 +16,10 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { sanitizeImageSrc, type ImageNode } from 'stream-markdown-parser'
+
+import { ChatImage } from '@/components/chat-image'
 
 type ResponseImageProps = {
   node: ImageNode
@@ -26,10 +27,11 @@ type ResponseImageProps = {
 
 export function ResponseImage(props: ResponseImageProps) {
   const { t } = useTranslation()
-  const [hasError, setHasError] = useState(false)
+  // 加载失败的降级交给 ChatImage（它内部同样渲染文本占位），这里只需判空 src
+  // ——留一份 `hasError` 状态会让「谁负责降级」出现两个真相。
   const src = sanitizeImageSrc(props.node.src)
 
-  if (!src || hasError) {
+  if (!src) {
     return (
       <span className='border-border/70 text-muted-foreground my-4 inline-flex rounded-md border px-3 py-2 text-xs italic'>
         {props.node.alt || t('Image not available')}
@@ -37,14 +39,17 @@ export function ResponseImage(props: ResponseImageProps) {
     )
   }
 
+  // 复用统一的图片操作层（点击放大 + 下载），而不是只渲染一个裸 `<img>`：
+  // 生成图在正文里以 markdown 形式返回，用户最常想做的就是「存下来」，
+  // 原先整个应用没有任何图片下载入口。
+  // 尺寸仍由本组件决定（`imgClassName`），保持既有正文排版不变。
   return (
-    <img
-      alt={props.node.alt}
-      className='border-border/70 my-4 block h-auto max-h-96 max-w-full rounded-lg border object-contain'
-      loading='lazy'
-      onError={() => setHasError(true)}
-      src={src}
-      title={props.node.title ?? undefined}
-    />
+    <span className='my-4 block'>
+      <ChatImage
+        src={src}
+        alt={props.node.alt}
+        imgClassName='max-h-96 max-w-full rounded-lg'
+      />
+    </span>
   )
 }
