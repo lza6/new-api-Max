@@ -75,6 +75,14 @@ func SetupLogger() {
 			_ = oldFile.Close()
 		}
 		common.LogWriterMu.Unlock()
+
+		// 轮转后按保留策略清理旧文件。
+		//
+		// 放在这里而不是单开一个定时 loop：日志目录的增长**只发生在轮转时**
+		// （每 100 万行新建一个文件），在轮转点清理与增长一一对应，
+		// 既不需要额外 goroutine，也不会出现「长时间没轮转但定时器空跑」。
+		// activePath 传入当前文件，保证它永不被删。
+		cleanupOldLogFiles(*common.LogDir, logPath)
 	}
 }
 
