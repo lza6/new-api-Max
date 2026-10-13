@@ -150,3 +150,41 @@ T1/T2 优先（结构性改动，其它功能挂在它们上面）→ T3/T4/T5�
 
 **明确不做**（并说明理由）：agent 自主判断改哪张图 —— 需要后端 agent loop，
 与 MCP/G5-3 一起立项。
+
+---
+
+## 调查：本站是否在储存用户图片（2026-10-14）
+
+用户反馈：「我记得有个本站储存他们图片的行为我肯定是搞错了，本站不应该储存的，
+这样对我们服务器压力非常大」。
+
+### 逐条实测结论：**生产没有储存用户图片**
+
+| 可能的存图路径 | 生产状态 | 证据 |
+|---|---|---|
+| **站内图床**（`TaskArtifactStore` local 模式） | ❌ **未启用** | `.env` 与容器 env 均**无** `TASK_ARTIFACT_STORE_MODE`；默认值 = `upstream`（`setting/system_setting/task_artifact_store.go:56`） |
+| **响应缓存磁盘后端**（缓存整个上游响应体） | ❌ **未启用** | `RESPONSE_CACHE_ENABLED` 默认 `false`（`setting/response_cache_setting/...:112`），生产 `options` 表**无**该键、env 也未设 |
+| **磁盘缓存 `disk_cache`** | ✅ 启用，但**不存图片** | 它缓存的是**请求体**，且 `diskStorage.Close()` 会 `os.Remove` 自己的文件（`common/body_storage.go:219`）——请求结束即删，是瞬时的 |
+| **日志里含 base64 图片** | ❌ 无 | `grep -c "data:image"` 最新日志 = **0**；最长行 **2089 字符**（正常请求行，base64 图会是几十万字符） |
+| **DEBUG 打印完整请求/响应体** | ❌ 未触发 | 生产 `LOG_LEVEL` 未设置；近 1000 行日志 `[DEBUG]` 计数 = **0** |
+
+### 那 862M 是什么？
+
+**全是日志**，不是图片：
+```
+865M  /opt/new-api/data/logs     ← 逐日 oneapi-*.log，单文件最大 166M
+8.0K  /opt/new-api/data/data     ← 只有空的 response-cache 目录
+```
+单个日志文件超大（166M/142M/115M）值得治理，但那是**日志轮转**问题，
+与「存用户图片」无关。
+
+### 用户看到的「存图」最可能是哪来的？
+
+本地开发环境。`web/e2e-local/` 与本地 E2E 跑过图生图，data URL 落在
+**浏览器 localStorage**（`playground_conversations` 里 messages 的 `versions[].images`），
+那是**用户自己的浏览器**，不占服务器磁盘。
+
+### 建议（待用户确认后再做，不擅自改）
+1. **日志轮转**：单文件 166M 不利于排查也不利于磁盘；加按大小/按天的轮转与保留上限。
+2. 若用户确实**想要**站内图床：需显式设 `TASK_ARTIFACT_STORE_MODE=local`——
+   当前是明确关闭的，不会自己打开。
