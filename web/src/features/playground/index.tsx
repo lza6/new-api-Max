@@ -15,8 +15,8 @@ import { useState } from 'react'
 
 import { PlaygroundChat } from './components/chat/playground-chat'
 import { AgentPresetSwitcher } from './components/header/agent-preset-switcher'
-import { ConversationSwitcher } from './components/header/conversation-switcher'
 import { PlaygroundInput } from './components/input/playground-input'
+import { PlaygroundSidebar } from './components/sidebar/playground-sidebar'
 import { VideoGenerationControls } from './components/video/video-generation-controls'
 import { VideoResultPanel } from './components/video/video-result-panel'
 import {
@@ -24,6 +24,7 @@ import {
   usePlaygroundConversation,
   usePlaygroundOptions,
   usePlaygroundState,
+  useSidebarCollapsed,
   useVideoGeneration,
 } from './hooks'
 import { isVideoModel } from './lib/video/video-generation-utils'
@@ -90,6 +91,9 @@ export function Playground({ initialModel }: { initialModel?: string }) {
   const { profile, refreshProfile } = useProfile()
   const [activePresetId, setActivePresetId] = useState('')
 
+  // T1 会话侧边栏折叠（持久化到 localStorage）。
+  const sidebar = useSidebarCollapsed()
+
   // P1-6 视频生成：仅对视频模型启用，参数（时长/分辨率）随会话保留。
   const video = useVideoGeneration()
   const isVideo = isVideoModel(config.model)
@@ -110,90 +114,97 @@ export function Playground({ initialModel }: { initialModel?: string }) {
     pricingModels.find((item) => item.model_name === config.model) ?? null
 
   return (
-    <div className='relative flex size-full min-h-0 flex-col overflow-hidden'>
-      {/* 多会话工具条（P0-4）：新建 / 切换 / 删除会话。 */}
-      <div className='mx-auto flex w-full max-w-4xl items-center justify-between px-1 pt-2'>
-        <ConversationSwitcher
-          conversations={conversations}
-          activeConversationId={activeConversationId}
-          disabled={isGenerating}
-          onCreate={createNewConversation}
-          onSwitch={switchConversation}
-          onDelete={deleteConversation}
-        />
-        <AgentPresetSwitcher
-          config={config}
-          disabled={isGenerating}
-          setting={profile?.setting}
-          activePresetId={activePresetId}
-          onActivePresetChange={setActivePresetId}
-          onProfileUpdate={refreshProfile}
-          onApplyPreset={(next) => {
-            // 逐字段写回，复用既有 updateConfig（会自动落盘到 localStorage）。
-            updateConfig('model', next.model)
-            updateConfig('group', next.group)
-            updateConfig('temperature', next.temperature)
-            updateConfig('max_tokens', next.max_tokens)
-            updateConfig('reasoning_effort', next.reasoning_effort)
-            updateConfig('system_prompt', next.system_prompt)
-          }}
-        />
-      </div>
-      {/* Full-width scroll container: scrolling works even over side whitespace */}
-      <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
-        <PlaygroundChat
-          messages={messages}
-          isLoadingMessages={isLoadingMessages}
-          onRegenerateMessage={handleRegenerateMessage}
-          onEditMessage={handleEditMessage}
-          onDeleteMessage={handleDeleteMessage}
-          onSelectPrompt={handleSendMessage}
-          isGenerating={isGenerating}
-          editingKey={editingMessageKey}
-          onCancelEdit={handleEditOpenChange}
-          onSaveEdit={(newContent) => applyEdit(newContent, false)}
-          onSaveEditAndSubmit={(newContent) => applyEdit(newContent, true)}
-        />
-      </div>
+    <div className='flex size-full min-h-0 overflow-hidden'>
+      {/* T1 左侧会话侧边栏：新建 / 按时间分组 / 搜索 / 折叠 / 删除。
+          原先只有正文上方一个 Select，会话多了无法浏览与定位。 */}
+      <PlaygroundSidebar
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        collapsed={sidebar.collapsed}
+        disabled={isGenerating}
+        onCreate={createNewConversation}
+        onSwitch={switchConversation}
+        onDelete={deleteConversation}
+        onToggleCollapsed={sidebar.toggle}
+      />
 
-      {/* Input area: center content and constrain to the same container width */}
-      <div className='mx-auto w-full max-w-4xl space-y-2'>
-        {isVideo && (
-          <VideoGenerationControls
-            seconds={videoSeconds}
-            size={videoSize}
-            disabled={video.isGenerating}
-            onSecondsChange={setVideoSeconds}
-            onSizeChange={setVideoSize}
+      <div className='relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden'>
+        {/* 预设工具条：会话导航已移到左侧，这里只留 Agent 预设切换。 */}
+        <div className='mx-auto flex w-full max-w-4xl items-center justify-end px-1 pt-2'>
+          <AgentPresetSwitcher
+            config={config}
+            disabled={isGenerating}
+            setting={profile?.setting}
+            activePresetId={activePresetId}
+            onActivePresetChange={setActivePresetId}
+            onProfileUpdate={refreshProfile}
+            onApplyPreset={(next) => {
+              // 逐字段写回，复用既有 updateConfig（会自动落盘到 localStorage）。
+              updateConfig('model', next.model)
+              updateConfig('group', next.group)
+              updateConfig('temperature', next.temperature)
+              updateConfig('max_tokens', next.max_tokens)
+              updateConfig('reasoning_effort', next.reasoning_effort)
+              updateConfig('system_prompt', next.system_prompt)
+            }}
           />
-        )}
-        <PlaygroundInput
-          config={config}
-          disabled={isGenerating || video.isGenerating}
-          groups={groups}
-          groupValue={config.group}
-          isGenerating={isGenerating || video.isGenerating}
-          isModelLoading={isLoadingModels}
-          modelValue={config.model}
-          models={models}
-          onGroupChange={(value) => updateConfig('group', value)}
-          onConfigChange={updateConfig}
-          onClearMessages={handleClearMessages}
-          onModelChange={(value) => updateConfig('model', value)}
-          onParameterEnabledChange={updateParameterEnabled}
-          onStop={isVideo ? video.cancel : stopGeneration}
-          onSubmit={isVideo ? handleVideoSubmit : handleSendMessage}
-          parameterEnabled={parameterEnabled}
-          hasMessages={messages.length > 0}
-          estimateModel={isVideo ? null : estimateModel}
-        />
-        {isVideo && (
-          <VideoResultPanel
-            state={video}
-            onReset={video.reset}
-            onCancel={video.cancel}
+        </div>
+        {/* Full-width scroll container: scrolling works even over side whitespace */}
+        <div className='flex min-h-0 flex-1 flex-col overflow-hidden'>
+          <PlaygroundChat
+            messages={messages}
+            isLoadingMessages={isLoadingMessages}
+            onRegenerateMessage={handleRegenerateMessage}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={handleDeleteMessage}
+            onSelectPrompt={handleSendMessage}
+            isGenerating={isGenerating}
+            editingKey={editingMessageKey}
+            onCancelEdit={handleEditOpenChange}
+            onSaveEdit={(newContent) => applyEdit(newContent, false)}
+            onSaveEditAndSubmit={(newContent) => applyEdit(newContent, true)}
           />
-        )}
+        </div>
+
+        {/* Input area: center content and constrain to the same container width */}
+        <div className='mx-auto w-full max-w-4xl space-y-2'>
+          {isVideo && (
+            <VideoGenerationControls
+              seconds={videoSeconds}
+              size={videoSize}
+              disabled={video.isGenerating}
+              onSecondsChange={setVideoSeconds}
+              onSizeChange={setVideoSize}
+            />
+          )}
+          <PlaygroundInput
+            config={config}
+            disabled={isGenerating || video.isGenerating}
+            groups={groups}
+            groupValue={config.group}
+            isGenerating={isGenerating || video.isGenerating}
+            isModelLoading={isLoadingModels}
+            modelValue={config.model}
+            models={models}
+            onGroupChange={(value) => updateConfig('group', value)}
+            onConfigChange={updateConfig}
+            onClearMessages={handleClearMessages}
+            onModelChange={(value) => updateConfig('model', value)}
+            onParameterEnabledChange={updateParameterEnabled}
+            onStop={isVideo ? video.cancel : stopGeneration}
+            onSubmit={isVideo ? handleVideoSubmit : handleSendMessage}
+            parameterEnabled={parameterEnabled}
+            hasMessages={messages.length > 0}
+            estimateModel={isVideo ? null : estimateModel}
+          />
+          {isVideo && (
+            <VideoResultPanel
+              state={video}
+              onReset={video.reset}
+              onCancel={video.cancel}
+            />
+          )}
+        </div>
       </div>
     </div>
   )

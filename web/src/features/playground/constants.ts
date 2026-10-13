@@ -93,6 +93,8 @@ export const STORAGE_KEYS = {
   CONFIG: 'playground_config',
   MESSAGES: 'playground_messages',
   PARAMETER_ENABLED: 'playground_parameter_enabled',
+  // T1 会话侧边栏折叠状态：与既有配置同走 localStorage，刷新后保持。
+  SIDEBAR_COLLAPSED: 'playground_sidebar_collapsed',
 } as const
 
 // Error messages

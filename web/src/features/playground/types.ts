@@ -208,6 +208,17 @@ export interface VideoTaskResponse {
 export interface ModelOption {
   label: string
   value: string
+  /**
+   * 模型能力类别标签（Text / Image / Video / Audio / Embedding）。
+   *
+   * 模型选择器按它分组渲染（`{{category}} Models`）。`/api/user/models` 只返回
+   * 模型名数组、不带元数据，因此在 `api.ts` 的 `getUserModels` 里用
+   * `getModelKindLabel` 按名字规则归类。
+   *
+   * 可选：缺省时选择器会把该模型归入 "Other" 组（既有行为，保留兼容）。
+   */
+  category?: string
+  description?: string
 }
 
 export interface GroupOption {
