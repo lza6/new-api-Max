@@ -16,6 +16,7 @@ import (
 // TestResetPasswordNeverReturnsPlaintextTempPassword 覆盖 T8/G3 回归：
 // 重置密码响应不得包含明文临时密码；密码确实被更新（旧密码不再可用）。
 func TestResetPasswordNeverReturnsPlaintextTempPassword(t *testing.T) {
+	cleanControllerTables(t)
 	gin.SetMode(gin.TestMode)
 	email := "reset-g3@example.com"
 	// 构造用户（密码哈希格式有效）
@@ -61,6 +62,7 @@ func TestResetPasswordNeverReturnsPlaintextTempPassword(t *testing.T) {
 
 // TestResetPasswordRejectsInvalidToken 覆盖过期/无效 token 的回归：失败响应不泄露内部细节。
 func TestResetPasswordRejectsInvalidToken(t *testing.T) {
+	cleanControllerTables(t)
 	gin.SetMode(gin.TestMode)
 	email := "reset-g3-invalid@example.com"
 	password, err := common.HashAccountPassword("original-password-456")
@@ -91,6 +93,7 @@ func TestResetPasswordRejectsInvalidToken(t *testing.T) {
 // TestSendEmailVerificationAntiEnumeration 覆盖 G4：发送邮箱验证码接口对已注册与
 // 未注册邮箱必须返回完全一致的统一成功响应（不泄露注册状态），且已注册邮箱不生成验证码。
 func TestSendEmailVerificationAntiEnumeration(t *testing.T) {
+	cleanControllerTables(t)
 	gin.SetMode(gin.TestMode)
 	registeredEmail := "g4-registered@example.com"
 	password, err := common.HashAccountPassword("password-123")
