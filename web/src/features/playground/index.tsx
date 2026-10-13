@@ -12,6 +12,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 */
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { toast } from 'sonner'
 
 import { PlaygroundChat } from './components/chat/playground-chat'
 import { AgentPresetSwitcher } from './components/header/agent-preset-switcher'
@@ -28,10 +30,12 @@ import {
   useVideoGeneration,
 } from './hooks'
 import { isVideoModel } from './lib/video/video-generation-utils'
+import { UseAsReferenceProvider } from '@/components/use-as-reference-context'
 import { usePricingData } from '@/features/pricing/hooks/use-pricing-data'
 import { useProfile } from '@/features/profile/hooks'
 
 export function Playground({ initialModel }: { initialModel?: string }) {
+  const { t } = useTranslation()
   const {
     config,
     parameterEnabled,
@@ -94,6 +98,19 @@ export function Playground({ initialModel }: { initialModel?: string }) {
   // T1 会话侧边栏折叠（持久化到 localStorage）。
   const sidebar = useSidebarCollapsed()
 
+  // T5 「用作参考图」：对话里的图片点按钮后，把它的 URL 交给输入框转成附件
+  // （图生图 / 二次改图）。用 state 中转是因为触发方在消息区、消费方在输入框
+  // 子树内，两者无共同祖先可直接传 props。
+  const [pendingReference, setPendingReference] = useState<string | null>(null)
+  const handleUseAsReference = (url: string) => {
+    if (isVideoModel(config.model)) {
+      // 视频模型没有「参考图」概念，不要静默无事发生。
+      toast.error(t('Reference images are only supported by image models.'))
+      return
+    }
+    setPendingReference(url)
+  }
+
   // P1-6 视频生成：仅对视频模型启用，参数（时长/分辨率）随会话保留。
   const video = useVideoGeneration()
   const isVideo = isVideoModel(config.model)
@@ -114,6 +131,9 @@ export function Playground({ initialModel }: { initialModel?: string }) {
     pricingModels.find((item) => item.model_name === config.model) ?? null
 
   return (
+    // T5：生成图走通用 markdown 渲染链，无法直接收到 props；
+    // 用 Context 在游乐场边界内声明「可把图片送回输入框」，不污染通用组件。
+    <UseAsReferenceProvider value={handleUseAsReference}>
     <div className='flex size-full min-h-0 overflow-hidden'>
       {/* T1 左侧会话侧边栏：新建 / 按时间分组 / 搜索 / 折叠 / 删除。
           原先只有正文上方一个 Select，会话多了无法浏览与定位。 */}
@@ -158,6 +178,7 @@ export function Playground({ initialModel }: { initialModel?: string }) {
             onEditMessage={handleEditMessage}
             onDeleteMessage={handleDeleteMessage}
             onSelectPrompt={handleSendMessage}
+            onUseAsReference={handleUseAsReference}
             isGenerating={isGenerating}
             editingKey={editingMessageKey}
             onCancelEdit={handleEditOpenChange}
@@ -196,6 +217,11 @@ export function Playground({ initialModel }: { initialModel?: string }) {
             parameterEnabled={parameterEnabled}
             hasMessages={messages.length > 0}
             estimateModel={isVideo ? null : estimateModel}
+            pendingReference={pendingReference}
+            onReferenceConsumed={() => setPendingReference(null)}
+            onReferenceError={() =>
+              toast.error(t('Could not load that image as a reference.'))
+            }
           />
           {isVideo && (
             <VideoResultPanel
@@ -207,5 +233,6 @@ export function Playground({ initialModel }: { initialModel?: string }) {
         </div>
       </div>
     </div>
+    </UseAsReferenceProvider>
   )
 }

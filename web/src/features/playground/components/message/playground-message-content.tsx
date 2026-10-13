@@ -61,6 +61,11 @@ type PlaygroundMessageContentProps = {
   isSourceVisible?: boolean
   message: Message
   versionContent: string
+  /**
+   * 「用作参考图」回调（T5）：把历史图片送回输入框做二次改图（图生图）。
+   * 不传时图片不显示该按钮。
+   */
+  onUseAsReference?: (url: string) => void
 }
 
 export function PlaygroundMessageContent({
@@ -70,6 +75,7 @@ export function PlaygroundMessageContent({
   isSourceVisible = false,
   message,
   versionContent,
+  onUseAsReference,
 }: PlaygroundMessageContentProps) {
   const { t } = useTranslation()
   const {
@@ -148,6 +154,7 @@ export function PlaygroundMessageContent({
                   src={url}
                   alt={t('Attached image')}
                   imgClassName='max-h-40'
+                  onUseAsReference={onUseAsReference}
                 />
               ))}
             </div>

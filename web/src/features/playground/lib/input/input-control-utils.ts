@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import type { GroupOption, ModelOption } from '../../types'
+import { downscaleImageFile } from './image-downscale'
 
 type InputControlStateOptions = {
   disabled?: boolean
@@ -67,6 +68,12 @@ export function extractInputImageUrls(message: SubmittableInputMessage): string[
 
 // 把 blob: / http(s) URL 转成 data: URL（图片以 base64 内联发给上游，上游无需回访
 // 客户端）。已是 data: 的原样返回；远端 http(s) 图直接返回（上游可自行拉取）。
+//
+// **转 base64 之前先降采样**：这是参考图进入上游的**唯一漏斗**，而 base64 会把
+// 体积放大 ~33%、图像 token 又近似正比于像素数。手机原图（4000×3000）不缩直接
+// 内联，会既显著推高用户账单、又常被上游以超限拒绝。降采样放在这里而不是上传时，
+// 是因为只有此处能拿到最终要发送的字节，改一处即覆盖全部来源（上传/拖拽/粘贴）。
+// 降采样失败时 fail-open 用原图（见 `downscaleImageFile`）。
 export async function blobUrlToDataUrl(url: string): Promise<string> {
   if (url.startsWith('data:')) {
     return url
@@ -75,13 +82,34 @@ export async function blobUrlToDataUrl(url: string): Promise<string> {
     return url
   }
   const resp = await fetch(url)
-  const blob = await resp.blob()
+  const rawBlob = await resp.blob()
+  const blob = await shrinkImageBlob(rawBlob)
   return await new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
     reader.onerror = () => reject(reader.error ?? new Error('read failed'))
     reader.readAsDataURL(blob)
   })
+}
+
+/**
+ * 对 Blob 做降采样。非图片或无法解码的类型原样返回。
+ *
+ * `downscaleImageFile` 面向 `File`（携带 name）；这里从 blob URL 拿到的是无名
+ * Blob，故包装成 File 后再交给同一实现——**不重复写第二套缩放逻辑**。
+ */
+async function shrinkImageBlob(blob: Blob): Promise<Blob> {
+  if (!blob.type.startsWith('image/')) {
+    return blob
+  }
+  try {
+    const file = new File([blob], 'upload', { type: blob.type })
+    const result = await downscaleImageFile(file)
+    return result.file
+  } catch {
+    // 缩放不可用（旧浏览器/解码失败）：原样上传，不阻断。
+    return blob
+  }
 }
 
 export function getInputControlState({

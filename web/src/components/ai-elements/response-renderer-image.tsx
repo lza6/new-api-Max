@@ -20,6 +20,7 @@ import { useTranslation } from 'react-i18next'
 import { sanitizeImageSrc, type ImageNode } from 'stream-markdown-parser'
 
 import { ChatImage } from '@/components/chat-image'
+import { useUseAsReference } from '@/components/use-as-reference-context'
 
 type ResponseImageProps = {
   node: ImageNode
@@ -27,6 +28,9 @@ type ResponseImageProps = {
 
 export function ResponseImage(props: ResponseImageProps) {
   const { t } = useTranslation()
+  // 游乐场通过 Context 声明「可把这张图送回输入框做二次改图」；其它调用方
+  // 没有 Provider，读到 undefined → 不显示该按钮，行为零变化。
+  const useAsReference = useUseAsReference()
   // 加载失败的降级交给 ChatImage（它内部同样渲染文本占位），这里只需判空 src
   // ——留一份 `hasError` 状态会让「谁负责降级」出现两个真相。
   const src = sanitizeImageSrc(props.node.src)
@@ -49,6 +53,7 @@ export function ResponseImage(props: ResponseImageProps) {
         src={src}
         alt={props.node.alt}
         imgClassName='max-h-96 max-w-full rounded-lg'
+        onUseAsReference={useAsReference}
       />
     </span>
   )

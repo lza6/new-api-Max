@@ -38,6 +38,7 @@ import type {
   PlaygroundConfig,
 } from '../../types'
 import { PlaygroundInputControls } from './playground-input-controls'
+import { ReferenceImageBridge } from './reference-image-bridge'
 import { PlaygroundInputTools } from './playground-input-tools'
 import { CostEstimateHint } from './cost-estimate-hint'
 
@@ -65,6 +66,12 @@ interface PlaygroundInputProps {
     value: boolean
   ) => void
   parameterEnabled: ParameterEnabled
+  /** T5：待加入附件的参考图 URL（来自对话里的历史图片）。 */
+  pendingReference?: string | null
+  /** T5：参考图处理完成后清空。 */
+  onReferenceConsumed?: () => void
+  /** T5：参考图加入失败时提示。 */
+  onReferenceError?: (url: string) => void
   estimateModel?: {
     model_name: string
     enable_groups: string[]
@@ -100,6 +107,9 @@ export function PlaygroundInput({
   onParameterEnabledChange,
   parameterEnabled,
   estimateModel,
+  pendingReference,
+  onReferenceConsumed,
+  onReferenceError,
 }: PlaygroundInputProps) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
@@ -150,6 +160,13 @@ export function PlaygroundInput({
         onSubmit={handleSubmit}
       >
         {/* 已附图片缩略图（图生图 / 多图参考）：可移除。 */}
+        {/* T5：把「用作参考图」的历史图片 URL 转成附件。必须在 PromptInput
+            子树内，才能拿到它的 attachments context。 */}
+        <ReferenceImageBridge
+          pendingReference={pendingReference ?? null}
+          onConsumed={onReferenceConsumed ?? (() => {})}
+          onError={onReferenceError}
+        />
         <PromptInputAttachments>
           {(attachment) => <PromptInputAttachment data={attachment} />}
         </PromptInputAttachments>

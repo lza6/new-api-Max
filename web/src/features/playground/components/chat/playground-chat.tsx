@@ -53,6 +53,8 @@ interface PlaygroundChatProps {
   onEditMessage?: (message: MessageType) => void
   onDeleteMessage?: (message: MessageType) => void
   onSelectPrompt?: (prompt: string) => void
+  /** T5：把对话里的图片作为参考图送回输入框。 */
+  onUseAsReference?: (url: string) => void
   isGenerating?: boolean
   isLoadingMessages?: boolean
   editingKey?: string | null
@@ -69,6 +71,7 @@ export function PlaygroundChat({
   onEditMessage,
   onDeleteMessage,
   onSelectPrompt,
+  onUseAsReference,
   isGenerating = false,
   isLoadingMessages = false,
   editingKey,
@@ -146,6 +149,7 @@ export function PlaygroundChat({
             />
           ) : (
             <PlaygroundMessageContent
+              onUseAsReference={onUseAsReference}
               alignment={alignment}
               actions={
                 <MessageActions
