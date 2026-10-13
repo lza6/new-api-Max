@@ -5568,6 +5568,7 @@
     "Test selected models": "測試所選模型",
     "Testing all enabled channels started. Please refresh to see results.": "測試所有已啟用的渠道已開始。請重新整理以查看結果。",
     "Testing...": "測試中...",
+    "Embedding": "向量",
     "Text": "文字",
     "Text description of the desired image": "想要生成圖像的文字描述",
     "Text description of the desired video": "想要生成影片的文字描述",

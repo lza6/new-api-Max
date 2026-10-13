@@ -53,7 +53,6 @@ export default defineConfig({
     // speed for a suite that would otherwise report zero tests.
     pool: 'threads',
     maxWorkers: 1,
-    minWorkers: 1,
     fileParallelism: false,
   },
 })

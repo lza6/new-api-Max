@@ -64,6 +64,19 @@ export const MODEL_KIND_LABEL_KEY: Record<ModelKind, string> = {
   embedding: 'Embedding',
 }
 
+/**
+ * 选择器 `category` 字段的取值。
+ *
+ * 注意与 `MODEL_KIND_LABEL_KEY` 的区别：`model-group-selector.tsx` 把 `category`
+ * **当显示文案**用（先 `t(category)` 兜底，再套进 `t('{{category}} Models')`），
+ * 所以这里返回的必须是**可翻译的英文字面量**（同时也是 en locale 的键），
+ * 而不是 i18n key 路径。这些字面量在 7 个 locale 里均已存在对应翻译。
+ */
+export function getModelKindLabel(model: string): string {
+  const kind = getModelKind(model)
+  return MODEL_KIND_LABEL_KEY[kind]
+}
+
 // 图片生成模型关键词（文生图 / 图生图 / 图片编辑）。
 // 只列**明确**表示图片生成的词，不列 `dall-e` 之外可能的歧义词。
 const IMAGE_KEYWORDS = [

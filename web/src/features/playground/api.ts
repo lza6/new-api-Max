@@ -20,6 +20,8 @@ import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
 import { API_ENDPOINTS } from './constants'
+// 模型能力分类：选择器据此把模型分成文本/图片/视频/音频/向量几组。
+import { getModelKindLabel } from './lib/models/model-kind'
 import type {
   ChatCompletionRequest,
   ChatCompletionResponse,
@@ -59,6 +61,10 @@ export async function getUserModels(group: string): Promise<ModelOption[]> {
   return data.data.map((model: string) => ({
     label: model,
     value: model,
+    // 按能力归类，供模型选择器分组（文本/图片/视频/音频/向量）。
+    // `/api/user/models` 只返回模型名字符串、不带能力元数据，所以这里用规则分类；
+    // 不设置 category 时选择器会把所有模型塞进一个 "Other" 组。
+    category: getModelKindLabel(model),
   }))
 }
 
