@@ -9,14 +9,14 @@
 
 ## Phase 1：基础件（纯逻辑，先行且可充分单测）
 
-- [ ] **1.1 目录名净化 + 分片命名** `[P]`
+- [x] **1.1 目录名净化 + 分片命名** `[P]`
   - `service/training_capture/naming.go`：`SanitizeDirName(userID, username)`、`PartFileName(seq)`
   - 白名单化（只留 `[A-Za-z0-9._-]`）、折叠 `_`、空/`..` → `user-<id>`、截断 64、**追加 ID 消歧**
   - 验收：单测穷举——`../`、`..`、空、emoji、超长、纯符号、中文、两人 sanitize 后同名
   - 证据：`go test ./service/training_capture/ -run TestSanitizeDirName -v`
   - **Requirement**: Story 4 / ADR-008-4
 
-- [ ] **1.2 消息指纹 + 增量判定** `[P]`
+- [x] **1.2 消息指纹 + 增量判定** `[P]`
   - `service/training_capture/dedup.go`：`Fingerprint(role, content)`、`SelectIncrement(watermark, messages)`
   - 规范化（trim + 折叠空白）后哈希；水位 = 计数 + 末次指纹
   - 验收：单测覆盖——首采全量、重复不采、新增只采增量、**编辑/重生成视为新增**、
@@ -24,13 +24,13 @@
   - 证据：`go test ./service/training_capture/ -run TestDedup -v`
   - **Requirement**: Story 2 / ADR-008-2
 
-- [ ] **1.3 有界队列 + 丢弃计数** `[P]`
+- [x] **1.3 有界队列 + 丢弃计数** `[P]`
   - `service/training_capture/queue.go`：非阻塞投递、容量上限、`DroppedCount`
   - 验收：单测——满队列投递**不阻塞**（<1ms 返回且返回 false）、计数正确、并发投递不丢计数
   - 证据：`go test ./service/training_capture/ -run TestQueue -v`（含并发）
   - **Requirement**: Story 3 / ADR-008-1
 
-- [ ] **1.4 数据模型（两张新表）**
+- [x] **1.4 数据模型（两张新表）**
   - `model/training_data.go`：`TrainingDataConsent` + `TrainingDataWatermark`
   - 注册 `AutoMigrate`；唯一索引 `(user_id)` / `(user_id, conversation_id)`
   - **不使用** `gorm:"default:true"` 业务布尔；**不使用** `ON CONFLICT AS new`
@@ -40,13 +40,13 @@
 
 ## Phase 2：存储后端（先接口，后实现）
 
-- [ ] **2.1 Sink 接口 + 注册表**
+- [x] **2.1 Sink 接口 + 注册表**
   - `service/training_capture/sink.go`：`TrainingDataSink`（5 方法）+ `DefaultSink()` 选择
   - 未配置 → 返回 disabled sink（`EnsureDir` 报明确错误，不静默）
   - 验收：单测断言 disabled 时的错误**可读且含原因**
   - **Requirement**: Story 9 / ADR-008-3
 
-- [ ] **2.2 OneDrive 实现**（依赖 2.1）
+- [x] **2.2 OneDrive 实现**（依赖 2.1）
   - `service/training_capture/onedrive.go`：
     - client_credentials 取 token（**缓存 + 提前 5min 续期**）
     - `EnsureDir`（`@microsoft.graph.conflictBehavior=replace` 幂等）
