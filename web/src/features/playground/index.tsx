@@ -179,6 +179,8 @@ export function Playground({ initialModel }: { initialModel?: string }) {
             onDeleteMessage={handleDeleteMessage}
             onSelectPrompt={handleSendMessage}
             onUseAsReference={handleUseAsReference}
+            mediaModel={config.model}
+            mediaSize={isVideo ? videoSize : config.size}
             isGenerating={isGenerating}
             editingKey={editingMessageKey}
             onCancelEdit={handleEditOpenChange}

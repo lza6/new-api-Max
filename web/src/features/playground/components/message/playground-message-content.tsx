@@ -26,6 +26,7 @@ import {
 import { Loader } from '@/components/ai-elements/loader'
 import { MessageContent } from '@/components/ai-elements/message'
 import { ChatImage } from '@/components/chat-image'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Reasoning,
   ReasoningContent,
@@ -42,6 +43,7 @@ import {
 import { cn } from '@/lib/utils'
 
 import { MESSAGE_STATUS } from '../../constants'
+import { isMediaModel, mediaSkeletonAspectClass } from '../../lib/message/media-skeleton'
 import {
   getCurrentVersion,
   getMessageAlignmentClass,
@@ -66,6 +68,10 @@ type PlaygroundMessageContentProps = {
    * 不传时图片不显示该按钮。
    */
   onUseAsReference?: (url: string) => void
+  /** T9：当前模型名。仅在「生成媒体」的模型上显示生成中骨架。 */
+  mediaModel?: string
+  /** T9：当前图片尺寸（如 1024x1536），决定骨架宽高比。 */
+  mediaSize?: string
 }
 
 export function PlaygroundMessageContent({
@@ -76,6 +82,8 @@ export function PlaygroundMessageContent({
   message,
   versionContent,
   onUseAsReference,
+  mediaModel = '',
+  mediaSize = '',
 }: PlaygroundMessageContentProps) {
   const { t } = useTranslation()
   const {
@@ -134,6 +142,19 @@ export function PlaygroundMessageContent({
             {t('Responding...')}
           </Shimmer>
         </div>
+      )}
+
+      {/* 生成中骨架（T9）：生图/生视频比文本慢得多（数秒到数分钟），期间只转圈
+          会让用户以为卡住。用骨架**预留成品的形状**，成品到达时不会把下方内容
+          整体推下去（CLS），也给出「确实在做事」的视觉反馈。
+          比例按用户选的 size 推导，未选时用 1:1（生图默认）。 */}
+      {showLoader && isMediaModel(mediaModel) && (
+        <Skeleton
+          className={cn(
+            'mt-2 w-full max-w-sm rounded-lg',
+            mediaSkeletonAspectClass(mediaSize)
+          )}
+        />
       )}
 
       {isError && (

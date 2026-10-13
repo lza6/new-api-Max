@@ -55,6 +55,10 @@ interface PlaygroundChatProps {
   onSelectPrompt?: (prompt: string) => void
   /** T5：把对话里的图片作为参考图送回输入框。 */
   onUseAsReference?: (url: string) => void
+  /** T9：当前模型名（决定生成中骨架是否显示）。空 = 不显示骨架。 */
+  mediaModel?: string
+  /** T9：当前图片尺寸（决定骨架宽高比）。空 = 1:1 兜底。 */
+  mediaSize?: string
   isGenerating?: boolean
   isLoadingMessages?: boolean
   editingKey?: string | null
@@ -72,6 +76,8 @@ export function PlaygroundChat({
   onDeleteMessage,
   onSelectPrompt,
   onUseAsReference,
+  mediaModel = '',
+  mediaSize = '',
   isGenerating = false,
   isLoadingMessages = false,
   editingKey,
@@ -150,6 +156,8 @@ export function PlaygroundChat({
           ) : (
             <PlaygroundMessageContent
               onUseAsReference={onUseAsReference}
+              mediaModel={mediaModel}
+              mediaSize={mediaSize}
               alignment={alignment}
               actions={
                 <MessageActions

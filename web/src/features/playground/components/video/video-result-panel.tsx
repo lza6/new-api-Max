@@ -79,6 +79,13 @@ export function VideoResultPanel(props: VideoResultPanelProps) {
           value={state.progress ?? null}
           aria-label={t('Progress')}
         />
+        {/* 骨架占位（T9）：预留与成品**同宽高比**的 16:9 区域，视频到达时
+            不会把下方内容整体推下去（CLS）。纯转圈提示做不到这一点——
+            用户看到的是一个高度为 0 的容器突然长出一块视频。 */}
+        <div
+          aria-hidden='true'
+          className='bg-muted mt-3 aspect-video w-full animate-pulse rounded-lg'
+        />
         <div className='mt-3 flex justify-end'>
           <Button variant='outline' size='sm' onClick={props.onCancel}>
             {t('Cancel')}
