@@ -381,6 +381,7 @@ func migrateDB() error {
 		&BannedIP{},
 		&WebRequestLog{},
 		&SiteDailyVisitor{},
+		&TrainingDataConsent{}, &TrainingDataWatermark{},
 		&EventDelivery{},
 		&WebhookEndpoint{},
 	}
@@ -430,7 +431,8 @@ func BackupTables() []any {
 		&SubscriptionPlanGrant{},
 		&CustomOAuthProvider{}, &UserOAuthBinding{}, &PerfMetric{},
 		&SystemInstance{}, &SystemTask{}, &SystemTaskLock{}, &CasbinRule{},
-		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &SiteDailyVisitor{}, &EventDelivery{},
+		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &SiteDailyVisitor{},
+		&TrainingDataConsent{}, &TrainingDataWatermark{}, &EventDelivery{},
 		&WebhookEndpoint{},
 	}
 }
