@@ -116,6 +116,20 @@ func appendComplexityScore(ctx *gin.Context, other *model.LogOther) {
 	}
 	other.SetPublic("complexity_tier", string(score.Tier))
 	other.SetAdmin("complexity", score)
+	appendRoutingShadow(ctx, other)
+}
+
+// appendRoutingShadow G4 阶段 A：把复杂度路由的**影子决策**写入日志。
+//
+// 只进 admin_info：它是运维信息（含候选模型清单与剔除原因），对用户可见会
+// 暴露其他分组的模型名。shadow 期的全部价值就在于这些数据可被统计——
+// 没有它，shadow 模式等于没跑。
+func appendRoutingShadow(ctx *gin.Context, other *model.LogOther) {
+	decision, ok := common.GetContextKeyType[RoutingShadowDecision](ctx, constant.ContextKeyRoutingShadow)
+	if !ok {
+		return
+	}
+	other.SetAdmin("routing_shadow", decision)
 }
 
 func GenerateTextOtherInfo(ctx *gin.Context, relayInfo *relaycommon.RelayInfo, modelRatio, groupRatio, completionRatio float64,

@@ -209,6 +209,12 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	if service.ComplexityRoutingEnabled() {
 		if score, ok := scoreRequestComplexity(request, meta); ok {
 			common.SetContextKey(c, constant.ContextKeyComplexityScore, score)
+			// G4 阶段 A（shadow）：据档位算出「本应路由到哪」并记录，
+			// **不改实际选渠道**。硬约束见 service/routing_policy.go：
+			// 候选必须过用户可用分组白名单；无可用候选则回退原模型。
+			if service.RoutingEnabled() {
+				recordRoutingShadow(c, score.Tier, relayInfo)
+			}
 		}
 	}
 	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
@@ -448,6 +454,31 @@ func scoreRequestComplexity(request dto.Request, meta *types.TokenCountMeta) (se
 		}
 	}
 	return service.ScoreComplexity(signals), true
+}
+
+// recordRoutingShadow 把 G4 阶段 A 的影子决策写入 context，供日志回显与 shadow
+// 期误报率统计。**不改变任何实际路由**——这是阶段 A 的定义。
+//
+// 可用性校验复用**选渠道本身**作为权威判据：调 `GetRandomSatisfiedChannel` 看该
+// 模型在用户分组下是否真有可用渠道。刻意不另写一套「模型是否在分组内」的判断——
+// 权威来源就是 distributor 用的那个函数，重复实现必然与冷却/健康分/任务插件过滤
+// 等真实约束漂移，从而在日志里给出与事实不符的影子建议。
+//
+// 这里传 retry=0 与空 filters：只问「存在可用候选吗」，不真的占用或改变任何状态
+// （该函数是只读的候选查询，不修改冷却/计数）。
+func recordRoutingShadow(c *gin.Context, tier service.ComplexityTier, relayInfo *relaycommon.RelayInfo) {
+	if relayInfo == nil {
+		return
+	}
+	group := relayInfo.UsingGroup
+	if group == "" {
+		group = "default"
+	}
+	decision := service.ResolveRoutingShadow(tier, relayInfo.OriginModelName, func(candidate string) bool {
+		channel, err := model.GetRandomSatisfiedChannel(group, candidate, 0, nil)
+		return err == nil && channel != nil && channel.Id > 0
+	})
+	common.SetContextKey(c, constant.ContextKeyRoutingShadow, decision)
 }
 
 // evaluateRequestPolicy T10：为统一策略中心组装一次判定的输入。
