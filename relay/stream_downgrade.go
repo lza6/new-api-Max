@@ -154,6 +154,20 @@ func downgradeUpstreamStreamToSSE(c *gin.Context, resp *http.Response, info *rel
 	logger.LogWarn(c, fmt.Sprintf(
 		"upstream returned a non-stream %s body for a streaming request; synthesized SSE so the response is not misjudged as an empty stream (channel #%d)",
 		upstreamContentType, info.ChannelId))
+
+	// 自动回退：若本次请求体**确实被压缩过**，那么「明文会流式、gzip 却答非流式」
+	// 就是该上游不支持 gzip 请求体的**确证**（不是暂时抖动）。
+	// 立即把该渠道隔离出压缩路径（24h 长隔离），后续请求走明文——这正是用户要的
+	// 「不支持就自动退回」。用自己的实测而非猜测：本函数已经在同一渠道上观察到
+	// 上游把成功响应答错了形状。
+	//
+	// 放在合成成功之后：先保证这一次请求对用户是可用的（合成 SSE 已交给下游），
+	// 再去做「下次别再踩」的隔离；顺序反了会让本次请求平白失败。
+	if relaycommon.HasUsedOutboundCompression(info) {
+		relaycommon.TripChannelCompressionUnsupported(info.ChannelId,
+			relaycommon.CompressionBreakerReasonNonStreamDowngrade+
+				": upstream answered a gzip request with "+upstreamContentType)
+	}
 	return true
 }
 

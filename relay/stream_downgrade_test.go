@@ -282,3 +282,61 @@ func readAllString(t *testing.T, r interface{ Read([]byte) (int, error) }) strin
 	}
 	return sb.String()
 }
+
+// 回归：合成 SSE 成功**且**本次请求体确实被压缩过时，必须把该渠道隔离出压缩路径。
+//
+// 这是用户要的「上游不支持 gzip 就自动退回」的落点。判据是**自己的实测**：
+// 本函数刚刚亲眼看到同一渠道把 gzip 请求的成功响应答成了非流式——这比任何
+// 配置开关或探测都可信。
+func TestStreamDowngradeTripsCompressionBreakerForCompressedRequest(t *testing.T) {
+	relaycommon.ResetCompressionBreakerForTest()
+	t.Cleanup(relaycommon.ResetCompressionBreakerForTest)
+
+	c := newDowngradeTestContext()
+	info := newDowngradeTestInfo(true)
+	// 关键前置：本次请求体确实被压缩过（RequestOriginalBytes 由压缩成功时写入）。
+	info.RequestOriginalBytes = 62070
+	info.RequestCompressedBytes = 23549
+
+	require.False(t, relaycommon.IsChannelCompressionTrippedForTest(59), "前置：未熔断")
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json; charset=utf-8"}},
+		Body:       nopCloserString(nonStreamCompletionBody),
+	}
+	require.True(t, downgradeUpstreamStreamToSSE(c, resp, info))
+
+	assert.True(t, relaycommon.IsChannelCompressionTrippedForTest(59),
+		"压缩请求被降级为非流式 = 确证不支持 gzip，必须隔离该渠道")
+	assert.Contains(t, relaycommon.ChannelCompressionBreakerReason(59),
+		relaycommon.CompressionBreakerReasonNonStreamDowngrade,
+		"原因须以 non_stream_downgrade 归类，便于排查")
+	assert.Contains(t, relaycommon.ChannelCompressionBreakerReason(59), "application/json",
+		"原因应带上游真实 Content-Type，供排查直接看出「它答成了什么」")
+}
+
+// 反向保护：**未用过压缩**的降级不得触发压缩隔离。
+//
+// 否则会把「上游对明文请求也答非流式」这种与压缩无关的问题错误归因成 gzip 不兼容，
+// 白白关掉一个其实支持压缩的渠道的优化（首字延迟会退化）。
+func TestStreamDowngradeDoesNotTripBreakerWhenRequestWasNotCompressed(t *testing.T) {
+	relaycommon.ResetCompressionBreakerForTest()
+	t.Cleanup(relaycommon.ResetCompressionBreakerForTest)
+
+	c := newDowngradeTestContext()
+	info := newDowngradeTestInfo(true)
+	// RequestOriginalBytes 保持 0 = 本次未压缩（未达阈值/无收益/关闭）。
+	require.Zero(t, info.RequestOriginalBytes)
+
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"application/json"}},
+		Body:       nopCloserString(nonStreamCompletionBody),
+	}
+	require.True(t, downgradeUpstreamStreamToSSE(c, resp, info))
+
+	assert.False(t, relaycommon.IsChannelCompressionTrippedForTest(59),
+		"未压缩的请求出现降级，不能被归因成「不支持 gzip」")
+	assert.Empty(t, relaycommon.ChannelCompressionBreakerReason(59))
+}
