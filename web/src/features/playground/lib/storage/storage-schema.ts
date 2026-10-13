@@ -35,6 +35,10 @@ export const playgroundConfigSchema = z.object({
   seed: z.number().nullable().optional(),
   stream: z.boolean().optional(),
   size: z.string().optional(),
+  // T10 批量生成张数。用 number 而非枚举：档位表是 UI 建议，历史配置可能是任意
+  // 合法整数（如 5），用枚举会在读回时被 zod 拒绝、静默丢配置。上界在
+  // `lib/parameters/batch-count.ts` 的 normalizeBatchCount 里统一夹紧。
+  batch_count: z.number().optional(),
   reasoning_effort: z.string().optional(),
   system_prompt: z.string().optional(),
 })
@@ -47,6 +51,7 @@ export const parameterEnabledSchema = z.object({
   presence_penalty: z.boolean().optional(),
   seed: z.boolean().optional(),
   size: z.boolean().optional(),
+  batch_count: z.boolean().optional(),
   reasoning_effort: z.boolean().optional(),
 })
 

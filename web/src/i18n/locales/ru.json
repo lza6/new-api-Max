@@ -4695,6 +4695,8 @@
     "New chat": "New chat",
     "Delete conversation": "Delete conversation",
     "Attached image": "Attached image",
+    "Images per request": "Изображений за запрос",
+    "How many images to generate in one request (max {{max}}). Billed per image.": "Сколько изображений создавать за один запрос (максимум {{max}}). Оплата за изображение.",
     "Image Size": "Image Size",
     "Output size (width x height) for image generation models": "Output size (width x height) for image generation models",
     "Request Explanation": "Request Explanation",

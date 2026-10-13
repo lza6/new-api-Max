@@ -16,6 +16,8 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { toRequestBatchCount } from '../parameters/batch-count'
+
 import type {
   ChatCompletionRequest,
   Message,
@@ -71,6 +73,15 @@ export function buildChatCompletionPayload(
   // 图片生成模型尺寸档位（如 gpt-image 系列）。仅在启用且非空时发送。
   if (parameterEnabled.size && config.size) {
     payload.size = config.size
+  }
+
+  // T10 批量生成张数：仅在启用且 >1 时发送（1 是上游默认，发出去无意义，
+  // 且部分上游会因「显式 n」走不同响应结构）。上界由 toRequestBatchCount 保证。
+  if (parameterEnabled.batch_count) {
+    const batchCount = toRequestBatchCount(config.batch_count)
+    if (batchCount !== undefined) {
+      payload.n = batchCount
+    }
   }
 
   // 思考程度：仅启用且非空时发送（none=关闭思考）。

@@ -56,6 +56,12 @@ import {
   MAX_PRESET_SYSTEM_RUNES,
 } from '../../lib/presets/agent-preset-utils'
 import {
+  BATCH_COUNT_OPTIONS,
+  MAX_BATCH_COUNT,
+  normalizeBatchCount,
+  supportsBatchCount,
+} from '../../lib/parameters/batch-count'
+import {
   getParameterControlValueText,
   isImageSizeModel,
   normalizeParameterNumberValue,
@@ -250,6 +256,61 @@ function PlaygroundParameterContent({
               {PLAYGROUND_SIZE_CONTROL.options.map((size) => (
                 <SelectItem key={size} value={size}>
                   {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* T10 批量生成张数：仅生图模型。`n` 是计费乘数，因此只给有限档位、
+          不给自由输入，并在 UI 上明示上限。 */}
+      {supportsBatchCount(config.model) && (
+        <div className='border-border/70 bg-background/60 grid gap-2 rounded-lg border p-3 transition-opacity'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0 space-y-1'>
+              <label className='truncate text-sm leading-5 font-medium'>
+                {t('Images per request')}
+              </label>
+              <p className='text-muted-foreground text-xs leading-4'>
+                {t(
+                  'How many images to generate in one request (max {{max}}). Billed per image.',
+                  { max: MAX_BATCH_COUNT }
+                )}
+              </p>
+            </div>
+            <Switch
+              aria-label={t('Enable {{parameter}}', {
+                parameter: t('Images per request'),
+              })}
+              checked={parameterEnabled.batch_count}
+              disabled={disabled}
+              onCheckedChange={(checked) =>
+                onParameterEnabledChange('batch_count', checked)
+              }
+              size='sm'
+            />
+          </div>
+          <Select
+            items={BATCH_COUNT_OPTIONS.map((count) => ({
+              value: String(count),
+              label: String(count),
+            }))}
+            value={String(normalizeBatchCount(config.batch_count))}
+            onValueChange={(value) =>
+              onConfigChange('batch_count', normalizeBatchCount(value))
+            }
+          >
+            <SelectTrigger
+              aria-label={t('Images per request')}
+              disabled={disabled || !parameterEnabled.batch_count}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {BATCH_COUNT_OPTIONS.map((count) => (
+                <SelectItem key={count} value={String(count)}>
+                  {count}
                 </SelectItem>
               ))}
             </SelectContent>

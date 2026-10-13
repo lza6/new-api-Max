@@ -4695,6 +4695,8 @@
     "New chat": "New chat",
     "Delete conversation": "Delete conversation",
     "Attached image": "Attached image",
+    "Images per request": "Số ảnh mỗi lần gửi",
+    "How many images to generate in one request (max {{max}}). Billed per image.": "Số ảnh tạo ra trong một yêu cầu (tối đa {{max}}). Tính phí theo từng ảnh.",
     "Image Size": "Image Size",
     "Output size (width x height) for image generation models": "Output size (width x height) for image generation models",
     "Request Explanation": "Request Explanation",

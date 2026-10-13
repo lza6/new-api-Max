@@ -4695,6 +4695,8 @@
     "New chat": "New chat",
     "Delete conversation": "Delete conversation",
     "Attached image": "Attached image",
+    "Images per request": "1 回の生成枚数",
+    "How many images to generate in one request (max {{max}}). Billed per image.": "1 回のリクエストで生成する画像枚数（上限 {{max}} 枚）。1 枚ごとに課金されます。",
     "Image Size": "Image Size",
     "Output size (width x height) for image generation models": "Output size (width x height) for image generation models",
     "Request Explanation": "Request Explanation",

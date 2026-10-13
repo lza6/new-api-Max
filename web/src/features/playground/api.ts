@@ -45,6 +45,34 @@ export async function sendChatCompletion(
 }
 
 /**
+ * 把 `/api/user/models` 返回的**模型名数组**映射为选择器用的 `ModelOption[]`。
+ *
+ * 抽成导出的**纯函数**有两个理由：
+ *  1. 分类逻辑（`category`）是可以直接单测的业务规则，不需要为了测它去 mock
+ *     整个 axios 实例——mock 网络层在完整测试套件里会因模块注册表已被其它文件
+ *     加载而失效（表现为「单独跑通过、全量跑 Network Error」）。
+ *  2. 该映射是选择器分组的**唯一数据来源**，显式导出后可以被契约测试直接覆盖。
+ *
+ * 非数组 / 非字符串项一律跳过：上游改返回结构时宁可少几个模型，也不要让
+ * 选择器渲染出 `undefined` 条目。
+ */
+export function mapUserModels(raw: unknown): ModelOption[] {
+  if (!Array.isArray(raw)) {
+    return []
+  }
+  return raw
+    .filter((model): model is string => typeof model === 'string' && model !== '')
+    .map((model) => ({
+      label: model,
+      value: model,
+      // 按能力归类，供模型选择器分组（文本/图片/视频/音频/向量）。
+      // `/api/user/models` 只返回模型名字符串、不带能力元数据，所以这里用规则分类；
+      // 不设置 category 时选择器会把所有模型塞进一个 "Other" 组。
+      category: getModelKindLabel(model),
+    }))
+}
+
+/**
  * Get user available models
  */
 export async function getUserModels(group: string): Promise<ModelOption[]> {
@@ -54,18 +82,11 @@ export async function getUserModels(group: string): Promise<ModelOption[]> {
   const { data } = res
   requireServerSuccess(data)
 
-  if (!data.success || !Array.isArray(data.data)) {
+  if (!data.success) {
     return []
   }
 
-  return data.data.map((model: string) => ({
-    label: model,
-    value: model,
-    // 按能力归类，供模型选择器分组（文本/图片/视频/音频/向量）。
-    // `/api/user/models` 只返回模型名字符串、不带能力元数据，所以这里用规则分类；
-    // 不设置 category 时选择器会把所有模型塞进一个 "Other" 组。
-    category: getModelKindLabel(model),
-  }))
+  return mapUserModels(data.data)
 }
 
 /**

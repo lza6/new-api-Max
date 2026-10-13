@@ -51,7 +51,11 @@ export default defineConfig({
     // (`forks` still times out on this machine). `fileParallelism: false`
     // keeps the suite deterministic at the cost of speed — correctness over
     // speed for a suite that would otherwise report zero tests.
-    pool: 'threads',
+    // Worker startup on this Windows machine costs ~57s of jsdom setup, which
+    // exceeds vitest-pool-runner's startup budget. `vmThreads` is the pool
+    // verified to start here (threads and forks both time out), and a single
+    // worker keeps the suite deterministic.
+    pool: 'vmThreads',
     maxWorkers: 1,
     fileParallelism: false,
   },

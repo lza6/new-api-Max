@@ -4695,6 +4695,8 @@
     "New chat": "新增會話",
     "Delete conversation": "刪除會話",
     "Attached image": "附圖",
+    "Images per request": "每次生成張數",
+    "How many images to generate in one request (max {{max}}). Billed per image.": "單次請求生成多少張圖（上限 {{max}} 張）。按張計費。",
     "Image Size": "圖片尺寸",
     "Output size (width x height) for image generation models": "生圖模型的輸出尺寸（寬x高）",
     "Request Explanation": "請求解釋",

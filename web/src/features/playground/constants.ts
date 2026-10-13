@@ -73,6 +73,8 @@ export const DEFAULT_CONFIG: PlaygroundConfig = {
   seed: null,
   stream: true,
   size: '',
+  // T10 批量生成张数（图片模型）。1 = 上游默认，不发送 `n`。
+  batch_count: 1,
   reasoning_effort: '',
   system_prompt: '',
 }
@@ -85,6 +87,8 @@ export const DEFAULT_PARAMETER_ENABLED: ParameterEnabled = {
   presence_penalty: true,
   seed: false,
   size: false,
+  // 默认关闭：张数是计费乘数，默认参与请求会让不经意的设置放大账单。
+  batch_count: false,
   reasoning_effort: false,
 }
 

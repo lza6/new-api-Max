@@ -69,6 +69,7 @@ const EMPTY_CONFIG: PlaygroundConfig = {
   seed: null,
   stream: true,
   size: '',
+  batch_count: 1,
   reasoning_effort: '',
   system_prompt: '',
 }

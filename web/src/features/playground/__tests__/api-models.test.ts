@@ -16,40 +16,27 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { beforeEach, describe, expect, test, vi } from 'vitest'
+import { describe, expect, test } from 'vitest'
+
+import { mapUserModels } from '../api'
 
 // `/api/user/models` 只返回模型名数组、**不带能力元数据**。这里是「分类真正生效」
-// 的最后一环：若 `getUserModels` 忘了写 `category`，选择器会把全部模型塞进一个
-// "Other" 组——用户在同一个下拉里看到文本模型和文生图模型（就是用户上报的现象）。
-// 这条用例锁死「返回的每个模型都带 category」。
-const getUserMock = vi.fn()
-
-vi.mock('@/lib/api', () => ({
-  api: {
-    get: (...args: unknown[]) => getUserMock(...args),
-    post: vi.fn(),
-  },
-}))
-
-vi.mock('@/lib/server-error-message', () => ({
-  requireServerSuccess: () => {},
-}))
-
-describe('getUserModels', () => {
-  beforeEach(() => {
-    getUserMock.mockReset()
-  })
-
-  test('attaches a category to every model so the selector can group them', async () => {
-    getUserMock.mockResolvedValue({
-      data: {
-        success: true,
-        data: ['deepseek-v4.1-flash', 'dall-e-3', 'veo-3', 'whisper-1', 'bge-m3'],
-      },
-    })
-    const { getUserModels } = await import('../api')
-
-    const models = await getUserModels('default')
+// 的最后一环：若映射忘了写 `category`，选择器会把全部模型塞进一个 "Other" 组——
+// 用户在同一个下拉里看到文本模型和文生图模型（就是用户上报的现象）。
+//
+// 直接测纯函数而不是 mock axios：此前那版用 `vi.mock('@/lib/api')`，
+// **单独跑通过、全量跑报 Network Error** —— 其它测试文件先加载了 `@/lib/api`，
+// 模块注册表已缓存，factory 不再生效，请求打到了真实 XHR。
+// 测纯函数没有这个顺序依赖。
+describe('mapUserModels', () => {
+  test('attaches a category to every model so the selector can group them', () => {
+    const models = mapUserModels([
+      'deepseek-v4.1-flash',
+      'dall-e-3',
+      'veo-3',
+      'whisper-1',
+      'bge-m3',
+    ])
 
     expect(models.map((m) => m.value)).toEqual([
       'deepseek-v4.1-flash',
@@ -66,20 +53,38 @@ describe('getUserModels', () => {
       'Audio',
       'Embedding',
     ])
-    expect(models.every((m) => typeof m.label === 'string' && m.label.length > 0)).toBe(true)
+    expect(
+      models.every((m) => typeof m.label === 'string' && m.label.length > 0)
+    ).toBe(true)
   })
 
-  test('returns an empty list when the server reports failure', async () => {
-    getUserMock.mockResolvedValue({ data: { success: false, data: [] } })
-    const { getUserModels } = await import('../api')
-
-    expect(await getUserModels('default')).toEqual([])
+  test('preserves the server-provided order', () => {
+    // 后端返回顺序通常已按相关度排好，重排会让用户找不到常用模型。
+    const models = mapUserModels(['glm-5.3-flash', 'gpt-6-luna', 'deepseek-v4.1-flash'])
+    expect(models.map((m) => m.value)).toEqual([
+      'glm-5.3-flash',
+      'gpt-6-luna',
+      'deepseek-v4.1-flash',
+    ])
   })
 
-  test('returns an empty list when data is not an array', async () => {
-    getUserMock.mockResolvedValue({ data: { success: true, data: null } })
-    const { getUserModels } = await import('../api')
+  test('returns an empty list when data is not an array', () => {
+    // 上游改返回结构时宁可少几个模型，也不要渲染出 undefined 条目。
+    expect(mapUserModels(null)).toEqual([])
+    expect(mapUserModels(undefined)).toEqual([])
+    expect(mapUserModels('gpt-4o')).toEqual([])
+    expect(mapUserModels({})).toEqual([])
+    expect(mapUserModels(42)).toEqual([])
+  })
 
-    expect(await getUserModels('default')).toEqual([])
+  test('returns an empty list for an empty array', () => {
+    expect(mapUserModels([])).toEqual([])
+  })
+
+  test('skips non-string and empty entries instead of rendering undefined rows', () => {
+    const models = mapUserModels(['gpt-6-luna', null, 7, '', { name: 'x' }, 'dall-e-3'])
+
+    expect(models.map((m) => m.value)).toEqual(['gpt-6-luna', 'dall-e-3'])
+    expect(models).toHaveLength(2)
   })
 })

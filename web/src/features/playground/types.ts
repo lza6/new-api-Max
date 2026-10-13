@@ -84,6 +84,9 @@ export interface ChatCompletionRequest {
   size?: string
   // 思考程度：none（关闭）/ low / medium / high。关闭时上游不进行思考。
   reasoning_effort?: string
+  // T10 一次生成的图片张数（仅图片生成模型）。省略 = 上游默认（1）。
+  // 上界由 lib/parameters/batch-count.ts 保证（后端另有 dto.MaxImageN=128 硬上界）。
+  n?: number
 }
 
 export interface ChatCompletionChunk {
@@ -136,6 +139,8 @@ export interface PlaygroundConfig {
   stream: boolean
   // 图片生成尺寸（宽x高）。空串 = 不发送 size（上游用默认）。
   size: string
+  // T10 批量生成张数（图片模型）。1 = 不发送 n（上游默认），>1 才带上。
+  batch_count: number
   // 思考程度（reasoning_effort）。'' = 不发送（上游默认）；none=关闭思考；
   // 其余（low/medium/high）为可调档位。仅对支持的模型有效。
   reasoning_effort: string
@@ -170,6 +175,7 @@ export interface ParameterEnabled {
   seed: boolean
   size: boolean
   reasoning_effort: boolean
+  batch_count: boolean
 }
 
 /**
