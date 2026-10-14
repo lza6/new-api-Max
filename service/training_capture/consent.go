@@ -182,13 +182,45 @@ func refreshConsentCache(userId int, now time.Time) bool {
 		entry.granted = consent.Granted
 		entry.policyVersion = consent.PolicyVersion
 	}
-	storeConsentCache(userId, entry)
+	// [修复防御] 撤回 TOCTOU：这里是「读 DB → 写缓存」两步，而 `RevokeConsent`
+	// 会在中间执行「写 DB → 清缓存」。若采信上面读到的旧值直接写缓存，
+	// 就会把**已撤回**的用户重新缓存为 granted=true（最长 30 秒仍在采集）——
+	// 这是可观测的隐私事故：用户刚点完撤回，看到数据还在上传。
+	//
+	// 修法：在同一把锁里「先清、再写」，并让撤回方也持锁 —— 于是
+	//   - 若撤回发生在读 DB **之前**：读到的是新值 false，写进去也是 false（正确）；
+	//   - 若撤回发生在读 DB **之后**、写缓存**之前**：撤回方的清缓存先拿到锁，
+	//     本次写入会在其后发生 → 用 `consentRevocationEpoch` 检测并放弃写入。
+	storeConsentCacheChecked(userId, entry, consentRevocationEpoch.Load())
 	return entry.granted && entry.policyVersion == CurrentPolicyVersion
+}
+
+// consentRevocationEpoch 撤回纪元：每次撤回/清缓存自增。
+//
+// 用于让「读 DB 期间发生了撤回」的回源结果**作废**而不是覆盖缓存。
+var consentRevocationEpoch atomic.Uint64
+
+// storeConsentCacheChecked 仅当纪元未变时写入缓存。
+//
+// 纪元变了说明期间发生过撤回/清缓存，本次回源结果**可能已过期**，
+// 宁可不缓存（下次重新回源）也不写进一个可能已被撤回的 granted=true。
+func storeConsentCacheChecked(userId int, entry consentEntry, epoch uint64) {
+	consentCacheMu.Lock()
+	defer consentCacheMu.Unlock()
+	if consentRevocationEpoch.Load() != epoch {
+		return
+	}
+	storeConsentCacheLocked(userId, entry)
 }
 
 func storeConsentCache(userId int, entry consentEntry) {
 	consentCacheMu.Lock()
 	defer consentCacheMu.Unlock()
+	storeConsentCacheLocked(userId, entry)
+}
+
+// storeConsentCacheLocked 调用方必须已持有 consentCacheMu 写锁。
+func storeConsentCacheLocked(userId int, entry consentEntry) {
 	// 容量保护：满了就整体清空（简单且不会泄漏）。
 	// 不用 LRU：授权状态的访问分布没有局部性（用户随时可能来），
 	// 而清空的代价只是一次回源。
@@ -200,6 +232,9 @@ func storeConsentCache(userId int, entry consentEntry) {
 
 // invalidateConsentCache 清空整个授权缓存。
 func invalidateConsentCache() {
+	// 递增纪元：让「正在回源、尚未写缓存」的调用放弃写入
+	// （否则会把已撤回的旧值写回缓存）。
+	consentRevocationEpoch.Add(1)
 	consentCacheMu.Lock()
 	consentCache = make(map[int]consentEntry, 1024)
 	consentCacheMu.Unlock()
@@ -210,6 +245,7 @@ func invalidateConsentCache() {
 // **撤回时必须调用**：不能等 TTL 过期，否则「我刚关掉它还在传」是可观测的
 // 隐私问题（用户点了撤回却看到数据继续上传，会直接失去信任）。
 func InvalidateConsent(userId int) {
+	consentRevocationEpoch.Add(1)
 	consentCacheMu.Lock()
 	delete(consentCache, userId)
 	consentCacheMu.Unlock()

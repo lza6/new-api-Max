@@ -71,9 +71,13 @@ type TrainingDataWatermark struct {
 	// UploadedCount 已上传的消息条数（下次从该下标继续）。
 	UploadedCount int `json:"uploaded_count"`
 
-	// LastFingerprint 已上传的最后一条消息指纹，用于校验水位自洽。
-	// 历史被改写时指纹不匹配 → 采集侧保守全量重传（见 SelectIncrement）。
-	LastFingerprint string `json:"last_fingerprint" gorm:"type:varchar(64)"`
+	// PrefixFingerprint 已上传**整个前缀**的累积指纹（不是只有末条）。
+	//
+	// [修复防御] 原先只存「末条指纹」，导致**中间**消息被编辑时校验通过，
+	// 被改过的内容**永久不再上传**——采集不可逆，等于静默数据丢失。
+	// 改为前缀指纹后，历史中任意位置的改动都会让指纹不匹配
+	// → 保守全量重传（见 SelectIncrement）。
+	PrefixFingerprint string `json:"prefix_fingerprint" gorm:"type:varchar(64)"`
 
 	// LastUploadedAt 最近一次成功上传的时间（unix 秒）。
 	LastUploadedAt int64 `json:"last_uploaded_at"`
@@ -167,7 +171,7 @@ func GetTrainingDataWatermark(userId int, conversationId string) (*TrainingDataW
 }
 
 // SaveTrainingDataWatermark 写入/更新水位（**只在采集 worker 里调用**，非热路径）。
-func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount int, lastFingerprint string, now int64) error {
+func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount int, prefixFingerprint string, now int64) error {
 	wm, err := GetTrainingDataWatermark(userId, conversationId)
 	if err != nil {
 		return err
@@ -177,7 +181,7 @@ func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount 
 			UserId:          userId,
 			ConversationId:  conversationId,
 			UploadedCount:   uploadedCount,
-			LastFingerprint: lastFingerprint,
+			PrefixFingerprint: prefixFingerprint,
 			LastUploadedAt:  now,
 		}).Error
 	}
@@ -185,7 +189,7 @@ func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount 
 		Where("user_id = ? AND conversation_id = ?", userId, conversationId).
 		Updates(map[string]any{
 			"uploaded_count":   uploadedCount,
-			"last_fingerprint": lastFingerprint,
+			"prefix_fingerprint": prefixFingerprint,
 			"last_uploaded_at": now,
 		}).Error
 }

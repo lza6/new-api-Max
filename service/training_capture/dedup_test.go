@@ -71,7 +71,8 @@ func TestSelectIncrementFirstCaptureIsFull(t *testing.T) {
 	inc, wm := SelectIncrement(messages, Watermark{})
 	require.Len(t, inc, 2, "首次采集应上传全部")
 	assert.Equal(t, 2, wm.UploadedCount)
-	assert.Equal(t, Fingerprint(messages[1]), wm.LastFingerprint)
+	// 前缀指纹覆盖**整个已上传前缀**（不是只有末条）——见 B3 回归。
+	assert.Equal(t, PrefixFingerprint(messages, 2), wm.PrefixFingerprint)
 }
 
 func TestSelectIncrementLongConversationUploadsOnlyNewTurns(t *testing.T) {
@@ -181,7 +182,7 @@ func TestSelectIncrementSkipsFingerprintCheckWhenWatermarkHasNoFingerprint(t *te
 
 	require.Len(t, inc, 1)
 	assert.Equal(t, "c", inc[0].Content)
-	assert.NotEmpty(t, wm.LastFingerprint, "新水位必须带上指纹")
+	assert.NotEmpty(t, wm.PrefixFingerprint, "新水位必须带上指纹")
 }
 
 // ---------- GlobalDedup（无会话 id 的退化路径） ----------
@@ -351,4 +352,105 @@ func TestNormalizeContentDoesNotGrowUnboundedMemory(t *testing.T) {
 	huge := strings.Repeat("a", 100_000)
 	out := normalizeContent(huge)
 	assert.Equal(t, 100_000, len(out), "非空白内容不得被改动长度")
+}
+
+// ---------- B3 回归：中间历史的编辑不得被静默丢弃 ----------
+
+// 回归（B3）：历史中**中间**某条消息被编辑 → 必须被上传。
+//
+// 原实现只把水位的**末条**指纹存起来校验，于是：
+//
+//	历史已传: [A, B, C]        水位 count=3, 指纹=C
+//	本次请求: [A, B_EDITED, C, D]
+//	校验：messages[2] == C → 通过 → 只传 [D]
+//	结果：B_EDITED **永久不上传**
+//
+// 采集不可逆（上传过就不再回看），所以这就是静默的数据丢失。
+// 改为**前缀指纹**后，历史中任意位置的改动都会让校验失败 → 保守全量重传。
+func TestSelectIncrementReuploadsWhenMiddleMessageEdited(t *testing.T) {
+	historical := []Message{
+		msg("user", "A"), msg("assistant", "B"), msg("user", "C"),
+	}
+	_, wm := SelectIncrement(historical, Watermark{})
+	require.Equal(t, 3, wm.UploadedCount)
+
+	edited := []Message{
+		msg("user", "A"), msg("assistant", "B_EDITED"), msg("user", "C"), msg("user", "D"),
+	}
+	inc, _ := SelectIncrement(edited, wm)
+
+	var gotEdited bool
+	var contents []string
+	for _, m := range inc {
+		contents = append(contents, m.Content)
+		if m.Content == "B_EDITED" {
+			gotEdited = true
+		}
+	}
+	assert.True(t, gotEdited,
+		"中间被编辑的内容必须被上传，绝不能静默丢弃；实际上传 %v", contents)
+	assert.Len(t, inc, 4, "保守全量重传")
+}
+
+// 回归（B3 补充）：中间消息被**删除**时同样不得静默通过。
+func TestSelectIncrementReuploadsWhenMiddleMessageDeleted(t *testing.T) {
+	historical := []Message{
+		msg("user", "A"), msg("assistant", "B"), msg("user", "C"), msg("user", "D"),
+	}
+	_, wm := SelectIncrement(historical, Watermark{})
+	require.Equal(t, 4, wm.UploadedCount)
+
+	// 删掉中间那条 C。
+	shrunk := []Message{
+		msg("user", "A"), msg("assistant", "B"), msg("user", "D"), msg("user", "E"),
+	}
+	inc, _ := SelectIncrement(shrunk, wm)
+
+	assert.Len(t, inc, len(shrunk), "中间删除也必须被察觉并保守全量重传")
+}
+
+// 前缀指纹必须对**任意位置**的改动敏感（这是 B3 修复的核心性质）。
+func TestPrefixFingerprintDetectsChangeAtAnyPosition(t *testing.T) {
+	base := []Message{
+		msg("user", "1"), msg("assistant", "2"), msg("user", "3"),
+		msg("assistant", "4"), msg("user", "5"),
+	}
+	original := PrefixFingerprint(base, len(base))
+
+	for i := range base {
+		mutated := append([]Message{}, base...)
+		mutated[i] = msg(mutated[i].Role, mutated[i].Content+"-EDIT")
+		assert.NotEqual(t, original, PrefixFingerprint(mutated, len(mutated)),
+			"位置 %d 的改动必须改变前缀指纹", i)
+	}
+}
+
+// 前缀指纹对**顺序**变化也敏感（消息重排是真实的编辑行为）。
+func TestPrefixFingerprintDetectsReordering(t *testing.T) {
+	a := []Message{msg("user", "1"), msg("assistant", "2")}
+	b := []Message{msg("assistant", "2"), msg("user", "1")}
+
+	assert.NotEqual(t, PrefixFingerprint(a, 2), PrefixFingerprint(b, 2),
+		"消息顺序变化必须改变前缀指纹")
+}
+
+// 前缀指纹的边界：n<=0 或空输入返回空串（表示「没有已上传前缀」）。
+func TestPrefixFingerprintBoundaries(t *testing.T) {
+	msgs := []Message{msg("user", "a")}
+	assert.Empty(t, PrefixFingerprint(msgs, 0))
+	assert.Empty(t, PrefixFingerprint(msgs, -1))
+	assert.Empty(t, PrefixFingerprint(nil, 3))
+	// n 超出长度时夹到长度（不 panic）。
+	assert.Equal(t, PrefixFingerprint(msgs, 1), PrefixFingerprint(msgs, 99))
+}
+
+// 前缀指纹对**前缀**与**整体**的区分：只改后缀不影响前缀指纹
+// （这正是「增量上传」成立的前提——否则每次新增都要全量）。
+func TestPrefixFingerprintOfPrefixIsStableWhenOnlyTailAppended(t *testing.T) {
+	base := []Message{msg("user", "1"), msg("assistant", "2")}
+	withTail := append(append([]Message{}, base...), msg("user", "3"))
+
+	assert.Equal(t, PrefixFingerprint(base, 2), PrefixFingerprint(withTail, 2),
+		"仅追加尾部时，前 2 条的前缀指纹必须不变（增量上传的前提）")
+	assert.NotEqual(t, PrefixFingerprint(base, 2), PrefixFingerprint(withTail, 3))
 }

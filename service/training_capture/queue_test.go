@@ -233,3 +233,57 @@ func TestEnqueueIsFastEnoughForHotPath(t *testing.T) {
 		"10 万次投递耗时 %v，过慢则不适合放在热路径", elapsed)
 	t.Logf("10 万次投递耗时 %v（平均 %v/次）", elapsed, elapsed/n)
 }
+
+// 回归（B1）：`TryEnqueue` 与 `Close` **并发**时绝不能 panic。
+//
+// 这是原实现的一个真实 BLOCKING 缺陷：`TryEnqueue` 的「读 closed 标志」与
+// 「send」是两步，`Close` 的「置标志」与 `close(ch)` 也是两步；交错时会
+// `panic: send on closed channel`。
+//
+// 为什么这个 panic 是**进程级**事故而不是「丢一条采集」：
+// 接线后 `TryEnqueue` 跑在 **relay 请求 goroutine** 上，panic 会杀掉整个网关。
+// 而触发条件只是「停机/切换总开关与在途请求并发」——正常运维场景。
+//
+// 原测试 `TestTryEnqueueAfterCloseDoesNotPanic` 是**串行**的（先 Close 再 Enqueue），
+// 恰好绕过并发窗口，所以没能发现。本用例补上这个窗口。
+func TestTryEnqueueConcurrentWithCloseNeverPanics(t *testing.T) {
+	for range 200 {
+		q := NewCaptureQueue(4)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			for range 200 {
+				q.TryEnqueue(CaptureSignal{UserID: 1})
+			}
+		}()
+		go func() {
+			defer wg.Done()
+			q.Close()
+		}()
+		wg.Wait()
+	}
+}
+
+// 回归（B1 补充）：多个生产者与 Close 并发，且带 race 检测。
+func TestTryEnqueueManyWritersConcurrentWithClose(t *testing.T) {
+	for range 50 {
+		q := NewCaptureQueue(8)
+		var wg sync.WaitGroup
+		for range 4 {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for range 100 {
+					q.TryEnqueue(CaptureSignal{UserID: 2})
+				}
+			}()
+		}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			q.Close()
+		}()
+		wg.Wait()
+	}
+}

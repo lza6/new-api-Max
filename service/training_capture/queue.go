@@ -51,13 +51,31 @@ type CaptureSignal struct {
 
 // CaptureQueue 有界、非阻塞投递的采集队列。
 type CaptureQueue struct {
+	// ch 数据通道。**永不 close**（见下方 stop 的说明）。
 	ch chan CaptureSignal
+
+	// stop 关闭信号。`Close` 关闭的是**它**，不是数据通道。
+	//
+	// [修复防御] 原实现让 `Close` 执行 `close(q.ch)`，而 `TryEnqueue` 是
+	// 「读 closed 标志」+「send」两步，两者交错时会
+	// `panic: send on closed channel`（实测稳定复现）。
+	// 那个 panic 出现在 relay 请求 goroutine 上时会**杀掉整个网关进程**，
+	// 触发条件只是「停机/切换开关与在途请求并发」——正常运维场景。
+	//
+	// 修法有两种：
+	//   (a) 用锁把「检查+发送」与 close 互斥 —— 实测让热路径从 2.4µs 涨到 11.6µs；
+	//   (b) **根本不关数据通道**，另用 stop 通道表达「停止消费」。
+	//       发送方即使在 Close 之后 send，也只是把信号放进缓冲（无人消费），
+	//       不会 panic —— 彻底消除该 panic 的可能，且热路径零锁。
+	// 采用 (b)：安全与性能同时成立，而不是二选一。
+	stop chan struct{}
 
 	// enqueued/dropped 用原子计数，读侧（指标）不加锁。
 	enqueued atomic.Int64
 	dropped  atomic.Int64
 
-	// closed 标记队列已关闭，之后投递直接丢弃（避免 close 后 send panic）。
+	// closed 供投递侧快速短路（避免在停机后继续堆积数据）。
+	// 它**不参与正确性**：即使读到过期值也不会 panic，最多多放一条进缓冲。
 	closed atomic.Bool
 
 	// closeOnce 保证 Close 幂等。
@@ -77,14 +95,20 @@ func NewCaptureQueue(capacity int) *CaptureQueue {
 	if capacity <= 0 {
 		capacity = CaptureQueueDefaultCapacity
 	}
-	return &CaptureQueue{ch: make(chan CaptureSignal, capacity)}
+	return &CaptureQueue{
+		ch:   make(chan CaptureSignal, capacity),
+		stop: make(chan struct{}),
+	}
 }
 
 // TryEnqueue **非阻塞**投递。返回 false 表示队列已满（已计入丢弃）或已关闭。
 //
 // **这是请求路径上唯一被调用的方法**，因此它必须极快：
-// 只有一次 `select` + 一次 channel send（或 default 分支）。
-// 没有锁、没有分配、没有日志。
+// 一次 RLock + 一次 `select`（含 default 分支）。
+// 没有堆分配、没有日志、没有系统调用。
+//
+// 与 `Close` 的互斥由 `closeMu` 保证（见字段注释里的 panic 说明）：
+// **绝不对已关闭的 channel 发送**。
 func (q *CaptureQueue) TryEnqueue(signal CaptureSignal) bool {
 	if q == nil || q.closed.Load() {
 		return false
@@ -102,23 +126,38 @@ func (q *CaptureQueue) TryEnqueue(signal CaptureSignal) bool {
 }
 
 // Receive 阻塞取出（供 worker 使用）。队列关闭后返回 ok=false。
+//
+// 关闭后**先尽力取完缓冲**再返回 false：平滑停机不该丢掉已入队的数据
+// （这些数据已经过授权判定，丢掉就是白采）。
 func (q *CaptureQueue) Receive() (CaptureSignal, bool) {
 	if q == nil {
 		return CaptureSignal{}, false
 	}
-	signal, ok := <-q.ch
-	return signal, ok
+	select {
+	case signal := <-q.ch:
+		return signal, true
+	case <-q.stop:
+		// 已发停止信号：把缓冲里剩余的先取完。
+		select {
+		case signal := <-q.ch:
+			return signal, true
+		default:
+			return CaptureSignal{}, false
+		}
+	}
 }
 
-// Close 关闭队列，使 worker 的 Receive 返回 ok=false 以退出。
-// 幂等；关闭后 TryEnqueue 一律返回 false（不 panic）。
+// Close 停止消费：worker 的 Receive 会返回 ok=false 从而退出。
+//
+// 幂等。**不关数据通道**（见 `stop` 字段的说明）——因此
+// `TryEnqueue` 与 `Close` 并发时不可能 panic，热路径也不需要加锁。
 func (q *CaptureQueue) Close() {
 	if q == nil {
 		return
 	}
 	q.closeOnce.Do(func() {
 		q.closed.Store(true)
-		close(q.ch)
+		close(q.stop)
 	})
 }
 

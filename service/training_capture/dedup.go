@@ -44,8 +44,34 @@ type Message struct {
 type Watermark struct {
 	// UploadedCount 已上传的消息条数。下次从该下标继续。
 	UploadedCount int
-	// LastFingerprint 已上传的最后一条消息的指纹（用于校验水位自洽）。
-	LastFingerprint string
+	// PrefixFingerprint 已上传**整个前缀**的累积指纹（不是只有末条）。
+	//
+	// [修复防御] 只存末条指纹时，**中间**消息被编辑无法被察觉：
+	// 末条没变 → 校验通过 → 水位照常推进 → 被改过的内容**永久不再上传**。
+	// 采集不可逆，那就是静默数据丢失。改存前缀指纹后，
+	// 历史中任意位置的改动都会让校验失败 → 保守全量重传。
+	PrefixFingerprint string
+}
+
+// PrefixFingerprint 计算前 n 条消息的累积指纹。
+//
+// 逐条把消息指纹喂进同一个 hash：**任何一条内容变化都会改变结果**，
+// 且与位置相关（顺序变化同样被发现）。
+//
+// n <= 0 返回空串（表示「没有已上传的前缀」）。
+func PrefixFingerprint(messages []Message, n int) string {
+	if n <= 0 || len(messages) == 0 {
+		return ""
+	}
+	if n > len(messages) {
+		n = len(messages)
+	}
+	h := sha256.New()
+	for i := range n {
+		h.Write([]byte(Fingerprint(messages[i])))
+		h.Write([]byte{0})
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 // Fingerprint 计算一条消息的内容指纹。
@@ -120,11 +146,14 @@ func SelectIncrement(messages []Message, watermark Watermark) ([]Message, Waterm
 		return messages, watermarkAfter(messages)
 	}
 
-	// 水位自洽校验：末次指纹必须与下标处一致。
-	// 不一致 = 历史被改动，保守全量重传。
-	if watermark.LastFingerprint != "" {
-		actual := Fingerprint(messages[watermark.UploadedCount-1])
-		if actual != watermark.LastFingerprint {
+	// 水位自洽校验：**整个已上传前缀**的累积指纹必须一致。
+	//
+	// 为什么必须是前缀而不是末条：只比末条时，中间某条被编辑不可见
+	// （末条没变 → 校验通过 → 水位推进 → 被改内容永久丢失）。
+	// 前缀指纹覆盖到每一条，任何位置的改动都会被发现。
+	if watermark.PrefixFingerprint != "" {
+		actual := PrefixFingerprint(messages, watermark.UploadedCount)
+		if actual != watermark.PrefixFingerprint {
 			return messages, watermarkAfter(messages)
 		}
 	}
@@ -143,8 +172,8 @@ func watermarkAfter(messages []Message) Watermark {
 		return Watermark{}
 	}
 	return Watermark{
-		UploadedCount:   len(messages),
-		LastFingerprint: Fingerprint(messages[len(messages)-1]),
+		UploadedCount:     len(messages),
+		PrefixFingerprint: PrefixFingerprint(messages, len(messages)),
 	}
 }
 
