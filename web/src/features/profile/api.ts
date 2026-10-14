@@ -33,6 +33,7 @@ import type {
   EmailBindingFlow,
   UserSkill,
   AgentPreset,
+  TrainingDataConsentStatus,
 } from './types'
 
 // ============================================================================
@@ -341,5 +342,48 @@ export async function performCheckin(
     ? `/api/user/checkin?turnstile=${encodeURIComponent(turnstileToken)}`
     : '/api/user/checkin'
   const res = await api.post(url)
+  return res.data
+}
+
+// ============================================================================
+// Training Data Collection APIs (Spec-008)
+// ============================================================================
+
+/**
+ * 读取当前用户的训练数据采集授权状态。
+ *
+ * 服务端只认会话里的用户 ID，不接受任何客户端传入的用户标识。
+ */
+export async function getTrainingDataStatus(): Promise<
+  ApiResponse<TrainingDataConsentStatus>
+> {
+  const res = await api.get('/api/user/training-data/status')
+  return res.data
+}
+
+/**
+ * 同意采集（必须在用户于免责声明弹窗中确认后调用）。
+ *
+ * 传 `policyVersion` 与服务端不一致时服务端会拒绝 —— 那说明免责声明
+ * 已更新，前端应重新拉取文案让用户重新确认，而不是把旧同意当数。
+ */
+export async function grantTrainingDataConsent(
+  policyVersion: string
+): Promise<ApiResponse<TrainingDataConsentStatus>> {
+  const res = await api.post('/api/user/training-data/grant', {
+    policy_version: policyVersion,
+  })
+  return res.data
+}
+
+/**
+ * 撤回同意（立即停止后续采集）。
+ *
+ * 注意语义边界：撤回**不删除**已上传的数据，只停止后续采集。
+ */
+export async function revokeTrainingDataConsent(): Promise<
+  ApiResponse<TrainingDataConsentStatus>
+> {
+  const res = await api.post('/api/user/training-data/revoke')
   return res.data
 }

@@ -284,3 +284,23 @@ export interface CheckinResponse {
   /** Quota awarded for this check-in */
   quota_awarded: number
 }
+
+/**
+ * 训练数据采集授权状态（Spec-008）。
+ *
+ * 与服务端 `service/training_capture.ConsentStatus` 一一对应。
+ * `available === false` 时前端**不应渲染**开关 —— 管理员关闭了总开关、
+ * 或云盘未配置时，给用户一个「能点但没作用」的开关是误导。
+ */
+export interface TrainingDataConsentStatus {
+  /** 该功能对本用户是否可用（= 管理员总开关已开 且 云盘已配置）。 */
+  available: boolean
+  /** 不可用时的可读原因（用于文案；可用时后端不下发该字段）。 */
+  reason?: string
+  /** 用户当前是否已授权。 */
+  granted: boolean
+  /** 服务端当前免责声明版本（始终下发，用于判断是否需要重新同意）。 */
+  policy_version: string
+  /** 最近一次同意的时间（unix 秒）；从未同意为 0。 */
+  granted_at: number
+}

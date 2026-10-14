@@ -44,6 +44,7 @@ import { ProfileHeader } from './components/profile-header'
 import { ProfileSettingsCard } from './components/profile-settings-card'
 import { SidebarModulesCard } from './components/sidebar-modules-card'
 import { SkillsPreferencesCard } from './components/skills-preferences-card'
+import { TrainingDataPreferencesCard } from './components/training-data-preferences-card'
 import { useProfile } from './hooks'
 
 export function Profile() {
@@ -117,6 +118,12 @@ export function Profile() {
                       ?.memory_injection_enabled === true
                   }
                 />
+                {/*
+                  Spec-008 训练数据采集授权。
+                  自行判定可用性（拉自己的 status 接口），因此无需 enabled 入参；
+                  不可用时组件返回 null，不渲染「点了没作用」的开关。
+                */}
+                <TrainingDataPreferencesCard />
               </div>
 
               <div className='space-y-4 sm:space-y-6 xl:sticky xl:top-6'>
