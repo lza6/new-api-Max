@@ -6,7 +6,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -32,6 +31,16 @@ const maxLogCount = 1000000
 // 在 Go 内存模型下就是数据竞争（并发压测下 race detector 会报错并导致测试
 // panic）。用 atomic 既保留「近似计数、不阻塞日志」的原意，又消除竞争。
 var logCount atomic.Int64
+
+// logBytes 当前日志文件累计写入的字节数（T6.3 按大小分片的依据）。
+//
+// 用 atomic 的理由与 logCount 相同：多个 goroutine 并发写日志。
+// 它在轮转时与 logCount 一起清零。
+var logBytes atomic.Int64
+
+// maxLogSizeBytes 单文件大小上限（启动时解析一次，避免每条日志读环境变量）。
+var maxLogSizeBytes = resolveMaxLogSizeBytes()
+
 var setupLogLock sync.Mutex
 var setupLogWorking atomic.Bool
 var currentLogPath string
@@ -57,11 +66,17 @@ func SetupLogger() {
 		defer func() {
 			setupLogLock.Unlock()
 		}()
-		logPath := filepath.Join(*common.LogDir, fmt.Sprintf("oneapi-%s.log", time.Now().Format("20060102150405")))
+		// 文件名经唯一性校验：按大小轮转时两次轮转可能落在同一秒，
+		// 只靠时间戳会让新文件与旧文件同名 → O_APPEND 继续写原文件，
+		// 「轮转」静默失效（见 rotation.go 的说明）。
+		logPath := nextLogFileName(*common.LogDir, time.Now(), nil)
 		fd, err := os.OpenFile(logPath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Fatal("failed to open log file")
 		}
+		// 新文件从 0 字节开始计数（不是续上旧文件的累计值，
+		// 否则新文件一创建就立刻超过阈值、陷入连续轮转）。
+		logBytes.Store(0)
 		currentLogPathMu.Lock()
 		oldFile := currentLogFile
 		currentLogPath = logPath
@@ -124,11 +139,24 @@ func logHelper(ctx context.Context, level string, msg string) {
 	if level == loggerINFO {
 		writer = gin.DefaultWriter
 	}
-	_, _ = fmt.Fprintf(writer, "[%s] %v | %s | %s \n", level, now.Format("2006/01/02 - 15:04:05"), id, msg)
+	// Fprintf 的返回值就是**实际写入的字节数**，因此字节计数零额外开销
+	// （不需要先格式化再量长度）。
+	written, _ := fmt.Fprintf(writer, "[%s] %v | %s | %s \n", level, now.Format("2006/01/02 - 15:04:05"), id, msg)
 	common.LogWriterMu.RUnlock()
+
 	// 近似计数：用 atomic 避免数据竞争（无需精确，故不做 CAS 语义的严格递增）。
-	if logCount.Add(1) > maxLogCount && setupLogWorking.CompareAndSwap(false, true) {
+	if written > 0 {
+		logBytes.Add(int64(written))
+	}
+	logCount.Add(1)
+
+	// 轮转触发：**行数或字节数任一超限**（T6.3）。
+	// 用 CAS 保证同一时刻只有一个轮转在进行（否则并发触发会开出多个新文件，
+	// 后一个把前一个已写入的内容留在无人引用的文件里）。
+	if shouldRotate(logCount.Load(), logBytes.Load(), maxLogCount, maxLogSizeBytes) &&
+		setupLogWorking.CompareAndSwap(false, true) {
 		logCount.Store(0)
+		logBytes.Store(0)
 		gopool.Go(func() {
 			SetupLogger()
 		})
