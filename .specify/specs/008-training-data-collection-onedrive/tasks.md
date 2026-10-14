@@ -60,26 +60,41 @@
 
 ## Phase 3：采集管道（接线，风险最高的部分）
 
-- [ ] **3.1 授权服务**
+- [x] **3.1 授权服务**
   - `service/training_capture/consent.go`：`IsGranted(userID)`（带短 TTL 缓存）、
     `Grant`、`Revoke`、`PolicyVersion` 校验
   - 验收：单测——未授权不采、撤回后立即不采、版本变更视为需重新同意
   - **Requirement**: Story 1/6
+  - 已完成 + 独立审查发现并修复 **B2（撤回 TOCTOU）**：
+    「撤回立即生效」原只在无并发时成立（refresh 读 DB 后写缓存的窗口内，
+    撤回可能先清缓存再被旧值写回），修法为 `consentRevocationEpoch` 纪元校验。
 
-- [ ] **3.2 采集 worker + 自适应节奏**（依赖 2.2、3.1）
+- [x] **3.2 采集 worker + 自适应节奏**（依赖 2.2、3.1）
   - 单 goroutine 消费：查授权 → 取增量 → 拼目录 → 分片 → 上传
   - 令牌桶限速；失败指数退避 + 有界重试；云盘不可达不影响主流程
   - 分片达 `MaxPartBytes` 即新建；重启后 `List` 恢复序号
   - 验收：单测（用 fake sink）——目录结构正确、分片轮转、重试不重复、失败降级
   - **Requirement**: Story 3/4 / ADR-008-5
+  - 已完成（22 个 worker 用例，真实 SQLite + 内存后端）。
+    **实测发现并修复的设计缺口**：请求路径每次只产出 1 条拼接文本，
+    消息级水位恒为 1 → 增量完全失效（用户点名要避免的）。
+    新增 `text_increment.go` 按**文本前缀**做增量，并加 DB 列
+    `request_text_bytes` / `request_text_hash`。
 
-- [ ] **3.3 接线到请求收口**（依赖 3.1、1.3）
+- [x] **3.3 接线到请求收口**（依赖 3.1、1.3）
   - `controller/relay.go` 的 `defer` 中：**仅成功请求**投递
   - 投递内容只含已算好的 meta（不重复解析 JSON）
   - **硬约束**：投递路径**无 DB 写、无网络、无锁**——只有 channel send
   - 验收：**压测对照**——开启 vs 关闭采集，请求 p95 无可感知劣化
   - 证据：本地压测脚本 + 数据入 `计划书/e2e-evidence/`
   - **Requirement**: Story 3 / 宪法 V（**最高风险项**）
+  - 已完成接线 + 基准（`go test -bench`，见提交 200c7ffe9）：
+    未启用 **96.7 ns/op / 0 allocs**、启用 **1653 ns/op / 2 allocs**、
+    含入队 **1911 ns/op**。接线点在成功分支 `newAPIError == nil` 之后，
+    信号构造与入队在 `gopool.Go` 内执行（彻底离开响应返回路径）。
+  - **遗留待补**：真实 HTTP 压测脚本（开/关对照 p95）+ 证据入
+    `计划书/e2e-evidence/spec-008/`。基准已证明**单请求开销**，
+    但「网关整体 p95 无劣化」需要 HTTP 层负载对照，尚未执行。
 
 ## Phase 4：接口层
 
