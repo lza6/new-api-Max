@@ -98,9 +98,9 @@ func TestOneDriveLive(t *testing.T) {
 	})
 
 	t.Run("CountItemsCountsFoldersAndFiles", func(t *testing.T) {
-		folders, files, err := sink.CountItems(ctx, 3)
+		folders, files, truncated, err := sink.CountItems(ctx, 3)
 		require.NoError(t, err)
-		t.Logf("根目录统计：%d 个目录 / %d 个文件", folders, files)
+		t.Logf("根目录统计：%d 个目录 / %d 个文件 truncated=%v", folders, files, truncated)
 		assert.GreaterOrEqual(t, folders, 1, "至少应有本次创建的日期目录")
 	})
 

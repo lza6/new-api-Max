@@ -1,9 +1,11 @@
 package model
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // 训练数据采集的两张表。
@@ -98,7 +100,7 @@ func GetTrainingDataConsent(userId int) (*TrainingDataConsent, error) {
 	var consent TrainingDataConsent
 	err := DB.Where("user_id = ?", userId).First(&consent).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -108,40 +110,40 @@ func GetTrainingDataConsent(userId int) (*TrainingDataConsent, error) {
 
 // UpsertTrainingDataConsent 写入/更新授权状态（同意或撤回）。
 //
-// 用「先查后写」而不是 ON CONFLICT：`ON CONFLICT ... AS new` 需要
-// PostgreSQL 15+ / MySQL 8.0.19+，而本项目要兼容 MySQL 5.7.8+（宪法 IV）。
-// 本方法只在用户点开关时调用（**非热路径**），先查后写的代价可忽略。
+// 用 GORM 的 `clause.OnConflict` 做**原子 upsert**，而不是「先查后写」：
+// 后者在并发下（用户双击开关 / 两个标签页同时操作）两个请求都读到 nil、
+// 都尝试 Create，其中一个撞唯一索引 `idx_training_consent_user` 并把
+// 「唯一约束冲突」这种内部错误直接甩给用户。
+//
+// 关于三库兼容：`clause.OnConflict{DoUpdates: ...}` 由 GORM 按方言生成 SQL——
+// MySQL 走 `ON DUPLICATE KEY UPDATE col=VALUES(col)`（**5.7 支持**），
+// PostgreSQL/SQLite 走 `ON CONFLICT (col) DO UPDATE SET`。
+// 刻意**不用** GORM 的 `ON CONFLICT ... AS new` 语法（那是 MySQL 8.0.19+ /
+// PG 15+ 才有的别名形式，违反宪法 IV 对 MySQL 5.7.8 的兼容要求）。
 func UpsertTrainingDataConsent(userId int, granted bool, policyVersion string, now int64) error {
-	consent, err := GetTrainingDataConsent(userId)
-	if err != nil {
-		return err
-	}
-	if consent == nil {
-		record := TrainingDataConsent{
-			UserId:        userId,
-			Granted:       granted,
-			PolicyVersion: policyVersion,
-		}
-		if granted {
-			record.GrantedAt = now
-		} else {
-			record.RevokedAt = now
-		}
-		return DB.Create(&record).Error
-	}
-
-	updates := map[string]any{
-		"granted":        granted,
-		"policy_version": policyVersion,
+	record := TrainingDataConsent{
+		UserId:        userId,
+		Granted:       granted,
+		PolicyVersion: policyVersion,
 	}
 	if granted {
-		updates["granted_at"] = now
+		record.GrantedAt = now
 	} else {
-		updates["revoked_at"] = now
+		record.RevokedAt = now
 	}
-	return DB.Model(&TrainingDataConsent{}).
-		Where("user_id = ?", userId).
-		Updates(updates).Error
+
+	// 冲突时更新：授权状态、声明版本、以及对应的时间戳。
+	columns := []string{"granted", "policy_version", "updated_at"}
+	if granted {
+		columns = append(columns, "granted_at")
+	} else {
+		columns = append(columns, "revoked_at")
+	}
+
+	return DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "user_id"}},
+		DoUpdates: clause.AssignmentColumns(columns),
+	}).Create(&record).Error
 }
 
 // ListGrantedTrainingDataUserIds 返回所有**当前授权且声明版本匹配**的用户 ID。
@@ -162,7 +164,7 @@ func GetTrainingDataWatermark(userId int, conversationId string) (*TrainingDataW
 	err := DB.Where("user_id = ? AND conversation_id = ?", userId, conversationId).
 		First(&wm).Error
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
 		return nil, err
@@ -172,26 +174,22 @@ func GetTrainingDataWatermark(userId int, conversationId string) (*TrainingDataW
 
 // SaveTrainingDataWatermark 写入/更新水位（**只在采集 worker 里调用**，非热路径）。
 func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount int, prefixFingerprint string, now int64) error {
-	wm, err := GetTrainingDataWatermark(userId, conversationId)
-	if err != nil {
-		return err
-	}
-	if wm == nil {
-		return DB.Create(&TrainingDataWatermark{
-			UserId:          userId,
-			ConversationId:  conversationId,
-			UploadedCount:   uploadedCount,
-			PrefixFingerprint: prefixFingerprint,
-			LastUploadedAt:  now,
-		}).Error
-	}
-	return DB.Model(&TrainingDataWatermark{}).
-		Where("user_id = ? AND conversation_id = ?", userId, conversationId).
-		Updates(map[string]any{
-			"uploaded_count":   uploadedCount,
-			"prefix_fingerprint": prefixFingerprint,
-			"last_uploaded_at": now,
-		}).Error
+	// 同样用原子 upsert：省掉一次「先查」，并让它在（未来的）多 worker
+	// 场景下也正确。当前 worker 是单 goroutine，但正确的写法不更贵。
+	return DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "user_id"}, {Name: "conversation_id"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"uploaded_count", "prefix_fingerprint", "last_uploaded_at", "updated_at",
+		}),
+	}).Create(&TrainingDataWatermark{
+		UserId:            userId,
+		ConversationId:    conversationId,
+		UploadedCount:     uploadedCount,
+		PrefixFingerprint: prefixFingerprint,
+		LastUploadedAt:    now,
+	}).Error
 }
 
 // DeleteStaleTrainingDataWatermarks 清理长期未更新的水位记录，防止表无界增长。

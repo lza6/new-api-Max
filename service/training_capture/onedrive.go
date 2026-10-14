@@ -59,6 +59,16 @@ const (
 
 	// onedriveListPageLimit 列举时的分页大小。
 	onedriveListPageLimit = 200
+
+	// onedriveCountMaxDirs 管理员统计时最多访问的目录数（防打爆 API 配额）。
+	onedriveCountMaxDirs = 500
+
+	// onedriveListMaxEntries 单目录列举的条目上限。
+	//
+	// 超限时 `List` **报错而非静默截断**：截断的列表会让分片序号算小，
+	// 进而覆盖已上传分片（不可逆）。取 5 万：按 2MB/分片 ≈ 100GB/天/用户/模型，
+	// 远超实际；正常目录只有几十个分片。
+	onedriveListMaxEntries = 50_000
 )
 
 // OneDriveConfig OneDrive 后端配置。
@@ -308,13 +318,62 @@ func (s *oneDriveSink) createFolder(ctx context.Context, parentPath, name string
 	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 
-	// 201 新建 / 200 已存在（replace）/ 409 并发下已存在。
-	if resp.StatusCode == http.StatusCreated ||
-		resp.StatusCode == http.StatusOK ||
-		resp.StatusCode == http.StatusConflict {
+	// 201 新建 / 200 已存在（`replace` 语义）。
+	if resp.StatusCode == http.StatusCreated || resp.StatusCode == http.StatusOK {
+		return nil
+	}
+	// [修复防御] 409 有**两个**来源：(a) 并发下同名目录已存在（无害）；
+	// (b) 该位置已存在一个**同名文件**。后者若被当成「目录已就绪」，
+	// 后续走 `/root:/…/X:/children` 会全部失败，而错误会在**离根因很远的地方**
+	// 才浮现（上游只报「children 不可用」），极难排查。
+	// 因此 409 时**回读该路径确认它确实是目录**。
+	if resp.StatusCode == http.StatusConflict {
+		isFolder, verifyErr := s.isFolderAt(ctx, token, parentPath, name)
+		if verifyErr != nil {
+			return fmt.Errorf("onedrive create folder %q conflicted and verification failed: %w", name, verifyErr)
+		}
+		if !isFolder {
+			return fmt.Errorf("onedrive create folder %q: a file with the same name already exists at that path", name)
+		}
 		return nil
 	}
 	return fmt.Errorf("onedrive create folder %q returned %d", name, resp.StatusCode)
+}
+
+// isFolderAt 回读 parentPath/name，报告它是否**确实是目录**。
+func (s *oneDriveSink) isFolderAt(ctx context.Context, token, parentPath, name string) (bool, error) {
+	full := name
+	if parentPath != "" {
+		full = parentPath + "/" + url.PathEscape(name)
+	}
+	endpoint := s.driveURL("/root:/" + full)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return false, err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	resp, err := s.client.Do(req)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if resp.StatusCode != http.StatusOK {
+		return false, fmt.Errorf("stat %q returned %d", full, resp.StatusCode)
+	}
+	var item struct {
+		Folder *any `json:"folder"`
+		File   *any `json:"file"`
+	}
+	if err := common.Unmarshal(body, &item); err != nil {
+		return false, err
+	}
+	if item.File != nil && item.Folder == nil {
+		return false, nil
+	}
+	return item.Folder != nil, nil
 }
 
 // WritePart 上传分片。
@@ -437,9 +496,15 @@ func (s *oneDriveSink) List(ctx context.Context, path string) ([]string, error) 
 				names = append(names, item.Name)
 			}
 		}
-		// 分页保护：极端情况下避免无限循环。
-		if len(names) > 100_000 {
-			break
+		// [修复防御] 分页上限**不能静默截断**：`List` 的唯一用途是让
+		// `PickNextPartSeq` 算出下一个分片序号。截断后若高序号在后面的分页里，
+		// 算出的序号会**偏小** → **覆盖已上传的分片**（不可逆的数据破坏）。
+		// 因此超限时**明确报错**，让调用方放弃本次上传（下轮重试），
+		// 而不是带着一个错误的序号去做破坏性决策。
+		if len(names) > onedriveListMaxEntries {
+			return nil, fmt.Errorf(
+				"onedrive list %q exceeded %d entries; refusing to return a truncated list because the caller uses it to pick the next part number",
+				itemPath, onedriveListMaxEntries)
 		}
 		next = page.NextLink
 	}
@@ -494,9 +559,13 @@ func (s *oneDriveSink) Stat(ctx context.Context) (SinkStat, error) {
 
 // CountItems 统计本程序根目录下的目录数与文件数（供管理员视图）。
 //
-// 只遍历到**第二层**（日期目录 → 用户目录）——完整遍历整个 5TB 云盘
-// 既慢又会打爆 API 配额，而管理员视图只需要「大概规模」。
-func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, files int, err error) {
+// 只遍历到 maxDepth 层、且**最多访问 onedriveCountMaxDirs 个目录**
+// ——完整遍历整个 5TB 云盘既慢又会打爆 API 配额，而管理员视图只需要「大概规模」。
+//
+// [修复防御] 返回 ：达到上限就说明数字是**下界**而非总量。
+// 不披露这一点会让管理员把 undercount 当成真实值去做扩缩容决策。
+// 这与  的既有约定一致（未知用 0/标志表达，不假装是真实值）。
+func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, files int, truncated bool, err error) {
 	if maxDepth <= 0 {
 		maxDepth = 3
 	}
@@ -512,7 +581,7 @@ func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, f
 	queue := []queueItem{{path: root, depth: 0}}
 	visited := 0
 
-	for len(queue) > 0 && visited < 500 {
+	for len(queue) > 0 && visited < onedriveCountMaxDirs {
 		item := queue[0]
 		queue = queue[1:]
 		visited++
@@ -537,7 +606,9 @@ func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, f
 			}
 		}
 	}
-	return folders, files, nil
+	// 队列里还有待访问目录 → 达到了访问上限，数字是下界。
+	truncated = len(queue) > 0
+	return folders, files, truncated, nil
 }
 
 type dirEntry struct {
