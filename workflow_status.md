@@ -164,3 +164,79 @@ glm-5.3-flash 同形态展开为 `$0.004 / $0.005 / $0.006`。
 - `CHANNEL_KEY_ENCRYPTION` 默认 false（未启用，渠道 key 仍明文——**P0 未闭合**）
 - Batch-5 开关（COMPLEXITY_ROUTING / TOOL_DRAWER_ENABLED / RELAY_AUDIT_ENABLED /
   POLICY_ENGINE_MODE / CHANNEL_HEALTH_WEIGHTED_LB）全部默认关
+
+---
+
+# workflow_status.md — Spec-008：训练数据采集 + OneDrive 冷存储
+
+> 起始 2026-10-14。用户全量授权。规范见 `.specify/specs/008-training-data-collection-onedrive/`。
+> 纪律：只记录**实际运行的命令与观察到的结果**；未见交付物与验收证据不标 done。
+
+## 契约
+
+**目标**：用户授权后异步采集对话数据 → 冷存 OneDrive（`日期/用户名/模型/part-NNNN.jsonl`）；
+管理员可总开关与看统计；用户可在个人资料页自助授权/撤回（含免责声明）。
+**成功标准**（每项都要证据）：
+1. 采集**不影响请求延迟**（压测对照证明）
+2. 增量去重（长期会话只传新增）
+3. 三库迁移幂等
+4. 真实 OneDrive 上传 + 读回一致
+5. 端到端：授权 → 对话 → 云盘出现正确文件；撤回 → 无新增
+6. 管理员关总开关 → 用户页开关消失
+**停止条件**：全部任务完成且验证通过，或遇到不可替代的凭证/环境阻塞。
+
+## 硬约束（来自项目宪法 `docs/.../constitution.md`）
+
+| 条款 | 对本功能的要求 |
+|---|---|
+| I 生产优先 | 真实链路验证，禁止静态审查/mock 冒充完成 |
+| II 计费安全 | 采集**不得触碰**计费路径 |
+| III 安全基线 | 凭据不落库；服务端强制授权 |
+| IV 三库兼容 | 新表三库成立、迁移幂等 |
+| **V 性能** | **网关不得给用户请求增加可感知延迟** ← 本功能最大风险 |
+| VI i18n | 新增文案全语言同步 |
+| VII 保守改动 | 不做无关重构 |
+
+## 任务进度（8/23）
+
+| 任务 | 状态 | 证据 |
+|---|---|---|
+| T1.1 目录名净化 + 分片命名 | ✅ done | `go test ./service/training_capture/` **21/21 PASS**；含 6 种路径穿越变体、同名消歧、非 ASCII |
+| T1.2 增量去重（水位+指纹） | ✅ done | 同包 **48/48 PASS，`-race` 干净**；`SelectIncrementLongConversationUploadsOnlyNewTurns` 断言「40 条会话追加 2 轮 → 只传 4 条」 |
+| T1.3 有界非阻塞队列 | ✅ done | **61/61 PASS，`-race` 干净**；**热路径实测 2.395µs/次** |
+| T1.4 两张新表 + 三库 | ✅ done | **三库 conformance 全过**（SQLite / **MySQL 5.7** / PostgreSQL）；证据 `计划书/e2e-evidence/spec-008/three-db-conformance.md` |
+| T2.1 Sink 抽象 | ✅ done | 单测锁定「未配置必须报错而非静默成功」 |
+| T2.2 OneDrive 实现 | ✅ done | **真实云盘 9/9 PASS**；证据 `计划书/e2e-evidence/spec-008/onedrive-live-integration.md` |
+| 日志轮转（双上限） | ✅ done | `go test ./logger/` **13/13 PASS**；对生产真实文件模拟：删 10 个释放 **476MB** |
+| T3.1–3.3 采集管道 | ⏳ 进行中 | — |
+| T4.x 接口层 | ⏳ 待做 | — |
+| T5.x 前端 | ⏳ 待做 | — |
+| T6.3 日志按大小分片 | ⏳ 待做 | — |
+| T7.1 README 重写 | ⏳ 待做 | — |
+| T8.x E2E + 部署 + 文档 | ⏳ 待做 | — |
+
+## 关键实测事实（省得重复调研）
+
+- **OneDrive 配额 5TB / 剩余 5.00TB**；client_credentials 认证（无需浏览器登录）
+- OneDrive 能力实测：建目录✅ 上传✅ 读回✅ 列举✅ 删除✅
+- **读回必须跟随 302 重定向**，否则空响应
+- **建目录必须 `conflictBehavior=replace`**，否则 409 或产生垃圾目录
+- **简单上传上限 4MB**（Graph 限制）
+- `dto.Request` 接口**读不到结构化消息数组**，只有 `TokenCountMeta.CombineText`
+- **`logs` 表不含对话正文** → 「扫日志表采集」不可行
+- 本机**无 Docker/MySQL**；三库验证要在**生产服务器**上做（方法记在 ledger）
+
+## 生产磁盘现状（2026-10-14）
+
+- 根盘 9.3G / 78G（12%）
+- `/opt/new-api/data/logs` = 870MB / 24 文件 / 单个最大 173MB
+- `/opt/new-api/data/data` = 8KB
+- **生产没有储存用户图片**：站内图床未启用、响应缓存未启用、日志无 base64、DEBUG 未开
+
+## 阻塞 / 待决策
+
+- 无（当前无不可替代阻塞）
+
+## 验证日志（追加式）
+
+- 2026-10-14：Phase 1 全部 4 个任务 + T2.1/T2.2 完成并通过真实验证（见上表）
