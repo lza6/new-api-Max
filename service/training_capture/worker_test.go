@@ -111,12 +111,31 @@ func (m *memSink) snapshot() map[string][]byte {
 }
 
 // 汇总所有分片的 JSONL 行数（用于断言「到底传了多少条」）。
+//
+// 必须持锁：worker goroutine 在并发写 files，而不持锁地 range map
+// 就是数据竞争（-race 下会直接报错）。测试辅助函数同样要遵守并发契约。
 func (m *memSink) totalLines() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	total := 0
-	for _, data := range m.snapshot() {
+	for _, data := range m.files {
 		total += strings.Count(string(data), "\n")
 	}
 	return total
+}
+
+// writeCallsCount 持锁读取写入次数。
+func (m *memSink) writeCallsCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.writeCalls
+}
+
+// dirCallsCount 持锁读取建目录次数。
+func (m *memSink) dirCallsCount() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.dirCalls
 }
 
 // ---------- 测试装置 ----------
@@ -149,7 +168,7 @@ func withMemSink(t *testing.T) *memSink {
 
 func TestProcessSignalCreatesDateUserModelLayout(t *testing.T) {
 	sink := withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 
 	sig := signal(7, "alice", "gpt-4o", "conv-1",
 		[]Message{{Role: "user", Content: "你好"}}, "你也好")
@@ -170,7 +189,7 @@ func TestProcessSignalCreatesDateUserModelLayout(t *testing.T) {
 
 func TestProcessSignalSanitizesDangerousUsernameInPath(t *testing.T) {
 	sink := withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 
 	// 用户名是用户可控输入，必须净化，否则可制造路径穿越。
 	sig := signal(42, "../../etc/passwd", "m", "c",
@@ -195,7 +214,7 @@ func TestProcessSignalSanitizesDangerousUsernameInPath(t *testing.T) {
 
 func TestProcessSignalRejectsInvalidInputWithoutTouchingSink(t *testing.T) {
 	sink := withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 
 	cases := []struct {
 		name string
@@ -217,8 +236,8 @@ func TestProcessSignalRejectsInvalidInputWithoutTouchingSink(t *testing.T) {
 		})
 	}
 	// 无效输入不得产生任何云盘调用（否则会在云盘留下空目录垃圾）。
-	if sink.dirCalls != 0 || sink.writeCalls != 0 {
-		t.Fatalf("无效输入不应触达后端：EnsureDir=%d WritePart=%d", sink.dirCalls, sink.writeCalls)
+	if sink.dirCallsCount() != 0 || sink.writeCallsCount() != 0 {
+		t.Fatalf("无效输入不应触达后端：EnsureDir=%d WritePart=%d", sink.dirCallsCount(), sink.writeCallsCount())
 	}
 }
 
@@ -226,7 +245,7 @@ func TestProcessSignalRejectsInvalidInputWithoutTouchingSink(t *testing.T) {
 
 func TestProcessSignalUploadsOnlyIncrementOnRepeatedRequest(t *testing.T) {
 	sink := withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 	ctx := context.Background()
 
 	// 长期会话：先有一次完整历史。
@@ -262,7 +281,7 @@ func TestProcessSignalUploadsOnlyIncrementOnRepeatedRequest(t *testing.T) {
 
 func TestProcessSignalNoopWhenNothingNew(t *testing.T) {
 	sink := withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 	ctx := context.Background()
 
 	sig := signal(102, "carol", "m", "conv-x",
@@ -270,7 +289,7 @@ func TestProcessSignalNoopWhenNothingNew(t *testing.T) {
 	if _, _, err := processSignal(ctx, sig, limiter); err != nil {
 		t.Fatalf("首次：%v", err)
 	}
-	writesAfterFirst := sink.writeCalls
+	writesAfterFirst := sink.writeCallsCount()
 
 	// 完全相同的请求再来一次 → 不应产生任何上传。
 	n, b, err := processSignal(ctx, sig, limiter)
@@ -280,8 +299,8 @@ func TestProcessSignalNoopWhenNothingNew(t *testing.T) {
 	if n != 0 || b != 0 {
 		t.Fatalf("无新增时不应上传，实际 n=%d b=%d", n, b)
 	}
-	if sink.writeCalls != writesAfterFirst {
-		t.Fatalf("无新增时不应调用 WritePart（实际多调用了 %d 次）", sink.writeCalls-writesAfterFirst)
+	if sink.writeCallsCount() != writesAfterFirst {
+		t.Fatalf("无新增时不应调用 WritePart（实际多调用了 %d 次）", sink.writeCallsCount()-writesAfterFirst)
 	}
 	// 也不该白建目录（增量判定在 EnsureDir 之前）。
 	// 这里只断言没有新增写入，目录调用是否发生不影响正确性。
@@ -289,7 +308,7 @@ func TestProcessSignalNoopWhenNothingNew(t *testing.T) {
 
 func TestProcessSignalFallsBackToGlobalDedupWithoutConversationId(t *testing.T) {
 	withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 	ctx := context.Background()
 
 	// 先清空全局指纹集合，避免与其它用例互相影响。
@@ -388,7 +407,7 @@ func TestSplitBySizeBoundaries(t *testing.T) {
 
 func TestProcessSignalOpensNewPartWhenExistingPartsPresent(t *testing.T) {
 	sink := withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 	ctx := context.Background()
 
 	// 预置已存在的分片，模拟「进程重启」。
@@ -420,7 +439,7 @@ func TestProcessSignalOpensNewPartWhenExistingPartsPresent(t *testing.T) {
 // ---------- 失败路径：错就明确错，绝不假装成功 ----------
 
 func TestProcessSignalSurfacesSinkErrors(t *testing.T) {
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 	ctx := context.Background()
 	sig := signal(105, "frank", "m", "conv-err",
 		[]Message{{Role: "user", Content: "x"}}, "")
@@ -445,7 +464,7 @@ func TestProcessSignalSurfacesSinkErrors(t *testing.T) {
 
 func TestProcessSignalDoesNotAdvanceWatermarkWhenUploadFails(t *testing.T) {
 	sink := withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 	ctx := context.Background()
 	const userId, convId = 106, "conv-atomic"
 
@@ -480,7 +499,7 @@ func TestProcessSignalDoesNotAdvanceWatermarkWhenUploadFails(t *testing.T) {
 
 func TestProcessSignalAdvancesWatermarkAfterSuccess(t *testing.T) {
 	withMemSink(t)
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
 	ctx := context.Background()
 	const userId, convId = 107, "conv-wm"
 
@@ -508,7 +527,7 @@ func TestProcessSignalAdvancesWatermarkAfterSuccess(t *testing.T) {
 // ---------- 限速（用户点名：不能影响用户请求） ----------
 
 func TestByteLimiterDoesNotWaitWithinBurst(t *testing.T) {
-	limiter := newByteLimiter(1 << 20) // 1MB/s，初始桶 1MB
+	limiter := NewByteLimiter(1<<20, nil) // 1MB/s，初始桶 1MB
 	start := time.Now()
 	limiter.wait(context.Background(), 1<<19) // 512KB，在桶内
 	if elapsed := time.Since(start); elapsed > 50*time.Millisecond {
@@ -517,7 +536,7 @@ func TestByteLimiterDoesNotWaitWithinBurst(t *testing.T) {
 }
 
 func TestByteLimiterWaitsWhenOverBudget(t *testing.T) {
-	limiter := newByteLimiter(100_000) // 100KB/s
+	limiter := NewByteLimiter(100_000, nil) // 100KB/s
 	ctx := context.Background()
 	limiter.wait(ctx, 100_000)         // 用光桶
 	start := time.Now()
@@ -532,7 +551,7 @@ func TestByteLimiterWaitsWhenOverBudget(t *testing.T) {
 }
 
 func TestByteLimiterRespectsContextCancellation(t *testing.T) {
-	limiter := newByteLimiter(1000) // 极慢
+	limiter := NewByteLimiter(1000, nil) // 极慢；不绑停止信号
 	ctx, cancel := context.WithCancel(context.Background())
 	limiter.wait(ctx, 1000)
 	cancel()
@@ -543,12 +562,49 @@ func TestByteLimiterRespectsContextCancellation(t *testing.T) {
 	}
 }
 
+func TestByteLimiterRespectsStopSignal(t *testing.T) {
+	// 停机信号必须能打断限速等待，否则 StopWorker 会卡在一次限速上。
+	stop := make(chan struct{})
+	limiter := NewByteLimiter(1000, stop)
+	limiter.wait(context.Background(), 1000) // 用光桶
+
+	go func() {
+		time.Sleep(50 * time.Millisecond)
+		close(stop)
+	}()
+
+	start := time.Now()
+	limiter.wait(context.Background(), 500_000) // 正常要等 500s
+	if elapsed := time.Since(start); elapsed > 2*time.Second {
+		t.Fatalf("停机信号必须立刻中断限速等待，实际等了 %v", elapsed)
+	}
+}
+
+func TestByteLimiterDoesNotDependOnGlobalWorkerStop(t *testing.T) {
+	// 回归：原实现直接读包级 workerStop。测试里前一个用例关掉它之后，
+	// 后续用例的限速等待会**立即返回**（该等 0.5s 却等了 0s）。
+	// 这里刻意先关掉全局 workerStop，再验证限速仍然生效。
+	originalStop := workerStop
+	workerStop = make(chan struct{})
+	close(workerStop)
+	defer func() { workerStop = originalStop }()
+
+	limiter := NewByteLimiter(100_000, nil) // 不绑任何停止信号
+	ctx := context.Background()
+	limiter.wait(ctx, 100_000) // 用光桶
+	start := time.Now()
+	limiter.wait(ctx, 50_000) // 需要 0.5s
+	if elapsed := time.Since(start); elapsed < 300*time.Millisecond {
+		t.Fatalf("限速被全局 workerStop 影响而失效，实际只等了 %v", elapsed)
+	}
+}
+
 func TestByteLimiterNilAndZeroAreSafe(t *testing.T) {
 	var nilLimiter *byteLimiter
 	nilLimiter.wait(context.Background(), 100) // 不得 panic
 	newByteLimiter(0).wait(context.Background(), 100)
 	newByteLimiter(-5).wait(context.Background(), 100)
-	newByteLimiter(1000).wait(context.Background(), 0)
+	NewByteLimiter(1000, nil).wait(context.Background(), 0)
 }
 
 // ---------- 队列与 MaybeCapture 的契约 ----------

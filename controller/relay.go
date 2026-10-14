@@ -26,6 +26,7 @@ import (
 	"github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/service/training_capture"
 	"github.com/lza6/new-api-Max/setting"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/lza6/new-api-Max/setting/relay_setting"
@@ -330,6 +331,11 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			service.AuditModelFingerprintOnce(c, relayInfo.OriginModelName, relayInfo.UpstreamModelName)
 			// B3-3：成功结果计入渠道健康分聚合。
 			service.RecordChannelOutcome(channel.Id, true, time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)), service.ErrClassOK)
+			// 训练数据采集（Spec-008）：**只在成功路径**上投递一条非阻塞信号。
+			// 放在 gopool.Go 里是为了让「构造信号 + 入队」彻底离开响应返回路径
+			// —— 响应体此刻已经写完，再花几微秒只会推迟连接复用。
+			// 该 goroutine 内**不做任何 IO**（不查库/不联网），见 hotpath.go。
+			maybeCaptureTrainingData(c, relayInfo, meta)
 			return
 		}
 
@@ -520,6 +526,93 @@ func evaluateRequestPolicy(c *gin.Context, relayInfo *relaycommon.RelayInfo, met
 	service.RecordPolicyEval()
 	return service.Evaluate(in)
 }
+
+// maybeCaptureTrainingData 训练数据采集在请求路径上的**唯一入口**（Spec-008）。
+//
+// 设计约束（全部来自用户对「不能影响请求延迟」的要求）：
+//   - 只在**成功**路径调用（失败请求的对话无训练价值，且会放大重试噪声）；
+//   - 丢进 gopool 异步执行 —— 不占用响应返回的关键路径；
+//   - goroutine 内**零 IO**：`BuildSignal` 是纯计算，`MaybeCapture` 只做
+//     一次 map 读（授权缓存）+ 一次非阻塞入队（实测 1.93µs）；
+//   - `meta` 直接复用调用方已经算好的对象，**不重新解析请求体**
+//     （重新解析是热路径上最昂贵的一种「顺手」）。
+//
+// 采集未启用时（绝大多数请求）开销 ≈ 一次 `gopool.Go` + 两次原子读。
+func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, meta *types.TokenCountMeta) {
+	if relayInfo == nil || meta == nil {
+		return
+	}
+	// 快速短路：总开关/云盘未就绪时，连 gopool 都不进。
+	// 注意这里是**读缓存**而非查库（见 consent.go 的缓存设计）。
+	if !training_capture.HotPathEnabled() {
+		return
+	}
+
+	userId := relayInfo.UserId
+	username := common.GetContextKeyString(c, constant.ContextKeyUserName)
+	model := relayInfo.OriginModelName
+	convId := conversationIdFromContext(relayInfo)
+
+	gopool.Go(func() {
+		// 在调用方已算好的 meta 上取文本。**不复制 meta** ——
+		// 它只在本函数内被读取，且 BuildSignal 只做字符串切片。
+		signal := training_capture.BuildSignal(training_capture.CaptureInput{
+			UserId:         userId,
+			Username:       username,
+			Model:          model,
+			ConversationID: convId,
+			Meta:           meta,
+		})
+		if signal == nil {
+			return
+		}
+		// 未授权 / 队列满时返回 false：两者都已在内部计数，
+		// 这里不再记日志（热路径日志会淹没日志文件，队列满时日志本身也是负担）。
+		training_capture.MaybeCapture(*signal)
+	})
+}
+
+// conversationIdFromContext 尽力取会话标识。
+//
+// 网关本身**没有**会话概念（它是无状态转发），所以只能借用一个
+// 客户端会自然携带的字段。`prompt_cache_key` 是 OpenAI 语义下
+// 「同一段对话前缀」的标识，正好符合「长期会话增量」的用途；
+// 客户端不传时返回空串 → 退化到全局指纹去重（正确性不受影响）。
+//
+// 刻意**不**用 user+model 之类的组合猜一个伪会话 id：
+// 那会把「不同会话」错误地合并成一个水位，导致新会话的**前几轮被当成
+// 历史而不上传**（静默丢数据）。宁可退化到全局去重。
+//
+// 用类型断言而非 context key：`prompt_cache_key` 并未被任何中间件
+// 写入 gin context，唯一可靠来源是已解析的请求 DTO。
+// 断言失败的代价只是一次类型检查（无分配、无反射）。
+func conversationIdFromContext(relayInfo *relaycommon.RelayInfo) string {
+	if relayInfo == nil || relayInfo.Request == nil {
+		return ""
+	}
+	if req, ok := relayInfo.Request.(*dto.GeneralOpenAIRequest); ok {
+		if key := strings.TrimSpace(req.PromptCacheKey); key != "" {
+			// 客户端可控值，作为 DB 列有长度上限（varchar(128)）。
+			// 超长会让插入失败并产生错误日志噪声 —— 这里**硬截断**。
+			// 不用 common.LocalLogPreview：它在 Debug 模式下不截断，
+			// 且会追加一段说明文字（那是给人看的，不是可入库的标识）。
+			if len(key) > maxConversationIdLen {
+				key = key[:maxConversationIdLen]
+			}
+			return key
+		}
+	}
+	return ""
+}
+
+// maxConversationIdLen 与 model.TrainingDataWatermark.ConversationId 的
+// varchar(128) 对齐。改这里必须同步改那一列的宽度。
+//
+// 用字节截断：客户端理论上可传非 ASCII。截出半个 UTF-8 字符不会导致
+// 崩溃或注入（它只是一个 map/唯一索引的键），最坏是两个不同的
+// prompt_cache_key 因截断而碰撞 → 退化为按前缀共用一条水位，
+// 不会丢数据（水位只会更保守）。
+const maxConversationIdLen = 128
 
 func fastTokenCountMetaForPricing(request dto.Request) *types.TokenCountMeta {
 	if request == nil {

@@ -81,6 +81,21 @@ type TrainingDataWatermark struct {
 	// → 保守全量重传（见 SelectIncrement）。
 	PrefixFingerprint string `json:"prefix_fingerprint" gorm:"type:varchar(64)"`
 
+	// RequestTextBytes 已上传的**拼接文本字节数**。
+	//
+	// 网关的请求路径只能拿到 `TokenCountMeta.CombineText`（一整块拼接文本），
+	// 因此每次请求只产生 1 条消息 —— 消息级水位恒为 1，**无法表达增量**。
+	// 实测确认这一缺口后新增本列：改为按**文本前缀**做增量，
+	// 长期会话只上传追加的那一段（用户点名的核心需求）。
+	// 见 `service/training_capture/text_increment.go`。
+	RequestTextBytes int `json:"request_text_bytes"`
+
+	// RequestTextHash 已上传前缀的指纹（校验前缀未被改动）。
+	//
+	// 只比长度不够：同样长度的不同内容会被误判为「未改动」，
+	// 从而把被编辑掉的部分永久丢弃。必须比内容指纹。
+	RequestTextHash string `json:"request_text_hash" gorm:"type:varchar(64)"`
+
 	// LastUploadedAt 最近一次成功上传的时间（unix 秒）。
 	LastUploadedAt int64 `json:"last_uploaded_at"`
 
@@ -173,7 +188,7 @@ func GetTrainingDataWatermark(userId int, conversationId string) (*TrainingDataW
 }
 
 // SaveTrainingDataWatermark 写入/更新水位（**只在采集 worker 里调用**，非热路径）。
-func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount int, prefixFingerprint string, now int64) error {
+func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount int, prefixFingerprint string, requestTextBytes int, requestTextHash string, now int64) error {
 	// 同样用原子 upsert：省掉一次「先查」，并让它在（未来的）多 worker
 	// 场景下也正确。当前 worker 是单 goroutine，但正确的写法不更贵。
 	return DB.Clauses(clause.OnConflict{
@@ -181,13 +196,17 @@ func SaveTrainingDataWatermark(userId int, conversationId string, uploadedCount 
 			{Name: "user_id"}, {Name: "conversation_id"},
 		},
 		DoUpdates: clause.AssignmentColumns([]string{
-			"uploaded_count", "prefix_fingerprint", "last_uploaded_at", "updated_at",
+			"uploaded_count", "prefix_fingerprint",
+			"request_text_bytes", "request_text_hash",
+			"last_uploaded_at", "updated_at",
 		}),
 	}).Create(&TrainingDataWatermark{
 		UserId:            userId,
 		ConversationId:    conversationId,
 		UploadedCount:     uploadedCount,
 		PrefixFingerprint: prefixFingerprint,
+		RequestTextBytes:  requestTextBytes,
+		RequestTextHash:   requestTextHash,
 		LastUploadedAt:    now,
 	}).Error
 }

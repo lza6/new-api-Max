@@ -123,20 +123,27 @@ func RegisterSink(name string, factory func() (TrainingDataSink, error)) {
 // 配错名字时静默降级会让管理员以为在采集）。
 func ConfigureSink(name string) error {
 	sinkMu.Lock()
-	defer sinkMu.Unlock()
 	if name == "" || name == "disabled" {
 		activeSink = disabledSink{}
+		sinkMu.Unlock()
+		// 后端变了 → 热路径快速开关必须跟着变，否则会出现
+		// 「热路径以为能采、实际 sink 是 disabled」的白跑。
+		SyncHotPathFlag()
 		return nil
 	}
 	factory, ok := sinkRegistry[name]
 	if !ok {
+		sinkMu.Unlock()
 		return errors.New("training data sink: unknown backend " + name)
 	}
 	sink, err := factory()
 	if err != nil {
+		sinkMu.Unlock()
 		return err
 	}
 	activeSink = sink
+	sinkMu.Unlock()
+	SyncHotPathFlag()
 	return nil
 }
 
@@ -150,10 +157,12 @@ func SetSinkForTest(s TrainingDataSink) func() {
 		activeSink = s
 	}
 	sinkMu.Unlock()
+	SyncHotPathFlag()
 	return func() {
 		sinkMu.Lock()
 		activeSink = previous
 		sinkMu.Unlock()
+		SyncHotPathFlag()
 	}
 }
 

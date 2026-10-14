@@ -240,6 +240,15 @@ func main() {
 	controller.RegisterScheduledSystemTasks()
 	service.StartSystemTaskRunner()
 
+	// Spec-008 训练数据采集：装配后端 + 启动消费 worker。
+	//
+	// **必须在启动时调用**，否则请求路径投递的信号无人消费 ——
+	// 表现为「开关是开的、队列在涨、云盘上一个文件都没有」。
+	// 这是本项目踩过的「库全绿但生产零调用」死代码坑，故显式接线。
+	//
+	// 未配置云盘时这里只记一条日志并保持关闭，不影响启动。
+	controller.StartTrainingDataCapture()
+
 	// B3-1：注册 /metrics 的派生型瞬时指标提供者（渠道健康分/熔断/队列深度）。
 	controller.RegisterMetricsGaugeProvider()
 

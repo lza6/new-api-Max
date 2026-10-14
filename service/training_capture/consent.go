@@ -86,9 +86,14 @@ func IsGatewayEnabled() bool {
 //
 // 清缓存是必要的：开关状态参与 `IsGranted` 的判定，
 // 不清缓存会让「刚关闭」在 TTL 内仍被判为可采集。
+//
+// 同时同步**热路径快速开关**（`captureHotPathEnabled`）：请求路径上
+// 的第一步就是读它，不同步会让「管理员刚打开开关但请求路径仍短路」
+// 持续到进程重启 —— 表现为「开关是开的但一条数据都没有」。
 func SetGatewayEnabled(enabled bool) {
 	gatewayEnabled.Store(enabled)
 	invalidateConsentCache()
+	SyncHotPathFlag()
 }
 
 // SetGatewayEnabledForTest 测试用覆盖，返回恢复函数。
@@ -96,10 +101,24 @@ func SetGatewayEnabledForTest(enabled bool) func() {
 	previous := gatewayEnabled.Load()
 	gatewayEnabled.Store(enabled)
 	invalidateConsentCache()
+	SyncHotPathFlag()
 	return func() {
 		gatewayEnabled.Store(previous)
 		invalidateConsentCache()
+		SyncHotPathFlag()
 	}
+}
+
+// SyncHotPathFlag 把热路径快速开关对齐到当前真实状态。
+//
+// 判据与 `IsGranted` 的前置条件完全一致：**总开关开 且 云盘已配置**。
+// 必须同时满足，否则会出现「热路径放行但 worker 拒绝」的白跑，
+// 或者反过来「热路径短路但 worker 本该采集」的漏采。
+//
+// 调用时机：总开关变更、后端配置变更、启动完成。**不**在请求路径调用
+// （它会读 sink 注册表的 RWMutex，不该出现在热路径上）。
+func SyncHotPathFlag() {
+	SetHotPathEnabled(IsGatewayEnabled() && CanEnableGateway())
 }
 
 // CanEnableGateway 报告总开关**是否允许被打开**。

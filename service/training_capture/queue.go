@@ -130,6 +130,19 @@ func (q *CaptureQueue) TryEnqueue(signal CaptureSignal) bool {
 // 关闭后**先尽力取完缓冲**再返回 false：平滑停机不该丢掉已入队的数据
 // （这些数据已经过授权判定，丢掉就是白采）。
 func (q *CaptureQueue) Receive() (CaptureSignal, bool) {
+	return q.ReceiveWithStop(nil)
+}
+
+// ReceiveWithStop 同 Receive，但额外监听一个外部停止信号。
+//
+// [修复防御] 这个 `extraStop` 不是可选优化，而是**停机正确性**的一部分：
+// worker 有自己的停止信号（`workerStop`），与队列的 `stop` 是**两个不同的
+// channel**。原实现只等队列 stop，而 `StopWorker` 关的是 workerStop ——
+// 于是「worker 正阻塞在这里等数据」时 StopWorker **完全无效**：
+// 进程停机、管理端关闭采集后 worker 会永久挂住（实测 5s 内停不掉）。
+//
+// 把两个信号都纳入 select，任一触发都能唤醒并退出。
+func (q *CaptureQueue) ReceiveWithStop(extraStop <-chan struct{}) (CaptureSignal, bool) {
 	if q == nil {
 		return CaptureSignal{}, false
 	}
@@ -137,13 +150,20 @@ func (q *CaptureQueue) Receive() (CaptureSignal, bool) {
 	case signal := <-q.ch:
 		return signal, true
 	case <-q.stop:
-		// 已发停止信号：把缓冲里剩余的先取完。
-		select {
-		case signal := <-q.ch:
-			return signal, true
-		default:
-			return CaptureSignal{}, false
-		}
+		return q.drainOrDefault()
+	case <-extraStop:
+		// worker 被要求停止：先取完缓冲再退出（不丢已入队数据）。
+		return q.drainOrDefault()
+	}
+}
+
+// drainOrDefault 尽力再取一条缓冲；取不到则返回 ok=false。
+func (q *CaptureQueue) drainOrDefault() (CaptureSignal, bool) {
+	select {
+	case signal := <-q.ch:
+		return signal, true
+	default:
+		return CaptureSignal{}, false
 	}
 }
 

@@ -239,7 +239,9 @@ func StopWorker() {
 
 // runWorker 主循环。
 func runWorker() {
-	limiter := newByteLimiter(uploadRateLimitBytesPerSec)
+	// 把 workerStop 绑进限速器：停机时限速等待也要被打断，
+	// 否则一个正在等 2 分钟的限速会让 StopWorker 卡住。
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, workerStop)
 	consecutiveErrors := 0
 
 	for {
@@ -249,7 +251,9 @@ func runWorker() {
 		default:
 		}
 
-		signal, ok := captureQueue.Receive()
+		// 把 workerStop 一并交给 Receive：否则 worker 阻塞在这里等数据时
+		// StopWorker 无法唤醒它（两个是不同的 channel，见 ReceiveWithStop）。
+		signal, ok := captureQueue.ReceiveWithStop(workerStop)
 		if !ok {
 			// 队列关闭（停机）或暂无数据。Receive 是阻塞的，
 			// 不会走到这里空转；保险起见仍睡一下。
@@ -327,6 +331,8 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 
 	var increment []Message
 	var nextWatermark Watermark
+	var nextTextWatermark TextWatermark
+	var textSuffix string
 
 	if conversationId != "" {
 		// 主路径：会话水位精确增量。
@@ -335,13 +341,33 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 			return 0, 0, fmt.Errorf("load watermark: %w", err)
 		}
 		var current Watermark
+		var currentText TextWatermark
 		if wm != nil {
 			current = Watermark{
-				UploadedCount:   wm.UploadedCount,
+				UploadedCount:     wm.UploadedCount,
 				PrefixFingerprint: wm.PrefixFingerprint,
 			}
+			currentText = TextWatermark{
+				UploadedBytes: wm.RequestTextBytes,
+				PrefixHash:    wm.RequestTextHash,
+			}
 		}
-		increment, nextWatermark = SelectIncrement(messages, current)
+
+		// 数据形态判定（实测确认，见 text_increment.go）：
+		// 请求路径只有 1 条 `role="request"`（拼接文本）+ 可能 1 条 assistant。
+		// 这种情况下**必须**按文本前缀做增量 —— 消息级水位恒为 1，
+		// 去重完全失效（长期会话每次都全量重传，正是用户要避免的）。
+		//
+		// 保留消息级路径是为了真实结构化消息（将来扩展 dto.Request 后）
+		// 仍走原来的、更强的逐条语义。
+		if isSingleRequestBlob(messages) {
+			textSuffix, nextTextWatermark = SelectTextIncrement(messages[0].Content, currentText)
+			if textSuffix != "" {
+				increment = []Message{{Role: "request", Content: textSuffix}}
+			}
+		} else {
+			increment, nextWatermark = SelectIncrement(messages, current)
+		}
 	} else {
 		// 退化路径：拿不到会话 id 时按内容指纹全局去重。
 		increment = GlobalDedup(messages, globalSeenFingerprints)
@@ -391,6 +417,7 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 		if err := model.SaveTrainingDataWatermark(
 			signal.UserID, conversationId,
 			nextWatermark.UploadedCount, nextWatermark.PrefixFingerprint,
+			nextTextWatermark.UploadedBytes, nextTextWatermark.PrefixHash,
 			time.Now().Unix(),
 		); err != nil {
 			// 水位保存失败：数据已上传，但下次会重复上传这段增量。
@@ -400,6 +427,18 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 	}
 
 	return len(increment), uploadedBytes, nil
+}
+
+// isSingleRequestBlob 判定「只有一条拼接文本」的数据形态。
+//
+// 这是当前生产路径的**唯一**形态（见 hotpath.go）：请求路径拿不到
+// 结构化消息，只能给出 `CombineText`。判定成真时按文本前缀做增量。
+//
+// 判定刻意严格（恰好 1 条 且 role=="request"）：将来若真的加上了
+// 结构化消息，会自动走回逐条语义更精确的 `SelectIncrement`，
+// 不需要改这里。
+func isSingleRequestBlob(messages []Message) bool {
+	return len(messages) == 1 && messages[0].Role == "request"
 }
 
 // encodeJSONL 把消息编码为 JSONL（每行一条 JSON）。
@@ -477,6 +516,15 @@ type byteLimiter struct {
 	mu         sync.Mutex
 	lastRefill time.Time
 	available  float64
+
+	// stop 限速等待的中断信号。
+	//
+	// [修复防御] 原实现直接读**包级变量** `workerStop`：那让
+	// `wait` 的行为依赖全局状态 —— 测试里前一个用例关掉 workerStop 后，
+	// 后续用例的限速等待会**立即返回**（表现为「该等 0.5s 却等了 0s」，
+	// 实测在整套测试里稳定复现）。把信号作为实例字段注入，
+	// 限速器就只依赖自己的生命周期。
+	stop <-chan struct{}
 }
 
 func newByteLimiter(ratePerSec int64) *byteLimiter {
@@ -489,6 +537,14 @@ func newByteLimiter(ratePerSec int64) *byteLimiter {
 		// 初始给一个桶容量（1 秒的量），让首次上传不必等待。
 		available: float64(ratePerSec),
 	}
+}
+
+// NewByteLimiter 构造限速器，并绑定一个停止信号
+// （worker 传入 `workerStop`；测试传 nil 即「只受 ctx 与计时器控制」）。
+func NewByteLimiter(ratePerSec int64, stop <-chan struct{}) *byteLimiter {
+	limiter := newByteLimiter(ratePerSec)
+	limiter.stop = stop
+	return limiter
 }
 
 // wait 消耗 n 字节的额度，不足时按速率等待。
@@ -518,7 +574,7 @@ func (l *byteLimiter) wait(ctx context.Context, n int64) {
 	select {
 	case <-ctx.Done():
 	case <-timer.C:
-	case <-workerStop:
+	case <-l.stop:
 	}
 }
 
