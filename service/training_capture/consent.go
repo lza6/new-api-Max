@@ -275,6 +275,16 @@ func ResetConsentCacheForTest() {
 	invalidateConsentCache()
 }
 
+// consentCacheSizeForTest 返回当前缓存条目数（仅测试用）。
+//
+// 暴露给测试是为了验证「缓存有界」这一安全属性：
+// 大量不同用户并发访问时缓存不能无界增长（那会随用户数吃光内存）。
+func consentCacheSizeForTest() int {
+	consentCacheMu.RLock()
+	defer consentCacheMu.RUnlock()
+	return len(consentCache)
+}
+
 // ---------- 授权操作 ----------
 
 // GrantConsent 记录用户同意（服务端强制，不信前端）。
