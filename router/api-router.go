@@ -142,6 +142,12 @@ func SetApiRouter(router *gin.Engine) {
 				selfRoute.POST("/aff_transfer", middleware.UserCriticalRateLimit("aff-transfer"), controller.TransferAffQuota)
 				selfRoute.PUT("/setting", controller.UpdateUserSetting)
 
+				// 训练数据采集（Spec-008）：用户自主授权。
+				// 全部只读会话里的用户 ID，不接受请求体里的用户标识。
+				selfRoute.GET("/training-data/status", middleware.DisableCache(), controller.GetTrainingDataStatus)
+				selfRoute.POST("/training-data/grant", middleware.DisableCache(), controller.GrantTrainingDataConsent)
+				selfRoute.POST("/training-data/revoke", middleware.DisableCache(), controller.RevokeTrainingDataConsent)
+
 				// 2FA routes
 				selfRoute.GET("/2fa/status", controller.Get2FAStatus)
 				selfRoute.POST("/2fa/setup", middleware.UserCriticalRateLimit("security-verification"), middleware.DisableCache(), controller.Setup2FA)
@@ -163,6 +169,12 @@ func SetApiRouter(router *gin.Engine) {
 			{
 				// P1 管理员重置所有签到（福利重置）
 				adminRoute.POST("/checkins/reset", controller.ResetAllCheckins)
+
+				// 训练数据采集（Spec-008）管理端。
+				// 统计含全站采集规模，属运营数据 → 全部在 AdminAuth() 之下。
+				adminRoute.GET("/training-data/admin/overview", middleware.DisableCache(), controller.GetTrainingDataAdminOverview)
+				adminRoute.GET("/training-data/admin/by-date", middleware.DisableCache(), controller.GetTrainingDataByDate)
+				adminRoute.PUT("/training-data/admin/enabled", middleware.DisableCache(), controller.SetTrainingDataEnabled)
 				adminRoute.GET("/", controller.GetAllUsers)
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
