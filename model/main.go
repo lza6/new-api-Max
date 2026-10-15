@@ -382,6 +382,7 @@ func migrateDB() error {
 		&WebRequestLog{},
 		&SiteDailyVisitor{},
 		&TrainingDataConsent{}, &TrainingDataWatermark{},
+		&TrainingDataExport{}, &TrainingDataExportDownload{},
 		&EventDelivery{},
 		&WebhookEndpoint{},
 	}

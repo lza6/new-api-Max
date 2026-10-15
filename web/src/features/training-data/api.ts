@@ -24,6 +24,10 @@ import type {
   FileListResponse,
   FilePreviewResponse,
   AnalysisResponse,
+  ExportListResponse,
+  ExportDetailResponse,
+  TrainingDataExport,
+  ExportLinkResponse,
 } from './types'
 
 // 训练数据采集管理端 API（Spec-008）。
@@ -35,7 +39,7 @@ import type {
 export async function getTrainingDataOverview(): Promise<
   ApiEnvelope<CaptureOverview>
 > {
-  const res = await api.get('/api/training-data/admin/overview')
+  const res = await api.get('/api/admin/training-data/overview')
   return res.data
 }
 
@@ -44,7 +48,7 @@ export async function listTrainingDataFiles(
   path: string,
   max?: number
 ): Promise<ApiEnvelope<FileListResponse>> {
-  const res = await api.get('/api/training-data/admin/files', {
+  const res = await api.get('/api/admin/training-data/files', {
     params: { path, max },
   })
   return res.data
@@ -54,7 +58,7 @@ export async function listTrainingDataFiles(
 export async function previewTrainingDataFile(
   path: string
 ): Promise<ApiEnvelope<FilePreviewResponse>> {
-  const res = await api.get('/api/training-data/admin/file', {
+  const res = await api.get('/api/admin/training-data/file', {
     params: { path },
   })
   return res.data
@@ -69,7 +73,7 @@ export async function previewTrainingDataFile(
 export async function deleteTrainingDataFile(
   path: string
 ): Promise<ApiEnvelope<{ deleted: string }>> {
-  const res = await api.delete('/api/training-data/admin/file', {
+  const res = await api.delete('/api/admin/training-data/file', {
     params: { path, confirm: 1 },
   })
   return res.data
@@ -86,7 +90,7 @@ export async function analyzeTrainingDataConversation(payload: {
   model?: string
   messages?: { role: string; content: string }[]
 }): Promise<ApiEnvelope<AnalysisResponse>> {
-  const res = await api.post('/api/training-data/admin/analyze', payload)
+  const res = await api.post('/api/admin/training-data/analyze', payload)
   return res.data
 }
 
@@ -94,6 +98,66 @@ export async function analyzeTrainingDataConversation(payload: {
 export async function setTrainingDataEnabled(enabled: boolean): Promise<
   ApiEnvelope<{ enabled: boolean; can_enable: boolean; reason?: string }>
 > {
-  const res = await api.put('/api/training-data/admin/enabled', { enabled })
+  const res = await api.put('/api/admin/training-data/enabled', { enabled })
+  return res.data
+}
+
+// ---------- 一键导出 / 下载（增量需求） ----------
+
+/** 创建一个导出任务（同步打包，返回就绪的导出记录）。 */
+export async function createTrainingDataExport(payload: {
+  date_from: string
+  date_to: string
+  user_id?: number
+  model?: string
+}): Promise<ApiEnvelope<TrainingDataExport>> {
+  const res = await api.post('/api/admin/training-data/export', payload)
+  return res.data
+}
+
+/** 分页列出导出任务。 */
+export async function listTrainingDataExports(
+  offset = 0,
+  limit = 50
+): Promise<ApiEnvelope<ExportListResponse>> {
+  const res = await api.get('/api/admin/training-data/export', {
+    params: { offset, limit },
+  })
+  return res.data
+}
+
+/** 读取单个导出 + 其下载记录。 */
+export async function getTrainingDataExportDetail(
+  id: number
+): Promise<ApiEnvelope<ExportDetailResponse>> {
+  const res = await api.get('/api/admin/training-data/export/detail', {
+    params: { id },
+  })
+  return res.data
+}
+
+/**
+ * 为导出签发一个限时直链（可供 curl / aria2 / wget 使用，支持断点续传）。
+ *
+ * ⚠️ 直链 token 绑定导出 ID 且**限时**；过期后需重新签发。
+ */
+export async function issueTrainingDataExportLink(
+  id: number,
+  ttlSeconds?: number
+): Promise<ApiEnvelope<ExportLinkResponse>> {
+  const res = await api.post('/api/admin/training-data/export/link', {
+    id,
+    ttl_seconds: ttlSeconds ?? 0,
+  })
+  return res.data
+}
+
+/** 删除导出任务及其产物（`confirm=1` 由服务端强制）。 */
+export async function deleteTrainingDataExport(
+  id: number
+): Promise<ApiEnvelope<{ deleted: number }>> {
+  const res = await api.delete('/api/admin/training-data/export', {
+    params: { id, confirm: 1 },
+  })
   return res.data
 }

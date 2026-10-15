@@ -129,6 +129,8 @@ func conformanceModels() []any {
 		// Spec-008：训练数据采集的两张新表。必须在三库上验证
 		// 「首次建表 + 二次迁移不乱改 schema」（宪法 IV）。
 		&TrainingDataConsent{}, &TrainingDataWatermark{},
+		// 训练数据导出与下载记录（一键导出增量需求）。同样需三库 idempotency 覆盖。
+		&TrainingDataExport{}, &TrainingDataExportDownload{},
 	}
 }
 

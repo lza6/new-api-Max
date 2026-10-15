@@ -113,3 +113,73 @@ export interface AnalysisResponse {
   }[]
   error?: { message?: string }
 }
+
+// ---------- 一键导出 / 下载（增量需求） ----------
+
+/** 导出状态。 */
+export type ExportStatus = 'pending' | 'building' | 'ready' | 'failed'
+
+/** 一个导出任务（对应 model.TrainingDataExport）。 */
+export interface TrainingDataExport {
+  id: number
+  status: ExportStatus
+  date_from: string
+  date_to: string
+  user_id: number
+  model: string
+  archive_format: string
+  /** 产物的相对路径（未就绪时为空）。 */
+  object_path: string
+  size_bytes: number
+  part_count: number
+  record_count: number
+  /** 失败原因（status 为 failed 时非空）。 */
+  error_msg: string
+  created_by: number
+  /** 已完成的下载次数（明细以 downloads 为准）。 */
+  download_count: number
+  created_at: string
+  updated_at: string
+}
+
+/** 一次下载记录（对应 model.TrainingDataExportDownload）。 */
+export interface TrainingDataExportDownload {
+  id: number
+  export_id: number
+  downloader_id: number
+  /** browser / direct。 */
+  source: string
+  bytes_sent: number
+  range_header: string
+  completed: boolean
+  started_at: number
+  completed_at: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ExportListResponse {
+  exports: TrainingDataExport[]
+  total: number
+  offset: number
+  limit: number
+}
+
+export interface ExportDetailResponse {
+  export: TrainingDataExport
+  downloads: TrainingDataExportDownload[]
+}
+
+/** 直链签发结果。 */
+export interface ExportLinkResponse {
+  url: string
+  expires_at: number
+  export_id: number
+  /** 签发该链接的管理员 ID（下载记录会归到他名下）。 */
+  issuer_id: number
+  size_bytes: number
+  filename: string
+  /** 是否支持断点续传（服务端声明）。 */
+  resumable: boolean
+  accept_ranges: string
+}

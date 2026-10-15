@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button'
 
 import { AnalysisPanel } from './components/analysis-panel'
 import { CaptureOverviewPanel } from './components/overview-panel'
+import { ExportPanel } from './components/export-panel'
 import { FileBrowserPanel } from './components/file-browser-panel'
 
 /**
@@ -37,7 +38,9 @@ import { FileBrowserPanel } from './components/file-browser-panel'
  */
 export function TrainingDataPage() {
   const { t } = useTranslation()
-  const [tab, setTab] = useState<'overview' | 'files' | 'analysis'>('overview')
+  const [tab, setTab] = useState<'overview' | 'files' | 'export' | 'analysis'>(
+    'overview'
+  )
   // 在「文件」里点「分析」时，把目标路径带过去。
   const [analysisPath, setAnalysisPath] = useState<string | null>(null)
 
@@ -56,6 +59,7 @@ export function TrainingDataPage() {
       <div className='flex flex-wrap items-center gap-2'>
         {tabBtn('overview', 'Overview')}
         {tabBtn('files', 'Cloud files')}
+        {tabBtn('export', 'Export')}
         {tabBtn('analysis', 'Analysis')}
       </div>
 
@@ -69,6 +73,8 @@ export function TrainingDataPage() {
           }}
         />
       )}
+
+      {tab === 'export' && <ExportPanel />}
 
       {tab === 'analysis' && <AnalysisPanel path={analysisPath} />}
     </div>

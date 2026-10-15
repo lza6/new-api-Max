@@ -23,7 +23,7 @@ import type { OpsOverview, OpsRankingResult } from './types'
 
 /** GET /api/ops/overview —— 当日/累计消耗、用户剩余额度合计、日均消耗与运营天数估算。 */
 export async function getOpsOverview(days?: number): Promise<OpsOverview> {
-  const res = await api.get('/api/ops/overview', {
+  const res = await api.get('/api/admin/ops/overview', {
     params: days == null ? undefined : { days },
   })
   return requireServerSuccess(res.data)?.data as OpsOverview
@@ -34,7 +34,7 @@ export async function getOpsConsumptionRanking(
   days: number,
   limit: number
 ): Promise<OpsRankingResult> {
-  const res = await api.get('/api/ops/consumption-ranking', {
+  const res = await api.get('/api/admin/ops/consumption-ranking', {
     params: { days, limit },
   })
   return requireServerSuccess(res.data)?.data as OpsRankingResult
@@ -45,6 +45,6 @@ export async function grantUserQuota(payload: {
   user_id: number
   quota: number
 }): Promise<void> {
-  const res = await api.post('/api/ops/grant-quota', payload)
+  const res = await api.post('/api/admin/ops/grant-quota', payload)
   requireServerSuccess(res.data)
 }
