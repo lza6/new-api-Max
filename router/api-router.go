@@ -195,6 +195,14 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/:id", controller.GetUser)
 				adminRoute.POST("/", controller.CreateUser)
 				adminRoute.POST("/manage", controller.ManageUser)
+
+				// 运营面板（管理员专属）：每日/总消耗、消耗排行榜、
+				// 全体普通用户剩余额度与「按当前日均还能撑多少天」。
+				// 口径写在 controller/ops_panel.go 的文件头注释里。
+				adminRoute.GET("/ops/overview", middleware.DisableCache(), controller.GetOpsOverview)
+				adminRoute.GET("/ops/consumption-ranking", middleware.DisableCache(), controller.GetOpsConsumptionRanking)
+				// 给用户加额度：复用既有的管理端记账路径，不自己写 UPDATE。
+				adminRoute.POST("/ops/grant-quota", middleware.DisableCache(), controller.GrantUserQuota)
 				adminRoute.POST("/manage/batch", controller.BatchManageUsers)
 				adminRoute.PUT("/", controller.UpdateUser)
 				adminRoute.DELETE("/:id", controller.DeleteUser)

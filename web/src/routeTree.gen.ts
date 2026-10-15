@@ -46,6 +46,7 @@ import { Route as AuthenticatedErrorsErrorRouteImport } from './routes/_authenti
 import { Route as AuthenticatedKeysIndexRouteImport } from './routes/_authenticated/keys/index'
 import { Route as AuthenticatedModelsIndexRouteImport } from './routes/_authenticated/models/index'
 import { Route as AuthenticatedModelsSectionRouteImport } from './routes/_authenticated/models/$section'
+import { Route as AuthenticatedOpsPanelIndexRouteImport } from './routes/_authenticated/ops-panel/index'
 import { Route as AuthenticatedPlaygroundIndexRouteImport } from './routes/_authenticated/playground/index'
 import { Route as AuthenticatedProfileIndexRouteImport } from './routes/_authenticated/profile/index'
 import { Route as AuthenticatedProfileInsightsRouteImport } from './routes/_authenticated/profile/insights'
@@ -55,6 +56,7 @@ import { Route as AuthenticatedSubscriptionsIndexRouteImport } from './routes/_a
 import { Route as AuthenticatedSystemInfoIndexRouteImport } from './routes/_authenticated/system-info/index'
 import { Route as AuthenticatedSystemSettingsIndexRouteImport } from './routes/_authenticated/system-settings/index'
 import { Route as AuthenticatedTaskPluginsIndexRouteImport } from './routes/_authenticated/task-plugins/index'
+import { Route as AuthenticatedTrainingDataIndexRouteImport } from './routes/_authenticated/training-data/index'
 import { Route as AuthenticatedUsageLogsIndexRouteImport } from './routes/_authenticated/usage-logs/index'
 import { Route as AuthenticatedUsageLogsSectionRouteImport } from './routes/_authenticated/usage-logs/$section'
 import { Route as AuthenticatedUsageLogsAuditRouteImport } from './routes/_authenticated/usage-logs/audit'
@@ -271,6 +273,12 @@ const AuthenticatedModelsSectionRoute =
     path: '/models/$section',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedOpsPanelIndexRoute =
+  AuthenticatedOpsPanelIndexRouteImport.update({
+    id: '/ops-panel/',
+    path: '/ops-panel/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedPlaygroundIndexRoute =
   AuthenticatedPlaygroundIndexRouteImport.update({
     id: '/playground/',
@@ -323,6 +331,12 @@ const AuthenticatedTaskPluginsIndexRoute =
   AuthenticatedTaskPluginsIndexRouteImport.update({
     id: '/task-plugins/',
     path: '/task-plugins/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTrainingDataIndexRoute =
+  AuthenticatedTrainingDataIndexRouteImport.update({
+    id: '/training-data/',
+    path: '/training-data/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedUsageLogsIndexRoute =
@@ -512,6 +526,7 @@ export interface FileRoutesByFullPath {
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
   '/models/': typeof AuthenticatedModelsIndexRoute
+  '/ops-panel/': typeof AuthenticatedOpsPanelIndexRoute
   '/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/profile/': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -520,6 +535,7 @@ export interface FileRoutesByFullPath {
   '/system-info/': typeof AuthenticatedSystemInfoIndexRoute
   '/system-settings/': typeof AuthenticatedSystemSettingsIndexRoute
   '/task-plugins/': typeof AuthenticatedTaskPluginsIndexRoute
+  '/training-data/': typeof AuthenticatedTrainingDataIndexRoute
   '/usage-logs/': typeof AuthenticatedUsageLogsIndexRoute
   '/users/': typeof AuthenticatedUsersIndexRoute
   '/wallet/': typeof AuthenticatedWalletIndexRoute
@@ -582,6 +598,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
   '/models': typeof AuthenticatedModelsIndexRoute
+  '/ops-panel': typeof AuthenticatedOpsPanelIndexRoute
   '/playground': typeof AuthenticatedPlaygroundIndexRoute
   '/profile': typeof AuthenticatedProfileIndexRoute
   '/redemption-codes': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -590,6 +607,7 @@ export interface FileRoutesByTo {
   '/system-info': typeof AuthenticatedSystemInfoIndexRoute
   '/system-settings': typeof AuthenticatedSystemSettingsIndexRoute
   '/task-plugins': typeof AuthenticatedTaskPluginsIndexRoute
+  '/training-data': typeof AuthenticatedTrainingDataIndexRoute
   '/usage-logs': typeof AuthenticatedUsageLogsIndexRoute
   '/users': typeof AuthenticatedUsersIndexRoute
   '/wallet': typeof AuthenticatedWalletIndexRoute
@@ -656,6 +674,7 @@ export interface FileRoutesById {
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
   '/_authenticated/models/': typeof AuthenticatedModelsIndexRoute
+  '/_authenticated/ops-panel/': typeof AuthenticatedOpsPanelIndexRoute
   '/_authenticated/playground/': typeof AuthenticatedPlaygroundIndexRoute
   '/_authenticated/profile/': typeof AuthenticatedProfileIndexRoute
   '/_authenticated/redemption-codes/': typeof AuthenticatedRedemptionCodesIndexRoute
@@ -664,6 +683,7 @@ export interface FileRoutesById {
   '/_authenticated/system-info/': typeof AuthenticatedSystemInfoIndexRoute
   '/_authenticated/system-settings/': typeof AuthenticatedSystemSettingsIndexRoute
   '/_authenticated/task-plugins/': typeof AuthenticatedTaskPluginsIndexRoute
+  '/_authenticated/training-data/': typeof AuthenticatedTrainingDataIndexRoute
   '/_authenticated/usage-logs/': typeof AuthenticatedUsageLogsIndexRoute
   '/_authenticated/users/': typeof AuthenticatedUsersIndexRoute
   '/_authenticated/wallet/': typeof AuthenticatedWalletIndexRoute
@@ -729,6 +749,7 @@ export interface FileRouteTypes {
     | '/dashboard/'
     | '/keys/'
     | '/models/'
+    | '/ops-panel/'
     | '/playground/'
     | '/profile/'
     | '/redemption-codes/'
@@ -737,6 +758,7 @@ export interface FileRouteTypes {
     | '/system-info/'
     | '/system-settings/'
     | '/task-plugins/'
+    | '/training-data/'
     | '/usage-logs/'
     | '/users/'
     | '/wallet/'
@@ -799,6 +821,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/keys'
     | '/models'
+    | '/ops-panel'
     | '/playground'
     | '/profile'
     | '/redemption-codes'
@@ -807,6 +830,7 @@ export interface FileRouteTypes {
     | '/system-info'
     | '/system-settings'
     | '/task-plugins'
+    | '/training-data'
     | '/usage-logs'
     | '/users'
     | '/wallet'
@@ -872,6 +896,7 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard/'
     | '/_authenticated/keys/'
     | '/_authenticated/models/'
+    | '/_authenticated/ops-panel/'
     | '/_authenticated/playground/'
     | '/_authenticated/profile/'
     | '/_authenticated/redemption-codes/'
@@ -880,6 +905,7 @@ export interface FileRouteTypes {
     | '/_authenticated/system-info/'
     | '/_authenticated/system-settings/'
     | '/_authenticated/task-plugins/'
+    | '/_authenticated/training-data/'
     | '/_authenticated/usage-logs/'
     | '/_authenticated/users/'
     | '/_authenticated/wallet/'
@@ -1190,6 +1216,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedModelsSectionRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/ops-panel/': {
+      id: '/_authenticated/ops-panel/'
+      path: '/ops-panel'
+      fullPath: '/ops-panel/'
+      preLoaderRoute: typeof AuthenticatedOpsPanelIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/playground/': {
       id: '/_authenticated/playground/'
       path: '/playground'
@@ -1251,6 +1284,13 @@ declare module '@tanstack/react-router' {
       path: '/task-plugins'
       fullPath: '/task-plugins/'
       preLoaderRoute: typeof AuthenticatedTaskPluginsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/training-data/': {
+      id: '/_authenticated/training-data/'
+      path: '/training-data'
+      fullPath: '/training-data/'
+      preLoaderRoute: typeof AuthenticatedTrainingDataIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/usage-logs/': {
@@ -1534,6 +1574,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
   AuthenticatedModelsIndexRoute: typeof AuthenticatedModelsIndexRoute
+  AuthenticatedOpsPanelIndexRoute: typeof AuthenticatedOpsPanelIndexRoute
   AuthenticatedPlaygroundIndexRoute: typeof AuthenticatedPlaygroundIndexRoute
   AuthenticatedProfileIndexRoute: typeof AuthenticatedProfileIndexRoute
   AuthenticatedRedemptionCodesIndexRoute: typeof AuthenticatedRedemptionCodesIndexRoute
@@ -1541,6 +1582,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedSubscriptionsIndexRoute: typeof AuthenticatedSubscriptionsIndexRoute
   AuthenticatedSystemInfoIndexRoute: typeof AuthenticatedSystemInfoIndexRoute
   AuthenticatedTaskPluginsIndexRoute: typeof AuthenticatedTaskPluginsIndexRoute
+  AuthenticatedTrainingDataIndexRoute: typeof AuthenticatedTrainingDataIndexRoute
   AuthenticatedUsageLogsIndexRoute: typeof AuthenticatedUsageLogsIndexRoute
   AuthenticatedUsersIndexRoute: typeof AuthenticatedUsersIndexRoute
   AuthenticatedWalletIndexRoute: typeof AuthenticatedWalletIndexRoute
@@ -1563,6 +1605,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,
   AuthenticatedModelsIndexRoute: AuthenticatedModelsIndexRoute,
+  AuthenticatedOpsPanelIndexRoute: AuthenticatedOpsPanelIndexRoute,
   AuthenticatedPlaygroundIndexRoute: AuthenticatedPlaygroundIndexRoute,
   AuthenticatedProfileIndexRoute: AuthenticatedProfileIndexRoute,
   AuthenticatedRedemptionCodesIndexRoute:
@@ -1571,6 +1614,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedSubscriptionsIndexRoute: AuthenticatedSubscriptionsIndexRoute,
   AuthenticatedSystemInfoIndexRoute: AuthenticatedSystemInfoIndexRoute,
   AuthenticatedTaskPluginsIndexRoute: AuthenticatedTaskPluginsIndexRoute,
+  AuthenticatedTrainingDataIndexRoute: AuthenticatedTrainingDataIndexRoute,
   AuthenticatedUsageLogsIndexRoute: AuthenticatedUsageLogsIndexRoute,
   AuthenticatedUsersIndexRoute: AuthenticatedUsersIndexRoute,
   AuthenticatedWalletIndexRoute: AuthenticatedWalletIndexRoute,

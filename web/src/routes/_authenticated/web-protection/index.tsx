@@ -18,10 +18,17 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { lazy } from 'react'
 import { createFileRoute, redirect } from "@tanstack/react-router"
+import z from 'zod'
 
 const WebProtectionPage = lazy(() => import("@/features/web-protection/web-protection-page").then((m) => ({ default: m.WebProtectionPage })))
 import { ROLE } from "@/lib/roles"
 import { useAuthStore } from "@/stores/auth-store"
+
+// URL As State: 分页页码/每页条数写进 search params，刷新/分享后状态不丢。
+const webProtectionSearchSchema = z.object({
+  page: z.number().optional().catch(1),
+  pageSize: z.number().optional().catch(undefined),
+})
 
 export const Route = createFileRoute("/_authenticated/web-protection/")({
   beforeLoad: () => {
@@ -30,5 +37,6 @@ export const Route = createFileRoute("/_authenticated/web-protection/")({
       throw redirect({ to: "/403" })
     }
   },
+  validateSearch: webProtectionSearchSchema,
   component: WebProtectionPage,
 })

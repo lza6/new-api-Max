@@ -21,10 +21,12 @@ import {
   Box,
   ClipboardList,
   CreditCard,
+  Database,
   FileText,
   FlaskConical,
   Key,
   LayoutDashboard,
+  LineChart,
   ListTodo,
   PlugZap,
   Radio,
@@ -169,6 +171,20 @@ export function useSidebarData(): SidebarData {
             url: '/web-protection',
             icon: ShieldCheck,
             requiredRole: ROLE.SUPER_ADMIN,
+          },
+          {
+            // 运营面板：每日/总消耗、消耗排行、剩余额度与可运营天数。
+            title: t('Ops Panel'),
+            url: '/ops-panel',
+            icon: LineChart,
+            requiredRole: ROLE.ADMIN,
+          },
+          {
+            // 训练数据采集管理：总开关、云盘浏览、对话深度分析。
+            title: t('Training Data'),
+            url: '/training-data',
+            icon: Database,
+            requiredRole: ROLE.ADMIN,
           },
           {
             title: t('Webhook'),

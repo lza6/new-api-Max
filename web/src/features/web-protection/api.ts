@@ -74,12 +74,12 @@ export async function getWebRequestLogs(params: {
   return r.data.data;
 }
 
-export async function getWebRequestLogDetail(ip: string, page = 1, size = 50) {
+export async function getWebRequestLogDetail(ip: string, page = 1, size = 50): Promise<{ items: WebRequestLogDetailRow[]; total: number }> {
   const r = await api.get('/api/admin/web-request-logs/detail', { params: { ip, page, size } });
   return r.data.data;
 }
 
-export async function getBannedIPs(page = 1, size = 50) {
+export async function getBannedIPs(page = 1, size = 50): Promise<{ items: BannedIPRow[]; total: number }> {
   const r = await api.get('/api/admin/banned-ips', { params: { page, size } });
   return r.data.data;
 }
