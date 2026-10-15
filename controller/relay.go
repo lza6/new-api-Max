@@ -542,6 +542,18 @@ func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, 
 	if relayInfo == nil || meta == nil {
 		return
 	}
+	// [修复防御] **跳过本站内部合成请求**。
+	//
+	// 否则会形成闭环：管理端「对话深度分析」→ 合成请求 → Relay() →
+	// 成功路径 → 这里 → 把**整段用户对话**当成「发起分析的管理员的对话」
+	// 再上传一份到云盘。后果：数据重复、归属错乱（别人的对话落到管理员
+	// 目录）、以及用户从未同意的二次采集。
+	//
+	// 放在最前面（早于 HotPathEnabled）是为了让「内部请求」在任何
+	// 开关状态下都绝不被采集 —— 这是正确性，不是性能优化。
+	if IsInternalSynthesizedRequest(c) {
+		return
+	}
 	// 快速短路：总开关/云盘未就绪时，连 gopool 都不进。
 	// 注意这里是**读缓存**而非查库（见 consent.go 的缓存设计）。
 	if !training_capture.HotPathEnabled() {

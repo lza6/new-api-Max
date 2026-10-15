@@ -321,5 +321,43 @@ func synthesizeRelayRequest(c *gin.Context, body []byte, modelName string) bool 
 	if modelName != "" {
 		c.Set("model", modelName)
 	}
+
+	// [修复防御] 把这次请求标记为**本站内部合成请求**，让采集路径跳过它。
+	//
+	// 不加这个标记会形成一条闭环：分析 → Relay() → 成功 → 采集
+	// → 把**整段用户对话**当成「发起分析的管理员的对话」再上传到云盘。
+	// 后果有三重：数据重复入库、数据归属错乱（别人的对话落到管理员目录）、
+	// 以及用户从未同意过「自己的对话会被再次采集到另一个目录」。
+	//
+	// 这是一个真实的闭环缺陷（盲点扫描发现），不是理论风险。
+	SetInternalSynthesizedRequest(c)
 	return true
+}
+
+// internalRequestContextKey 标记「本站内部合成请求」的 context key。
+//
+// 用常量而不是裸字符串：采集侧与合成侧必须用**同一个**拼写，
+// 拼错会静默失效（两边都不报错，但标记永远不生效）。
+const internalRequestContextKey = "training_capture_internal_request"
+
+// SetInternalSynthesizedRequest 标记当前请求是本站内部合成的。
+func SetInternalSynthesizedRequest(c *gin.Context) {
+	if c != nil {
+		c.Set(internalRequestContextKey, true)
+	}
+}
+
+// IsInternalSynthesizedRequest 判断当前请求是否为本站内部合成。
+//
+// 采集路径见 `maybeCaptureTrainingData`：命中则不采集。
+func IsInternalSynthesizedRequest(c *gin.Context) bool {
+	if c == nil {
+		return false
+	}
+	v, ok := c.Get(internalRequestContextKey)
+	if !ok {
+		return false
+	}
+	b, _ := v.(bool)
+	return b
 }

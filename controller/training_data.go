@@ -307,6 +307,18 @@ func ListTrainingDataFiles(c *gin.Context) {
 		return
 	}
 
+	// [修复防御] 管理员**浏览用户对话数据**必须留痕。
+	//
+	// 采集的是用户与模型的对话内容（可能含密钥、源码、个人信息），
+	// 而管理员能看任意用户的数据。没有审计就没法回答
+	// 「谁在什么时候看过谁的数据」—— 这是内部人滥用无法追查的缺口
+	// （盲点扫描发现）。与 OAuth 迁移用同一套审计设施。
+	recordUserSecurityAudit(c, c.GetInt("id"), "admin.training_data.list_files", map[string]any{
+		"success": true,
+		"root":    root,
+		"count":   len(entries),
+	})
+
 	out := make([]TrainingDataFileEntry, 0, len(entries))
 	var totalBytes int64
 	for _, e := range entries {
@@ -375,6 +387,13 @@ func PreviewTrainingDataFile(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+
+	// 同上：**预览即读取用户对话正文**，是比列目录更敏感的访问，必须留痕。
+	recordUserSecurityAudit(c, c.GetInt("id"), "admin.training_data.preview_file", map[string]any{
+		"success": true,
+		"path":    path,
+		"bytes":   len(raw),
+	})
 
 	// 分片是 gzip（见 compression.go）。兼容历史明文分片：
 	// 解压失败就按明文处理 —— 不因为格式演进就让旧数据读不了。

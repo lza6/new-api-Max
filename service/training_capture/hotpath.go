@@ -140,6 +140,11 @@ func BuildSignal(in CaptureInput) *CaptureSignal {
 		// 拿不到任何文本 —— 常见于纯图片/纯 embedding/音频请求。
 		// 这些请求采了也没有对话内容可训练，直接跳过更诚实
 		// （而不是存一堆空记录进云盘）。
+		//
+		// **但要计数**：`CountToken` 关闭时 `CombineText` 恒为空，
+		// 此时采集一条不出而管理端只看到「今天 0 条」，无法区分
+		// 「没流量」与「配置导致的静默失效」。这个计数器就是那个信号。
+		captureStats.TotalSkippedNoText.Add(1)
 		return nil
 	}
 	if !captureHotPathEnabled.Load() {

@@ -103,6 +103,14 @@ type CaptureStats struct {
 	// TotalSkippedNoConsent 因未授权而跳过的次数。
 	TotalSkippedNoConsent atomic.Int64
 
+	// TotalSkippedNoText 因**取不到任何文本**而跳过的次数。
+	//
+	// 为什么必须单独计数（而不是静默 return nil）：当 CountToken 关闭时
+	// 上游 meta.CombineText 为空，采集会一条不出 —— 而管理端只看得到
+	// 「今天 0 条」，无法区分「没流量」与「配置导致的静默失效」。
+	// 这个计数器就是那个区分信号（盲点扫描发现的可观测性缺口）。
+	TotalSkippedNoText atomic.Int64
+
 	// usersToday 今日去重用户集合（有界，只存今日）。
 	usersTodayMu sync.Mutex
 	usersToday   map[int]struct{}
@@ -127,6 +135,7 @@ type CaptureStatsSnapshot struct {
 	TotalDropped      int64  `json:"total_dropped"`
 	TotalUploadErrors int64  `json:"total_upload_errors"`
 	SkippedNoConsent  int64  `json:"skipped_no_consent"`
+	SkippedNoText     int64  `json:"skipped_no_text"`
 	QueueLen          int    `json:"queue_len"`
 	// InFlightBytes 当前正在上传的字节数（瞬时值）。
 	InFlightBytes int64 `json:"in_flight_bytes"`
@@ -150,6 +159,7 @@ func GetCaptureStats() CaptureStatsSnapshot {
 		TotalDropped:      captureStats.TotalDropped.Load(),
 		TotalUploadErrors: captureStats.TotalUploadErrors.Load(),
 		SkippedNoConsent:  captureStats.TotalSkippedNoConsent.Load(),
+		SkippedNoText:     captureStats.TotalSkippedNoText.Load(),
 		QueueLen:          queueStats.Len,
 		InFlightBytes:     captureStats.InFlightBytes.Load(),
 		QueueCapacity:     queueStats.Capacity,
@@ -481,6 +491,13 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 	rawChunks := splitBySize(payload, rawChunkSize)
 
 	var uploadedBytes int64
+	// written 记录**本批**已成功写入的分片，用于失败时补偿删除。
+	//
+	// [修复防御] 没有它会出现「部分成功」残留（盲点扫描发现）：
+	// 逐块上传时若第 2 块失败，第 1 块已落盘 → 水位不推进（对，不丢数据），
+	// 但下轮重试会 List 到更大的 seq，把**整段增量再写一遍** →
+	// 云盘上出现重复数据 + 孤儿分片，且孤儿会被分析/导出当有效增量读回。
+	var written []string
 	for _, rawChunk := range rawChunks {
 		partName := dirPath + "/" + PartFileName(partSeq)
 
@@ -502,8 +519,10 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 				_, writeErr := sink.WritePart(ctx, subName, sub)
 				captureStats.InFlightBytes.Add(-int64(len(sub)))
 				if writeErr != nil {
-					return 0, uploadedBytes, fmt.Errorf("write part %s: %w", subName, writeErr)
+					cleanupOrphanParts(ctx, sink, written)
+					return 0, 0, fmt.Errorf("write part %s: %w", subName, writeErr)
 				}
+				written = append(written, subName)
 				uploadedBytes += int64(len(sub))
 				partSeq++
 			}
@@ -519,8 +538,12 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 		_, writeErr := sink.WritePart(ctx, partName, blob)
 		captureStats.InFlightBytes.Add(-int64(len(blob)))
 		if writeErr != nil {
-			return 0, uploadedBytes, fmt.Errorf("write part %s: %w", partName, writeErr)
+			cleanupOrphanParts(ctx, sink, written)
+			// 返回 0 字节：已上传的部分被删除，本轮等于什么都没发生，
+			// 水位不推进 → 下轮重试整段，数据集不会出现半截或重复。
+			return 0, 0, fmt.Errorf("write part %s: %w", partName, writeErr)
 		}
+		written = append(written, partName)
 		uploadedBytes += int64(len(blob))
 		partSeq++
 	}
@@ -696,4 +719,39 @@ func (l *byteLimiter) wait(ctx context.Context, n int64) {
 func CleanupStaleWatermarks() (int64, error) {
 	cutoff := time.Now().Add(-watermarkCleanupAge).Unix()
 	return model.DeleteStaleTrainingDataWatermarks(cutoff)
+}
+
+// cleanupOrphanParts 尽力删除本批已写入但**最终未提交**的分片。
+//
+// 为什么需要它：上传是逐块的，中途失败会留下「部分的这一批」。
+// 水位不推进（正确：不丢数据），但孤儿分片会留在云盘上 ——
+// 下轮重试会把整段增量**再写一遍**为更大的序号，
+// 于是数据集里既有重复内容又有永远不该存在的残片。
+//
+// 语义边界（诚实说明）：
+//   - 这是**补偿**（best-effort），不是事务。删除失败只记录日志，
+//     不改变「本次上传失败」这个结论 —— 返回错误给上层，水位照样不推进。
+//   - 单实例前提下安全：只删**本批自己刚写**的那几个名字，不会碰历史分片。
+//     多实例会重新引入竞态（见启动日志里的多实例告警）。
+func cleanupOrphanParts(ctx context.Context, sink TrainingDataSink, written []string) {
+	if len(written) == 0 {
+		return
+	}
+	deleter, ok := sink.(interface {
+		DeleteFile(ctx context.Context, path string) error
+	})
+	if !ok {
+		// 后端不支持删除（如未来某个只写不删的实现）：
+		// 明确记录，而不是假装清理过。
+		common.SysError(fmt.Sprintf(
+			"training capture: %d orphan part(s) left on the sink (backend does not support delete): %v",
+			len(written), written))
+		return
+	}
+	for _, name := range written {
+		if err := deleter.DeleteFile(ctx, name); err != nil {
+			common.SysError(fmt.Sprintf(
+				"training capture: failed to clean up orphan part %s: %s", name, err.Error()))
+		}
+	}
 }

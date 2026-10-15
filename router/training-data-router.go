@@ -48,6 +48,27 @@ func SetTrainingDataRouter(router *gin.Engine) {
 	admin.GET("/ops/overview", middleware.DisableCache(), controller.GetOpsOverview)
 	admin.GET("/ops/consumption-ranking", middleware.DisableCache(), controller.GetOpsConsumptionRanking)
 	admin.POST("/ops/grant-quota", middleware.DisableCache(), controller.GrantUserQuota)
+
+	// ---- 一键导出 + 下载记录 ----
+	admin.POST("/training-data/export", middleware.DisableCache(), controller.CreateTrainingDataExport)
+	admin.GET("/training-data/export", middleware.DisableCache(), controller.ListTrainingDataExports)
+	admin.GET("/training-data/export/detail", middleware.DisableCache(), controller.GetTrainingDataExportDetail)
+	admin.POST("/training-data/export/link", middleware.DisableCache(), controller.IssueTrainingDataExportLink)
+	admin.DELETE("/training-data/export", middleware.DisableCache(), controller.DeleteTrainingDataExport)
+
+	// ---- 直链下载（**刻意不在 AdminAuth 之下**）----
+	//
+	// 为什么这里不挂 AdminAuth：直链是给 curl / aria2 / wget 用的，
+	// 它们不带会话 Cookie —— 挂 AdminAuth 会让「复制直链给工具下载」
+	// 这个明确的需求直接 401 不可用。
+	//
+	// 那鉴权靠什么：**限时 HMAC 签名 token**（`service/training_capture/export_sign.go`），
+	// 签名绑定 exportID + 签发人 + 过期时间，改动任一处即验签失败。
+	// `TryUserAuth()` 是**可选**会话识别：浏览器下载时能把记录归到具体的人，
+	// 无会话（curl）时回落到签发人 —— 它不做拒绝。
+	exportGroup := apiRouter.Group("/training-data")
+	exportGroup.Use(middleware.TryUserAuth())
+	exportGroup.GET("/export/download", middleware.DisableCache(), controller.DownloadTrainingDataExport)
 }
 
 // trainingDataAdminRoutes 供**路由契约测试**断言用（前缀必须与前端一致）。
@@ -69,4 +90,12 @@ var trainingDataAdminRoutes = []struct {
 	{"GET", "/api/admin/ops/overview"},
 	{"GET", "/api/admin/ops/consumption-ranking"},
 	{"POST", "/api/admin/ops/grant-quota"},
+	// 导出（管理端）
+	{"POST", "/api/admin/training-data/export"},
+	{"GET", "/api/admin/training-data/export"},
+	{"GET", "/api/admin/training-data/export/detail"},
+	{"POST", "/api/admin/training-data/export/link"},
+	{"DELETE", "/api/admin/training-data/export"},
+	// 直链下载（签名 token 鉴权，不在 AdminAuth 之下 —— 见上方注释）
+	{"GET", "/api/training-data/export/download"},
 }

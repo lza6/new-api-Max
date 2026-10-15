@@ -52,6 +52,17 @@ func StartTrainingDataCapture() {
 
 	sinkName := strings.TrimSpace(os.Getenv(EnvTrainingDataSink))
 
+	// 初始化导出产物的本地存储。
+	//
+	// [修复防御] 这一步**必须接线**：盲点扫描发现导出功能的
+	// `InitExportStore()` 定义后无人调用 —— 而它的 handler 与两张表都已存在。
+	// 不接线的后果就是本项目反复踩的「库全绿但生产零调用」：
+	// 接口 404 或运行时报错，而所有单元测试都是绿的。
+	// 失败不阻塞启动（导出是辅助功能），但必须明确告知。
+	if err := training_capture.InitExportStore(); err != nil {
+		common.SysError("training data capture: export store init failed, export feature will be degraded: " + err.Error())
+	}
+
 	if sinkName == "" || strings.EqualFold(sinkName, "disabled") {
 		// 显式保持关闭：同步热路径标志，让请求路径走最省的分支。
 		training_capture.SetGatewayEnabled(false)
@@ -86,6 +97,23 @@ func StartTrainingDataCapture() {
 	startTrainingDataCleanupLoop()
 
 	common.SysLog("training data capture: worker started (sink=" + sinkName + ")")
+
+	// ⚠️ 多实例约束：**必须显式告知运维**（盲点扫描发现的真实缺陷）。
+	//
+	// 采集模块目前**没有跨实例协调**，多实例同时开启会造成两类真实问题：
+	//
+	//	1. 分片互相覆盖：两实例对同一 (用户,会话) 各自 List→取序号→WritePart，
+	//	   得到同一个 partSeq，而 OneDrive 的 PUT .../content 是**替换**语义
+	//	   → 先写的被后写的覆盖（静默丢数据）。
+	//	2. 开关/撤回不跨实例传播：总开关与授权缓存都是**进程内**状态
+	//	   （`gatewayEnabled` + 内存 map），A 实例关掉后 B 实例最长 30s 仍在采集；
+	//	   管理员关开关时看到的「已关闭」只对当前实例成立。
+	//
+	// 这不是理论风险，是代码路径可直接推出的结论。在实现跨实例协调
+	// （云盘侧条件写 / DB 租约 / Redis 锁）之前，必须让运维知道。
+	common.SysLog("training data capture: WARNING - capture does NOT coordinate across instances; " +
+		"run it on a SINGLE instance only, otherwise shards may overwrite each other " +
+		"and the gateway switch will not propagate between instances")
 }
 
 // trainingDataCleanupInterval 水位清理周期。
