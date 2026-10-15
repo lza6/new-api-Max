@@ -78,6 +78,44 @@ type TrainingDataSink interface {
 	Stat(ctx context.Context) (SinkStat, error)
 }
 
+// SinkReader 云盘**读取**能力（可选接口，供管理端浏览/预览文件）。
+//
+// 刻意**不**并入 TrainingDataSink 主接口：写入是采集的必需能力，
+// 读取只有管理端分析需要 —— 并入会强迫每个新后端（S3/OSS/WebDAV）
+// 都实现读取才能注册。用接口断言探测（见 controller/training_data.go）。
+type SinkReader interface {
+	// ReadFile 读取一个文件的内容（管理端预览/分析用）。
+	// 返回原始字节（分片是 .jsonl.gz，解压由**调用方**做 ——
+	// sink 层不做格式假设）。
+	//
+	// maxBytes 上限由调用方传：防止把一个未知的巨大文件整个读进内存。
+	// 超限返回 ErrFileTooLarge（不是截断 —— 半个文件比没有更危险）。
+	ReadFile(ctx context.Context, path string, maxBytes int64) ([]byte, error)
+
+	// DeleteFile 删除一个文件（管理端清理用，需二次确认由 HTTP 层保证）。
+	DeleteFile(ctx context.Context, path string) error
+
+	// ListTree 递归列举目录树（管理端云盘浏览用）。
+	// 每项含相对路径与是否目录；总数受 maxEntries 硬顶（防打爆 API）。
+	ListTree(ctx context.Context, root string, maxEntries int) ([]TreeEntry, error)
+}
+
+// TreeEntry 云盘目录树的一项。
+type TreeEntry struct {
+	// Path 相对 root 的路径（如 `2026-10-14/alice-7/gpt-4o/part-0001.jsonl.gz`）。
+	Path string `json:"path"`
+	// IsDir 是否目录。
+	IsDir bool `json:"is_dir"`
+	// SizeBytes 文件字节数（目录为 0；后端不支持时为 0）。
+	SizeBytes int64 `json:"size_bytes"`
+	// ModifiedAt unix 秒（后端不支持时为 0）。
+	ModifiedAt int64 `json:"modified_at"`
+}
+
+// ErrFileTooLarge 读取的文件超过调用方给的上限。
+// **不是截断**：返回半个文件会让分析端把残缺当完整。
+var ErrFileTooLarge = errors.New("training data sink: file exceeds read limit")
+
 // ---------- disabled sink ----------
 
 // disabledSink 未配置任何后端时的占位实现。
