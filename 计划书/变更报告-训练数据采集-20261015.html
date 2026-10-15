@@ -1,0 +1,461 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>变更报告 — 训练数据采集 + 工程补漏（2026-10-15）</title>
+<style>
+  :root{
+    --bg:#0f1115; --panel:#171a21; --panel2:#1d2129; --fg:#e6e8ee; --muted:#9aa3b2;
+    --line:#2a2f3a; --accent:#6ea8fe; --ok:#3fb950; --warn:#d29922; --bad:#f85149;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f7f8fa; --panel:#fff; --panel2:#f2f4f7; --fg:#1b1f27; --muted:#5b6472;
+           --line:#e2e6ec; --accent:#1f6feb; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:15px/1.7 -apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans SC",sans-serif}
+  .wrap{max-width:1000px;margin:0 auto;padding:40px 20px 120px}
+  h1{font-size:28px;margin:0 0 6px;letter-spacing:-.02em}
+  h2{font-size:20px;margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:16px;margin:26px 0 10px}
+  .sub{color:var(--muted);margin:0 0 28px;font-size:14px}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin:14px 0}
+  .grid{display:grid;gap:12px}
+  @media(min-width:720px){ .grid.c2{grid-template-columns:1fr 1fr} .grid.c4{grid-template-columns:repeat(4,1fr)} }
+  .stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+  .stat .n{font:600 22px/1.2 var(--mono);letter-spacing:-.02em}
+  .stat .l{color:var(--muted);font-size:12px;margin-top:4px}
+  table{width:100%;border-collapse:collapse;margin:12px 0;font-size:14px}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.04em}
+  code{font-family:var(--mono);font-size:13px;background:var(--panel2);padding:2px 6px;border-radius:5px}
+  pre{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:14px;overflow:auto;
+      font-family:var(--mono);font-size:12.5px;line-height:1.6}
+  .tag{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;
+       border:1px solid var(--line);color:var(--muted);font-family:var(--mono)}
+  .tag.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+  .tag.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,transparent)}
+  .tag.bad{color:var(--bad);border-color:color-mix(in srgb,var(--bad) 45%,transparent)}
+  .note{border-left:3px solid var(--accent);padding-left:14px;color:var(--muted);margin:16px 0}
+  .warnbox{border-left:3px solid var(--warn);background:color-mix(in srgb,var(--warn) 8%,transparent);
+           padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0}
+  .badbox{border-left:3px solid var(--bad);background:color-mix(in srgb,var(--bad) 8%,transparent);
+          padding:12px 16px;border-radius:0 8px 8px 0;margin:16px 0}
+  ul{margin:10px 0;padding-left:22px} li{margin:6px 0}
+  a{color:var(--accent)}
+
+  /* 测验 */
+  #quiz{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:22px;margin-top:20px}
+  .q{padding:18px 0;border-bottom:1px solid var(--line)}
+  .q:last-of-type{border-bottom:0}
+  .q .qt{font-weight:600;margin-bottom:10px}
+  .q .qh{color:var(--muted);font-size:12.5px;font-weight:400;margin-left:6px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;cursor:pointer;
+       border:1px solid transparent;margin:5px 0}
+  .opt:hover{background:var(--panel2)}
+  .opt input{margin-top:4px;flex:none}
+  .opt.correct{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 10%,transparent)}
+  .opt.wrong{border-color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,transparent)}
+  .expl{display:none;margin-top:10px;padding:10px 12px;background:var(--panel2);border-radius:8px;
+        font-size:13.5px;color:var(--muted)}
+  .expl.show{display:block}
+  .bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:18px}
+  button{font:inherit;font-weight:600;padding:10px 18px;border-radius:9px;border:1px solid var(--line);
+         background:var(--accent);color:#fff;cursor:pointer}
+  button.ghost{background:transparent;color:var(--fg)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+  #score{font-weight:600}
+  .pass{color:var(--ok)} .fail{color:var(--bad)}
+  footer{color:var(--muted);font-size:13px;margin-top:50px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>变更报告：训练数据采集 + 工程补漏</h1>
+<p class="sub">2026-10-15 · 16 个提交 · 81 文件 · +11,463 / −690 行 · 全部已推送 <code>main</code></p>
+
+<h2>1. 为什么要做</h2>
+<div class="card">
+  <p>起点是一个功能需求：<strong>让用户在明确授权后，把自己与模型的对话匿名采集到云盘，用于训练数据积累</strong>；管理员可随时关闭，用户可随时撤回，撤回即不再采集。</p>
+  <p>但真正的问题不在功能本身，而在<strong>它被加到哪里</strong>——一个正在线上跑的 API 网关，请求路径上每一微秒都直接换算成用户体验。所以我给自己定的第一约束不是「功能能跑」，而是：</p>
+  <ul>
+    <li><strong>绝不拖慢用户请求</strong>（采集必须完全脱离请求路径）</li>
+    <li><strong>绝不丢数据</strong>（采集不可逆——上传过就不再回看，丢了就是永久丢）</li>
+    <li><strong>绝不骗人</strong>（做不到的边界要写在界面上和代码里，不能用「看起来能用」顶上）</li>
+  </ul>
+</div>
+
+<h2>2. 直觉：三个反直觉的判断</h2>
+
+<h3>判断一：注释里写「绝不会」的时候，必须有并发用例去证伪它</h3>
+<div class="card">
+  <p>我最初写的三处代码，注释都在<strong>宣称一个没被验证的保证</strong>。独立审查把它们全抓了出来：</p>
+  <table>
+    <tr><th>缺陷</th><th>我的注释当时怎么说</th><th>真相</th></tr>
+    <tr><td><span class="tag bad">BLOCKING</span> 队列投递</td>
+        <td>「关闭后一律返回 false，不 panic」</td>
+        <td><strong>会 panic</strong>。且发生在 relay goroutine 上时<strong>杀掉整个网关进程</strong>。条件只是「停机与在途请求并发」——正常运维。</td></tr>
+    <tr><td><span class="tag bad">BLOCKING</span> 撤回授权</td>
+        <td>「撤回时主动失效缓存，使撤回立即生效」</td>
+        <td>只在无并发时成立。并发下旧的「已授权」会写回缓存，用户<strong>继续被采集最长 30 秒</strong>——这是隐私事故。</td></tr>
+    <tr><td><span class="tag bad">BLOCKING</span> 增量判定</td>
+        <td>「历史被改动 → 保守全量重传」</td>
+        <td>只对<strong>末位</strong>成立。历史<strong>中间</strong>被编辑时校验通过 → 被改内容<strong>永久不再上传</strong>。</td></tr>
+  </table>
+  <p>共同点：<strong>原实现的测试恰好都是串行的，全部绕过并发窗口</strong>。所以「我测过了」在有并发的地方几乎不构成证据。</p>
+  <div class="note">修 B1 时我先试了「用锁让检查+发送与close互斥」——修好了，但热路径从 2.4µs 涨到 <strong>11.6µs（5 倍）</strong>。改成<strong>根本不关数据通道</strong>（另开 stop 通道表达「停止消费」）后：安全与性能同时成立，热路径 <strong>1.93µs</strong>，比原实现还快。<br>
+  <strong>教训</strong>：遇到「加锁才安全」，先问能否从设计上消除共享，而不是直接上锁。</div>
+</div>
+
+<h3>判断二：「自适应」如果读的是宿主机内存，在容器里就是 OOM</h3>
+<div class="card">
+  <p>你指出 900MB 预算锁死不合理，应该按机器内存自适应取 80%。直觉上直接读系统内存就行——<strong>但那是个会杀进程的坑</strong>：</p>
+  <pre>容器里 mem.VirtualMemory() 返回的是 <b>宿主机</b> 内存。
+限 512MB 的容器跑在 64G 宿主机上，
+按宿主机 80% 预算 = 采集自己吃掉 50GB
+→ 被 OOM killer 杀掉，表现为「容器无征兆重启」，极难排查。</pre>
+  <p>所以检测顺序是 <strong>cgroup v2 → cgroup v1 → 宿主机 → 安全下限</strong>，并且取 <strong>min</strong>（容器可能同时受两者约束）。</p>
+</div>
+
+<h3>判断三：64KB 截断不是「限制」，是「丢数据」——你也是对的</h3>
+<div class="card">
+  <p>你原话是「遇到二三十 MB 的可以压缩完再上传」。我原来做的是<strong>砍掉</strong>，不是压缩。对训练数据来说，一个 30MB 的代码对话只存 64KB，是<strong>残缺样本</strong>，比不采更糟。</p>
+  <p>改成 gzip 压缩后上传（BestSpeed）。实测压缩率对对话类 JSON 约 <strong>1/5 ~ 1/10</strong>，让单分片能装 20~40MB 原文，同时<strong>上行带宽占用降一个量级</strong>——而上行是全站共享的，省带宽就是直接保护用户请求延迟。</p>
+  <div class="warnbox"><strong>顺带修掉一个我自己写的、很难发现的 bug</strong>：截断函数返回的是<code>text[:cut]</code>子串，Go 的<strong>子串共享底层数组</strong>——于是「截断到 64KB」的每条信号背后，仍钉着完整的 10MB 原文。1024 条队列最坏钉住 <strong>10GB</strong>，所谓「内存硬闸门」根本不存在。修法：<code>strings.Clone</code>，并写了用 <code>unsafe</code> 指针比对来证明不再共享的回归测试。</div>
+</div>
+
+<h2>3. 做了什么</h2>
+
+<h3>3.1 功能：训练数据采集（Spec-008）</h3>
+<div class="card">
+  <table>
+    <tr><th>能力</th><th>实现要点</th></tr>
+    <tr><td>用户授权 + 免责声明</td>
+        <td>开启必须经免责声明弹窗<strong>勾选确认</strong>；撤回<strong>立即</strong>生效（无 30s 窗口）；撤回只停止后续采集、<strong>不删除已上传数据</strong>——这条边界写在界面小字里，不写模糊承诺。</td></tr>
+    <tr><td>管理员总开关</td>
+        <td>默认开，但<strong>前提是云盘已配置</strong>；关闭后<strong>用户侧不渲染开关</strong>（不给「点了没作用」的按钮）。</td></tr>
+    <tr><td>目录结构</td>
+        <td><code>日期/用户名-用户ID/模型/part-NNNN.jsonl.gz</code>。用户名是用户可控输入 → 白名单净化 + 强制追加用户 ID 消歧（防路径穿越与跨用户覆盖）。</td></tr>
+    <tr><td>增量识别</td>
+        <td>按<strong>文本前缀</strong>做增量：只在「新文本以旧前缀开头且前缀哈希一致」时裁剪（此时 <code>new = old + suffix</code> 是恒等式，不可能丢内容）。用户消息里重复的段落不会被误判为新轮次。</td></tr>
+    <tr><td>异步 / 不拖慢请求</td>
+        <td>热路径只做三件事：读一个原子布尔量 → 从<strong>调用方已算好的</strong> meta 取文本 → 一次非阻塞入队。全部在 <code>gopool.Go</code> 内，响应体已返回。</td></tr>
+    <tr><td>自适应内存</td>
+        <td>cgroup 感知的 80% 预算，派生单条上限 / 分片上限 / 队列容量；全部可用环境变量覆盖；启动日志打印预算与来源。</td></tr>
+    <tr><td>压缩</td>
+        <td>分片 gzip 后上传（<code>.jsonl.gz</code>，后缀即契约）；读取侧带 zip-bomb 防护。</td></tr>
+    <tr><td>管理端</td>
+        <td>总览（今日统计 / 云盘配额 / 队列 / 在传字节实时值）、<strong>云盘文件下钻浏览 + 预览 + 删除</strong>、<strong>对话深度分析 + 继续追问</strong>（复用 relay 栈，费用记管理员账）。</td></tr>
+  </table>
+</div>
+
+<h3>3.2 补漏：接线时发现的三个真实缺陷</h3>
+<div class="card">
+  <table>
+    <tr><th>#</th><th>缺陷</th><th>为什么致命</th></tr>
+    <tr><td>1</td><td><strong>增量完全失效</strong></td>
+        <td>网关只能拿到一整块<strong>拼接文本</strong>，每次请求只有 1 条消息；而水位按<strong>消息条数</strong>算 → 恒为 1 → 每次都全量重传。<strong>正是你点名要避免的</strong>。新增按文本前缀做增量。</td></tr>
+    <tr><td>2</td><td><strong>StopWorker 停不掉</strong></td>
+        <td>worker 阻塞在队列的 <code>stop</code>，而 StopWorker 关的是 <code>workerStop</code>——<strong>两个不同的 channel</strong>。停机/关闭采集后 worker 永久挂住。</td></tr>
+    <tr><td>3</td><td><strong>限速器读全局变量</strong></td>
+        <td>前一用例关掉 <code>workerStop</code> 后，后续用例的限速等待立即返回（该等 0.5s 却等 0s）。改为实例字段注入。</td></tr>
+  </table>
+  <p>还修了日志轮转的一个静默失效：按大小轮转时两次可能落在<strong>同一秒</strong>，文件名相同 → <code>O_APPEND</code> 继续写原文件，「轮转」失效且日志里看不出异常。我最初写的兜底「改用纳秒时间戳就必然唯一」<strong>是错的</strong>——被我自己写的 261 次连环轮转用例抓出来。</p>
+</div>
+
+<h3>3.3 性能证据（你明确要求的验收项）</h3>
+<div class="card">
+  <pre>请求路径单次开销（30 万次迭代，12th Gen i9）
+  未启用       96.7 ns/op     0 B/op   0 allocs/op   ← 绝大多数请求
+  启用         1653 ns/op   176 B/op   2 allocs/op
+  含入队        1911 ns/op   176 B/op   2 allocs/op   ← 且在 gopool 内，响应已返回
+
+高并发压测
+  洪峰    32 写者 × 5000 次 = 16 万次投递，队列容量仅 64 → 1.15s 跑完（13.9 万次/秒）
+          计数严格守恒：入队 70 + 丢弃 159930 == 尝试 160000
+          → 证明投递<b>不阻塞</b>（否则 32 写者会串行化，远超此耗时）
+  无消费者 队列仍是硬上限：最坏内存 8.4MB（容器预算 900MB 的 0.9%）
+  开关切换 16 写者持续投递 + 反复开关总开关 100 次 → 无 panic、无死锁
+          （这是 BLOCKING #1「send on closed channel 杀进程」的原始触发场景）
+  内存有界 授权缓存 30000→10000（上限 20000）；指纹集合 50000→1000（上限 1000）
+  授权热路径 缓存命中 989 ns/次</pre>
+</div>
+
+<h3>3.4 文档与其它</h3>
+<div class="card">
+  <ul>
+    <li><strong>README 重写为全中文</strong>：删掉上游模板段落；许可块与旧版 <code>diff</code> <strong>逐字一致</strong>（AGPLv3 附加条款、QuantumNous 联系方式、One API 署名全部保留）；文中 23 个环境变量、全部命令<strong>逐条 grep 核验存在</strong>。</li>
+    <li><strong>运营面板</strong>：当日/累计消耗、消耗排行榜、全体普通用户剩余额度、日均消耗与「还能撑多少天」（口径写在文件头，金额在 SQL 侧整数 SUM 避免 float 精度损失）。</li>
+    <li><strong>Web 防护分页</strong>：换成服务端分页（不是前端假分页），页码写入 URL，含排序/筛选/空错态。</li>
+    <li><strong>i18n</strong>：92 个新键 × 7 语言 = 644 行，全部<strong>纯文本行插入</strong>（保护混淆键 <code>footer.newapi.projectAttributionSuffix</code>，删除列恒为 0）。</li>
+  </ul>
+</div>
+
+<h2>4. 诚实边界（没做到的，如实说）</h2>
+<div class="badbox">
+  <table>
+    <tr><th>项</th><th>真实状态</th></tr>
+    <tr><td>HTTP 层 p95 对照压测</td>
+        <td><span class="tag warn">未做</span> 基准只证明<strong>单请求开销</strong>，网关整体 p95 需要真实上游渠道跑负载对照。</td></tr>
+    <tr><td>浏览器 E2E 截图</td>
+        <td><span class="tag warn">未做</span> 类型检查/lint/构建都过，但<strong>没在真浏览器里点过</strong>。分页与开关的交互路径属「静态确认」。</td></tr>
+    <tr><td>assistant 回复未被采集</td>
+        <td><span class="tag bad">已知缺陷</span> 请求路径拿不到上游回复文本 → 记录里<strong>只有用户侧</strong>。分析报告的提示词已如实告知模型这一点。</td></tr>
+    <tr><td>逐轮角色还原</td>
+        <td><span class="tag warn">只能启发式</span> 记录是拼接连通文本，无法可靠还原「哪段是 user」。已写入代码注释与界面小字，不宣称精确。</td></tr>
+    <tr><td>Claude 计费两处缺陷</td>
+        <td><span class="tag bad">已复现 · 未修</span> 见下节。<strong>需你拍板</strong>，因为涉及商业口径且有血泪流程约束。</td></tr>
+    <tr><td>多云端对接</td>
+        <td><span class="tag warn">仅接口抽象</span> 目前只有 OneDrive 实现；S3/OSS/WebDAV 可从 <code>SinkReader</code> 接口接。</td></tr>
+    <tr><td>生产部署</td>
+        <td><span class="tag warn">未部署</span> 按你的部署纪律，等明确要求。</td></tr>
+  </table>
+</div>
+
+<h2>5. 上游对标（弱化风险，未改计费）</h2>
+<div class="card">
+  <p>fork 点在 <strong>2026-09-09</strong>，已落后上游 <strong>223 个提交</strong>。逐项核对我们是否已修、是否更好：</p>
+  <table>
+    <tr><th>项</th><th>判定</th></tr>
+    <tr><td>ClickHouse <code>Scan error on column "other"</code></td><td><span class="tag ok">我们已修且更完善</span>（上游仍 open）</td></tr>
+    <tr><td>邮箱登录大小写敏感</td><td><span class="tag ok">我们已修</span>（归一化 + LOWER 查询）</td></tr>
+    <tr><td>Claude 全缓存命中请求计费</td><td><span class="tag bad">确认存在</span> <code>hasBillableUsage()</code> 只看 input+output，<strong>完全忽略 cache</strong>。<em>影响面待验证</em>：尖锐形态需要上游返回 <code>output_tokens=0</code>，本轮未核实。</td></tr>
+    <tr><td>Claude cache creation 5m/1h 拆分</td><td><span class="tag bad">确认存在</span> 未拆分的总量<strong>全被算进便宜的 5m 档</strong>（1h 单价通常是 5m 的 2 倍）→ <strong>网关少收费</strong>。既有测试断言的正是这个行为，说明是有意的旧行为而非笔误。</td></tr>
+    <tr><td>多密钥渠道任务轮询 / OAuth 绑定证据 / auth 限流桶</td><td><span class="tag warn">验证中</span></td></tr>
+  </table>
+  <div class="warnbox"><strong>为什么我没有直接改计费数学</strong>：项目有一条明确的血泪约束——曾在生产直接改计费表达式，导致 225 次请求多扣费、补偿 $20.86。改计费必须走「影响分析 → 测试锁死 → 对照验证」，而且第二项属<strong>商业口径选择</strong>（少收费 vs 改动风险）。所以我只固化了 <strong>7 个复现用例</strong>（断言当前行为，注释标明「期望行为 vs 当前行为」），可直接用于将来的 RED→GREEN。<strong>等你决定。</strong></div>
+</div>
+
+<h2>6. 验证证据</h2>
+<div class="grid c4">
+  <div class="stat"><div class="n">141</div><div class="l">training_capture 用例全 PASS（-race）</div></div>
+  <div class="stat"><div class="n">6/6</div><div class="l">真实 OneDrive 集成测试（非 mock）</div></div>
+  <div class="stat"><div class="n">11</div><div class="l">接口安全契约用例</div></div>
+  <div class="stat"><div class="n">0</div><div class="l">i18n 缺失键</div></div>
+</div>
+<div class="card">
+  <ul>
+    <li><code>go test ./service/training_capture/ -race</code> → ok</li>
+    <li><code>go test ./controller/ -run '…'</code> → 全 PASS（含路径穿越、删除需 confirm、提示词注入过滤）</li>
+    <li><code>go build ./...</code> → ok；<code>bun run build</code> → 成功；<code>bun run typecheck</code> → 无输出</li>
+    <li>真实 OneDrive：读回字节精确 + gzip 可解压、超限返回错误而非截断、目录树三级路径完整、删除幂等</li>
+    <li>证据归档：<code>计划书/e2e-evidence/spec-008/hotpath-stress.md</code></li>
+  </ul>
+</div>
+
+<h2>7. 测验（必须全部答对）</h2>
+<p class="sub">下面 10 题覆盖本次变更的关键判断。选完点「提交」，答错的题会给出解释，可以重做。</p>
+
+<div id="quiz"></div>
+
+<div class="bar">
+  <button id="submit">提交答案</button>
+  <button id="retry" class="ghost" disabled>重做</button>
+  <span id="score"></span>
+</div>
+
+<footer>训练数据采集 Spec-008 · 16 commits · 由 Claude Code 生成</footer>
+</div>
+
+<script>
+const QUESTIONS = [
+  {
+    q: "采集功能被加到请求热路径上。关于「未启用采集」时的开销，下列哪项是实测结果？",
+    hint: "想一想：大多数请求根本不该为这个功能付任何代价",
+    options: [
+      "约 96.7 ns/op，且 0 次堆分配",
+      "约 1.9 µs/op，2 次堆分配",
+      "约 50 µs/op，因为要查数据库确认授权",
+      "与启用时相同，因为代码路径一样"
+    ],
+    answer: 0,
+    why: "未启用时只有两次原子读 + 一次 gopool tick，且零分配（不产生 GC 压力）。1.9µs 是「启用且用户已授权」时的数字。授权判定走内存缓存，不在热路径查库。"
+  },
+  {
+    q: "把一个 10MB 的请求文本「截断到 64KB」后放进队列，为什么这条 64KB 的内容实际仍占着 10MB 内存？",
+    hint: "Go 的字符串切片语义",
+    options: [
+      "因为字符串在 Go 里是不可变的，所以无法释放",
+      "因为 text[:cut] 返回的子串与原文共享底层数组，原文不会被 GC 回收",
+      "因为队列是带缓冲 channel，会预分配全部容量",
+      "因为 gzip 压缩前必须先完整读入内存"
+    ],
+    answer: 1,
+    why: "Go 的子串操作共享底层数组。必须 strings.Clone 才能真正切断引用——这也是「内存硬闸门」注释原本不成立的原因。修复后加了用 unsafe 指针比对证明不共享的回归测试。"
+  },
+  {
+    q: "在容器里按「宿主机内存的 80%」给采集模块定预算，会出什么问题？",
+    hint: "容器内存限制不是靠读系统 API 得到的",
+    options: [
+      "没有问题，这是最准确的做法",
+      "会低估可用内存，导致采集被不必要地限制",
+      "会高估可用内存：限 512MB 的容器可能按宿主机的 80% 分配，被 OOM killer 杀掉",
+      "会导致 cgroup 统计不准确，但不影响进程"
+    ],
+    answer: 2,
+    why: "容器里 mem.VirtualMemory() 返回宿主机内存。必须优先读 cgroup（v2 的 memory.max / v1 的 limit_in_bytes）并取 min，否则限 512MB 的容器会按 64G 宿主机算预算。"
+  },
+  {
+    q: "队列投递曾经会导致整个网关进程崩溃（panic）。最终是怎么修的？",
+    hint: "我曾试过一个修法，功能正确但让热路径慢了 5 倍",
+    options: [
+      "加读写锁，让「检查+发送」与 close 互斥",
+      "给 relay goroutine 加 recover 兜住 panic",
+      "根本不关数据通道，另用一个 stop 通道表达「停止消费」",
+      "把队列容量调大，让投递永不失败"
+    ],
+    answer: 2,
+    why: "加锁确实正确，但实测让热路径从 2.4µs 涨到 11.6µs（5 倍）。改用独立 stop 通道后，发送到已停止的队列也只是进缓冲、不可能 panic，且热路径降到 1.93µs——安全与性能同时成立。加 recover 是掩盖问题。"
+  },
+  {
+    q: "「增量上传」在这个系统里按什么维度做的？为什么？",
+    hint: "网关的 dto.Request 接口只暴露 GetTokenCountMeta()",
+    options: [
+      "按消息条数：记录已上传几条消息，下次从该下标继续",
+      "按文本前缀：新文本以旧前缀开头时才只上传追加部分",
+      "按时间戳：只上传某个时间点之后的请求",
+      "按 token 数：比对 prompt token 数决定增量"
+    ],
+    answer: 1,
+    why: "请求路径只能拿到 TokenCountMeta.CombineText —— 一整块拼接文本，每次请求只有 1 条消息。按消息条数做水位会恒为 1，增量完全失效（每次都全量重传）。所以改成按文本前缀，并只在「新文本以旧前缀开头且哈希一致」时裁剪（此时是恒等式，不可能丢内容）。"
+  },
+  {
+    q: "撤回授权曾经有一个「最长 30 秒仍在采集」的窗口。根因是什么？",
+    hint: "读数据库和写缓存是两个步骤",
+    options: [
+      "数据库事务隔离级别太低",
+      "回源读 DB 与写缓存之间存在窗口，撤回时清的缓存可能被旧值写回",
+      "缓存 TTL 设置过长（30 秒是 TTL）",
+      "worker 每 30 秒才检查一次开关"
+    ],
+    answer: 1,
+    why: "这是 TOCTOU：refresh 读到旧值 → 用户撤回并清缓存 → refresh 把旧的「已授权」写回。修法是用一个撤回纪元（epoch）计数，写缓存前比对纪元，撤回后旧值会被放弃写入。这是隐私边界，注释里「撤回立即生效」原先是假的。"
+  },
+  {
+    q: "日志轮转新增了按大小分片。改了之后最容易踩的坑是什么？",
+    hint: "两次轮转可能发生在同一秒",
+    options: [
+      "大文件写入会阻塞日志调用",
+      "分片文件不再被保留策略识别，永远不会被清理",
+      "同秒轮转会生成同名文件，O_APPEND 继续写原文件，轮转静默失效",
+      "压缩会让日志无法用 grep 查看"
+    ],
+    answer: 2,
+    why: "命名原本是秒级时间戳。按大小触发后两次轮转可能落在同一秒 → 同名 → O_APPEND 继续写原文件。我最初写的兜底「改用纳秒就必然唯一」也是错的（调用方传入的 now 相同时纳秒也一样），被 261 次连环轮转的测试抓出来。另外还要保证所有命名分支都被 isManagedLogFile 匹配，否则 retention 清不掉。"
+  },
+  {
+    q: "关于「对话深度分析」功能，下列关于数据内容的描述哪项是准确的？",
+    hint: "网关拿不到上游返回的回复正文",
+    options: [
+      "记录里包含完整的双向对话，可精确还原每一轮的 user/assistant",
+      "记录里有用户的全部原话，但 assistant 回复未被采集；逐轮角色只能启发式还原",
+      "记录里只有 token 数，没有文本内容",
+      "记录里只有 assistant 回复，用户输入被脱敏"
+    ],
+    answer: 1,
+    why: "请求路径只能拿到 CombineText（含用户侧文本），上游回复正文拿不到。所以报告提示词里明确告知模型「只有用户侧」，界面小字也写明逐轮角色只能启发式还原——不宣称能做精确的结构化对话还原。"
+  },
+  {
+    q: "管理端「删除云盘分片」接口做了哪些防护？",
+    hint: "考虑误调用与误删目录",
+    options: [
+      "只靠前端二次确认弹窗",
+      "要求 confirm=1，且只允许删 .jsonl.gz / .jsonl 结尾的文件，路径含 .. 一律拒绝",
+      "只校验管理员身份，其余交给云盘 API",
+      "只在删除成功后记审计日志"
+    ],
+    answer: 1,
+    why: "前端确认不算防护。服务端强制 confirm=1（避免查询串拼错就静默删数据）、只允许分片文件名（防误删整棵子树）、拒绝 .. 上跳（纵深防御）。被拒绝的请求不得删除任何文件——测试专门断言了这一点。"
+  },
+  {
+    q: "发现了两处 Claude 计费缺陷（缓存命中可能零计费 / cache creation 全落入便宜的 5m 档）。本次为什么没有直接修？",
+    hint: "项目里有一条关于计费的血泪记录",
+    options: [
+      "因为缺陷不存在，是误报",
+      "因为改动需要上游同步才能生效",
+      "因为计费变更需走「影响分析→测试锁死→对照验证」，且第二项属商业口径选择；项目曾因直接改计费导致 225 次请求多扣费",
+      "因为这两处代码不属于本仓库"
+    ],
+    answer: 2,
+    why: "项目有明确教训：曾在生产直接改计费表达式，导致 225 次请求多扣费、补偿 $20.86。计费配置没有「部署」这一步，改库即生效，直接影响真实用户钱包。所以本轮只固化了 7 个复现用例（断言当前行为并标注期望行为），等业主决策。"
+  }
+];
+
+const quizEl = document.getElementById('quiz');
+let answered = false;
+
+function render(){
+  quizEl.innerHTML = '';
+  QUESTIONS.forEach((item, qi) => {
+    const box = document.createElement('div');
+    box.className = 'q';
+    box.innerHTML = `<div class="qt">${qi+1}. ${item.q}<span class="qh">${item.hint||''}</span></div>`;
+    item.options.forEach((opt, oi) => {
+      const id = `q${qi}o${oi}`;
+      const label = document.createElement('label');
+      label.className = 'opt';
+      label.setAttribute('for', id);
+      label.innerHTML = `<input type="radio" name="q${qi}" id="${id}" value="${oi}">
+        <span>${String.fromCharCode(65+oi)}. ${opt}</span>`;
+      box.appendChild(label);
+    });
+    const expl = document.createElement('div');
+    expl.className = 'expl';
+    expl.id = `expl${qi}`;
+    box.appendChild(expl);
+    quizEl.appendChild(box);
+  });
+  answered = false;
+  document.getElementById('retry').disabled = true;
+  document.getElementById('submit').disabled = false;
+  document.getElementById('score').textContent = '';
+}
+
+function grade(){
+  let correct = 0;
+  let unanswered = 0;
+  QUESTIONS.forEach((item, qi) => {
+    const picked = document.querySelector(`input[name="q${qi}"]:checked`);
+    const expl = document.getElementById(`expl${qi}`);
+    const labels = [...document.querySelectorAll(`input[name="q${qi}"]`)].map(i => i.closest('.opt'));
+    if (!picked) { unanswered++; }
+    labels.forEach((lbl, oi) => {
+      lbl.classList.remove('correct','wrong');
+      if (oi === item.answer) lbl.classList.add('correct');
+    });
+    if (picked) {
+      const val = Number(picked.value);
+      if (val === item.answer) {
+        correct++;
+      } else {
+        picked.closest('.opt').classList.add('wrong');
+      }
+    }
+    expl.innerHTML = `<b>正确答案：${String.fromCharCode(65+item.answer)}</b> — ${item.why}`;
+    expl.classList.add('show');
+  });
+
+  const total = QUESTIONS.length;
+  const el = document.getElementById('score');
+  if (unanswered > 0) {
+    el.innerHTML = `<span class="fail">还有 ${unanswered} 题未作答</span>（已得 ${correct}/${total}）`;
+  } else if (correct === total) {
+    el.innerHTML = `<span class="pass">通过 ✓ ${correct}/${total} — 全部答对</span>`;
+  } else {
+    el.innerHTML = `<span class="fail">未通过：${correct}/${total} — 答错的题见上方红框，请重做</span>`;
+  }
+  answered = true;
+  document.getElementById('retry').disabled = false;
+  document.getElementById('submit').disabled = true;
+}
+
+document.getElementById('submit').addEventListener('click', grade);
+document.getElementById('retry').addEventListener('click', render);
+render();
+</script>
+</body>
+</html>
