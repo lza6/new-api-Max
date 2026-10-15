@@ -1,24 +1,21 @@
 <div align="center">
 
-![new-api](/web/public/logo.png)
+![new-api](./web/public/logo.png)
 
 # New API
 
-🍥 **Next-Generation LLM Gateway and AI Asset Management System**
+🍥 **新一代 LLM 网关与 AI 资产管理系统**
 
 <p align="center">
   <a href="./README.zh_CN.md">简体中文</a> |
   <a href="./README.zh_TW.md">繁體中文</a> |
-  <strong>English</strong> |
+  <a href="./README.en.md">English</strong></a> |
   <a href="./README.fr.md">Français</a> |
   <a href="./README.ja.md">日本語</a>
 </p>
 
 <p align="center">
-  <a href="https://raw.githubusercontent.com/lza6/new-api-Max/main/LICENSE">
-    <img src="https://img.shields.io/github/license/lza6/new-api-Max?color=brightgreen" alt="license">
-  </a><!--
-  --><a href="https://github.com/lza6/new-api-Max/releases/latest">
+  <a href="https://github.com/lza6/new-api-Max/releases/latest">
     <img src="https://img.shields.io/github/v/release/lza6/new-api-Max?color=brightgreen&include_prereleases" alt="release">
   </a><!--
   --><a href="https://hub.docker.com/r/lza6/new-api-max">
@@ -26,20 +23,16 @@
   </a>
 </p>
 
-<p align="center">
-  <br><!--
-  -->
-</p>
-
-<p align="center">
-  <a href="#-quick-start">Quick Start</a> •
-  <a href="#-key-features">Key Features</a> •
-  <a href="#-deployment">Deployment</a> •
-  <a href="#-documentation">Documentation</a> •
-  <a href="#-help-support">Help</a>
-</p>
-
 </div>
+
+---
+
+## 📝 项目说明
+
+> [!IMPORTANT]
+> - 本项目仅用于**合法授权**的 AI API 网关、组织级鉴权、多模型管理、用量分析、成本核算与私有化部署场景。
+> - 使用者须合法取得上游 API 密钥、账号、模型服务与接口权限，并遵守上游服务条款及适用法律法规。
+> - 面向公众提供生成式 AI 服务时，使用者应遵守所在司法辖区的监管要求，履行备案、许可、内容安全、实名认证、日志留存、税务与上游授权等义务。
 
 ---
 
@@ -69,7 +62,6 @@
 ### 运维与本地化
 - 前端 zh / zh-TW 汉化；系统信息页 CPU/内存/状态真实上报
 - 部署/回滚/验收/E2E 复现：见 `计划书/ops/deployment-sop.md`、`计划书/workflow_status.md`、`计划书/audit/final-audit-v1.3.46.md`
-- 常用改动请先读 `.claude/skills/new-api-add-feature/SKILL.md`（项目可复用开发工作流技能）
 
 ### 生产安全加固与报表（007 批次，2026-10-04，**未部署**）
 - **登录暴力破解防护**：登录限流默认开启（`login_rate_limit.enabled` 默认 true）；**失败登录写审计**（`audit_logs`，`success=false` + `status` + `reason`，去敏不含密码）——OWASP 反暴力破解基线
@@ -84,7 +76,6 @@
   **防盗刷**（HMAC 签名 capability URL + 下载限流 10/min + `attachment`/`nosniff` + 防目录穿越）；
   **每 5 分钟自动清理**已完成任务超过保留期的素材（`TASK_ARTIFACT_RETENTION_SECONDS`，默认 300s）
 - 规范：`.specify/specs/007-prod-safety-audit-report/`（spec/plan/tasks）
-- **排障**：`ERR_CONNECTION_RESET` 见 `计划书/ops/connection-reset-sop.md`（大陆直连香港源站 IP:443 被 RST，非服务器故障）
 - **领域感知路由（4.8.1，默认关）**：`DOMAIN_ROUTE_ENABLED` + `DOMAIN_ROUTE_MAP=tag:group,...`；请求头 `X-Route-Tag` 命中白名单即覆盖分组（**不越权**：仅限用户可用分组）
 - **轻量用户记忆（4.7.1）**：记录用户最近使用模型（`UserSetting.last_used_model`，JSON 列无需迁移），供前端回填默认模型
 - **媒体能力注册表（4.6.1）**：`GET /api/system-info/media-providers` 返回媒体能力目录（文生视频/图生视频/图像生成/TTS/ASR × 渠道）
@@ -93,7 +84,7 @@
 - **服务探活**：`GET /healthz`（存活，进程活着即 200，极轻量）/ `GET /readyz`（就绪，主库+日志库可达才 200，否则 503）——供 K8s/Caddy/Docker 健康检查；推荐用 `/healthz` 替换较重的 `/api/status` 作健康检查
 - **报表安全**：CSV 导出防公式注入；参数非法返回 400；内部错误不泄漏到响应
 
-### 🔒 Security Headers (CSP) & Reverse Proxy
+### 🔒 安全响应头（CSP）与反向代理
 
 仓库提供 `deploy/Caddyfile.example`——生产用的 **Caddy 反向代理 + 安全响应头**模板（HSTS / nosniff / X-Frame-Options / Referrer-Policy / Permissions-Policy + CSP）。
 
@@ -105,457 +96,254 @@
 
 **注意**：模板的 CSP 已包含 SPA 所需的 `'unsafe-inline'`（React hydration）与 `'unsafe-eval'`（前端依赖库运行时用到 `new Function`/`eval`，实测有 1 处 eval 违规），**不含**外部 CDN。若接入 GA/Umami，需在 `script-src`/`connect-src` 追加其域名后启用。参考 `~/.claude/rules/web/security.md`。
 
-## 📝 Project Description
-
-> [!IMPORTANT]
-> - This project is intended solely for lawful and authorized AI API gateway, organization-level authentication, multi-model management, usage analytics, cost accounting, and private deployment scenarios.
-> - Users must lawfully obtain upstream API keys, accounts, model services, and interface permissions, and must comply with upstream terms of service and applicable laws and regulations.
-> - Users should ensure their use complies with upstream terms of service and applicable laws and regulations.
-> - When providing generative AI services to the public, users should comply with applicable regulatory requirements and fulfill all filing, licensing, content safety, real-name verification, log retention, tax, and upstream authorization obligations required by their jurisdiction.
-
 ---
 
-## 🤝 Trusted Partners
+## 🚀 快速开始
 
-<p align="center">
-  <em>No particular order</em>
-</p>
+### 使用 Docker Compose（推荐）
 
-<p align="center">
-  <a href="https://www.cherry-ai.com/" target="_blank">
-    <img src="./docs/images/cherry-studio.png" alt="Cherry Studio" height="80" />
-  </a><!--
-  --><a href="https://github.com/iOfficeAI/AionUi/" target="_blank">
-    <img src="./docs/images/aionui.png" alt="Aion UI" height="80" />
-  </a><!--
-  --><a href="https://bda.pku.edu.cn/" target="_blank">
-    <img src="./docs/images/pku.png" alt="Peking University" height="80" />
-  </a><!--
-  --><a href="https://www.compshare.cn/?ytag=GPU_yy_gh_newapi" target="_blank">
-    <img src="./docs/images/ucloud.png" alt="UCloud" height="80" />
-  </a><!--
-  --><a href="https://www.aliyun.com/" target="_blank">
-    <img src="./docs/images/aliyun.png" alt="Alibaba Cloud" height="80" />
-  </a><!--
-  --><a href="https://io.net/" target="_blank">
-    <img src="./docs/images/io-net.png" alt="IO.NET" height="80" />
-  </a>
-</p>
-
----
-
-## 🙏 Special Thanks
-
-<p align="center">
-  <a href="https://www.jetbrains.com/?from=new-api" target="_blank">
-    <img src="https://resources.jetbrains.com/storage/products/company/brand/logos/jb_beam.png" alt="JetBrains Logo" width="120" />
-  </a>
-</p>
-
-<p align="center">
-  <strong>Thanks to <a href="https://www.jetbrains.com/?from=new-api">JetBrains</a> for providing free open-source development license for this project</strong>
-</p>
-
----
-
-## 🚀 Quick Start
-
-### Using Docker Compose (Recommended)
+`docker-compose.yml` 默认拉起三个服务：`new-api`（网关，映射 `3000:3000`）、
+`redis`（缓存）、`postgres`（数据库，镜像 `postgres:15`）。
 
 ```bash
-# Clone the project
+# 克隆项目
 git clone https://github.com/lza6/new-api-Max.git
-cd new-api
+cd new-api-Max
 
-# Edit docker-compose.yml configuration
-nano docker-compose.yml
+# 编辑 docker-compose.yml 配置（务必修改默认密码！）
+# 其中 SQL_DSN 默认指向 compose 内的 postgres 服务
+vim docker-compose.yml
 
-# Start the service
-docker-compose up -d
+# 启动服务
+docker compose up -d
 ```
 
-<details>
-<summary><strong>Using Docker Commands</strong></summary>
+### 使用 SQLite（默认，无需外部数据库）
+
+不设置 `SQL_DSN` 时使用内置 SQLite，数据文件在容器内 `/data` 目录：
 
 ```bash
-# Pull the latest image
-docker pull calciumion/new-api:latest
-
-# Using SQLite (default)
-docker run --name new-api -d --restart always \
+docker run -d --name new-api \
   -p 3000:3000 \
+  -v /your/data:/data \
   -e TZ=Asia/Shanghai \
-  -v ./data:/data \
-  calciumion/new-api:latest
-
-# Using MySQL
-docker run --name new-api -d --restart always \
-  -p 3000:3000 \
-  -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
-  -e TZ=Asia/Shanghai \
-  -v ./data:/data \
-  calciumion/new-api:latest
+  ghcr.io/lza6/new-api-max:latest
 ```
 
-> **💡 Tip:** `-v ./data:/data` will save data in the `data` folder of the current directory, you can also change it to an absolute path like `-v /your/custom/path:/data`
+### 使用 MySQL
 
-</details>
+把 `docker-compose.yml` 里的 `SQL_DSN` 换成 MySQL 形式
+（compose 中已给出注释形式的示例）：
 
----
+```yaml
+- SQL_DSN=root:123456@tcp(mysql:3306)/new-api
+```
 
-🎉 After deployment is complete, visit `http://localhost:3000` to start using!
+> MySQL 需要 **≥ 5.7.8**（本项目的建表/迁移语句依赖该版本起的 JSON 与 `ON DUPLICATE KEY UPDATE` 行为）。
 
-> [!WARNING]
-> When operating this project as a public generative AI service or API resale service, users should first complete all required filing, licensing, content safety, real-name verification, log retention, tax, payment, and upstream authorization obligations.
-
-📖 For more deployment methods, please refer to [Deployment Guide](https://docs.newapi.pro/en/docs/installation)
-
----
-
-## 📚 Documentation
-
-<div align="center">
-
-### 📖 [Official Documentation](https://docs.newapi.pro/en/docs) | [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/lza6/new-api-Max)
-
-</div>
-
-**Quick Navigation:**
-
-| Category | Link |
-|------|------|
-| 🚀 Deployment Guide | [Installation Documentation](https://docs.newapi.pro/en/docs/installation) |
-| ⚙️ Environment Configuration | [Environment Variables](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables) |
-| 📡 API Documentation | [API Documentation](https://docs.newapi.pro/en/docs/api) |
-| ❓ FAQ | [FAQ](https://docs.newapi.pro/en/docs/support/faq) |
-| 💬 Community Interaction | [Communication Channels](https://docs.newapi.pro/en/docs/support/community-interaction) |
-
----
-
-## ✨ Key Features
-
-> For detailed features, please refer to [Features Introduction](https://docs.newapi.pro/en/docs/guide/wiki/basic-concepts/features-introduction)
-
-### 🎨 Core Functions
-
-| Feature | Description |
-|------|------|
-| 🎨 New UI | Modern user interface design |
-| 🌍 Multi-language | Supports Simplified Chinese, Traditional Chinese, English, French, Japanese |
-| 🔄 Data Compatibility | Fully compatible with the original One API database |
-| 📈 Data Dashboard | Visual console and statistical analysis |
-| 🔒 Permission Management | Token grouping, model restrictions, user management |
-
-### 💰 Authorized Usage Accounting and Billing
-
-- ✅ Internal top-up and quota allocation for lawful authorized scenarios (EPay, Stripe)
-- ✅ Organization-level per-request, usage-based, and cache-hit cost accounting
-- ✅ Cache billing statistics for OpenAI, Azure, DeepSeek, Claude, Qwen, and supported models
-- ✅ Flexible billing policies for internal management or authorized enterprise customers
-
-### 🔐 Authorization and Security
-
-- 😈 Discord authorization login
-- 🤖 LinuxDO authorization login
-- 📱 Telegram authorization login
-- 🔑 OIDC unified authentication
-- 🔍 Key quota query usage (with [new-api-key-tool](https://github.com/lza6/new-api-Max-key-tool))
-
-### 🚀 Advanced Features
-
-**API Format Support:**
-- ⚡ [OpenAI Responses](https://docs.newapi.pro/en/docs/api/ai-model/chat/openai/create-response)
-- ⚡ [OpenAI Realtime API](https://docs.newapi.pro/en/docs/api/ai-model/realtime/create-realtime-session) (including Azure)
-- ⚡ [Claude Messages](https://docs.newapi.pro/en/docs/api/ai-model/chat/create-message)
-- ⚡ [Google Gemini](https://doc.newapi.pro/en/api/google-gemini-chat)
-- 🔄 [Rerank Models](https://docs.newapi.pro/en/docs/api/ai-model/rerank/create-rerank) (Cohere, Jina)
-
-**Intelligent Routing:**
-- ⚖️ Channel weighted random
-- 🔄 Automatic retry on failure
-- 🚦 User-level model rate limiting
-
-**Format Conversion:**
-- 🔄 **OpenAI Compatible ⇄ Claude Messages**
-- 🔄 **OpenAI Compatible → Google Gemini**
-- 🔄 **Google Gemini → OpenAI Compatible** - Text only, function calling not supported yet
-- 🚧 **OpenAI Compatible ⇄ OpenAI Responses** - In development
-- 🔄 **Thinking-to-content functionality**
-
-**Reasoning Effort Support:**
-
-<details>
-<summary>View detailed configuration</summary>
-
-**OpenAI series models:**
-- `o3-mini-high` - High reasoning effort
-- `o3-mini-medium` - Medium reasoning effort
-- `o3-mini-low` - Low reasoning effort
-- `gpt-5-high` - High reasoning effort
-- `gpt-5-medium` - Medium reasoning effort
-- `gpt-5-low` - Low reasoning effort
-
-**Claude thinking models:**
-- `claude-3-7-sonnet-20250219-thinking` - Enable thinking mode
-
-**Google Gemini series models:**
-- `gemini-2.5-flash-thinking` - Enable thinking mode
-- `gemini-2.5-flash-nothinking` - Disable thinking mode
-- `gemini-2.5-pro-thinking` - Enable thinking mode
-- `gemini-2.5-pro-thinking-128` - Enable thinking mode with thinking budget of 128 tokens
-- You can also append `-low`, `-medium`, or `-high` to any Gemini model name to request the corresponding reasoning effort (no extra thinking-budget suffix needed).
-
-</details>
-
----
-
-## 🤖 Model Support
-
-> For details, please refer to [API Documentation - Gateway Interface](https://docs.newapi.pro/en/docs/api)
-
-| Model Type | Description | Documentation |
-|---------|------|------|
-| 🤖 OpenAI-Compatible | OpenAI compatible models | [Documentation](https://docs.newapi.pro/en/docs/api/ai-model/chat/openai/createchatcompletion) |
-| 🤖 OpenAI Responses | OpenAI Responses format | [Documentation](https://docs.newapi.pro/en/docs/api/ai-model/chat/openai/createresponse) |
-| 🎨 Midjourney-Proxy | [Midjourney-Proxy(Plus)](https://github.com/novicezk/midjourney-proxy) | [Documentation](https://doc.newapi.pro/api/midjourney-proxy-image) |
-| 🎵 Suno-API | [Suno API](https://github.com/Suno-API/Suno-API) | [Documentation](https://doc.newapi.pro/api/suno-music) |
-| 🔄 Rerank | Cohere, Jina | [Documentation](https://docs.newapi.pro/en/docs/api/ai-model/rerank/creatererank) |
-| 💬 Claude | Messages format | [Documentation](https://docs.newapi.pro/en/docs/api/ai-model/chat/createmessage) |
-| 🌐 Gemini | Google Gemini format | [Documentation](https://docs.newapi.pro/en/docs/api/ai-model/chat/gemini/geminirelayv1beta) |
-| 🔧 Dify | ChatFlow mode | - |
-| 🎯 Custom upstream | Supports configuring legally authorized upstream endpoints | - |
-
-### 📡 Supported Interfaces
-
-<details>
-<summary>View complete interface list</summary>
-
-- [Chat Interface (Chat Completions)](https://docs.newapi.pro/en/docs/api/ai-model/chat/openai/createchatcompletion)
-- [Response Interface (Responses)](https://docs.newapi.pro/en/docs/api/ai-model/chat/openai/createresponse)
-- [Image Interface (Image)](https://docs.newapi.pro/en/docs/api/ai-model/images/openai/post-v1-images-generations)
-- [Audio Interface (Audio)](https://docs.newapi.pro/en/docs/api/ai-model/audio/openai/create-transcription)
-- [Video Interface (Video)](https://docs.newapi.pro/en/docs/api/ai-model/videos/sora/createvideo)
-- [Embedding Interface (Embeddings)](https://docs.newapi.pro/en/docs/api/ai-model/embeddings/createembedding)
-- [Rerank Interface (Rerank)](https://docs.newapi.pro/en/docs/api/ai-model/rerank/creatererank)
-- [Realtime Conversation (Realtime)](https://docs.newapi.pro/en/docs/api/ai-model/realtime/createrealtimesession)
-- [Claude Chat](https://docs.newapi.pro/en/docs/api/ai-model/chat/createmessage)
-- [Google Gemini Chat](https://docs.newapi.pro/en/docs/api/ai-model/chat/gemini/geminirelayv1beta)
-
-</details>
-
----
-
-## 🚢 Deployment
-
-> [!TIP]
-> **Latest Docker image:** `calciumion/new-api:latest`
-
-### 📋 Deployment Requirements
-
-| Component | Requirement |
-|------|------|
-| **Local database** | SQLite (Docker must mount `/data` directory)|
-| **Remote database** | MySQL ≥ 5.7.8 or PostgreSQL ≥ 9.6 |
-| **Container engine** | Docker / Docker Compose |
-| **System architecture** | 64-bit only (amd64 / arm64); 32-bit systems are not supported |
-
-### ⚙️ Environment Variable Configuration
-
-<details>
-<summary>Common environment variable configuration</summary>
-
-| Variable Name | Description | Default Value |
-|--------|------|--------|
-| `SESSION_SECRET` | Authentication signing secret; must be identical on every node | - |
-| `SESSION_COOKIE_SECURE` | `false`/unset disables the refresh/logout OriginGuard for local HTTP dev proxies; `true` enables the Secure cookie and strict Origin checks | `false` |
-| `SESSION_COOKIE_TRUSTED_URL` | Required with Secure mode: comma-separated exact HTTPS Origins allowed to call refresh/logout; not a relay CORS allowlist | - |
-| `TRUSTED_PROXIES` | Unset/blank trusts loopback, RFC 1918 and IPv6 ULA with a startup warning; `none` trusts no proxies; an explicit proxy IP/CIDR list replaces the defaults | `127.0.0.0/8, ::1, 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, fc00::/7` |
-| `USER_SESSION_ACTIVE_LIMIT` | Maximum active login Sessions per user | `50` |
-| `USER_SESSION_ISSUANCE_LIMIT` | Maximum Sessions created per user within the issuance window, including revoked Sessions | `100` |
-| `USER_SESSION_ISSUANCE_WINDOW_SECONDS` | Per-user Session issuance window; clamped to the revoked retention period when configured higher | `86400` |
-| `USER_SESSION_REVOKED_RETENTION_DAYS` | Days to retain revoked Session rows for audit and issuance accounting | `7` |
-| `USER_SESSION_HOURLY_ALERT_THRESHOLD` | Global Sessions created per hour that triggers an alert only; it never blocks login | `5000` |
-| `CRYPTO_SECRET` | HMAC secret for cache keys; nodes sharing Redis must use the same effective value | Defaults to `SESSION_SECRET` |
-| `SQL_DSN` | Database connection string | - |
-| `REDIS_CONN_STRING` | Redis connection string | - |
-| `SUBSCRIPTION_ACTIVE_CACHE_SECONDS` | 订阅档位正缓存 TTL（秒）：限流中间件对「有 active 订阅」用户每 TTL 才查询一次 DB，订阅变更即时失效；`0` = 关闭（逐位回退基线，每请求直查 DB）。多实例为进程内缓存，与 RPM 并发计数同口径 | `10` |
-| `SUBSCRIPTION_STATS_CACHE_SECONDS` | 公开订阅统计端点（`/v1/stats/subscriptions`）短缓存 TTL（秒）；`0` = 关闭实时聚合。公开只读端点已用宽松 `PublicReadRateLimit`（60/min/IP） | `30` |
-| `METRICS_ENABLED` | 是否开放 Prometheus 文本格式 `/metrics` 端点（默认关；含请求量/延迟直方图、限流命中、自动封禁、事件总线投递计数，以及**渠道健康分/熔断状态/冷却/队列深度** gauge）。**鉴权**：仅可信来源（环回/私网 `IsTrustedSourceIP`）或 root 会话可读，公网匿名 401 | `false` |
-| `READYZ_CHECK_REDIS` | `/readyz` 就绪探针是否将 Redis 可达性计入就绪码：`true`（默认）= Redis 宕机返回 503（fail-hard）；`false` = fail-soft（仅报告 Redis 状态，不影响就绪码）。未配置 `REDIS_CONN_STRING` 时 Redis 视为「未依赖」恒就绪 | `true` |
-| `SLOW_REQUEST_THRESHOLD_MS` | 慢请求采样阈值（毫秒）：超过则输出 `[SLOW] request-id=...` 日志，供按 request-id 聚合慢链路；`0` = 全部采样 | `3000` |
-| `QUOTA_WARN_THRESHOLDS` | 额度预警多档位（逗号分隔，从大到小）：用户**未显式设置** `QuotaWarningThreshold`（注册注入的默认 80% 视为未显式设置）时按此多档分级提醒；解析失败或全空时回退默认档位 | `1000,500,100` |
-| `QUOTA_REMIND_THRESHOLD`（旧） | **已弃用**：旧单阈值由多档 `QUOTA_WARN_THRESHOLDS` 取代，预警路径不再读取此值；保留仅为系统设置 UI 兼容显示，新部署无需配置 | `1000` |
-| `RELAY_IDLE_CONN_TIMEOUT` | Idle keep-alive timeout for relay HTTP clients, seconds. Defaults to Go standard library behavior; set `0` to disable | `90` |
-| `RELAY_RESPONSE_HEADER_TIMEOUT` | How long the relay waits for upstream **response headers**, seconds; set `0` to disable. Only bounds the header wait -- streaming after the headers arrive is unaffected. Note that non-streaming upstreams usually send headers only once generation finishes, so leave headroom | `1800` |
-| `STREAMING_TIMEOUT` | Streaming timeout (seconds) | `300` |
-| `RELAY_REQUEST_COMPRESSION_ENABLED` | Global kill-switch for outbound request-body compression. When `true`, channels with `setting.request_compression=true` gzip the upstream request body (≥ threshold). Useful when upstream upload bandwidth is the first-token bottleneck | `true` |
-| `RELAY_REQUEST_COMPRESSION_THRESHOLD_KB` | Request-body size (KB) below which compression is skipped (not worth the CPU). 256KB covers the common 300KB–1MB prompt range at ~44ms CPU cost | `256` |
-| `STREAM_SCANNER_MAX_BUFFER_MB` | Max per-line buffer (MB) for the stream scanner; increase when upstream sends huge image/base64 payloads | `64` |
-| `MAX_REQUEST_BODY_MB` | Max request body size (MB, counted **after decompression**; prevents huge requests/zip bombs from exhausting memory). Exceeding it returns `413` | `32` |
-| `AZURE_DEFAULT_API_VERSION` | Azure API version | `2025-04-01-preview` |
-| `ERROR_LOG_ENABLED` | Error log switch | `false` |
-| `PYROSCOPE_URL` | Pyroscope server address | - |
-| `PYROSCOPE_APP_NAME` | Pyroscope application name | `new-api` |
-| `PYROSCOPE_BASIC_AUTH_USER` | Pyroscope basic auth user | - |
-| `PYROSCOPE_BASIC_AUTH_PASSWORD` | Pyroscope basic auth password | - |
-| `PYROSCOPE_MUTEX_RATE` | Pyroscope mutex sampling rate | `5` |
-| `PYROSCOPE_BLOCK_RATE` | Pyroscope block sampling rate | `5` |
-| `HOSTNAME` | Hostname tag for Pyroscope | `new-api` |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated exact Origins allowed to make cross-origin browser requests (credentials enabled). Unset/blank = same-origin only (no CORS headers). Wildcard is never combined with credentials (spec-invalid) | - |
-| `CHANNEL_CIRCUIT_BREAKER` | Enable per-channel circuit breaker (`on`/`true`): a channel is tripped after `CHANNEL_CIRCUIT_FAILURE_THRESHOLD` consecutive upstream failures and re-probed after the open window. Off = zero behavior change | `false` |
-| `CHANNEL_CIRCUIT_FAILURE_THRESHOLD` | Consecutive upstream failures (auth/rate-limit/5xx/timeout) before a channel is tripped | `5` |
-| `CHANNEL_CIRCUIT_OPEN_SECONDS` | Circuit-open window in seconds before a half-open probe is allowed | `120` |
-| `TASK_ARTIFACT_STORE_MODE` | 站内图床模式：`upstream`（默认，产物走上游代理，零变化）/ `local`（本地磁盘存储生成产物与参考素材） | `upstream` |
-| `TASK_ARTIFACT_STORE_DIR` | 本地图床根目录（`local` 模式）；默认 `<工作目录>/data/task-artifacts` | - |
-| `TASK_ARTIFACT_MAX_FILE_MB` | 本地图单单文件上限（MB），超限拒绝落盘 | `64` |
-| `TASK_ARTIFACT_RETENTION_SECONDS` | 产物/参考素材保留期（秒）：后台每 5 分钟清理「任务已完成且超过保留期」的目录 | `300` |
-| `DOMAIN_ROUTE_ENABLED` | 领域感知路由开关（默认关）。开启后请求头 `X-Route-Tag` 命中 `DOMAIN_ROUTE_MAP` 时可覆盖分组（仅限用户可用分组） | `false` |
-| `DOMAIN_ROUTE_MAP` | 领域路由映射（逗号分隔 `tag:group`），如 `medical:medical-group,legal:legal-group` | - |
-| `CHANNEL_KEY_ENCRYPTION` | 渠道密钥**加密存储**开关（AES-256-GCM，主密钥由 `CRYPTO_SECRET` 派生）。默认关；开启后**下次保存渠道即加密**、读取自动解密，旧明文 fail-open 兼容。**多节点须一致** | `false` |
-| `PRICING_SYNC_TASK_ENABLED` | 上游**价目**定时同步开关（倍率/价目，幂等 merge）。上游源走 `PRICING_SYNC_UPSTREAMS`（JSON 数组，`[{name,base_url,path}]`）；未配置时任务空转 | `true` |
-| `PRICING_SYNC_TASK_INTERVAL_MINUTES` | 价目同步周期（分钟，最小 1） | `360` |
-| `CATALOG_SYNC_TASK_ENABLED` | **模型目录**定时同步开关（B2-2）：上游 llm-metadata 的 models/vendors 增删与字段对齐。默认关（目录变更是有副作用的写）；仅自动应用 create（新建）与 update（本地 `sync_official=1` 的官方条目），不删本地条目 | `false` |
-| `CATALOG_SYNC_TASK_INTERVAL_MINUTES` | 目录同步周期（分钟，最小 1） | `720` |
-| `CATALOG_SYNC_LOCALE` | 目录同步拉取的上游语言（`zh` / `en` / `ja`） | `zh` |
-| `LOG_STAT_MAX_DAYS` | 管理端日志统计（`SumUsedQuota`）的时间窗口**天数上限**：传入无上界/超长窗口时收敛到该边界，避免对全历史做无界 SUM 聚合；`0` = 关闭收敛 | `366` |
-| `COMPLEXITY_ROUTING` | 复杂度路由开关（规则版 7 维打分：长度/代码/数学/推理/工具/多模态/多轮 → simple/medium/complex）。默认关 | `false` |
-| `TOOL_DRAWER_ENABLED` | 工具抽屉开关：对 `tools` 定义做**等价去重**（同 name/schema 指纹只留一份），省 prompt token。默认关 | `false` |
-| `CHANNEL_HEALTH_WEIGHTED_LB` | 健康加权负载均衡：渠道选择按「基础权重 × 健康系数」加权，健康渠道更常被选中。默认关 | `false` |
-| `CHANNEL_HEALTH_MIN_WEIGHT_FACTOR` | 健康分为 0 的渠道保留的最小权重比例（%），避免彻底饿死、保留探测恢复 | `5` |
-| `CHANNEL_COOLDOWN_AUTH_SECONDS` | 渠道鉴权失败（401/403）冷却时长（秒）；`0`=用默认 300 | `300` |
-| `CHANNEL_COOLDOWN_RATE_LIMIT_SECONDS` | 渠道限流（429，无 Retry-After 时）冷却时长（秒）；`0`=用默认 60 | `60` |
-| `CHANNEL_COOLDOWN_SERVER_ERROR_SECONDS` | 渠道 5xx 冷却时长（秒）；`0`=用默认 60 | `60` |
-| `CHANNEL_COOLDOWN_TIMEOUT_SECONDS` | 渠道超时冷却时长（秒）；`0`=用默认 30 | `30` |
-| `RELAY_AUDIT_ENABLED` | 中继一致性自检开关（SSE 白名单/usage 单调/错误不泄漏/渠道指纹）。默认关 | `false` |
-| `OUTBOUND_UPLOAD_BANDWIDTH_BPS` | Savings Baseline 折算省时用的上行带宽（bps）；`0` = 只报字节口径不折算 | `0` |
-
-📖 **Complete configuration:** [Environment Variables Documentation](https://docs.newapi.pro/en/docs/installation/config-maintenance/environment-variables)
-
-</details>
-
-### 🔧 Deployment Methods
-
-<details>
-<summary><strong>Method 1: Docker Compose (Recommended)</strong></summary>
+### 从源码构建
 
 ```bash
-# Clone the project
-git clone https://github.com/lza6/new-api-Max.git
-cd new-api
+# 后端（Go 1.25+）
+go build -o new-api .
 
-# Edit configuration
-nano docker-compose.yml
-
-# Start service
-docker-compose up -d
+# 前端（Bun + Rsbuild）
+cd web && bun install --frozen-lockfile && bun run build
 ```
 
-</details>
-
-<details>
-<summary><strong>Method 2: Docker Commands</strong></summary>
-
-**Using SQLite:**
-```bash
-docker run --name new-api -d --restart always \
-  -p 3000:3000 \
-  -e TZ=Asia/Shanghai \
-  -v ./data:/data \
-  calciumion/new-api:latest
-```
-
-**Using MySQL:**
-```bash
-docker run --name new-api -d --restart always \
-  -p 3000:3000 \
-  -e SQL_DSN="root:123456@tcp(localhost:3306)/oneapi" \
-  -e TZ=Asia/Shanghai \
-  -v ./data:/data \
-  calciumion/new-api:latest
-```
-
-> **💡 Path explanation:**
-> - `./data:/data` - Relative path, data saved in the data folder of the current directory
-> - You can also use absolute path, e.g.: `/your/custom/path:/data`
-
-</details>
-
-<details>
-<summary><strong>Method 3: BaoTa Panel</strong></summary>
-
-1. Install BaoTa Panel (≥ 9.2.0 version)
-2. Search for **New-API** in the application store
-3. One-click installation
-
-📖 [Tutorial with images](./docs/BT.md)
-
-</details>
-
-### ⚠️ Multi-machine Deployment Considerations
-
-> [!WARNING]
-> - All nodes must use the same primary database and the same `SESSION_SECRET`; otherwise Access Tokens, refresh sessions, and temporary authentication flows cannot be verified consistently.
-> - Nodes connected to the same Redis must also use the same `CRYPTO_SECRET`, or their cache-key digests will differ and shared entries cannot be reused consistently.
-
-The database is authoritative for login Sessions and for the per-user active/issuance limits. Redis Session entries are short-lived caches whose TTL follows `SYNC_FREQUENCY` (60 seconds by default) and never exceeds the Session's remaining lifetime.
-
-| Redis topology | Session propagation | Rate limiting |
-| --- | --- | --- |
-| Shared Redis | Revocations and version publications normally propagate immediately | Redis limits are shared across nodes |
-| Independent Redis per node | Nodes converge from the database within the effective `SYNC_FREQUENCY`; a newly rotated token may receive a temporary 401 on a node with stale cache | Each node has its own allowance, so aggregate capacity can reach roughly the configured limit multiplied by the node count |
-| No Redis | Every Session validation reads the database | In-memory limits are independent per node |
-
-A shorter `SYNC_FREQUENCY` reduces the independent-Redis staleness window but causes one additional primary-key Session lookup per active SID, per node, per TTL. These guarantees make Session authentication bounded-stale across the supported topologies; rate limits and other Redis-backed control-plane caches remain topology-dependent.
-
-See [User authentication and login sessions](./docs/authentication.md) for the token, Origin-check and PAT contracts.
-
-### 🔄 Channel Retry and Cache
-
-**Retry configuration:** `Settings → Operation Settings → General Settings → Failure Retry Count`
-
-**Cache configuration:**
-- `REDIS_CONN_STRING`: Redis cache (recommended)
-- `MEMORY_CACHE_ENABLED`: Memory cache
+`make build-web` 会完成前端构建，`make start-api` 以 `go run main.go` 启动后端；
+`make all` 等价于「构建前端 + 启动后端」。
 
 ---
 
-## 🔗 Related Projects
+## ⚙️ 配置
 
-### Upstream Projects
+配置以**环境变量**为主，后台可改的项存在数据库 `options` 表。
 
-| Project | Description |
+### 必改项
+
+| 变量 | 说明 |
 |------|------|
-| [One API](https://github.com/songquanpeng/one-api) | Original project base |
-| [Midjourney-Proxy](https://github.com/novicezk/midjourney-proxy) | Midjourney interface support |
+| `PORT` | 监听端口，默认 `3000` |
+| `SQL_DSN` | 数据库连接串。**不设置则用 SQLite**（文件在 `common.SQLitePath`，默认 `one-api.db`，也可用 `SQLITE_PATH` 指定） |
+| `LOG_SQL_DSN` | 可选。**独立日志库**连接串；设置后主库不再建 `logs` 表（便于分离日志与业务库，也支持 ClickHouse） |
+| `SESSION_SECRET` | 会话签名密钥 |
+| `CRYPTO_SECRET` | 敏感字段加密密钥（用于加密渠道密钥等） |
+| `TZ` | 时区，例如 `Asia/Shanghai` |
+| `GIN_MODE` | `release` 关闭调试输出（生产建议设置） |
 
-### Supporting Tools
+### 存储与缓存
 
-| Project | Description |
+| 变量 | 说明 |
 |------|------|
-| [new-api-key-tool](https://github.com/lza6/new-api-Max-key-tool) | Key quota query tool |
-| [new-api-horizon](https://github.com/lza6/new-api-Max-horizon) | New API high-performance optimized version |
+| `REDIS_CONN_STRING` | Redis 连接串；设置后用于缓存与验证码存储（未设置时用内存兜底） |
+| `MEMORY_CACHE_ENABLED` | 启用内存缓存 |
+| `SYNC_FREQUENCY` | 渠道缓存同步周期（秒） |
+| `CHANNEL_UPDATE_FREQUENCY` | 渠道余额自动更新周期 |
+| `BATCH_UPDATE_ENABLED` | 批量额度更新（`true` 启用，降低 DB 写压力） |
+
+### HTTP 与安全
+
+| 变量 | 说明 |
+|------|------|
+| `CORS_ALLOWED_ORIGINS` | 允许的跨域来源白名单（**默认仅同源**；切勿与 credentials 一起用 `*`） |
+| `SHUTDOWN_TIMEOUT_SECONDS` | 优雅关闭超时（秒），默认 `120` |
+| `CHANNEL_CIRCUIT_BREAKER` | 渠道级熔断开关 |
+| `ENABLE_PPROF` | 启用 pprof（`127.0.0.1:8005`），仅排障时开 |
+| `METRICS_ENABLED` | 启用 Prometheus 指标端点 `/metrics` |
+
+### 产物存储与日志
+
+| 变量 | 说明 |
+|------|------|
+| `TASK_ARTIFACT_STORE_MODE` | 生成产物存储模式。默认 `upstream`（**不在本站存图**）；`local` 才落本地磁盘 |
+| `TASK_ARTIFACT_RETENTION_SECONDS` | `local` 模式下产物的保留时长，默认 `300` 秒 |
+| `LOG_MAX_SIZE_MB` | 单个日志文件大小上限（MB），默认 `256`；超过即分片，配合保留策略（最多 14 个文件 / 总计 1GB）自动清理 |
+| `LOG_DIR` | 日志目录（也可用命令行参数 `--log-dir`） |
+| `UMAMI_WEBSITE_ID` / `UMAMI_SCRIPT_URL` | 接入 Umami 统计（可选） |
+| `GOOGLE_ANALYTICS_ID` | 接入 Google Analytics（可选） |
+
+> 完整清单以代码为准：后端读环境变量的位置集中在 `common/`、`main.go` 与各 `setting/` 包中。
 
 ---
 
-## 💬 Help Support
+## 🧑‍💻 开发
 
-### 📖 Documentation Resources
+### 前端（`web/`，Bun + Rsbuild）
 
-| Resource | Link |
+```bash
+cd web
+bun install
+
+bun run dev           # 开发服务器（rsbuild dev）
+bun run build         # 生产构建
+bun run build:check   # 类型检查 + 构建
+bun run typecheck     # 仅类型检查（tsgo -b）
+bun run lint          # oxlint
+bun run test          # vitest run
+bun run i18n:check    # 校验各语言缺失的文案键
+bun run i18n:sync     # 同步 i18n 键
+bun run format        # 统一格式化（保留受保护的文件头）
+bun run copyright:check  # 校验版权头
+```
+
+### 后端（Go）
+
+```bash
+go build ./...                    # 构建全部包
+go test ./...                     # 运行测试
+make test                         # 根模块 + relaykit 子模块一起测
+make dev-api                      # 用 docker-compose.dev.yml 起开发依赖
+make db-check                     # 三库一致性契约测试（SQLite + MySQL + PostgreSQL）
+```
+
+> `make db-check` 需要真实可连的 MySQL / PostgreSQL 实例，通过 `TEST_MYSQL_DSN` /
+> `TEST_POSTGRES_DSN` 指定；未配置的方言会被跳过。
+
+### 代码规范
+
+- 后端：`gofmt`；改动数据库相关代码必须通过三库一致性契约测试（`go test ./model/ -run TestDBConformance`）。
+- 前端：提交前跑 `bun run typecheck` 与 `bun run lint`，两者都不得有 error。
+- 前端详细规范见 [`web/AGENTS.md`](./web/AGENTS.md)。
+
+---
+
+## 📚 文档
+
+| 资源 | 链接 |
 |------|------|
-| 📘 FAQ | [FAQ](https://docs.newapi.pro/en/docs/support/faq) |
-| 💬 Community Interaction | [Communication Channels](https://docs.newapi.pro/en/docs/support/community-interaction) |
-| 🐛 Issue Feedback | [Issue Feedback](https://docs.newapi.pro/en/docs/support/feedback-issues) |
-| 📚 Complete Documentation | [Official Documentation](https://docs.newapi.pro/en/docs) |
+| 官方文档 | <https://docs.newapi.pro/zh/docs> |
+| 常见问题 | <https://docs.newapi.pro/zh/docs/support/faq> |
+| 反馈问题 | <https://docs.newapi.pro/zh/docs/support/feedback-issues> |
+| Issue 反馈 | <https://github.com/lza6/new-api-Max/issues> |
 
-### 🤝 Contribution Guide
+---
 
-Welcome all forms of contribution!
+## ✨ 主要特性
 
-- 🐛 Report Bugs
-- 💡 Propose New Features
-- 📝 Improve Documentation
-- 🔧 Submit Code
+### 🎨 核心功能
+
+- 🎨 全新的用户界面
+- 🌍 多语言支持
+- 💾 支持多种数据库（SQLite / MySQL / PostgreSQL）
+- 🔄 支持多种渠道，可配置渠道优先级
+- ⚖️ 支持加权随机负载均衡
+- 🔁 支持失败自动重试
+- 💰 支持按次数计费与按量计费
+- 🔐 支持令牌分组与模型限速
+- 🧠 支持推理模型（reasoning）
+- 💬 支持流式输出
+- 🔑 支持多种鉴权方式（API Key / OAuth / Passkey / 2FA）
+
+### 💰 授权用量与成本管理
+
+- 按用户 / 令牌 / 渠道 / 模型多维统计
+- 额度充值、兑换码、订阅套餐
+- 用量与成本报表（管理员，支持 CSV 导出）
+
+### 🔐 授权与安全
+
+- 组织级多用户与权限管理
+- 令牌细粒度授权（模型 / 分组 / 额度 / 过期）
+- 登录限流、失败审计与账号级锁定
+- 敏感操作 step-up 安全验证
+- SSRF 防护、CORS 白名单、安全响应头模板
+
+### 🚀 高级功能
+
+- 渠道熔断与自动禁用/启用
+- 通用 Webhook 事件订阅（HMAC-SHA256 签名）
+- 服务探活 `/healthz`（存活）与 `/readyz`（就绪）
+- 可观测性指标与渠道健康分
+- 请求级实时面板与延迟拆解
+
+---
+
+## 🤖 模型支持
+
+覆盖主流上游的 OpenAI 兼容、Claude、Gemini、Midjourney、Suno、Rerank、
+Embedding、TTS/ASR 与视频生成等接口，具体可接入的模型以渠道配置为准。
+
+### 📡 支持的接口（节选）
+
+| 路径 | 说明 |
+|------|------|
+| `/v1/chat/completions` | OpenAI 兼容对话 |
+| `/v1/messages` | Claude 兼容对话 |
+| `/v1/embeddings` | 向量化 |
+| `/v1/rerank` | 重排序 |
+| `/v1/images/generations` | 图像生成 |
+| `/v1/videos/generations` | 视频生成（含等价别名） |
+| `/v1/messages/count_tokens` | Token 计数 |
+| `/api/…` | 后台管理接口 |
+
+---
+
+## 🚢 部署
+
+### 📋 部署要求
+
+- **Go** 1.25+（从源码构建时）
+- **Bun**（构建前端时）
+- **数据库**：SQLite（零依赖）／ MySQL **≥ 5.7.8** ／ PostgreSQL **≥ 9.6**
+- **Redis**（可选，推荐用于缓存与验证码）
+
+### 🔧 部署方式
+
+1. **Docker Compose**（推荐）：`docker compose up -d`
+2. **单容器**：`docker run` 挂载 `/data` 持久化 SQLite
+3. **从源码**：`go build` 后端 + `bun run build` 前端，再用 systemd/supervisor 托管
+4. **反向代理**：参考 `deploy/Caddyfile.example`（含安全响应头与 CSP）
+
+### ⚠️ 多机部署注意
+
+- 多实例必须共用同一数据库，且建议设置 `REDIS_CONN_STRING` 以共享缓存。
+- 主从节点通过 `NODE_TYPE` 区分（从节点不执行迁移等主控任务）。
+
+### 🔄 渠道重试与缓存
+
+- 上游失败按渠道优先级与重试次数自动切换渠道，可配置 429 退避。
+- 渠道信息有本地缓存，`SYNC_FREQUENCY` 控制同步周期；多机部署时同步周期不宜过大。
 
 ---
 
@@ -577,23 +365,13 @@ If your organization's policies do not permit the use of AGPLv3-licensed softwar
 
 ---
 
-## 🌟 Star History
-
 <div align="center">
 
-[![Star History Chart](https://api.star-history.com/svg?repos=lza6/new-api-Max&type=Date)](https://star-history.com/#lza6/new-api-Max&Date)
+### 💖 感谢使用 New API
 
-</div>
+如果这个项目对你有帮助，欢迎给我们一个 ⭐️ Star！
 
----
-
-<div align="center">
-
-### 💖 Thank you for using New API
-
-If this project is helpful to you, welcome to give us a ⭐️ Star！
-
-**[Official Documentation](https://docs.newapi.pro/en/docs)** • **[Issue Feedback](https://github.com/lza6/new-api-Max/issues)** • **[Latest Release](https://github.com/lza6/new-api-Max/releases)**
+**[官方文档](https://docs.newapi.pro/zh/docs)** • **[Issue 反馈](https://github.com/lza6/new-api-Max/issues)** • **[最新版本](https://github.com/lza6/new-api-Max/releases)**
 
 <sub>Built with ❤️ by lza6</sub>
 
