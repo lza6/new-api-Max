@@ -175,6 +175,16 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.GET("/training-data/admin/overview", middleware.DisableCache(), controller.GetTrainingDataAdminOverview)
 				adminRoute.GET("/training-data/admin/by-date", middleware.DisableCache(), controller.GetTrainingDataByDate)
 				adminRoute.PUT("/training-data/admin/enabled", middleware.DisableCache(), controller.SetTrainingDataEnabled)
+
+				// 云盘文件浏览与操作（B4/B7）：列出/预览/删除分片。
+				adminRoute.GET("/training-data/admin/files", middleware.DisableCache(), controller.ListTrainingDataFiles)
+				adminRoute.GET("/training-data/admin/file", middleware.DisableCache(), controller.PreviewTrainingDataFile)
+				adminRoute.DELETE("/training-data/admin/file", middleware.DisableCache(), controller.DeleteTrainingDataFile)
+
+				// 对话深度分析 + 继续追问（B9/B10）：
+				// 走完整 relay 栈（渠道选择/计费/日志自动生效），费用记在
+				// 发起分析的管理员账上，便于审计。
+				adminRoute.POST("/training-data/admin/analyze", middleware.DisableCache(), controller.AnalyzeTrainingDataConversation)
 				adminRoute.GET("/", controller.GetAllUsers)
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)

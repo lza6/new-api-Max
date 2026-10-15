@@ -86,6 +86,11 @@ type CaptureStats struct {
 	Conversations atomic.Int64
 	// BytesUploaded 今日上传字节数。
 	BytesUploaded atomic.Int64
+
+	// InFlightBytes 当前**正在上传**的字节数（增量需求 B5）。
+	// 管理端据此显示「正在上传 X MB」——只看累计值看不出「现在在忙什么」。
+	// 用原子加减配对（worker 单 goroutine，但仍保持并发安全语义）。
+	InFlightBytes atomic.Int64
 	// MessagesUploaded 今日上传的消息条数。
 	MessagesUploaded atomic.Int64
 
@@ -123,6 +128,8 @@ type CaptureStatsSnapshot struct {
 	TotalUploadErrors int64  `json:"total_upload_errors"`
 	SkippedNoConsent  int64  `json:"skipped_no_consent"`
 	QueueLen          int    `json:"queue_len"`
+	// InFlightBytes 当前正在上传的字节数（瞬时值）。
+	InFlightBytes int64 `json:"in_flight_bytes"`
 	QueueCapacity     int    `json:"queue_capacity"`
 }
 
@@ -144,6 +151,7 @@ func GetCaptureStats() CaptureStatsSnapshot {
 		TotalUploadErrors: captureStats.TotalUploadErrors.Load(),
 		SkippedNoConsent:  captureStats.TotalSkippedNoConsent.Load(),
 		QueueLen:          queueStats.Len,
+		InFlightBytes:     captureStats.InFlightBytes.Load(),
 		QueueCapacity:     queueStats.Capacity,
 	}
 }
@@ -427,8 +435,14 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 		partName := dirPath + "/" + PartFileName(partSeq)
 		// 自适应限速：按本次上传字节数等待额度。
 		limiter.wait(ctx, int64(len(chunk)))
-		if _, err := sink.WritePart(ctx, partName, chunk); err != nil {
-			return 0, uploadedBytes, fmt.Errorf("write part %s: %w", partName, err)
+		// 在传字节实时可见（B5）：管理端要能看出「现在在忙什么」。
+		// 必须在 WritePart 前后成对加减 —— 忘记减会让数字只涨不落，
+		// 管理员会以为卡死。
+		captureStats.InFlightBytes.Add(int64(len(chunk)))
+		_, writeErr := sink.WritePart(ctx, partName, chunk)
+		captureStats.InFlightBytes.Add(-int64(len(chunk)))
+		if writeErr != nil {
+			return 0, uploadedBytes, fmt.Errorf("write part %s: %w", partName, writeErr)
 		}
 		uploadedBytes += int64(len(chunk))
 		partSeq++

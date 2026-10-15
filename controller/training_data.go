@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -255,3 +256,189 @@ func SetTrainingDataEnabled(c *gin.Context) {
 }
 
 // ---------- 小工具 ----------
+
+// ---------- 管理端：云盘文件浏览与操作（增量需求 B4 / B7） ----------
+
+// trainingDataReader 取得当前后端的读取能力。
+// 返回 nil 表示后端不支持读取（如 disabled）——调用方须给出明确错误。
+func trainingDataReader() (training_capture.SinkReader, error) {
+	sink := training_capture.ActiveSink()
+	if reader, ok := sink.(training_capture.SinkReader); ok {
+		return reader, nil
+	}
+	return nil, fmt.Errorf(
+		"backend %q does not support reading (needed for browsing/analysis)", sink.Name())
+}
+
+// TrainingDataFileEntry 云盘文件项（对外展示）。
+type TrainingDataFileEntry struct {
+	Path       string `json:"path"`
+	IsDir      bool   `json:"is_dir"`
+	SizeBytes  int64  `json:"size_bytes"`
+	ModifiedAt int64  `json:"modified_at"`
+}
+
+// ListTrainingDataFiles 列出云盘目录树。
+//
+// GET /api/training-data/admin/files?path=<可选子目录>&max=<可选条目上限>
+//
+// `path` 为空表示从配置的根目录开始。管理端据此渲染可下钻的文件树。
+func ListTrainingDataFiles(c *gin.Context) {
+	reader, err := trainingDataReader()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	root := strings.Trim(strings.TrimSpace(c.Query("path")), "/")
+	maxEntries := 0
+	if raw := c.Query("max"); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
+			maxEntries = v
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	entries, err := reader.ListTree(ctx, root, maxEntries)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	out := make([]TrainingDataFileEntry, 0, len(entries))
+	var totalBytes int64
+	for _, e := range entries {
+		out = append(out, TrainingDataFileEntry{
+			Path: e.Path, IsDir: e.IsDir,
+			SizeBytes: e.SizeBytes, ModifiedAt: e.ModifiedAt,
+		})
+		if !e.IsDir {
+			totalBytes += e.SizeBytes
+		}
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"root":        root,
+		"entries":     out,
+		"count":       len(out),
+		"total_bytes": totalBytes,
+		// 达到上限说明列表**不完整**，前端须提示（不能当成全部）。
+		"truncated": maxEntries > 0 && len(out) >= maxEntries,
+	})
+}
+
+// PreviewTrainingDataFile 读取并预览一个分片（解压后的 JSONL 文本）。
+//
+// GET /api/training-data/admin/file?path=...&max_bytes=...
+//
+// 返回**解压后**的行数组（云盘上存的是 gzip）。同时如实披露坏行数与
+// 截断事实 —— 管理端不能把残缺数据当完整展示。
+func PreviewTrainingDataFile(c *gin.Context) {
+	path := strings.TrimSpace(c.Query("path"))
+	if path == "" {
+		common.ApiErrorMsg(c, "missing required query parameter: path")
+		return
+	}
+	if strings.Contains(path, "..") {
+		// 纵深防御：即使 sink 侧也做了净化，这里再拒一次上跳路径。
+		common.ApiErrorMsg(c, "invalid path")
+		return
+	}
+
+	reader, err := trainingDataReader()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	maxBytes := int64(0)
+	if raw := c.Query("max_bytes"); raw != "" {
+		if v, err := strconv.ParseInt(raw, 10, 64); err == nil && v > 0 {
+			maxBytes = v
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
+	defer cancel()
+
+	raw, err := reader.ReadFile(ctx, path, maxBytes)
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	// 分片是 gzip（见 compression.go）。兼容历史明文分片：
+	// 解压失败就按明文处理 —— 不因为格式演进就让旧数据读不了。
+	plain := raw
+	compressed := false
+	if len(raw) > 2 && raw[0] == 0x1f && raw[1] == 0x8b { // gzip magic
+		decompressed, derr := training_capture.DecompressPart(raw)
+		if derr != nil {
+			common.ApiError(c, fmt.Errorf("decompress %s: %w", path, derr))
+			return
+		}
+		plain = decompressed
+		compressed = true
+	}
+
+	lines := make([]string, 0, 64)
+	for _, ln := range strings.Split(string(plain), "\n") {
+		if strings.TrimSpace(ln) != "" {
+			lines = append(lines, ln)
+		}
+	}
+
+	common.ApiSuccess(c, gin.H{
+		"path":             path,
+		"compressed":       compressed,
+		"compressed_bytes": len(raw),
+		"plain_bytes":      len(plain),
+		"lines":            lines,
+		"line_count":       len(lines),
+	})
+}
+
+// DeleteTrainingDataFile 删除一个分片。
+//
+// DELETE /api/training-data/admin/file?path=...
+//
+// 危险操作：HTTP 层要求前端二次确认，这里额外要求显式 `confirm=1`，
+// 避免误调用（例如把查询串拼错）造成静默删数据。
+func DeleteTrainingDataFile(c *gin.Context) {
+	path := strings.TrimSpace(c.Query("path"))
+	if path == "" {
+		common.ApiErrorMsg(c, "missing required query parameter: path")
+		return
+	}
+	if strings.Contains(path, "..") {
+		common.ApiErrorMsg(c, "invalid path")
+		return
+	}
+	if c.Query("confirm") != "1" {
+		common.ApiErrorMsg(c, "destructive operation requires confirm=1")
+		return
+	}
+	// 只允许删文件（以分片/压缩后缀结尾），不允许删目录字符串。
+	if !strings.HasSuffix(path, ".jsonl.gz") && !strings.HasSuffix(path, ".jsonl") {
+		common.ApiErrorMsg(c, "only part files (.jsonl.gz / .jsonl) can be deleted via this endpoint")
+		return
+	}
+
+	reader, err := trainingDataReader()
+	if err != nil {
+		common.ApiError(c, err)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
+	defer cancel()
+
+	if err := reader.DeleteFile(ctx, path); err != nil {
+		common.ApiError(c, err)
+		return
+	}
+	common.SysLog("training data capture: admin deleted remote part " + path)
+	common.ApiSuccess(c, gin.H{"deleted": path})
+}

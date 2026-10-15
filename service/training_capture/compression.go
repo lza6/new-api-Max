@@ -71,3 +71,17 @@ func gzipDecompress(data []byte, maxPlain int64) ([]byte, error) {
 	}
 	return plain, nil
 }
+
+// DecompressPart 解压一个分片（导出给接口层用）。
+//
+// 上限固定为「单分片原始上限的 8 倍」：正常数据远达不到，
+// 超限即 ErrDecompressTooLarge（防 zip-bomb）。
+func DecompressPart(data []byte) ([]byte, error) {
+	return gzipDecompress(data, int64(MaxPartBytes)*8)
+}
+
+// CompressPartForTest 暴露压缩给跨包测试（controller 层要造真实的
+// gzip 分片 fixture）。生产代码路径请用 gzipCompress。
+func CompressPartForTest(payload []byte) ([]byte, error) {
+	return gzipCompress(payload)
+}
