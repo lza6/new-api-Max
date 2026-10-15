@@ -359,6 +359,13 @@ func PreviewTrainingDataFile(c *gin.Context) {
 			maxBytes = v
 		}
 	}
+	// **夹取上限**：不夹取的话管理员传 max_bytes=50000000000 就能绕过
+	// reader 的默认上限，把巨型文件整个读进内存（与全仓「无界 io.ReadAll」
+	// 治理相悖）。夹到 64MB —— 压缩分片解压后远小于此。
+	const previewMaxBytesLimit = int64(64) << 20
+	if maxBytes <= 0 || maxBytes > previewMaxBytesLimit {
+		maxBytes = previewMaxBytesLimit
+	}
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 60*time.Second)
 	defer cancel()

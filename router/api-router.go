@@ -170,21 +170,10 @@ func SetApiRouter(router *gin.Engine) {
 				// P1 管理员重置所有签到（福利重置）
 				adminRoute.POST("/checkins/reset", controller.ResetAllCheckins)
 
-				// 训练数据采集（Spec-008）管理端。
-				// 统计含全站采集规模，属运营数据 → 全部在 AdminAuth() 之下。
-				adminRoute.GET("/training-data/admin/overview", middleware.DisableCache(), controller.GetTrainingDataAdminOverview)
-				adminRoute.GET("/training-data/admin/by-date", middleware.DisableCache(), controller.GetTrainingDataByDate)
-				adminRoute.PUT("/training-data/admin/enabled", middleware.DisableCache(), controller.SetTrainingDataEnabled)
-
-				// 云盘文件浏览与操作（B4/B7）：列出/预览/删除分片。
-				adminRoute.GET("/training-data/admin/files", middleware.DisableCache(), controller.ListTrainingDataFiles)
-				adminRoute.GET("/training-data/admin/file", middleware.DisableCache(), controller.PreviewTrainingDataFile)
-				adminRoute.DELETE("/training-data/admin/file", middleware.DisableCache(), controller.DeleteTrainingDataFile)
-
-				// 对话深度分析 + 继续追问（B9/B10）：
-				// 走完整 relay 栈（渠道选择/计费/日志自动生效），费用记在
-				// 发起分析的管理员账上，便于审计。
-				adminRoute.POST("/training-data/admin/analyze", middleware.DisableCache(), controller.AnalyzeTrainingDataConversation)
+				// 训练数据采集的管理端接口**不在这里** ——
+				// adminRoute 的父组是 `/user`，实际前缀会是 `/api/user/...`，
+				// 与前端调用的 `/api/admin/...` 不一致（会全部 404）。
+				// 见 router/training-data-router.go。
 				adminRoute.GET("/", controller.GetAllUsers)
 				adminRoute.GET("/topup", controller.GetAllTopUps)
 				adminRoute.POST("/topup/complete", controller.AdminCompleteTopUp)
@@ -196,13 +185,8 @@ func SetApiRouter(router *gin.Engine) {
 				adminRoute.POST("/", controller.CreateUser)
 				adminRoute.POST("/manage", controller.ManageUser)
 
-				// 运营面板（管理员专属）：每日/总消耗、消耗排行榜、
-				// 全体普通用户剩余额度与「按当前日均还能撑多少天」。
-				// 口径写在 controller/ops_panel.go 的文件头注释里。
-				adminRoute.GET("/ops/overview", middleware.DisableCache(), controller.GetOpsOverview)
-				adminRoute.GET("/ops/consumption-ranking", middleware.DisableCache(), controller.GetOpsConsumptionRanking)
-				// 给用户加额度：复用既有的管理端记账路径，不自己写 UPDATE。
-				adminRoute.POST("/ops/grant-quota", middleware.DisableCache(), controller.GrantUserQuota)
+				// 运营面板接口**不在这里**，理由同上方训练数据管理端
+				// （adminRoute 前缀是 /api/user）。见 router/training-data-router.go。
 				adminRoute.POST("/manage/batch", controller.BatchManageUsers)
 				adminRoute.PUT("/", controller.UpdateUser)
 				adminRoute.DELETE("/:id", controller.DeleteUser)

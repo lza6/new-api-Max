@@ -194,6 +194,20 @@ func deriveLimits(budget int64) ResourceBudget {
 		maxPart = 1 << 20 // 压缩后至少要可能 ≤4MB，原始太小没意义
 	}
 
+	// ---- 不变量：单分片原始上限必须**显著大于**单条文本上限 ----
+	//
+	// 为什么必须有这条：分片按**行边界**切，但一条记录本身就超限时
+	// `splitBySize` 只能硬切 —— 那会把一条 JSON 记录切成两半，
+	// 云盘上的 JSONL 就再也无法逐行解析（数据集损坏，且不报错）。
+	//
+	// JSON 转义最坏会放大 ~6 倍（控制字符变成 `\u00XX`）。取 8 倍留余量：
+	// 这保证**任何**一条通过文本上限的记录，其 JSON 编码后仍能整条放进
+	// 一个分片。少了这条保证，大文本（内存大的机器上上限会自适应到 8MB）
+	// 会在生产里静默切坏记录。
+	if maxPart < maxText*8 {
+		maxPart = maxText * 8
+	}
+
 	// ---- 队列容量 ----
 	// 队列最坏占用（容量 × 单条上限）≤ 预算的 25%。
 	// 上限 4096：再大也只是让积压数据在内存里放更久，没有收益
@@ -258,7 +272,24 @@ func GetResourceBudget() ResourceBudget {
 func InitResourceBudgetFromHost() ResourceBudget {
 	b := initResourceBudget(hostTotalMemoryBytes())
 	budgetInitialized.Store(true)
+	// 按新预算重建队列并同步热路径开关。
+	//
+	// [修复防御] 队列是**包级变量**，在包初始化时构造 —— 那一刻预算还是
+	// 零值，所以它拿到的是默认容量，与预算无关。若不在这里重建，
+	// 「自适应队列容量」就是死代码，而启动日志还会打印一个**假的**容量值
+	// （取自预算），运维据此判断「队列够大」会得出错误结论。
+	ApplyBudgetToRuntime()
 	return b
+}
+
+// ApplyBudgetToRuntime 把当前预算应用到运行期对象（队列 + 热路径标志）。
+//
+// **只应在 worker 启动前调用**：重建队列会丢弃其中的信号。
+// 启动流程是「初始化预算 → 启动 worker」，所以启动期调用是安全的；
+// 运行期调用会丢采集数据（采集是尽力而为的，但仍不应无谓丢失）。
+func ApplyBudgetToRuntime() {
+	captureQueue = NewCaptureQueue(GetResourceBudget().QueueCapacity)
+	SyncHotPathFlag()
 }
 
 // hostTotalMemoryBytes 用 gopsutil 读宿主机总内存（项目已有依赖）。
@@ -268,5 +299,35 @@ func hostTotalMemoryBytes() int64 {
 	return readHostMemoryTotal()
 }
 
-// 预算是否已初始化（供测试守护：忘记 init 的包级状态是最阴险的 bug 来源）。
+// 预算是否已初始化。
+//
+// 它**必须被真实读取**才不是死代码：本变量的全部意义就是「防忘记初始化」。
+// 因此暴露 `BudgetInitialized()` 供启动路径与测试断言使用 ——
+// 未初始化时 `EffectiveMaxPartRawBytes` 走的是现场推导（保守值），
+// 启动日志会明确标注，而不是让运维以为看到的是按预算算出来的值。
 var budgetInitialized atomic.Bool
+
+// BudgetInitialized 报告预算是否已按机器内存初始化。
+func BudgetInitialized() bool {
+	return budgetInitialized.Load()
+}
+
+// ResetBudgetForTest 把预算复位为未初始化状态（仅测试用）。
+func ResetBudgetForTest() {
+	budgetInitialized.Store(false)
+	resourceBudget = ResourceBudget{}
+}
+
+// EffectiveMaxPartRawBytes 返回生效的单分片原始上限。
+//
+// 预算已初始化时用预算值；**未初始化时现场推导**（而不是退回硬编码常量）。
+//
+// 为什么不能退回硬编码：推导过程包含「分片上限 ≥ 单条文本上限 × 8」这条
+// 不变量（见 deriveLimits）。退回常量会绕过该不变量，让「大文本记录被
+// 切成两半」的损坏在生产里重现 —— 而这正是本函数存在的原因。
+func EffectiveMaxPartRawBytes() int {
+	if b := GetResourceBudget(); b.MaxPartRawBytes > 0 {
+		return b.MaxPartRawBytes
+	}
+	return deriveLimits(0).MaxPartRawBytes
+}

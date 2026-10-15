@@ -300,8 +300,13 @@ func TestTruncateTextClonesUnderlyingArray(t *testing.T) {
 	original := strings.Repeat("a", 1<<20) // 1MB
 	truncated := truncateText(original, 64<<10)
 
-	if len(truncated) != 64<<10 {
-		t.Fatalf("截断长度应为 64KB，实际 %d", len(truncated))
+	// 契约是「**不超过**上限」，不是「恰好等于」——
+	// 现在保留头+尾并插入省略标记，长度会略小于上限。
+	if len(truncated) > 64<<10 {
+		t.Fatalf("截断必须不超过上限 64KB，实际 %d", len(truncated))
+	}
+	if len(truncated) == 0 {
+		t.Fatal("截断后不该变成空")
 	}
 	if unsafeStringSharesBacking(original, truncated) {
 		t.Fatal("截断产物与原文共享底层数组 —— 闸门失效，仍钉住 1MB 原文")
@@ -310,6 +315,29 @@ func TestTruncateTextClonesUnderlyingArray(t *testing.T) {
 	// 未截断路径允许共享（复制是浪费）：语义确认。
 	if truncateText(original, 0) == "" {
 		t.Fatal("maxBytes<=0 不应清空")
+	}
+}
+
+// 超限截断必须保留**尾部**（新内容所在处），否则尾部永远采集不到。
+func TestTruncateKeepsTailSoNewContentIsCapturable(t *testing.T) {
+	head := strings.Repeat("H", 1000)
+	tail := "TAIL-MARKER-NEW-CONTENT"
+	text := head + strings.Repeat("M", 5000) + tail
+
+	stored, tailOnly := truncateForCapture(text, 1024)
+
+	if !strings.Contains(stored, tail) {
+		t.Fatalf("截断后必须保留尾部内容（否则新内容永远采不到）：%q", stored[len(stored)-80:])
+	}
+	if !strings.Contains(tailOnly, tail) {
+		t.Fatalf("TailOnly 必须含尾部内容，实际 %q", tailOnly)
+	}
+	if len(stored) > 1024 {
+		t.Fatalf("存储内容不得超出上限：%d > 1024", len(stored))
+	}
+	// 未超限时不应产生 TailOnly（正常路径不该被这个机制影响）。
+	if s, tl := truncateForCapture("short", 1024); tl != "" || s != "short" {
+		t.Fatalf("未超限时不该截断或有 TailOnly：%q %q", s, tl)
 	}
 }
 

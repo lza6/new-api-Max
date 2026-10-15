@@ -354,26 +354,3 @@ func TestStressManyDistinctUsersThroughHotPath(t *testing.T) {
 		t.Fatalf("授权缓存 %d 条超过上限", size)
 	}
 }
-
-// itoaSmall 小整数转字符串（避免为测试引入 strconv 的语义混淆）。
-func itoaSmall(v int) string {
-	if v == 0 {
-		return "0"
-	}
-	neg := v < 0
-	if neg {
-		v = -v
-	}
-	var buf [12]byte
-	i := len(buf)
-	for v > 0 {
-		i--
-		buf[i] = byte('0' + v%10)
-		v /= 10
-	}
-	if neg {
-		i--
-		buf[i] = '-'
-	}
-	return string(buf[i:])
-}

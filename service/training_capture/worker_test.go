@@ -3,6 +3,7 @@ package training_capture
 import (
 	"context"
 	"fmt"
+	"github.com/lza6/new-api-Max/common"
 	"strings"
 	"sync"
 	"testing"
@@ -551,9 +552,9 @@ func TestByteLimiterDoesNotWaitWithinBurst(t *testing.T) {
 func TestByteLimiterWaitsWhenOverBudget(t *testing.T) {
 	limiter := NewByteLimiter(100_000, nil) // 100KB/s
 	ctx := context.Background()
-	limiter.wait(ctx, 100_000)         // 用光桶
+	limiter.wait(ctx, 100_000) // 用光桶
 	start := time.Now()
-	limiter.wait(ctx, 50_000)          // 需要 0.5s
+	limiter.wait(ctx, 50_000) // 需要 0.5s
 	elapsed := time.Since(start)
 	if elapsed < 300*time.Millisecond {
 		t.Fatalf("超额度必须等待，实际只等了 %v", elapsed)
@@ -706,4 +707,124 @@ func concat(chunks [][]byte) []byte {
 		out = append(out, c...)
 	}
 	return out
+}
+
+// 回归：**大 payload 切分后，每个分片必须是可独立解压的完整 gzip**。
+//
+// 这条测试的缺失曾经让一个数据损坏级 bug 逃过整套测试：
+// 原实现先把整个 payload 压成**一个** gzip member，再把这个 member 的
+// 字节按大小切开 —— 切出来的是 gzip **碎片**，解压报
+// `unexpected EOF` / `invalid header`。而且不是报错而是**静默乱码**：
+// 预览按 magic 判断失败后当明文显示二进制，分析端把碎片当明文喂给模型。
+//
+// 触发条件：压缩后超过单次上传上限。单条文本上限在内存大的机器上
+// 会自适应到 8MB，不可压缩内容（代码/随机串）压缩后仍接近 8MB → 必然触发。
+func TestProcessSignalEveryPartIsIndependentlyDecompressible(t *testing.T) {
+	sink := withMemSink(t)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
+	ctx := context.Background()
+
+	// 把单分片原始上限压到 1MB，让下面的体量稳定切出多片。
+	// （不变量保证它 ≥ 单条文本上限 × 8，所以单条记录永远不会被切开。）
+	//
+	// **必须先复位预算**：别的用例可能调用过 `initResourceBudget`，
+	// 把包级预算设成了大机器的值（maxPart=16MB），那样本用例的
+	// 3.7MB 内容会塞进 1 个分片、**测不到多分片路径**。
+	// 这是真实的测试隔离问题（我第一版就是这么假过的）。
+	ResetBudgetForTest()
+	t.Setenv(EnvCaptureMaxPartMB, "1")
+	t.Cleanup(ResetBudgetForTest)
+
+	// **多轮对话**形态：很多条记录合计超过单分片上限。
+	// 这正是真实「长期会话」的样子 —— 也正因如此，多分片是常态而非边缘。
+	//
+	// 内容刻意用**不可压缩**的十六进制：压缩率接近 1，
+	// 保证能跨过分片阈值（若用重复文本，压缩后可能只剩几十 KB）。
+	var msgs []Message
+	perMsg := 4096
+	for i := range 900 {
+		var b strings.Builder
+		for j := 0; b.Len() < perMsg; j++ {
+			fmt.Fprintf(&b, "%08x%08x%08x\n", i*131+j, i*7919+j, i*2654435761+j)
+		}
+		msgs = append(msgs, Message{Role: "user", Content: b.String()})
+	}
+
+	sig := signal(901, "biguser", "m", "conv-big", msgs, "")
+	n, _, err := processSignal(ctx, sig, limiter)
+	if err != nil {
+		t.Fatalf("processSignal：%v", err)
+	}
+	if n != len(msgs) {
+		t.Fatalf("应上传 %d 条消息，实际 %d", len(msgs), n)
+	}
+
+	files := sink.snapshot()
+	if len(files) < 2 {
+		t.Fatalf("这么大的内容应被切成多个分片，实际 %d 个 —— "+
+			"若只有 1 个，说明本用例没覆盖到多分片路径，需调整体量", len(files))
+	}
+
+	// **核心断言 1**：每个分片都必须能**独立解压**。
+	// 「先整体压缩再按字节切」会让这里报 unexpected EOF / invalid header。
+	parts := make(map[string]string, len(files))
+	for name, data := range files {
+		if !strings.HasSuffix(name, ".jsonl.gz") {
+			t.Fatalf("分片名不符合契约：%s", name)
+		}
+		plain, derr := gzipDecompress(data, 64<<20)
+		if derr != nil {
+			t.Fatalf("分片 %s 不是合法的完整 gzip（%v）—— "+
+				"这正是「先压缩再按字节切」会造成的碎片化损坏", name, derr)
+		}
+		parts[name] = string(plain)
+	}
+
+	// **核心断言 2**：每个分片里的每一行都必须是**完整 JSON**，
+	// 且解码出的内容要能对上原文（逐字无损）。
+	// 单条记录被切成两半时这里会失败（JSONL 数据集就此不可解析）。
+	//
+	// 注意：必须**解码后**比对内容，不能拿原文去 strings.Contains 编码后的
+	// payload —— JSON 会把换行转义成 `\n` 两个字面字符。
+	decodedCount := map[string]int{}
+	var totalRecords int
+	for name, plain := range parts {
+		for _, line := range strings.Split(strings.TrimRight(plain, "\n"), "\n") {
+			if line == "" {
+				continue
+			}
+			var rec struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			}
+			if err := common.Unmarshal([]byte(line), &rec); err != nil {
+				t.Fatalf("分片 %s 里有被切碎的记录（不是完整 JSON）：%v\n行首：%q",
+					name, err, firstN(line, 60))
+			}
+			if rec.Role == "" || rec.Content == "" {
+				t.Fatalf("分片 %s 里的记录缺字段：role=%q content 长度=%d",
+					name, rec.Role, len(rec.Content))
+			}
+			decodedCount[rec.Content]++
+			totalRecords++
+		}
+	}
+	if totalRecords != len(msgs) {
+		t.Fatalf("还原出的记录数 %d != 上传的 %d —— 有记录在切分/压缩中丢失",
+			totalRecords, len(msgs))
+	}
+	// 逐条比对：上传的每条内容都必须**恰好出现一次**。
+	for i, m := range msgs {
+		if decodedCount[m.Content] != 1 {
+			t.Fatalf("第 %d 条记录还原后出现 %d 次（应为 1）—— 压缩/切分链路有损或有重复",
+				i, decodedCount[m.Content])
+		}
+	}
+}
+
+func firstN(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }

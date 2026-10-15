@@ -562,23 +562,29 @@ func (s *oneDriveSink) Stat(ctx context.Context) (SinkStat, error) {
 // 只遍历到 maxDepth 层、且**最多访问 onedriveCountMaxDirs 个目录**
 // ——完整遍历整个 5TB 云盘既慢又会打爆 API 配额，而管理员视图只需要「大概规模」。
 //
-// [修复防御] 返回 ：达到上限就说明数字是**下界**而非总量。
+// [修复防御] 返回 truncated：达到上限就说明数字是**下界**而非总量。
 // 不披露这一点会让管理员把 undercount 当成真实值去做扩缩容决策。
-// 这与  的既有约定一致（未知用 0/标志表达，不假装是真实值）。
+// 这与 `List` / `Stat` 的既有约定一致（未知用 0/标志表达，不假装是真实值）。
 func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, files int, truncated bool, err error) {
 	if maxDepth <= 0 {
 		maxDepth = 3
 	}
-	root := s.cfg.RootPath
-	if root == "" {
-		root = ""
-	}
+	// 注意：这里**不再**取 s.cfg.RootPath —— 实际请求路径由 itemPath()
+	// 统一拼 RootPath | 目录层级由 queueItem.path 逐级累积。
+	// （原先的 `if root == "" { root = "" }` 是空操作，已删。）
 
 	type queueItem struct {
 		path  string
 		depth int
 	}
-	queue := []queueItem{{path: root, depth: 0}}
+	// [修复防御] 队列起点必须是**空串**，不是 `s.cfg.RootPath`。
+	//
+	// `listEntries` 内部会经 `itemPath()` 再拼一次 RootPath。若这里也放
+	// RootPath，实际请求变成 `/{Root}/.../{Root}/...` → Graph 404 →
+	// `fetchEntries` 把 404 当「空目录」→ 本函数**静默返回 0/0/0**，
+	// 而管理端会把这个 0 当权威值显示成「0 个目录 / 0 个文件」。
+	// 目录层级由 queueItem.path 逐级累积，与 RootPath 前缀无关。
+	queue := []queueItem{{path: "", depth: 0}}
 	visited := 0
 
 	for len(queue) > 0 && visited < onedriveCountMaxDirs {

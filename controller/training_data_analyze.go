@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"strconv"
 	"strings"
 	"time"
 
@@ -324,6 +323,3 @@ func synthesizeRelayRequest(c *gin.Context, body []byte, modelName string) bool 
 	}
 	return true
 }
-
-// 供测试注入（避免测试真的调用模型）。
-var _ = strconv.Itoa

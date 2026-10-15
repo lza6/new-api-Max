@@ -430,21 +430,53 @@ func findOrCreateOAuthUser(c *gin.Context, provider oauth.Provider, oauthUser *o
 		return user, nil
 	}
 
-	// Try to find user with legacy ID (for GitHub migration from login to numeric ID)
-	if legacyID, ok := oauthUser.Extra["legacy_id"].(string); ok && legacyID != "" {
-		if provider.IsUserIDTaken(legacyID) {
+	// 历史绑定迁移（GitHub 登录名 → 数字 id）。
+	//
+	// ## 🔴 安全边界：登录名**不是**账号所有权的证据
+	//
+	// 旧实现只要「GitHub 登录名 == 我库里存的值」就迁移并**直接登录**。
+	// 那是**账号接管**漏洞：GitHub 允许用户改名，释放出来的旧登录名
+	// 任何人都可以抢注；抢到之后用 GitHub 登录本服务，就会被当成
+	// 那个历史账号的主人。
+	//
+	// 现在的判据（任选其一，都必须由 provider 提供**不可伪造**的证据）：
+	//   - 该 GitHub 账号有一个**已验证**邮箱，与目标账号邮箱（归一化后）一致；
+	//   - 拿不到已验证邮箱列表 → **拒绝迁移**（fail-closed）。
+	//
+	// 拒绝迁移不等于拒绝登录：用户仍可用别的已绑定方式登录，
+	// 登录后再走显式的绑定流程。宁可让少数老用户手工重绑，
+	// 也不冒任何账号被接管的风险。
+	if legacyID, ok := oauthUser.Extra["legacy_id"].(string); ok && legacyID != "" && legacyID != oauthUser.ProviderUserID {
+		// 纯数字的 legacy 值不可能是一个登录名 —— 那是数据异常，
+		// 不参与登录名比较（避免「数字 id 恰好等于某人的登录名」这类碰撞）。
+		if !isAllDigits(legacyID) && provider.IsUserIDTaken(legacyID) {
 			err := provider.FillUserByProviderID(user, legacyID)
 			if err != nil {
 				return nil, err
 			}
 			if user.Id != 0 {
-				// Found user with legacy ID, migrate to new ID
-				common.SysLog(fmt.Sprintf("[OAuth] Migrating user %d from legacy_id=%s to new_id=%s",
+				if !legacyMigrationHasAccountEvidence(c, oauthUser, user) {
+					common.SysError(fmt.Sprintf(
+						"[OAuth] REFUSED legacy migration for user %d (legacy_id=%s): no verified-email evidence",
+						user.Id, legacyID))
+					recordUserSecurityAudit(c, user.Id, "user.oauth.legacy_migration_refused", map[string]any{
+						"provider":  provider.GetName(),
+						"legacy_id": legacyID,
+						"reason":    "no_verified_email_evidence",
+					})
+					return nil, oauth.ErrLegacyMigrationUnverified
+				}
+				common.SysLog(fmt.Sprintf("[OAuth] Migrating user %d from legacy_id=%s to new_id=%s (verified email matched)",
 					user.Id, legacyID, oauthUser.ProviderUserID))
 				if err := user.UpdateGitHubId(oauthUser.ProviderUserID); err != nil {
 					common.SysError(fmt.Sprintf("[OAuth] Failed to migrate user %d: %s", user.Id, err.Error()))
 					// Continue with login even if migration fails
 				}
+				recordUserSecurityAudit(c, user.Id, "user.oauth.legacy_migration", map[string]any{
+					"provider":  provider.GetName(),
+					"legacy_id": legacyID,
+					"new_id":    oauthUser.ProviderUserID,
+				})
 				return user, nil
 			}
 		}
@@ -617,4 +649,53 @@ func handleOAuthError(c *gin.Context, err error) {
 	default:
 		writeSecurityOperationError(c, err)
 	}
+}
+
+// legacyMigrationHasAccountEvidence 判断历史绑定迁移是否有**可采信的账号证据**。
+//
+// 判据：该 OAuth 账号有一个**已验证**邮箱，与目标账号邮箱（归一化后）一致。
+//
+// 拿不到已验证邮箱列表时返回 false —— **fail-closed**：
+// 没有证据就不迁移。这与「宁可让老用户手工重绑，也不冒账号被接管的风险」
+// 是同一个取舍，且方向必须是「拒绝」而不是「放行」。
+func legacyMigrationHasAccountEvidence(
+	c *gin.Context,
+	oauthUser *oauth.OAuthUser,
+	target *model.User,
+) bool {
+	targetEmail := model.NormalizeEmail(target.Email)
+	if targetEmail == "" {
+		// 目标账号没邮箱 → 无法比对 → 不给证据。
+		return false
+	}
+	raw, ok := oauthUser.Extra["verified_emails"]
+	if !ok || raw == nil {
+		return false
+	}
+	emails, ok := raw.([]string)
+	if !ok || len(emails) == 0 {
+		return false
+	}
+	for _, e := range emails {
+		if model.NormalizeEmail(e) == targetEmail {
+			return true
+		}
+	}
+	common.SysLog(fmt.Sprintf(
+		"[OAuth] legacy migration evidence mismatch: provider verified emails (%d) do not match target account email",
+		len(emails)))
+	return false
+}
+
+// isAllDigits 判断字符串是否全为数字。
+func isAllDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
 }

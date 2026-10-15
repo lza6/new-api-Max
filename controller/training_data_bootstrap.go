@@ -37,10 +37,18 @@ func StartTrainingDataCapture() {
 	// 初始化时构造，读的就是预算；运行期改预算不会重建队列。
 	// 预算初始化失败不阻塞启动（退到安全下限）。
 	budget := training_capture.InitResourceBudgetFromHost()
+	// 日志里的数字必须来自**真实生效**的对象，而不是「按预算推导出来的值」。
+	// 队列容量读实际队列（`InitResourceBudgetFromHost` 会按预算重建它），
+	// 否则会出现「日志说 queue=4096、实际是默认 1024」这种骗人的运维信息。
+	actualQueueCap := training_capture.CaptureQueueCapacity()
+	source := budget.Source
+	if !training_capture.BudgetInitialized() {
+		source = "uninitialized(fallback)"
+	}
 	common.SysLog(fmt.Sprintf(
-		"training data capture: memory budget %dMB (source=%s, maxText=%dKB, maxPart=%dMB, queue=%d)",
-		budget.BudgetBytes>>20, budget.Source,
-		budget.MaxTextBytes>>10, budget.MaxPartRawBytes>>20, budget.QueueCapacity))
+		"training data capture: memory budget %dMB (source=%s, maxText=%dKB, maxPartRaw=%dMB, queueCap=%d)",
+		budget.BudgetBytes>>20, source,
+		budget.MaxTextBytes>>10, budget.MaxPartRawBytes>>20, actualQueueCap))
 
 	sinkName := strings.TrimSpace(os.Getenv(EnvTrainingDataSink))
 

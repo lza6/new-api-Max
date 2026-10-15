@@ -45,6 +45,13 @@ type CaptureSignal struct {
 	Messages []Message
 	// ResponseText 助手回复文本（可能为空——见 plan §10.3 的诚实边界）。
 	ResponseText string
+
+	// TailOnly 超限截断时的**尾部片段**（新内容所在处）。
+	//
+	// 非空时 worker 用它做增量，而不是对整段存储文本做前缀比对 ——
+	// 存储文本含「省略 N 字节」标记，N 每次都变，前缀比对会退化成
+	// 每次全量重传（数据集里堆满重复头部）。
+	TailOnly string
 	// CreatedAt 请求完成时间（unix 秒），用于目录日期归属。
 	CreatedAt int64
 }
@@ -212,4 +219,15 @@ func (q *CaptureQueue) DroppedCount() int64 {
 		return 0
 	}
 	return q.dropped.Load()
+}
+
+// CaptureQueueCapacity 返回**当前实际生效**的队列容量。
+//
+// 供启动日志与测试使用：日志必须报告真实对象的值，而不是「按预算推导的
+// 理论值」—— 后者会让运维看到 queue=4096 而实际是默认 1024。
+func CaptureQueueCapacity() int {
+	if captureQueue == nil {
+		return 0
+	}
+	return cap(captureQueue.ch)
 }

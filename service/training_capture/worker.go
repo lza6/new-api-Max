@@ -130,7 +130,7 @@ type CaptureStatsSnapshot struct {
 	QueueLen          int    `json:"queue_len"`
 	// InFlightBytes 当前正在上传的字节数（瞬时值）。
 	InFlightBytes int64 `json:"in_flight_bytes"`
-	QueueCapacity     int    `json:"queue_capacity"`
+	QueueCapacity int   `json:"queue_capacity"`
 }
 
 // GetCaptureStats 返回统计快照。
@@ -256,6 +256,26 @@ func StopWorker() {
 
 // runWorker 主循环。
 func runWorker() {
+	// [修复防御] **顶层 panic 恢复是必须的，不是可选加固**。
+	//
+	// 后台 goroutine 的 panic 在 Go 里**不会**被 net/http 的 per-connection
+	// recover 兜住 —— 它直接终止**整个网关进程**。
+	// 而本函数调用链里有网络（sink 写入）、gzip、JSON 解析、DB、字符串切片，
+	// 任一处对畸形数据 panic，触发者都只是一条普通用户请求。
+	//
+	// 这与本模块的核心承诺（「采集绝不拖垮主业务」）完全相反，
+	// 且排查极难：崩的是后台 goroutine，没有请求栈可看。
+	// 因此这里把「采到坏数据」与「网关宕机」彻底解耦。
+	defer func() {
+		if r := recover(); r != nil {
+			captureStats.TotalUploadErrors.Add(1)
+			common.SysError(fmt.Sprintf(
+				"training capture: worker panic recovered (capture continues, gateway unaffected): %v", r))
+			// 不重入循环：本次处理的那条数据放弃，避免在坏数据上死循环。
+			// worker 由调用方（StartWorker/管理端开关）负责重启。
+		}
+	}()
+
 	// 把 workerStop 绑进限速器：停机时限速等待也要被打断，
 	// 否则一个正在等 2 分钟的限速会让 StopWorker 卡住。
 	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, workerStop)
@@ -285,6 +305,21 @@ func runWorker() {
 		// 消费时**再次**检查总开关：管理员可能在信号入队后关闭了采集。
 		// 不检查会让「关闭后仍在传」出现一个队列长度的窗口。
 		if !IsGatewayEnabled() || !CanEnableGateway() {
+			continue
+		}
+
+		// 消费时**再次**检查该用户是否仍授权。
+		//
+		// [修复防御] 授权判定发生在入队时（`MaybeCapture` → `IsGranted`），
+		// 但从入队到被消费之间有**队列积压窗口**（高并发下可达数秒）。
+		// 用户在这个窗口内撤回时，信号已经在队列里了 —— 只靠入队时的判定
+		// 会让他「撤回后仍被上传」。
+		//
+		// `IsGranted` 命中缓存时只是一次 map 读 + TTL 比对（实测 ~1µs），
+		// 在 worker 侧（非请求路径）完全可接受；而撤回会主动失效缓存，
+		// 所以这里能立刻看到最新状态。
+		if !IsGranted(signal.UserID) {
+			captureStats.TotalSkippedNoConsent.Add(1)
 			continue
 		}
 
@@ -378,9 +413,22 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 		// 保留消息级路径是为了真实结构化消息（将来扩展 dto.Request 后）
 		// 仍走原来的、更强的逐条语义。
 		if isSingleRequestBlob(messages) {
-			textSuffix, nextTextWatermark = SelectTextIncrement(messages[0].Content, currentText)
-			if textSuffix != "" {
-				increment = []Message{{Role: "request", Content: textSuffix}}
+			// 超限截断的会话：新内容在**尾部**，而存储文本含「省略 N 字节」
+			// 标记（N 每轮都变）。对整段做前缀比对会退化成每次全量重传，
+			// 所以这里改用 `TailOnly` 做真正的尾部增量。
+			//
+			// 这修复了一个静默丢数据的缺陷：原实现对超限会话只保留头部，
+			// 前缀恒定 → 增量后缀恒为空 → **尾部新内容永远不被采集**。
+			if signal.TailOnly != "" {
+				textSuffix, nextTextWatermark = SelectTextIncrement(signal.TailOnly, currentText)
+				if textSuffix != "" {
+					increment = []Message{{Role: "request", Content: textSuffix}}
+				}
+			} else {
+				textSuffix, nextTextWatermark = SelectTextIncrement(messages[0].Content, currentText)
+				if textSuffix != "" {
+					increment = []Message{{Role: "request", Content: textSuffix}}
+				}
 			}
 		} else {
 			increment, nextWatermark = SelectIncrement(messages, current)
@@ -413,38 +461,67 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 	partSeq := PickNextPartSeq(existing)
 
 	payload := encodeJSONL(increment)
-	// **压缩**（增量需求 B2）：JSON 文本 gzip 后约 1/5~1/10，
-	// 让单分片能承载 20~40MB 原始对话，同时大幅降低上行带宽占用
-	// （上行是全站共享的，省带宽 = 直接保护用户请求延迟）。
-	// 云盘上的分片从此是 .jsonl.gz —— 分析端按 gzip 解压读取。
-	compressed, err := gzipCompress(payload)
-	if err != nil {
-		// 压缩失败极罕见（内存不足等）。降级为明文上传 —— 宁可多占带宽
-		// 也不丢数据；同时记录，便于发现系统性问题。
-		common.SysError("training capture: gzip failed, uploading plain: " + err.Error())
-		compressed = payload
-	}
 
-	// 分片大小：压缩后必须 ≤ 单次上传上限。MaxPartRawBytes 是**原始**预算，
-	// 这里按压缩产物**实际大小**切分 —— 若压缩率意外地差（已压缩内容、
-	// 随机数据），切分会变多而不是失败。正确性优先于分片数美观。
-	chunks := splitBySize(compressed, OneDriveSimpleUploadMaxBytes-64<<10)
+	// ## 切分与压缩的顺序（这里曾经写错过，是个数据损坏级 bug）
+	//
+	// **必须先把原始 JSONL 按行切分，再对每一块独立 gzip。**
+	//
+	// 曾经的做法是先 `gzipCompress(整个 payload)` 得到**一个** gzip member，
+	// 再把这个 member 的字节按大小切开 —— 那是错的：
+	// 一个 gzip member 在任意字节位置切开，得到的是**碎片**，
+	// 每个碎片都不是合法的 gzip（`unexpected EOF` / `invalid header`）。
+	// 后果不是报错而是**静默乱码**：预览按 gzip magic 判断失败后当明文显示
+	// 二进制垃圾，分析端则把碎片当明文喂给模型。
+	//
+	// 正确顺序：原始文本按行切 → 每块各自 gzip → 每个分片都是**完整 member**，
+	// 可独立解压。这与 compression.go 的契约、以及
+	// compression_test.go「截断的 gzip 必须报错」的断言一致。
+	rawChunkSize := EffectiveMaxPartRawBytes()
+	// 按行边界切，保证不把一条 JSON 记录切成两半。
+	rawChunks := splitBySize(payload, rawChunkSize)
 
 	var uploadedBytes int64
-	for _, chunk := range chunks {
+	for _, rawChunk := range rawChunks {
 		partName := dirPath + "/" + PartFileName(partSeq)
+
+		// 对**这一块**独立压缩（每个分片 = 一个完整 gzip member）。
+		blob, err := gzipCompress(rawChunk)
+		if err != nil {
+			// 压缩失败极罕见（内存不足等）。降级为明文上传 —— 宁可多占带宽
+			// 也不丢数据；同时记录，便于发现系统性问题。
+			common.SysError("training capture: gzip failed, uploading plain: " + err.Error())
+			blob = rawChunk
+		}
+		// 压缩率意外差时（已压缩内容/随机数据）仍可能超过单次上传上限：
+		// 那时**再切一刀**并各自重压，而不是把超限数据硬塞进去。
+		if len(blob) > OneDriveSimpleUploadMaxBytes-64<<10 {
+			for _, sub := range splitBySize(blob, OneDriveSimpleUploadMaxBytes-64<<10) {
+				subName := dirPath + "/" + PartFileName(partSeq)
+				limiter.wait(ctx, int64(len(sub)))
+				captureStats.InFlightBytes.Add(int64(len(sub)))
+				_, writeErr := sink.WritePart(ctx, subName, sub)
+				captureStats.InFlightBytes.Add(-int64(len(sub)))
+				if writeErr != nil {
+					return 0, uploadedBytes, fmt.Errorf("write part %s: %w", subName, writeErr)
+				}
+				uploadedBytes += int64(len(sub))
+				partSeq++
+			}
+			continue
+		}
+
 		// 自适应限速：按本次上传字节数等待额度。
-		limiter.wait(ctx, int64(len(chunk)))
+		limiter.wait(ctx, int64(len(blob)))
 		// 在传字节实时可见（B5）：管理端要能看出「现在在忙什么」。
 		// 必须在 WritePart 前后成对加减 —— 忘记减会让数字只涨不落，
 		// 管理员会以为卡死。
-		captureStats.InFlightBytes.Add(int64(len(chunk)))
-		_, writeErr := sink.WritePart(ctx, partName, chunk)
-		captureStats.InFlightBytes.Add(-int64(len(chunk)))
+		captureStats.InFlightBytes.Add(int64(len(blob)))
+		_, writeErr := sink.WritePart(ctx, partName, blob)
+		captureStats.InFlightBytes.Add(-int64(len(blob)))
 		if writeErr != nil {
 			return 0, uploadedBytes, fmt.Errorf("write part %s: %w", partName, writeErr)
 		}
-		uploadedBytes += int64(len(chunk))
+		uploadedBytes += int64(len(blob))
 		partSeq++
 	}
 

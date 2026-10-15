@@ -31,6 +31,7 @@ func SetRouter(router *gin.Engine, assets WebAssets) {
 
 	SetApiRouter(router)
 	SetWebProtectionRouter(router)
+	SetTrainingDataRouter(router)
 	SetWebhookRouter(router)
 	SetDashboardRouter(router)
 	SetRelayRouter(router)

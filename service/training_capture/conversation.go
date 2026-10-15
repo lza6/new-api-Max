@@ -3,7 +3,8 @@ package training_capture
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
+	"github.com/lza6/new-api-Max/common"
+
 	"sort"
 	"strings"
 )
@@ -112,7 +113,7 @@ func AssembleConversation(objects map[string][]byte, maxBytes int) AssemblyResul
 				continue
 			}
 			var rec lineRecord
-			if err := json.Unmarshal([]byte(line), &rec); err != nil {
+			if err := common.Unmarshal([]byte(line), &rec); err != nil {
 				result.MalformedLines++
 				continue
 			}
@@ -136,6 +137,17 @@ func AssembleConversation(objects map[string][]byte, maxBytes int) AssemblyResul
 		}
 		result.Parts = append(result.Parts, part)
 		result.TotalLines += part.LineCount
+
+		// [修复防御] **必须检查 scanner.Err()**。
+		// bufio.Scanner 遇到超过 Buffer 上限的单行时，Scan() 返回 false，
+		// 该分片**剩余的所有行被静默跳过** —— 而 MalformedLines/Truncated
+		// 都还是 0/false，调用方（分析接口）会把这半截数据当完整正文
+		// 喂给模型，并且不告诉模型「有内容被丢」。
+		// 这正是本文件反复声明的「不假装完整」的反面。
+		if err := scanner.Err(); err != nil {
+			result.MalformedLines++
+			result.Truncated = true
+		}
 	}
 
 	result.Text = sb.String()

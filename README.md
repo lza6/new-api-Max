@@ -203,6 +203,36 @@ cd web && bun install --frozen-lockfile && bun run build
 | `UMAMI_WEBSITE_ID` / `UMAMI_SCRIPT_URL` | 接入 Umami 统计（可选） |
 | `GOOGLE_ANALYTICS_ID` | 接入 Google Analytics（可选） |
 
+### 训练数据采集（可选功能，默认关闭）
+
+用户明确授权后，把成功的请求异步采集到云盘，用于训练数据积累。
+**不配置 `TRAINING_DATA_SINK` 时该功能完全关闭**（不会往云盘传任何用户对话）。
+
+| 变量 | 说明 |
+|------|------|
+| `TRAINING_DATA_SINK` | 存储后端。`onedrive` 启用；留空或 `disabled` 关闭（默认） |
+| `TRAINING_ONEDRIVE_TENANT` | Azure AD 租户（`xxx.onmicrosoft.com`） |
+| `TRAINING_ONEDRIVE_CLIENT_ID` | 应用 client_id（`client_credentials` 流程，**无需浏览器登录**） |
+| `TRAINING_ONEDRIVE_CLIENT_SECRET` | 应用 client_secret（**只从环境变量读，不落库**） |
+| `TRAINING_ONEDRIVE_DRIVE_ID` | 目标 drive id |
+| `TRAINING_ONEDRIVE_ROOT_PATH` | 可选。云盘内的根目录，便于与其它内容隔离 |
+| `TRAINING_CAPTURE_BUDGET_PCT` | 采集模块可用内存占机器内存的百分比，默认 `80` |
+| `TRAINING_CAPTURE_MIN_BUDGET_MB` | 预算下限（MB），默认 `128`。检测不到 cgroup 与宿主机内存时用它兜底 |
+| `TRAINING_CAPTURE_MAX_TEXT_MB` | 单条采集文本上限（MB），默认随预算自适应（最小 64KB，最大 8MB） |
+| `TRAINING_CAPTURE_MAX_PART_MB` | 单个分片**压缩前**的原始上限（MB），默认 `16` |
+| `TRAINING_CAPTURE_QUEUE_CAP` | 采集队列容量（条），默认按预算自适应（上限 4096） |
+
+**内存预算是 cgroup 感知的**：容器里读 `mem.VirtualMemory()` 拿到的是**宿主机**内存，
+按它算 80% 会让受限容器被 OOM killer 杀掉（表现为无征兆重启）。
+因此检测顺序是 cgroup v2 → cgroup v1 → 宿主机 → 安全下限，并取 min。
+启动日志会打印实际预算与来源（`cgroupv2` / `cgroupv1` / `host` / `floor`）。
+
+**云盘数据布局**：`<ROOT_PATH>/<YYYY-MM-DD>/<用户名>-<用户ID>/<模型名>/part-0001.jsonl.gz`
+（分片为 gzip 压缩的 JSONL，读取方需先解压）。
+
+**管理端**：`/training-data` 页面提供总开关、今日采集统计、云盘配额与文件浏览，
+并支持对某段对话做深度分析（**会真实调用模型、消耗管理员额度**）。
+
 > 完整清单以代码为准：后端读环境变量的位置集中在 `common/`、`main.go` 与各 `setting/` 包中。
 
 ---

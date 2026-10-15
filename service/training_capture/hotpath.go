@@ -152,9 +152,10 @@ func BuildSignal(in CaptureInput) *CaptureSignal {
 	}
 
 	messages := make([]Message, 0, 2)
+	stored, tail := truncateForCapture(text, currentMaxTextBytes())
 	messages = append(messages, Message{
 		Role:    "request",
-		Content: truncateText(text, currentMaxTextBytes()),
+		Content: stored,
 	})
 	if reply := strings.TrimSpace(in.ResponseText); reply != "" {
 		messages = append(messages, Message{
@@ -170,31 +171,126 @@ func BuildSignal(in CaptureInput) *CaptureSignal {
 		ConversationID: in.ConversationID,
 		Messages:       messages,
 		ResponseText:   "", // 已并入 messages，避免 worker 侧重复追加
-		CreatedAt:      createdAt,
+		// TailOnly 非空表示文本超限被截断：worker 用**尾部**做增量
+		// （新内容在尾部；对整段做前缀比对会因省略标记长度变化而每次都全量重传）。
+		TailOnly:  tail,
+		CreatedAt: createdAt,
 	}
 }
 
-// truncateText 按**字节**上限截断，但不切断 UTF-8 字符。
+// truncateForCapture 截断并**同时返回尾部片段**（供增量使用）。
 //
-// 直接 `text[:n]` 会切出半个汉字（非法 UTF-8），
-// 存进 JSONL 后客户端解析会报错，且大模型训练数据里出现乱码。
+// 返回 (存储用的完整内容, 尾部增量片段)。未截断时第二个返回值为空。
 //
-// [修复防御] 截断时**必须复制**（strings.Clone），不能返回子串：
-// Go 的子串操作 `text[:cut]` 共享底层数组 —— 若返回子串，
-// 一个 10MB 的 `CombineText` 即使被「截断到 64KB」，
-// 队列里每条信号的 64KB 内容背后仍钉着完整的 10MB 原文
-// （独立审查确认了这一点：1024 条队列最坏可钉住 10GB 级内存）。
-// 「内存硬闸门」的注释只有在复制时才真正成立。
-// 未截断时不需要复制：长文本本就要入队，浅拷贝共享即可。
-func truncateText(text string, maxBytes int) string {
+// **总长度严格 ≤ maxBytes**（含省略标记）：上限是内存闸门，
+// 不能因为加了标记就超出 —— 否则队列最坏占用会按标记长度成倍放大。
+func truncateForCapture(text string, maxBytes int) (string, string) {
 	if maxBytes <= 0 || len(text) <= maxBytes {
-		return text
+		return text, ""
 	}
-	// 从 maxBytes 往回退到合法 UTF-8 边界。
-	cut := maxBytes
+	// 先按「上限」构造一次固定长度的标记，用它算出可用于正文的预算。
+	// 标记长度只取决于 elided 的位数，用 0 先探一次即可（下界），
+	// 实际 elided 最多 20 位，用 24 字节余量足够且不让总长超出。
+	const markerReserve = 64
+	bodyBudget := maxBytes - markerReserve
+	if bodyBudget < 2 {
+		// 上限小到放不下标记 → 退化为纯头部截断（无标记）。
+		return strings.Clone(safeCutPrefix(text, maxBytes)), ""
+	}
+
+	half := bodyBudget / 2
+	head := safeCutPrefix(text, half)
+	tailStart := len(text) - half
+	if tailStart <= len(head) {
+		// 头尾重叠（文本只比上限略大）→ 不值得省略中间，直接取头部。
+		return strings.Clone(safeCutPrefix(text, maxBytes)), ""
+	}
+	tail := text[skipToRuneStart(text, tailStart):]
+	elided := len(text) - len(head) - len(tail)
+	marker := elisionMarker(elided)
+	// 标记实际长度可能与预留不同（elided 位数变化）——按实际裁剪尾部，
+	// 保证 head+marker+tail 严格 ≤ maxBytes。
+	if over := len(head) + len(marker) + len(tail) - maxBytes; over > 0 {
+		if over >= len(tail) {
+			tail = ""
+		} else {
+			tail = tail[over:]
+			// 裁剪后可能落在多字节字符中间，向后对齐。
+			tail = tail[skipToRuneStart(tail, 0):]
+		}
+	}
+	stored := strings.Clone(head) + marker + strings.Clone(tail)
+	// 尾部也要复制（切断对大原文的引用）；作为独立增量单独返回。
+	return stored, strings.Clone(tail)
+}
+
+// truncateText 按**字节**上限截断（保留头+尾，见 truncateForCapture）。
+//
+// 只返回存储用的字符串；需要尾部增量时用 truncateForCapture。
+// 合并成一个实现是刻意的：曾经这里与 truncateForCapture 是两份逻辑不同的
+// UTF-8 边界截断（DRY 违规），两边行为不一致会让「显示的内容」与
+// 「用于增量的内容」对不上，属于最难排查的一类不一致。
+func truncateText(text string, maxBytes int) string {
+	stored, _ := truncateForCapture(text, maxBytes)
+	return stored
+}
+
+// safeCutPrefixIndex 返回 <= limit 且位于 UTF-8 边界的位置。
+func safeCutPrefixIndex(text string, limit int) int {
+	if limit >= len(text) {
+		return len(text)
+	}
+	cut := limit
 	for cut > 0 && (text[cut]&0xC0) == 0x80 {
 		cut--
 	}
-	// [关键] 复制而非共享：切断对原大字符串底层数组的引用。
-	return strings.Clone(text[:cut])
+	return cut
+}
+
+// safeCutPrefix 同 safeCutPrefixIndex，但直接返回子串。
+func safeCutPrefix(text string, limit int) string {
+	return text[:safeCutPrefixIndex(text, limit)]
+}
+
+// skipToRuneStart 从 pos 向后找到第一个合法 UTF-8 起始字节。
+func skipToRuneStart(text string, pos int) int {
+	i := pos
+	for i < len(text) && (text[i]&0xC0) == 0x80 {
+		i++
+	}
+	return i
+}
+
+// elisionMarker 中间省略标记。
+//
+// **固定前缀 + 省略字节数**。用一个显眼的、几乎不可能出现在真实对话里的
+// 形式，便于下游识别「这不是用户原文」。
+func elisionMarker(elidedBytes int) string {
+	return "\n…[training-capture: " + itoaSmall(elidedBytes) + " bytes elided]…\n"
+}
+
+// itoaSmall 小整数转十进制字符串。
+//
+// 不用 strconv 是为了让 hotpath.go 只依赖 strings —— 该文件在请求路径上，
+// 保持依赖面最小便于审查（且这里的数字最多 20 位，手写循环足够）。
+func itoaSmall(v int) string {
+	if v == 0 {
+		return "0"
+	}
+	neg := v < 0
+	if neg {
+		v = -v
+	}
+	var buf [20]byte
+	i := len(buf)
+	for v > 0 {
+		i--
+		buf[i] = byte('0' + v%10)
+		v /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
 }

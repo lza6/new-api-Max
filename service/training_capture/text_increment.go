@@ -1,7 +1,6 @@
 package training_capture
 
 import (
-	"strings"
 	"unicode/utf8"
 )
 
@@ -144,10 +143,4 @@ func utf8SafeCut(text string, limit int) int {
 		cut--
 	}
 	return cut
-}
-
-// trimCommonEdge 去掉首尾空白，用于把「增量」写成干净的一行。
-// 不做内容改写（只去首尾），保留真实对话（训练数据的价值在于真实）。
-func trimCommonEdge(s string) string {
-	return strings.Trim(s, " \t\r\n")
 }
