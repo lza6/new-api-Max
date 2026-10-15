@@ -313,3 +313,48 @@ glm-5.3-flash 同形态展开为 `$0.004 / $0.005 / $0.006`。
 ### 审查确认的新缺口（待修）
 - CountToken=false 时 CombineText 为空 → 采集静默失效（需启动日志提示）
 - Relay() 成功分支接线零测试（需 RED 验证）
+
+---
+
+## 2026-10-15/16 终局审计轮：独立审查 + 对抗审查 + 修复（16 提交）
+
+### 做了什么（本轮链路）
+1. **接线与装配**：worker 全链路测试 → 接线到请求热路径 → 启动装配 → 接口层 → 前端开关 → README
+2. **自适应与压缩**（用户中断补充）：cgroup 感知的 80% 内存预算；分片 gzip 压缩
+3. **云盘读取与管理端**：SinkReader（读/删/列树）+ 文件浏览 + 对话深度分析 + 继续追问
+4. **两个审查线程**：六维独立审查 + 对抗式批判审查
+5. **修复**：P0 路由 404、P1 gzip 分片损坏、P1 账号接管、P1 尾部静默丢弃、
+   P1 worker 无 panic 恢复 + 8 项 P2
+
+### 关键修复与 RED 验证
+| 问题 | 级别 | 修法与验证 |
+|---|---|---|
+| 管理端接口全部 404（`adminRoute` 前缀是 `/api/user`） | P0 | 迁到 `/api/admin/...`（照 web-protection 范式）+ **路由契约测试**（扫描前端源码断言路径存在）。RED：改错一个前端路径 → 测试失败并指出「会 404」 |
+| 先整体 gzip 再按字节切 → 分片是坏 gzip 碎片 | P1 | 改为「先按行切原始 JSONL，再逐块各自 gzip」+ 不变量 `分片上限 ≥ 文本上限×8`。RED：改回旧序 → 测试打印出泄漏的 gzip 魔数 |
+| OAuth 历史绑定迁移可被**账号接管** | P1 | 要求「已验证邮箱一致」作证据，否则拒绝（fail-closed）+ 审计。5 条用例含攻击者场景 |
+| 超限会话**尾部永不采集**（静默丢数据） | P1 | 截断保留头+尾；`CaptureSignal.TailOnly` 做尾部增量 |
+| worker 无 panic 恢复 → 单个坏数据杀进程 | P1 | 顶层 `defer recover()`，与「绝不拖垮主业务」承诺对齐 |
+| `scanner.Err()` 未检查 → 静默丢弃分片剩余内容且声称完整 | P2 | 加检查并计入 `Truncated` |
+| `CountItems` 双拼 RootPath → 目录/文件数恒为 0 | P2 | 队列起点改为空串（`itemPath` 已负责前缀） |
+| 队列容量自适应是死代码（包级变量早于预算初始化） | P2 | `ApplyBudgetToRuntime()` 按预算重建；日志报**实际**容量 |
+| worker 消费时不复查授权（撤回后已入队仍上传） | P2 | 消费前 `IsGranted` 复查 |
+| `max_bytes` 无上限可绕过读入巨型文件 | P2 | 夹取到 64MB |
+| `encoding/json` 直用违反 AGENTS.md | P2 | 改 `common.Unmarshal` |
+| 两份重复的 UTF-8 截断（DRY） | P2 | 合并为 `truncateForCapture` |
+| `budgetInitialized` 守卫从未被读取（自身静默失效） | P3 | 暴露 `BudgetInitialized()` 真实读取 |
+| 测试隔离：gzip 用例受前序预算污染而**假过** | P2 | 加 `ResetBudgetForTest()` |
+
+### 上游对标（fork 点 2026-09-09，落后 223 提交）
+- **已修/更优**：ClickHouse `other` 列 Scan error（上游仍 open）、邮箱登录大小写
+- **确认存在（已复现未修，需业主拍板）**：
+  - Claude 全缓存命中可能零计费（`hasBillableUsage` 忽略 cache）
+  - Claude cache creation 5m/1h 未拆分总量全落入便宜的 5m 档（**网关少收费**）
+- **验证中**：多密钥任务轮询、OAuth 绑定证据、auth refresh 共享限流桶
+
+### 未闭环（如实）
+- HTTP 层 p95 压测对照（需真实上游渠道）
+- 浏览器 E2E（两个新页面从未在真浏览器点过）
+- assistant 回复未被采集（架构限制，已在界面与提示词如实披露）
+- 逐轮 role 只能启发式还原
+- 计费修复（需拍板）
+- 多云端对接（仅接口抽象，只有 OneDrive 实现）
