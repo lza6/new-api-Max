@@ -32,7 +32,7 @@ const (
 	partFilePrefix = "part-"
 
 	// partFileSuffix 分片文件名后缀。逐行 JSON（JSONL）便于流式追加与逐条读取。
-	partFileSuffix = ".jsonl"
+	partFileSuffix = ".jsonl.gz"
 
 	// partFileDigits 分片序号补零位数。
 	//
@@ -166,8 +166,11 @@ func SanitizeModelName(model string) string {
 
 // PartFileName 生成分片文件名（零填充，字典序 == 数字序）。
 //
-// seq 从 1 开始。超过 4 位时自然增长（`part-10000.jsonl`），
-// 此时字典序会失真，但 9999 个分片（≈78GB/天/用户/模型）已远超实际；
+// 分片内容是 **gzip 压缩的 JSONL**（见 compression.go），因此后缀是
+// `.jsonl.gz` —— 后缀本身就是「需先解压」的显式声明。
+//
+// seq 从 1 开始。超过 4 位时自然增长（`part-10000.jsonl.gz`），
+// 此时字典序会失真，但 9999 个分片已远超实际；
 // 万一到达，`List` 的解析会按数值比较兜底（见 PickNextPartSeq）。
 func PartFileName(seq int) string {
 	if seq < 1 {
@@ -176,12 +179,24 @@ func PartFileName(seq int) string {
 	return fmt.Sprintf("%s%0*d%s", partFilePrefix, partFileDigits, seq, partFileSuffix)
 }
 
-// ParsePartSeq 从分片文件名解析序号。非本程序命名规则的文件返回 0。
+// ParsePartSeq 从分片文件名解析序号。
+//
+// 同时接受 `.jsonl.gz`（当前格式）与 `.jsonl`（历史格式——
+// 已部署的旧数据仍需能被「下一个序号」计算识别，否则重启后会
+// 覆盖历史分片）。非本程序命名规则的文件返回 0。
 func ParsePartSeq(name string) int {
-	if !strings.HasPrefix(name, partFilePrefix) || !strings.HasSuffix(name, partFileSuffix) {
+	if !strings.HasPrefix(name, partFilePrefix) {
 		return 0
 	}
-	digits := strings.TrimSuffix(strings.TrimPrefix(name, partFilePrefix), partFileSuffix)
+	digits := strings.TrimPrefix(name, partFilePrefix)
+	switch {
+	case strings.HasSuffix(digits, ".jsonl.gz"):
+		digits = strings.TrimSuffix(digits, ".jsonl.gz")
+	case strings.HasSuffix(digits, ".jsonl"):
+		digits = strings.TrimSuffix(digits, ".jsonl")
+	default:
+		return 0
+	}
 	if digits == "" {
 		return 0
 	}

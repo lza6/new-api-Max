@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -30,6 +31,16 @@ const EnvTrainingDataSink = "TRAINING_DATA_SINK"
 func StartTrainingDataCapture() {
 	// 注入落库函数，让 service 层不必依赖 options 表的具体实现。
 	training_capture.SetDBUpdater(model.UpdateOption)
+
+	// **先初始化资源预算**（增量需求 B1：按机器内存自适应，用户指定 80%）。
+	// 必须在任何队列/分片常量被消费之前 —— 包级变量 captureQueue 在包
+	// 初始化时构造，读的就是预算；运行期改预算不会重建队列。
+	// 预算初始化失败不阻塞启动（退到安全下限）。
+	budget := training_capture.InitResourceBudgetFromHost()
+	common.SysLog(fmt.Sprintf(
+		"training data capture: memory budget %dMB (source=%s, maxText=%dKB, maxPart=%dMB, queue=%d)",
+		budget.BudgetBytes>>20, budget.Source,
+		budget.MaxTextBytes>>10, budget.MaxPartRawBytes>>20, budget.QueueCapacity))
 
 	sinkName := strings.TrimSpace(os.Getenv(EnvTrainingDataSink))
 

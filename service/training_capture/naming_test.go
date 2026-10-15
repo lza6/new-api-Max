@@ -134,18 +134,18 @@ func TestSanitizeModelNameBoundsLength(t *testing.T) {
 func TestPartFileNameZeroPads(t *testing.T) {
 	// 补零是**功能需求**而非美观：恢复分片序号靠「列举后取最大」，
 	// 不补零时 `part-10` 字典序小于 `part-9`，重启会覆盖已上传分片。
-	assert.Equal(t, "part-0001.jsonl", PartFileName(1))
-	assert.Equal(t, "part-0009.jsonl", PartFileName(9))
-	assert.Equal(t, "part-0010.jsonl", PartFileName(10))
-	assert.Equal(t, "part-9999.jsonl", PartFileName(9999))
+	assert.Equal(t, "part-0001.jsonl.gz", PartFileName(1))
+	assert.Equal(t, "part-0009.jsonl.gz", PartFileName(9))
+	assert.Equal(t, "part-0010.jsonl.gz", PartFileName(10))
+	assert.Equal(t, "part-9999.jsonl.gz", PartFileName(9999))
 	// 超过 4 位自然增长（解析侧按数值比较兜底）。
-	assert.Equal(t, "part-10000.jsonl", PartFileName(10000))
+	assert.Equal(t, "part-10000.jsonl.gz", PartFileName(10000))
 }
 
 func TestPartFileNameClampsNonPositive(t *testing.T) {
 	// seq 0/负数无意义；夹到 1 而不是产出 `part-0000.jsonl`。
-	assert.Equal(t, "part-0001.jsonl", PartFileName(0))
-	assert.Equal(t, "part-0001.jsonl", PartFileName(-5))
+	assert.Equal(t, "part-0001.jsonl.gz", PartFileName(0))
+	assert.Equal(t, "part-0001.jsonl.gz", PartFileName(-5))
 }
 
 func TestParsePartSeqRoundTrips(t *testing.T) {
@@ -158,7 +158,7 @@ func TestParsePartSeqRejectsForeignNames(t *testing.T) {
 	// 云盘目录里可能有别的东西；非本程序命名的一律不认（返回 0）。
 	for _, name := range []string{
 		"", "part-.jsonl", "part-abc.jsonl", "part-0001.txt",
-		"other-0001.jsonl", "part-0001.jsonl.gz", "0001.jsonl",
+		"other-0001.jsonl", "part-0001.jsonl.gz.gz", "0001.jsonl",
 	} {
 		assert.Zero(t, ParsePartSeq(name), "不应解析 %q", name)
 	}
@@ -167,7 +167,7 @@ func TestParsePartSeqRejectsForeignNames(t *testing.T) {
 func TestPickNextPartSeqUsesNumericMaxNotLexical(t *testing.T) {
 	// 关键回归：位数不同时字典序失真（"part-9" > "part-10" 字面上成立），
 	// 必须按**数值**取最大，否则重启后从 10 退回 10……或更糟，覆盖 part-10。
-	names := []string{"part-0009.jsonl", "part-0010.jsonl", "part-0002.jsonl"}
+	names := []string{"part-0009.jsonl.gz", "part-0010.jsonl.gz", "part-0002.jsonl.gz"}
 	assert.Equal(t, 11, PickNextPartSeq(names))
 }
 
@@ -179,7 +179,7 @@ func TestPickNextPartSeqStartsAtOneWhenEmpty(t *testing.T) {
 }
 
 func TestPickNextPartSeqIgnoresForeignAndHandlesFiveDigits(t *testing.T) {
-	assert.Equal(t, 10001, PickNextPartSeq([]string{"part-10000.jsonl", "notes.md"}))
+	assert.Equal(t, 10001, PickNextPartSeq([]string{"part-10000.jsonl.gz", "notes.md"}))
 }
 
 func TestDateDirNameIsUTCAndStable(t *testing.T) {

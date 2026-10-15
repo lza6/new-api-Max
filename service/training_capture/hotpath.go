@@ -89,7 +89,16 @@ func SetHotPathEnabledForTest(enabled bool) func() {
 // 截断而非拒绝：截断仍保留开头的对话特征，对增量去重与
 // 「有没有这类数据」的判断都够用；拒绝则等于大请求完全不被采集。
 // 截断位置会被记录（见 `Truncated`），不假装是完整数据。
+// maxCapturedTextBytes 回退值：预算系统未初始化时使用（见 resources.go）。
 const maxCapturedTextBytes = 64 << 10 // 64KB
+
+// currentMaxTextBytes 返回生效的单条文本上限（预算初始化后取预算值）。
+func currentMaxTextBytes() int {
+	if b := GetResourceBudget(); b.MaxTextBytes > 0 {
+		return b.MaxTextBytes
+	}
+	return maxCapturedTextBytes
+}
 
 // CaptureInput 调用方（controller 层）能提供的**已有**数据。
 //
@@ -145,12 +154,12 @@ func BuildSignal(in CaptureInput) *CaptureSignal {
 	messages := make([]Message, 0, 2)
 	messages = append(messages, Message{
 		Role:    "request",
-		Content: truncateText(text, maxCapturedTextBytes),
+		Content: truncateText(text, currentMaxTextBytes()),
 	})
 	if reply := strings.TrimSpace(in.ResponseText); reply != "" {
 		messages = append(messages, Message{
 			Role:    "assistant",
-			Content: truncateText(reply, maxCapturedTextBytes),
+			Content: truncateText(reply, currentMaxTextBytes()),
 		})
 	}
 
@@ -169,6 +178,14 @@ func BuildSignal(in CaptureInput) *CaptureSignal {
 //
 // 直接 `text[:n]` 会切出半个汉字（非法 UTF-8），
 // 存进 JSONL 后客户端解析会报错，且大模型训练数据里出现乱码。
+//
+// [修复防御] 截断时**必须复制**（strings.Clone），不能返回子串：
+// Go 的子串操作 `text[:cut]` 共享底层数组 —— 若返回子串，
+// 一个 10MB 的 `CombineText` 即使被「截断到 64KB」，
+// 队列里每条信号的 64KB 内容背后仍钉着完整的 10MB 原文
+// （独立审查确认了这一点：1024 条队列最坏可钉住 10GB 级内存）。
+// 「内存硬闸门」的注释只有在复制时才真正成立。
+// 未截断时不需要复制：长文本本就要入队，浅拷贝共享即可。
 func truncateText(text string, maxBytes int) string {
 	if maxBytes <= 0 || len(text) <= maxBytes {
 		return text
@@ -178,5 +195,6 @@ func truncateText(text string, maxBytes int) string {
 	for cut > 0 && (text[cut]&0xC0) == 0x80 {
 		cut--
 	}
-	return text[:cut]
+	// [关键] 复制而非共享：切断对原大字符串底层数组的引用。
+	return strings.Clone(text[:cut])
 }

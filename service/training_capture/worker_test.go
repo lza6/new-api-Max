@@ -112,13 +112,26 @@ func (m *memSink) snapshot() map[string][]byte {
 
 // 汇总所有分片的 JSONL 行数（用于断言「到底传了多少条」）。
 //
-// 必须持锁：worker goroutine 在并发写 files，而不持锁地 range map
-// 就是数据竞争（-race 下会直接报错）。测试辅助函数同样要遵守并发契约。
+// 分片现在是 **gzip 压缩**的（见 compression.go），统计行数前必须先解压
+// ——直接数压缩字节里的 '\n' 是无意义的。按后缀分流：.gz 解压后统计，
+// 其它（历史明文 fixture）直接统计。
+//
+// 必须持锁：worker goroutine 在并发写 files，不持锁的 range map
+// 是数据竞争（-race 下直接报错）。
 func (m *memSink) totalLines() int {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	total := 0
-	for _, data := range m.files {
+	for name, data := range m.files {
+		if strings.HasSuffix(name, ".gz") {
+			plain, err := gzipDecompress(data, 1<<30)
+			if err != nil {
+				// 解压失败说明写入的不是合法 gzip —— 这本身就是缺陷，
+				// 不能静默跳过（否则测试对坏数据视而不见）。
+				panic("memSink: part is not valid gzip: " + err.Error())
+			}
+			data = plain
+		}
 		total += strings.Count(string(data), "\n")
 	}
 	return total
@@ -181,7 +194,7 @@ func TestProcessSignalCreatesDateUserModelLayout(t *testing.T) {
 		t.Fatalf("应有且仅有 1 个分片，实际 %d 个：%v", len(files), keysOf(files))
 	}
 	// 三级目录：日期 / 用户名-用户ID / 模型。日期取 UTC。
-	const want = "2026-10-14/alice-7/gpt-4o/part-0001.jsonl"
+	const want = "2026-10-14/alice-7/gpt-4o/part-0001.jsonl.gz"
 	if _, ok := files[want]; !ok {
 		t.Fatalf("目录结构不对，期望 %q，实际 %v", want, keysOf(files))
 	}
@@ -415,7 +428,7 @@ func TestProcessSignalOpensNewPartWhenExistingPartsPresent(t *testing.T) {
 	if err := sink.EnsureDir(ctx, dir); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := sink.WritePart(ctx, dir+"/part-0001.jsonl", []byte("{\"role\":\"user\",\"content\":\"旧\"}\n")); err != nil {
+	if _, err := sink.WritePart(ctx, dir+"/part-0001.jsonl.gz", []byte("{\"role\":\"user\",\"content\":\"旧\"}\n")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -427,11 +440,11 @@ func TestProcessSignalOpensNewPartWhenExistingPartsPresent(t *testing.T) {
 
 	files := sink.snapshot()
 	// **重启后绝不能覆盖已上传分片**（不可逆的数据破坏）。
-	if len(files[dir+"/part-0001.jsonl"]) == 0 ||
-		!strings.Contains(string(files[dir+"/part-0001.jsonl"]), "旧") {
+	if len(files[dir+"/part-0001.jsonl.gz"]) == 0 ||
+		!strings.Contains(string(files[dir+"/part-0001.jsonl.gz"]), "旧") {
 		t.Fatal("已上传的 part-0001 被覆盖了——重启会破坏历史数据")
 	}
-	if _, ok := files[dir+"/part-0002.jsonl"]; !ok {
+	if _, ok := files[dir+"/part-0002.jsonl.gz"]; !ok {
 		t.Fatalf("应在下一个序号开新分片，实际分片：%v", keysOf(files))
 	}
 }

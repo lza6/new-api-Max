@@ -180,11 +180,20 @@ func markUserToday(userId int) {
 // ---------- 队列与 worker 生命周期 ----------
 
 var (
-	captureQueue = NewCaptureQueue(CaptureQueueDefaultCapacity)
+	captureQueue = newAdaptiveCaptureQueue()
 
 	workerOnce sync.Once
 	workerStop chan struct{}
 )
+
+// newAdaptiveCaptureQueue 按内存预算构造队列（增量需求 B1）。
+//
+// 预算在 initResourceBudget（启动装配调用）里确定；
+// 未初始化时退回默认容量 —— 保证「忘记接线」时行为与旧版一致，
+// 而不是 panic 或容量 0。
+func newAdaptiveCaptureQueue() *CaptureQueue {
+	return NewCaptureQueue(GetResourceBudget().QueueCapacity)
+}
 
 // MaybeCapture 是**请求路径上唯一被调用的入口**。
 //
@@ -396,8 +405,22 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 	partSeq := PickNextPartSeq(existing)
 
 	payload := encodeJSONL(increment)
-	// 分片按 MaxPartBytes 切分。
-	chunks := splitBySize(payload, MaxPartBytes)
+	// **压缩**（增量需求 B2）：JSON 文本 gzip 后约 1/5~1/10，
+	// 让单分片能承载 20~40MB 原始对话，同时大幅降低上行带宽占用
+	// （上行是全站共享的，省带宽 = 直接保护用户请求延迟）。
+	// 云盘上的分片从此是 .jsonl.gz —— 分析端按 gzip 解压读取。
+	compressed, err := gzipCompress(payload)
+	if err != nil {
+		// 压缩失败极罕见（内存不足等）。降级为明文上传 —— 宁可多占带宽
+		// 也不丢数据；同时记录，便于发现系统性问题。
+		common.SysError("training capture: gzip failed, uploading plain: " + err.Error())
+		compressed = payload
+	}
+
+	// 分片大小：压缩后必须 ≤ 单次上传上限。MaxPartRawBytes 是**原始**预算，
+	// 这里按压缩产物**实际大小**切分 —— 若压缩率意外地差（已压缩内容、
+	// 随机数据），切分会变多而不是失败。正确性优先于分片数美观。
+	chunks := splitBySize(compressed, OneDriveSimpleUploadMaxBytes-64<<10)
 
 	var uploadedBytes int64
 	for _, chunk := range chunks {

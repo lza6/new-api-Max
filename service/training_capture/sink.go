@@ -52,6 +52,10 @@ var ErrSinkNotSupported = errors.New("training data sink: operation not supporte
 // 后者是运行时问题（可能重试）。管理端据此给出不同的提示。
 var ErrSinkNotConfigured = errors.New("training data sink: not configured")
 
+// ErrDecompressTooLarge 解压产物超过安全上限（疑似 zip-bomb 或脏数据）。
+// 拒绝解压比 OOM 好：管理端分析一次坏文件不该拖垮整个进程。
+var ErrDecompressTooLarge = errors.New("training data sink: decompressed content exceeds safety limit")
+
 // TrainingDataSink 云盘后端接口。
 type TrainingDataSink interface {
 	// Name 后端名（稳定字符串，用于展示与日志）。

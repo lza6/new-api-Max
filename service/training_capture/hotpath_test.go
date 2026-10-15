@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 	"unicode/utf8"
+	"unsafe"
 
 	"github.com/lza6/new-api-Max/relaykit/types"
 )
@@ -287,4 +288,41 @@ func BenchmarkHotPathFullCapture(b *testing.B) {
 			captureQueue.TryEnqueue(*signal)
 		}
 	}
+}
+
+// 回归（独立审查 P1）：截断必须**复制**而不是返回子串。
+//
+// Go 的 `s[:n]` 共享底层数组。若 truncateText 返回子串，
+// 一条 10MB 的 CombineText 即使「截断到 64KB」，其底层数组仍被
+// 队列里的信号引用 —— 「内存硬闸门」实际不成立（1024 条队列
+// 最坏钉住 10GB）。用 unsafe 指针比对验证截断产物**不再共享**原文。
+func TestTruncateTextClonesUnderlyingArray(t *testing.T) {
+	original := strings.Repeat("a", 1<<20) // 1MB
+	truncated := truncateText(original, 64<<10)
+
+	if len(truncated) != 64<<10 {
+		t.Fatalf("截断长度应为 64KB，实际 %d", len(truncated))
+	}
+	if unsafeStringSharesBacking(original, truncated) {
+		t.Fatal("截断产物与原文共享底层数组 —— 闸门失效，仍钉住 1MB 原文")
+	}
+
+	// 未截断路径允许共享（复制是浪费）：语义确认。
+	if truncateText(original, 0) == "" {
+		t.Fatal("maxBytes<=0 不应清空")
+	}
+}
+
+// unsafeStringSharesBacking 判断两个 string 是否共享底层数组。
+// 仅测试用；生产代码不得出现 unsafe。
+func unsafeStringSharesBacking(a, b string) bool {
+	if len(a) == 0 || len(b) == 0 || len(b) > len(a) {
+		return false
+	}
+	pa := unsafe.Pointer(unsafe.StringData(a))
+	pb := unsafe.Pointer(unsafe.StringData(b))
+	if pa == nil || pb == nil {
+		return false
+	}
+	return uintptr(pa) <= uintptr(pb) && uintptr(pb) < uintptr(pa)+uintptr(len(a))
 }
