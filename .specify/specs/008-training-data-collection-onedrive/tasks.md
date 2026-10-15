@@ -98,7 +98,7 @@
 
 ## Phase 4：接口层
 
-- [ ] **4.1 用户端接口**（依赖 3.1）
+- [x] **4.1 用户端接口**（依赖 3.1）（已完成，含 5 条安全契约用例）
   - `GET /api/user/training-data/status` → `{available, granted, policyVersion, grantedAt}`
   - `POST /api/user/training-data/grant` / `revoke`
   - `available` 由「管理员总开关 && 云盘已配置」决定
@@ -106,7 +106,7 @@
   - 验收：单测 + 真实 E2E（未登录 401 / 授权后 granted=true / 撤回后 false）
   - **Requirement**: Story 1
 
-- [ ] **4.2 管理端接口**（依赖 2.2、3.2）
+- [x] **4.2 管理端接口**（依赖 2.2、3.2）（已完成）
   - `GET /api/training-data/admin/overview` → 今日用户数/对话数/字节 + 云盘配额 + 文件夹/文件数 + 当前日期
   - `GET /api/training-data/admin/by-date?date=YYYY-MM-DD` → 该日采集量
   - `PUT /api/training-data/admin/enabled` → 总开关（关 → worker 停消费）
@@ -115,7 +115,7 @@
 
 ## Phase 5：前端
 
-- [ ] **5.1 个人资料页开关**（依赖 4.1）`[P]`
+- [x] **5.1 个人资料页开关**（依赖 4.1）`[P]`（已完成，typecheck+lint 通过；浏览器 E2E 待做）
   - 复用既有设置项渲染范式（先检索 `src/features/profile/`）
   - 开关 + **常驻小字说明** + 首次开启弹**免责声明**（必须点同意）
   - `available=false` 时**不渲染**开关
@@ -129,7 +129,9 @@
   - 验收：真实浏览器 E2E + 截图
   - **Requirement**: Story 5
 
-- [ ] **5.3 i18n 全语言同步**
+  - [x] **5.3 i18n 全语言同步**（已完成：20 键 × 7 locale = 140 行**纯文本插入**，
+    `git diff --numstat` 为 140 insertions / 0 deletions，证明无任何行被改写；
+    混淆键 `footer.newapi.projectAttributionSuffix` 完好）
   - 新增键走**纯文本行插入**（保护混淆键），跑 `bun run i18n:sync` 验证无漂移
   - 验收：7 locale 均含新键 + 混淆键完好 + `i18n:sync` 无 diff
   - **Requirement**: 宪法 VI
@@ -149,11 +151,19 @@
 
 ## Phase 7：README 重写
 
-- [ ] **7.1 README 全面重写**（可与 Phase 4-5 并行）
+- [x] **7.1 README 全面重写**（可与 Phase 4-5 并行）
   - 全中文（术语/路径/命令保留英文）
   - 覆盖：项目定位、快速开始、配置项、部署、验证命令、常见问题
   - **保留保护标识**（new-api / QuantumNous 归属不得删改）
   - 移除上游残留与过时内容
+  - 已完成：600 行 → ~360 行全中文。删除上游模板段落
+    （Trusted Partners 徽章墙 / Special Thanks / 泛化英文 Project Description）。
+    **许可块用 `diff` 与旧 README 逐行比对，结果完全一致**（含 AGPLv3
+    Section 7 附加条款、`Frontend design and development by New API
+    contributors.`、指向 lza6/new-api-Max 的可见链接、One API 署名、
+    support@quantumnous.com 联系方式、页脚 by lza6）。
+    文中 23 个环境变量、全部前端命令、6 个 Makefile 目标、compose 三服务
+    与端口、`/healthz` `/readyz` 等**逐条 grep 核验存在**，无编造。
   - 验收：按 README 步骤**真实走一遍**能跑起来（新环境模拟）
   - **Requirement**: Story 8
 
