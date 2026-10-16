@@ -221,3 +221,36 @@ func DeleteStaleTrainingDataWatermarks(cutoffUnix int64) (int64, error) {
 		Delete(&TrainingDataWatermark{})
 	return result.RowsAffected, result.Error
 }
+
+// DeleteTrainingDataForUser 删除某用户的采集授权记录与全部水位。
+//
+// ## 为什么必须由调用方在用户被删除时调用（合规缺口，不是可选清理）
+//
+// 用户注销/被硬删后，这两张表**不会自动清理**：
+//   - `training_data_consents` 会留下「曾经授权过」的记录；
+//   - `training_data_watermarks` 会留下他所有会话的水位。
+//
+// 更须注意的是**用户 ID 复用**：若数据库回收了自增 ID，
+// 一个新用户拿到同一个 ID 后，会**继承前一位用户的 `granted=true`**
+// —— 也就是「从未授权却被采集」。这是真实的数据保护风险，
+// 不是「表的整洁度」问题。
+//
+// ## 边界（诚实说明）
+//
+// 本函数**只清数据库**。已经上传到云盘的分片**不会**被删除 ——
+// 那是「数据主体删除请求」，需要云盘侧的删除流程（且删除本身不可逆，
+// 应有人工确认）。云盘路径形如 `<日期>/<用户名>-<用户ID>/`，
+// 调用方可据此另行处理（见 SOP-排障 里的说明）。
+//
+// 返回被删除的水位行数。
+func DeleteTrainingDataForUser(userId int) (int64, error) {
+	if userId <= 0 {
+		return 0, nil
+	}
+	// 两张表都要清：只清水位会留下授权记录（ID 复用时会误判为已授权）。
+	if err := DB.Where("user_id = ?", userId).Delete(&TrainingDataConsent{}).Error; err != nil {
+		return 0, err
+	}
+	result := DB.Where("user_id = ?", userId).Delete(&TrainingDataWatermark{})
+	return result.RowsAffected, result.Error
+}

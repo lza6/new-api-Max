@@ -622,6 +622,19 @@ func HardDeleteUserById(id int) error {
 	if id == 0 {
 		return errors.New("id 为空！")
 	}
+	// [修复防御] 用户被硬删时**必须**同时清掉他的采集授权与水位。
+	//
+	// 不清的后果（合规缺口，不只是「表不整洁」）：
+	//   - 留下「曾经授权过」的记录；
+	//   - 若数据库回收了自增 ID，新用户拿到同一 ID 会**继承
+	//     `granted=true`** —— 从未授权却被采集。
+	//
+	// 放在删除**之前**：先清派生数据，再删主体。
+	// 清理失败不阻断删除（用户删除是主诉求），但必须记录。
+	if _, err := DeleteTrainingDataForUser(id); err != nil {
+		common.SysError(fmt.Sprintf(
+			"failed to clean training-data consent/watermark for user %d: %s", id, err.Error()))
+	}
 	user := User{Id: id}
 	return user.HardDelete()
 }
