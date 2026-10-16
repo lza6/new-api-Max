@@ -16,6 +16,8 @@
 | 2026-10-17 | **Web 防护页 `/web-protection`** | 只读静态审计 | **发现真实缺陷**：表格分页控件渲染为 null（根因见下）——已修 | 改动 `web-protection-page.tsx` 或 `data-table` 的 page-footer 机制 |
 | 2026-10-17 | **用户消耗排名诉求** | 只读静态审计 | **未闭环**：用户维度消耗排名仅存在于管理员界面；「累计充值金额」前后端**均无实现**（零命中） | 实现后更新本行 |
 | 2026-10-17 | **占位/死链路扫描（ops-panel + web-protection）** | grep `mock\|fake\|dummy\|hardcod\|TODO\|FIXME\|sample` | 零命中 | — |
+| 2026-10-17 | **分页控件不可见排查（全 feature 首页）** | 逐页比对是否套 `SectionPageLayout` | 只有 web-protection 与 training-data 两个**页级**表格受影响（均已修）；`pricing` 用客户端分页且显式渲染 `DataTablePagination`、`system-settings` 的表格在对话框内 —— 两者**不需要**该布局 | 新增页级分页表格时按此判据自查 |
+| 2026-10-17 | **回复采集的下游集成（分析链路）** | 代码审计 + RED 测试 | **发现真实缺陷**：`AssembleConversation` 丢 `role` → 分析提示词要求「引用用户原话」却分不清用户/模型 → 模型会把自己的回复当用户原话。已修（新增 `AnnotatedText`） | 改动 `service/training_capture/conversation.go` 或分析提示词 |
 
 ### 关键的「根因 vs 表象」（避免误判）
 - **「web 防护没有翻页」**：不是后端缺分页（后端三张表全部支持 `page/size` 且返回 `total`），
@@ -42,9 +44,11 @@
 | 训练数据采集（后端） | `go test ./service/training_capture/` | 全 PASS |
 | 同上 + 竞态 | `go test -race ./service/training_capture/ -run 'TestProcessSignal\|TestResplit\|…'` | PASS |
 | 训练数据（controller） | `go test ./controller/ -run 'TrainingData\|ResponseCapture\|E2ECapture\|Extract'` | PASS |
+| 运营面板口径 | `go test ./controller/ -run 'TestOpsRanking'` | 2/2 PASS（含 500+ 管理员回退路径） |
 | 前端类型 | `cd web && bun run typecheck`（tsgo -b） | PASS |
 | i18n 一致性 | `cd web && npm run i18n:check` | 0 missing |
 | 路由契约 | `go test ./router/ -run 'TrainingDataRouter'` | PASS（会扫描前端源码里的 `/api/` 字面量与 gin 路由表比对） |
+| Web 防护页 | `npx vitest run src/features/web-protection/` | 2/2 PASS |
 
 ---
 
