@@ -60,9 +60,14 @@ const (
 
 	// MaxPartBytes 单个分片的目标大小。
 	//
-	// 必须 < `OneDriveSimpleUploadMaxBytes`(4MB)，否则会走上传会话
+	// 必须 < 后端单次写入上限（OneDrive 是 4MB，见
+	// `PartUploadLimiter`/`EffectiveMaxWritePartBytes`），否则会走上传会话
 	// （另一套复杂逻辑）。取 2MB：既减少文件数，又留足余量。
 	// **这是「文件不会无限增大」的实现**（用户明确要求轮转）。
+	//
+	// 注意：这是**目标**大小；真实生效的原始上限是
+	// `EffectiveMaxPartRawBytes()`（按内存预算自适应），
+	// 压缩后若仍超过后端上限会由 `writeAggregateParts` 再切一刀。
 	MaxPartBytes = 2 << 20
 
 	// watermarkCleanupAge 水位清理阈值：超过该时长未更新的水位被删。
@@ -199,9 +204,6 @@ func markUserToday(userId int) {
 
 var (
 	captureQueue = newAdaptiveCaptureQueue()
-
-	workerOnce sync.Once
-	workerStop chan struct{}
 )
 
 // newAdaptiveCaptureQueue 按内存预算构造队列（增量需求 B1）。
@@ -242,26 +244,74 @@ func MaybeCapture(signal CaptureSignal) bool {
 	return ok
 }
 
-// StartWorker 启动采集 worker（幂等；多次调用只启动一个）。
-func StartWorker() {
-	workerOnce.Do(func() {
-		workerStop = make(chan struct{})
-		go runWorker()
-	})
+// worker 生命周期状态。
+//
+// [修复防御] **这组状态的存在是为了修一个会让采集永久停摆的缺陷。**
+//
+// 原实现：`StartWorker` 用 `workerOnce.Do`（只生效一次），
+// `StopWorker` 关掉 `workerStop`。于是「管理员关开关 → 再打开」时：
+//   - 第二次 `StartWorker` 是 **no-op**（once 已消费）；
+//   - `workerStop` 已是**已关闭**的 channel → 新起的循环会立刻退出
+//     （即使真起了）。
+//
+// 结果：**队列继续被灌满、dropped 计数上涨，而管理端仍显示 enabled** ——
+// 典型的「看起来在工作其实没工作」。
+//
+// 更糟的是 worker 顶层 panic 恢复的注释当时写着「由调用方 StartWorker
+// 负责重启」—— 而那个重启机制本身就是坏的。注释在宣称一个不存在的保证。
+//
+// 修法：用 `workerRunning` 标志 + 每次 `StartWorker` **新建** stop channel，
+// 让启停可以任意次往返；并用同一把锁保证不会起两个 worker。
+var (
+	workerMu      sync.Mutex
+	workerStop    chan struct{}
+	workerRunning bool
+)
+
+// StartWorker 启动采集 worker（**可重复调用**：已运行则 no-op；已停止则重启）。
+//
+// 返回是否**实际启动了**新 worker（供调用方记日志/断言）。
+func StartWorker() bool {
+	workerMu.Lock()
+	defer workerMu.Unlock()
+	if workerRunning {
+		return false
+	}
+	// 每次启动都新建 stop channel —— 复用已关闭的 channel 会让
+	// 新起的循环立刻退出（这正是原实现的缺陷）。
+	workerStop = make(chan struct{})
+	workerRunning = true
+	go runWorker()
+	return true
 }
 
-// StopWorker 停止采集 worker（供总开关关闭 / 停机）。
+// StopWorker 停止采集 worker（可重复调用）。
 //
-// 通过关闭队列让 `Receive` 返回 false 从而退出循环——
-// 不丢已入队的数据（关闭后仍会取完缓冲）。
-func StopWorker() {
-	if workerStop != nil {
-		select {
-		case <-workerStop:
-		default:
-			close(workerStop)
-		}
+// 通过关闭 stop channel 让 worker 的 `Receive`/限速等待被唤醒并退出 ——
+// 不丢已入队的数据（ReceiveWithStop 在退出前会把缓冲取完）。
+//
+// 返回是否**实际停止了**一个在跑的 worker。
+func StopWorker() bool {
+	workerMu.Lock()
+	defer workerMu.Unlock()
+	if !workerRunning {
+		return false
 	}
+	workerRunning = false
+	if workerStop != nil {
+		close(workerStop)
+	}
+	return true
+}
+
+// WorkerRunning 报告 worker 是否在运行（供指标与自检）。
+//
+// 这是「看起来开着其实没在采」的**可观测信号**：
+// `training_capture_worker_running` 为 0 而总开关为开 → 有问题。
+func WorkerRunning() bool {
+	workerMu.Lock()
+	defer workerMu.Unlock()
+	return workerRunning
 }
 
 // runWorker 主循环。
@@ -278,11 +328,17 @@ func runWorker() {
 	// 因此这里把「采到坏数据」与「网关宕机」彻底解耦。
 	defer func() {
 		if r := recover(); r != nil {
+			// 兜底：即使循环**之外**的地方 panic（如 limiter 构造），
+			// 也只让 worker 退出，不让整个网关进程倒下。
+			// 退出后由 `WorkerRunning()` 暴露为「已停止」，
+			// 管理端重启开关即可恢复（StartWorker 现在可重复调用）。
+			workerMu.Lock()
+			workerRunning = false
+			workerMu.Unlock()
 			captureStats.TotalUploadErrors.Add(1)
 			common.SysError(fmt.Sprintf(
-				"training capture: worker panic recovered (capture continues, gateway unaffected): %v", r))
-			// 不重入循环：本次处理的那条数据放弃，避免在坏数据上死循环。
-			// worker 由调用方（StartWorker/管理端开关）负责重启。
+				"training capture: worker exited after panic (gateway unaffected; "+
+					"re-enable the switch to restart): %v", r))
 		}
 	}()
 
@@ -333,7 +389,7 @@ func runWorker() {
 			continue
 		}
 
-		uploaded, uploadedBytes, err := processSignal(context.Background(), signal, limiter)
+		uploaded, uploadedBytes, err := processSignalSafely(context.Background(), signal, limiter)
 		if err != nil {
 			captureStats.TotalUploadErrors.Add(1)
 			consecutiveErrors++
@@ -434,20 +490,37 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 		// 仍走原来的、更强的逐条语义。
 		if useTextIncrement {
 			// 超限截断的会话：新内容在**尾部**，而存储文本含「省略 N 字节」
-			// 标记（N 每轮都变）。对整段做前缀比对会退化成每次全量重传，
-			// 所以这里改用 `TailOnly` 做真正的尾部增量。
+			// 标记（N 每轮都变）—— 对整段做前缀比对会退化成每轮全量重传。
 			//
-			// 这修复了一个静默丢数据的缺陷：原实现对超限会话只保留头部，
+			// 这修复了一个**静默丢数据**的缺陷：原实现对超限会话只保留头部，
 			// 前缀恒定 → 增量后缀恒为空 → **尾部新内容永远不被采集**。
+			//
+			// ⚠️ **诚实边界（别把它读成「真正的尾部增量」）**：
+			// `truncateForCapture` 取的尾部窗口会随文本增长而**平移**，
+			// 所以 `tail(n+1)` 并不以 `tail(n)` 为前缀 → 前缀校验必然失败
+			// → `SelectTextIncrement` 每轮返回**整段尾部窗口**（保守全量），
+			// 而不是「只追加的新段」。
+			//
+			// 也就是说：对超限会话，每轮会上传约「半个上限」的重复尾部。
+			// 这是**刻意的取舍** —— 数据不丢优先于带宽（采集不可逆，
+			// 尾部是新内容所在处，漏掉就是永久丢失）。
+			// 若要真正做到「只传新段」，需要按尾部窗口的**滚动偏移**建水位，
+			// 那是独立设计，不在本函数的范围内。
 			if signal.TailOnly != "" {
 				textSuffix, nextTextWatermark = SelectTextIncrement(signal.TailOnly, currentText)
 				if textSuffix != "" {
-					increment = []Message{{Role: "request", Content: textSuffix}}
+					increment = []Message{{
+						Role: "request", Content: textSuffix,
+						Kind: requestKindFor(textSuffix, signal.TailOnly),
+					}}
 				}
 			} else {
 				textSuffix, nextTextWatermark = SelectTextIncrement(messages[0].Content, currentText)
 				if textSuffix != "" {
-					increment = []Message{{Role: "request", Content: textSuffix}}
+					increment = []Message{{
+						Role: "request", Content: textSuffix,
+						Kind: requestKindFor(textSuffix, messages[0].Content),
+					}}
 				}
 			}
 		} else {
@@ -533,21 +606,42 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 			common.SysError("training capture: gzip failed, uploading plain: " + err.Error())
 			blob = rawChunk
 		}
-		// 压缩率意外差时（已压缩内容/随机数据）仍可能超过单次上传上限：
-		// 那时**再切一刀**并各自重压，而不是把超限数据硬塞进去。
-		if len(blob) > OneDriveSimpleUploadMaxBytes-64<<10 {
-			for _, sub := range splitBySize(blob, OneDriveSimpleUploadMaxBytes-64<<10) {
+
+		// 压缩率意外差时（已压缩内容 / 随机数据）压缩后仍可能超过**后端**
+		// 单次写入上限：那时**再切一刀**。
+		//
+		// [修复防御] 关键：这一刀必须切在**原始字节**上，并各自重新 gzip。
+		// 旧写法是 `splitBySize(blob, ...)` —— 直接切**压缩产物**，于是每个
+		// 碎片都不是合法 gzip member（正是 ADR-003 记录的那类损坏）：
+		// 预览按 magic 判定失败当明文显示二进制垃圾，分析端把碎片喂给模型。
+		// 主路径修了、这个兜底分支没修，等于把同一个 bug 留在最难触发也
+		// 最难排查的地方（只有高压缩比内容才会走进来）。
+		//
+		// 切原始字节则每个子块都能独立压缩成完整 member，可独立解压。
+		// 递归深度天然为 1：切完后的子块远小于上限，不会再进入此分支。
+		if limit := EffectiveMaxWritePartBytes(sink); len(blob) > limit {
+			subChunks := resplitCompressedBetter(rawChunk, limit)
+			common.SysLog(fmt.Sprintf(
+				"training capture: part %d compresses poorly (%d -> %d bytes, limit %d), re-split into %d raw chunks",
+				partSeq, len(rawChunk), len(blob), limit, len(subChunks)))
+
+			for _, subRaw := range subChunks {
+				subBlob, subErr := gzipCompress(subRaw)
+				if subErr != nil {
+					common.SysError("training capture: gzip failed on re-split, uploading plain: " + subErr.Error())
+					subBlob = subRaw
+				}
 				subName := dirPath + "/" + PartFileName(partSeq)
-				limiter.wait(ctx, int64(len(sub)))
-				captureStats.InFlightBytes.Add(int64(len(sub)))
-				_, writeErr := sink.WritePart(ctx, subName, sub)
-				captureStats.InFlightBytes.Add(-int64(len(sub)))
+				limiter.wait(ctx, int64(len(subBlob)))
+				captureStats.InFlightBytes.Add(int64(len(subBlob)))
+				_, writeErr := sink.WritePart(ctx, subName, subBlob)
+				captureStats.InFlightBytes.Add(-int64(len(subBlob)))
 				if writeErr != nil {
 					cleanupOrphanParts(ctx, sink, written)
 					return 0, 0, fmt.Errorf("write part %s: %w", subName, writeErr)
 				}
 				written = append(written, subName)
-				uploadedBytes += int64(len(sub))
+				uploadedBytes += int64(len(subBlob))
 				partSeq++
 			}
 			continue
@@ -613,6 +707,11 @@ func encodeJSONL(messages []Message) []byte {
 			"role":    m.Role,
 			"content": m.Content,
 		}
+		// kind 只在有值时写出：assistant 行不带该字段，
+		// 保持「回复行总是完整的」这个简单事实不被多余字段干扰。
+		if m.Kind != "" {
+			record[RequestKindField] = m.Kind
+		}
 		line, err := common.Marshal(record)
 		if err != nil {
 			// 单条序列化失败不应让整批失败；跳过并继续。
@@ -659,6 +758,69 @@ func splitBySize(payload []byte, maxBytes int) [][]byte {
 		start = cut
 	}
 	return chunks
+}
+
+// resplitCompressedBetter 把一个「压缩后仍超后端上限」的原始块切成若干
+// **原始**子块，使每块压缩后都 ≤ limit。返回的每个子块都可独立 gzip 成完整 member。
+//
+// ## 为什么这样切（而不是按压缩比估一个大小）
+//
+// 压缩比是**内容相关**的：同一段文本改成随机数据，比例能从 1/10 变成 1。
+// 用「当前块的压缩比」去反推原始子块大小，是在赌「子块的压缩比与整块相同」——
+// 这个假设没有依据，赌错就仍然是超限上传（WritePart 直接报错）。
+//
+// 这里改成**按实测收敛**：拿当前块的压缩比做初值，切完**逐个试压**，
+// 任何仍超限的子块递归再切。因为「切小 → 压缩后更小」单调成立，
+// 过程必然终止；且退出时每个子块都是**已验证**压缩后 ≤ limit 的，
+// 不是估计值。
+//
+// ## 退出保证
+//
+// 每次递归至少切两块（splitBySize 在 len > maxBytes 时必产出 ≥2 块），
+// 因此总量严格下降。兜底：若某轮因「单行超长」而没切动（切出 1 块且
+// 长度不变），直接把子块大小减半，保证仍在前进。
+func resplitCompressedBetter(raw []byte, limit int) [][]byte {
+	if limit <= 0 || len(raw) == 0 {
+		return [][]byte{raw}
+	}
+	// 初值：按当前块的实测压缩比反推，并保守取一半（因为这里就是
+	// 「压缩不理想」的路径，实际比值很可能比整块差）。
+	compressed, err := gzipCompress(raw)
+	ratio := 1.0
+	if err == nil && len(raw) > 0 {
+		ratio = float64(len(compressed)) / float64(len(raw))
+	}
+	if ratio <= 0 {
+		ratio = 1
+	}
+	subSize := int(float64(limit)/ratio) / 2
+	if subSize < 1 {
+		subSize = 1
+	}
+	return resplitRecursive(raw, limit, subSize, 0)
+}
+
+// resplitRecursive depth 仅用于兜底收缩，正常情况下第一层就收敛。
+func resplitRecursive(raw []byte, limit, subSize, depth int) [][]byte {
+	// 已经能放下 → 直接返回（这是唯一的成功出口）。
+	if blob, err := gzipCompress(raw); err == nil && len(blob) <= limit {
+		return [][]byte{raw}
+	}
+	chunks := splitBySize(raw, subSize)
+	// 没切动（subSize ≥ 长度，或单行超长只能硬切回原块）→ 强制减半，保证前进。
+	if len(chunks) == 1 && len(chunks[0]) == len(raw) {
+		if subSize <= 1 || depth > 32 {
+			// 已到极限：单字节块无法再小。返回原块，由上层 WritePart
+			// 如实报错（宁可见错误，不可静默产出坏数据）。
+			return [][]byte{raw}
+		}
+		return resplitRecursive(raw, limit, subSize/2, depth+1)
+	}
+	var out [][]byte
+	for _, c := range chunks {
+		out = append(out, resplitRecursive(c, limit, subSize, depth+1)...)
+	}
+	return out
 }
 
 // ---------- 全局指纹集合（退化路径用） ----------
@@ -778,4 +940,63 @@ func cleanupOrphanParts(ctx context.Context, sink TrainingDataSink, written []st
 				"training capture: failed to clean up orphan part %s: %s", name, err.Error()))
 		}
 	}
+}
+
+// requestKindFor 判定这条请求行是「完整快照」还是「增量后缀」。
+//
+// 判据：**增量与整段文本长度相同** → 它就是全量。
+//
+// 为什么会相等（三种真实情况，都必须标 full）：
+//  1. 首次采集（水位为空）；
+//  2. 历史被改动 → `SelectTextIncrement` 保守全量重传；
+//  3. **水位被清理后重新开始**（`DeleteStaleTrainingDataWatermarks`
+//     删掉了长期不活跃会话的水位，下次采集从零开始）。
+//
+// 消费方对 full 是「重置对话文本」、对 suffix 是「追加」——规则相反。
+// 不打这个标，消费方**无法从数据本身**区分两者（第 3 种情况尤其隐蔽：
+// 任意分片都可能以 full 开头），结果是无声的数据污染。
+func requestKindFor(suffix, whole string) string {
+	// 判据：**增量与整段文本一样长** → 它就是全量。
+	//
+	// 推导：`suffix = whole[prev.UploadedBytes:]`，所以「两者等长」
+	// 当且仅当 `prev.UploadedBytes == 0`，也就是「这段文本此前一条都没传过」。
+	//
+	// 三种真实情况都落到这里，都必须标 full：
+	//  1. 首次采集（水位为空）；
+	//  2. 历史被改动 → SelectTextIncrement 保守全量重传；
+	//  3. **水位被清理后重新开始**（DeleteStaleTrainingDataWatermarks
+	//     删掉长期不活跃会话的水位，下次采集从零开始）——
+	//     这种情况尤其隐蔽：**任意分片**都可能以 full 开头。
+	//
+	// 消费方对 full 是「重置对话文本」、对 suffix 是「追加」，规则相反。
+	// 不打这个标，消费方无法从数据本身区分两者，结果是无声的数据污染。
+	if whole != "" && len(suffix) == len(whole) {
+		return KindRequestFull
+	}
+	return KindRequestSuffix
+}
+
+// processSignalSafely 在**单条信号**外包裹 panic 恢复。
+//
+// [修复防御] 为什么恢复要放在**每条信号**而不是整个循环外面：
+//
+// 循环外的 recover 只能让 worker **退出**（不让进程倒下），
+// 但一条坏数据就会让采集**永久停摆**，直到有人手动重启开关。
+// 恢复放在这里则：坏数据被丢弃并计入错误，**worker 继续处理下一条**。
+// 「采到坏数据」与「不再采集」是两件严重程度完全不同的事。
+//
+// 注意：这不能替代循环外的兜底 recover（循环体其它地方、限速器等
+// 仍可能 panic），两者是纵深防御的两层。
+func processSignalSafely(ctx context.Context, signal CaptureSignal, limiter *byteLimiter) (uploaded int, uploadedBytes int64, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			captureStats.TotalUploadErrors.Add(1)
+			common.SysError(fmt.Sprintf(
+				"training capture: recovered from panic while processing one signal "+
+					"(user=%d model=%s); skipping this record and continuing: %v",
+				signal.UserID, signal.Model, r))
+			uploaded, uploadedBytes, err = 0, 0, fmt.Errorf("panic while processing signal: %v", r)
+		}
+	}()
+	return processSignal(ctx, signal, limiter)
 }

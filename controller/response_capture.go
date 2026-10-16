@@ -190,6 +190,34 @@ func extractFromJSONObject(raw []byte) string {
 			return s
 		}
 	}
+	// --- OpenAI **Responses** 流式形态：{"type":"response.output_text.delta","delta":"..."} ---
+	//
+	// 这里的 `delta` 是**字符串**，不是上面那种对象 —— 之前只处理了
+	// `delta` 为对象的情形，导致 `/v1/responses` 的流式回复**静默不采集**
+	// （注释却声称覆盖 OpenAI，那是不准确的）。
+	if s, ok := root["delta"].(string); ok && s != "" {
+		return s
+	}
+
+	// --- OpenAI **Responses** 非流式形态：output[].content[].{type:output_text,text} ---
+	//
+	// 与 chat/completions 的 `choices[].message.content` 完全不同的一套结构，
+	// 必须单独处理，否则整个 `/v1/responses` 端点的回复都会被丢弃。
+	if outputs, ok := root["output"].([]any); ok {
+		var sb strings.Builder
+		for _, o := range outputs {
+			item, ok := o.(map[string]any)
+			if !ok {
+				continue
+			}
+			// output[] 里既有 message（含 content[]）也有 reasoning 等其它类型；
+			// textFromContentField 只认带 text 的条目，不会误取结构。
+			sb.WriteString(textFromContentField(item["content"]))
+		}
+		if sb.Len() > 0 {
+			return sb.String()
+		}
+	}
 
 	// --- Gemini 形态：candidates[].content.parts[].text ---
 	if cands, ok := root["candidates"].([]any); ok {

@@ -4,6 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/lza6/new-api-Max/model"
 )
 
 // 授权判定是**合规边界**：判错就是未授权用户的数据被采集。
@@ -123,6 +126,57 @@ func TestConsentCacheIsBounded(t *testing.T) {
 func TestCurrentPolicyVersionIsNonEmpty(t *testing.T) {
 	// 空版本号会让「同意旧条款」与「同意当前条款」无法区分——合规缺口。
 	assert.NotEmpty(t, CurrentPolicyVersion)
+}
+
+func TestStalePolicyVersionConsentDoesNotGrant(t *testing.T) {
+	// v2 声明新增「模型回复同样入库」「管理员可查看/导出原始对话」两条，
+	// 是采集范围的实质性扩张。用户在 v1 文本下点过的「同意」不能覆盖它 ——
+	// 否则等于拿旧授权采新范围的数据，用户并没有被告知。
+	require.NoError(t, ensureTestDB(t))
+	defer SetSinkForTest(fakeSink{name: "t"})()
+	defer SetGatewayEnabledForTest(true)()
+	ResetConsentCacheForTest()
+
+	const uid = 987001
+	stale := CurrentPolicyVersion + "-stale"
+	require.NoError(t, model.UpsertTrainingDataConsent(uid, true, stale, 1791937800))
+	InvalidateConsent(uid)
+	ResetConsentCacheForTest()
+
+	assert.False(t, IsGranted(uid),
+		"同意的是旧版本声明时，不得凭该记录采集")
+
+	status, err := GetConsentStatus(uid)
+	require.NoError(t, err)
+	assert.False(t, status.Granted, "对外状态同样必须报告为未授权")
+	assert.True(t, status.NeedsReconsent,
+		"已授权用户遇到声明改版时必须被标记为「需重新确认」，"+
+			"否则前端只会静默把开关变成关闭，用户不知道发生了什么")
+	assert.Equal(t, CurrentPolicyVersion, status.PolicyVersion,
+		"必须把当前版本告诉前端，前端据此要求用户重新确认")
+}
+
+func TestNeedsReconsentIsFalseForNeverGrantedAndForRevoked(t *testing.T) {
+	// 「需重新确认」必须**只**在声明改版这一种情况下为真。
+	// 从未同意 / 主动撤回时开关本就是关的，再提示「请重新确认」是噪音，
+	// 还会让用户误以为自己的操作没生效。
+	require.NoError(t, ensureTestDB(t))
+	defer SetSinkForTest(fakeSink{name: "t"})()
+	defer SetGatewayEnabledForTest(true)()
+	ResetConsentCacheForTest()
+
+	const neverGranted = 987002
+	status, err := GetConsentStatus(neverGranted)
+	require.NoError(t, err)
+	assert.False(t, status.NeedsReconsent, "从未同意不得提示重新确认")
+
+	const revoked = 987003
+	require.NoError(t, model.UpsertTrainingDataConsent(revoked, false, CurrentPolicyVersion, 1791937800))
+	status, err = GetConsentStatus(revoked)
+	require.NoError(t, err)
+	assert.False(t, status.Granted)
+	assert.False(t, status.NeedsReconsent,
+		"用户主动撤回后不得提示「请重新确认」")
 }
 
 func TestGrantAndRevokeRejectInvalidUserId(t *testing.T) {

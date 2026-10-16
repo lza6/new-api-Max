@@ -140,3 +140,46 @@ func TestCleanupOnlyTouchesOwnArtifacts(t *testing.T) {
 		t.Fatal("**非本模块的文件绝不能被删** —— 目录可能指向共享路径")
 	}
 }
+
+// 回归：清理**不得**碰到构建中的 `.tmp` 产物。
+//
+// 构建期先写 `export-<id>.tar.tmp` 再 rename。若清理把它算进来，
+// 一次长时间导出（目录恰好超总量上限时）可能写到一半被删：
+// Linux 上 unlink 后 rename 失败 → 数小时导出白做，且两平台行为不一致。
+func TestCleanupSkipsInProgressTempArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	done := filepath.Join(dir, "export-1.tar")
+	inProgress := filepath.Join(dir, "export-2.tar.tmp")
+	foreign := filepath.Join(dir, "notes.txt")
+	for _, p := range []string{done, inProgress, foreign} {
+		if err := os.WriteFile(p, []byte("x"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	old := time.Now().Add(-365 * 24 * time.Hour)
+	for _, p := range []string{done, inProgress, foreign} {
+		if err := os.Chtimes(p, old, old); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	restore := setExportStoreForTest(dir)
+	t.Cleanup(restore)
+
+	deleted, _, err := CleanupExportArtifacts(time.Now())
+	if err != nil {
+		t.Fatalf("清理报错：%v", err)
+	}
+	if deleted != 1 {
+		t.Fatalf("应只删 1 个已完成产物，实际 %d", deleted)
+	}
+	if _, err := os.Stat(inProgress); err != nil {
+		t.Fatal("**构建中的 .tmp 绝不能被清理删掉** —— 会毁掉进行中的导出")
+	}
+	if _, err := os.Stat(foreign); err != nil {
+		t.Fatal("非本模块的文件不能被删")
+	}
+	if _, err := os.Stat(done); !os.IsNotExist(err) {
+		t.Fatal("已完成的过期产物应被删除")
+	}
+}

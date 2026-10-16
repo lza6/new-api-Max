@@ -91,7 +91,8 @@ type ResourceBudget struct {
 	MaxTextBytes int
 
 	// MaxPartRawBytes 单个分片**压缩前**的原始字节上限。
-	// 压缩后仍必须 ≤ OneDriveSimpleUploadMaxBytes(4MB)，由 worker 二次校验。
+	// 压缩后仍必须 ≤ **后端自报的单次写入上限**（`PartUploadLimiter`，
+	// OneDrive 是 4MB），由 worker 用 `EffectiveMaxWritePartBytes` 二次校验。
 	MaxPartRawBytes int
 
 	// QueueCapacity 采集队列容量（条）。

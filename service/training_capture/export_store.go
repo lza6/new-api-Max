@@ -88,15 +88,6 @@ func (s *ExportStore) Enabled() bool { return s != nil && s.enabled }
 // Dir 返回导出根目录（测试用）。
 func (s *ExportStore) Dir() string { return s.root }
 
-// SetExportStoreDirForTest 注入一个临时目录（仅测试）。
-func SetExportStoreDirForTest(root string, enabled bool) func() {
-	prev := activeExportStore
-	activeExportStore = &ExportStore{root: root, enabled: enabled}
-	// 重置惰性初始化，避免 Once 已触发后本注入被「空的 once」绕过。
-	exportStoreOnce = sync.Once{}
-	return func() { activeExportStore = prev }
-}
-
 // PathFor 返回某导出的产物绝对路径（`export-<id>.tar`）。
 //
 // exportID 是数据库自增主键（不可预测性不作为安全边界 —— 直链 token 才是；
@@ -305,6 +296,11 @@ const (
 	// **只清自己产生的文件**：目录可由运维指向共享路径，
 	// 删别人的文件是不可接受的风险。
 	exportFilePrefix = "export-"
+
+	// exportArtifactSuffix 已完成产物的后缀。
+	// 构建期的临时文件以 `.tar.tmp` 结尾，**不匹配**这个后缀 ——
+	// 否则清理会在 Linux 上毁掉进行中的导出（见清理逻辑的说明）。
+	exportArtifactSuffix = ".tar"
 )
 
 // exportArtifactInfo 一个产物的元信息。
@@ -381,8 +377,19 @@ func CleanupExportArtifacts(now time.Time) (int, int64, error) {
 
 	files := make([]exportArtifactInfo, 0, len(entries))
 	for _, e := range entries {
-		if e.IsDir() || !strings.HasPrefix(e.Name(), exportFilePrefix) {
-			// **只碰自己的产物**：目录可能被运维指向共享路径。
+		// 只认**已完成的**产物（`export-<id>.tar`）。
+		//
+		// [修复防御] 构建期会先写 `export-<id>.tar.tmp` 再 rename ——
+		// 那个 `.tmp` 也匹配 `export-` 前缀。若把它算进清理范围，
+		// 一次长时间导出（目录又恰好超了总量上限）可能写到一半被清理任务删掉：
+		// Linux 上文件被 unlink 后 rename 失败 → **数小时的导出白做**；
+		// Windows 上删除失败，两平台行为不一致、极难排查。
+		//
+		// 用**白名单后缀**而不是「排除 .tmp」：将来新增别的临时后缀时，
+		// 白名单继续挡得住，黑名单挡不住。
+		if e.IsDir() || !strings.HasPrefix(e.Name(), exportFilePrefix) ||
+			!strings.HasSuffix(e.Name(), exportArtifactSuffix) {
+			// 只碰自己的、已完成产物：目录可能被运维指向共享路径。
 			continue
 		}
 		info, err := e.Info()

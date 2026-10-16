@@ -345,12 +345,23 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			// B3-3：成功结果计入渠道健康分聚合。
 			service.RecordChannelOutcome(channel.Id, true, time.Since(common.GetContextKeyTime(c, constant.ContextKeyRequestStartTime)), service.ErrClassOK)
 			// 训练数据采集（Spec-008）：**只在成功路径**上投递一条非阻塞信号。
-			// 放在 gopool.Go 里是为了让「构造信号 + 入队」彻底离开响应返回路径
-			// —— 响应体此刻已经写完，再花几微秒只会推迟连接复用。
-			// 该 goroutine 内**不做任何 IO**（不查库/不联网），见 hotpath.go。
-			// 把 tee 到的响应体里的**助手回复**一并交给采集
-			// （此前只采请求侧，导致数据无法用于 SFT —— 见 response_capture.go）。
-			maybeCaptureTrainingData(c, relayInfo, meta, extractAssistantText(responseCaptureBuffer.bytes()))
+			//
+			// [修复防御] 传的是**响应体缓冲区的指针**，提取在 gopool 里做。
+			//
+			// 原实现把 `extractAssistantText(buffer.bytes())` 直接写成实参 ——
+			// Go 在**调用之前**求值实参，于是「拷贝 ≤256KB + 字符串再拷贝 +
+			// 逐行 Split + 每行 Unmarshal」全部跑在**响应 goroutine** 上，
+			// 只有入队才进了 gopool。
+			//
+			// 那与两处自我声明直接矛盾：
+			//   - 这里原本就写着「放在 gopool 里是让构造+入队离开响应路径」；
+			//   - `hotpath.go` 写着请求路径「不解析 JSON」；
+			//   - 用户看到的免责声明写着「never blocks or slows down your requests」。
+			//
+			// 安全性：本函数在 handler **返回之后**才被调用，响应体已写完，
+			// 缓冲区不会再被写入 —— 在 goroutine 里读它是安全的。
+			// 且**不捕获 gin.Context**（只捕获 buffer 指针），避免上下文复用串号。
+			maybeCaptureTrainingData(c, relayInfo, meta, responseCaptureBuffer)
 			return
 		}
 
@@ -550,10 +561,16 @@ func evaluateRequestPolicy(c *gin.Context, relayInfo *relaycommon.RelayInfo, met
 //   - goroutine 内**零 IO**：`BuildSignal` 是纯计算，`MaybeCapture` 只做
 //     一次 map 读（授权缓存）+ 一次非阻塞入队（实测 1.93µs）；
 //   - `meta` 直接复用调用方已经算好的对象，**不重新解析请求体**
-//     （重新解析是热路径上最昂贵的一种「顺手」）。
+//     （重新解析是热路径上最昂贵的一种「顺手」）；
+//   - **响应体的解析也在 goroutine 内**（见下方 `capture` 参数）——
+//     这是后补的：最初把 `extractAssistantText(...)` 写成调用实参，
+//     于是 ≤256KB 的拷贝 + 逐行 JSON 解析全落在了响应 goroutine 上。
 //
 // 采集未启用时（绝大多数请求）开销 ≈ 一次 `gopool.Go` + 两次原子读。
-func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, meta *types.TokenCountMeta, assistantReply string) {
+//
+// `capture` 可为 nil（采集未开启时不分配缓冲区）。它的内容在 handler
+// 返回后才被 goroutine 读取，此时响应已写完、不会再被写入。
+func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, meta *types.TokenCountMeta, capture *responseCapture) {
 	if relayInfo == nil || meta == nil {
 		return
 	}
@@ -593,7 +610,10 @@ func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, 
 			// （格式不认识 / 纯工具调用 / 响应体超限被截断），
 			// 此时记录里就只有请求侧 —— 与修复前的行为一致，
 			// 不会因为提取失败而少采或写坏。
-			ResponseText: assistantReply,
+			//
+			// **提取在这里做（goroutine 内）**，不在响应路径上：
+			// 见本函数头部关于实参求值时机的说明。
+			ResponseText: extractAssistantText(capture.bytes()),
 		})
 		if signal == nil {
 			return

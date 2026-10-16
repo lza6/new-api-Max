@@ -1034,6 +1034,21 @@ func (user *User) delete(identity *AuthSessionIdentity) error {
 	if user.Id == 0 {
 		return errors.New("id 为空！")
 	}
+	// 关于训练数据：**软删时刻意不清理采集授权记录**（与 `HardDeleteUserById` 相反）。
+	//
+	// 理由（这不是遗漏，是有意为之）：
+	//
+	//  1. **授权记录是审计证据**。它是「我们当初收集这批数据时有合法依据」的凭据。
+	//     用户注销后，云盘上已采集的数据**仍然存在**；此时删掉授权记录，
+	//     等于让那些数据失去**可自证的合法性** —— 反而制造合规风险。
+	//  2. **软删没有 ID 复用风险**。软删保留行与 ID，自增计数器不会回收它，
+	//     因此不存在「新用户继承 `granted=true`」的问题
+	//     （那个风险只存在于**硬删**，见 `HardDeleteUserById`）。
+	//  3. **采集会自动停止**：用户无法登录 → 没有请求 → 不会产生新采集。
+	//
+	// 因此这里只需保证「不再采集」。若将来管理员需要「按数据主体请求删除」，
+	// 那是**另一个更重的流程**（要同时删云盘数据 + 写删除审计），
+	// 不该顺带塞进一次软删里。
 	var nextAuthVersion int64
 	if err := DB.Transaction(func(tx *gorm.DB) error {
 		if identity != nil {

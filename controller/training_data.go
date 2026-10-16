@@ -45,7 +45,9 @@ func GetTrainingDataStatus(c *gin.Context) {
 //
 // POST /api/user/training-data/grant
 //
-// 请求体可选 `{"policy_version":"v1"}`；**不传则用服务端当前版本**。
+// 请求体可选 `{"policy_version":"<当前版本>"}`；**不传则用服务端当前版本**。
+// 具体版本串以 `training_capture.CurrentPolicyVersion` 为准（会随声明改版递增），
+// 这里不写死，避免注释与代码版本脱节。
 // 刻意不信任前端传来的版本号：若允许前端指定任意版本，用户可以
 // 「同意一个不存在的旧版本」来绕过版本校验（那是合规缺口）。
 func GrantTrainingDataConsent(c *gin.Context) {

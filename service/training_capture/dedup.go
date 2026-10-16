@@ -34,11 +34,41 @@ import (
 
 // Message 参与采集的一条对话消息（已剥离敏感字段的最小结构）。
 type Message struct {
-	// Role 消息角色（user / assistant / system）。
+	// Role 消息角色（user / assistant / system / request）。
 	Role string
 	// Content 消息正文（**已经过字段白名单过滤**，不含密钥/令牌等）。
 	Content string
+	// Kind 内容形态标记（仅对请求行有意义，见下）。
+	//
+	// ## 为什么必须有这个字段（否则数据不可还原）
+	//
+	// 请求行有两种**语义完全不同**的形态：
+	//   - `KindRequestFull`：该 content 是**完整对话快照**（首次采集；
+	//     或历史被改动后的保守全量；或水位过期清理后重新开始）。
+	//   - `KindRequestSuffix`：该 content 只是**相对上一次的新增后缀**。
+	//
+	// 消费方要还原对话，对前者是「重置」，对后者是「追加」——**规则相反**。
+	// 而这个区别**无法从数据本身推断**：只有最低序号的分片可能以全量开头
+	// 是常见情况，但水位过期清理（`DeleteStaleTrainingDataWatermarks`）
+	// 之后，**任意**分片都可能以全量开头。
+	//
+	// 不写这个字段的后果：消费方把全量当后缀累加 → 对话文本被重复拼接 N 遍；
+	// 或把后缀当全量 → 历史被静默丢弃。两种都是无声的数据污染。
+	//
+	// assistant 行不使用该字段（回复总是完整的）。
+	Kind string
 }
+
+// 内容形态常量。写进 JSONL 的 `kind` 字段。
+const (
+	// KindRequestFull 请求行是完整对话快照。
+	KindRequestFull = "full"
+	// KindRequestSuffix 请求行是增量后缀。
+	KindRequestSuffix = "suffix"
+)
+
+// RequestKindField 写进 JSONL 的字段名（消费方契约的一部分）。
+const RequestKindField = "kind"
 
 // Watermark 某个会话的采集水位。
 type Watermark struct {

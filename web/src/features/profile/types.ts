@@ -303,4 +303,12 @@ export interface TrainingDataConsentStatus {
   policy_version: string
   /** 最近一次同意的时间（unix 秒）；从未同意为 0。 */
   granted_at: number
+  /**
+   * 声明改版导致旧同意失效，需要用户重新确认。
+   *
+   * 与「从未同意」「主动撤回」区分：那两种情况下开关本就是关的，用户不会有
+   * 疑问；这里是开关**从开悄悄变成关**。不解释的话用户会以为功能坏了、
+   * 自己误触了，甚至怀疑数据在被偷偷继续采集。
+   */
+  needs_reconsent: boolean
 }

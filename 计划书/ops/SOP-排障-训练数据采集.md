@@ -6,13 +6,27 @@
 
 ---
 
-## 0. 先看「设计上就采不到」的三种正常情况（不是故障）
+## 0. 先看「设计上就采不到」的正常情况（不是故障）
+
+> ⚠️ **本节已随功能演进更新**：助手回复**现在会被采集**（此前不会）。
+> 若你按旧版本 SOP 把「数据里没有回复」当成正常，会漏掉真实的提取失败。
 
 | 现象 | 根因（设计如此） | 依据 |
 |---|---|---|
-| 纯图片 / 纯 embedding / 音频请求没有采集 | `BuildSignal` 拿不到文本就返回 nil，不存空记录 | `service/training_capture/hotpath.go:139-143` |
-| 助手回复没被采集 | 热路径只拿得到 `TokenCountMeta.CombineText`；流式回复拼接代价高，默认不填 `ResponseText` | `service/training_capture/hotpath.go:28-54,122-124` |
-| 只能做「整段文本前缀」增量，没有逐轮 role 标注 | 网关 `dto.Request` 只暴露拼接后的 `CombineText`（不可逆） | `service/training_capture/hotpath.go:28-54` |
+| 纯图片 / 纯 embedding / 音频请求没有采集 | `BuildSignal` 拿不到文本就返回 nil，不存空记录 | `service/training_capture/hotpath.go` |
+| 只能做「整段文本前缀」增量，没有逐轮 role 标注 | 网关 `dto.Request` 只暴露拼接后的 `CombineText`（不可逆） | `service/training_capture/hotpath.go` |
+| 超长回复被截到 256KB | 响应体捕获有硬上限（防内存无界） | `controller/response_capture.go` |
+| 超限会话每轮重复上传约半个上限的尾部 | 尾部窗口随文本增长而平移，前缀校验必然失败 → 保守全量 | `service/training_capture/worker.go` |
+
+**助手回复「确实没采到」时的排查顺序**（不要当成设计边界放过）：
+
+1. 该请求是否为**流式**？流式走 `WriteString` —— 若这里没覆写会**一个字节都采不到**
+   （曾经的真实缺陷）。见 `controller/counting_writer.go`。
+2. 渠道返回的**格式**是否被 `extractAssistantText` 覆盖？
+   当前覆盖 OpenAI chat/Responses、Claude、Gemini 的流式与非流式。
+   **不认识的格式一律不提取**（宁可少采，不可把协议帧当正文）。
+3. 回复是否在 256KB 之后？超限部分被丢弃。
+4. 是否**纯工具调用**（没有正文文本）？那是正常的空提取。
 
 发现用户期望的是上述「设计边界」内的东西 → 如实说明，不要当 bug 查。
 
@@ -93,8 +107,12 @@
 
 ## 3. 切分、压缩与上传
 
-- 顺序硬约束：**先按原始 JSONL 的行切，再对每块各自 gzip**（`service/training_capture/worker.go:465-488`）。
+- 顺序硬约束：**先按原始 JSONL 的行切，再对每块各自 gzip**（`service/training_capture/worker.go`）。
   切错顺序 → 云盘上是坏 gzip 碎片 → 预览显示二进制垃圾（详见 ADR-003）。
+  **兜底重切分支同样遵守这条**：当某块压缩后仍超过后端写入上限时，切的是
+  **原始字节**并逐块重压（不是切压缩产物）。日志形如
+  `training capture: part N compresses poorly (A -> B bytes, limit L), re-split into K raw chunks`。
+  看到这行说明**内容压缩率差**（已压缩内容/随机数据），不是故障。
 - 压缩失败会降级为明文上传并记 `training capture: gzip failed, uploading plain: ...`
   （`worker.go:490-494`）。
 - watermark 保存失败会记 `training capture: save watermark failed: ...`（`worker.go`）。
@@ -122,5 +140,7 @@ docker logs --since 30m new-api 2>&1 | grep -i "training capture"
 | 刚开启没反应 | 等 30s 缓存 | `consentCacheTTL`（`consent.go:39`） |
 | 某些请求采不到 | 请求有没有文本 | `hotpath.go:138-143` |
 | 有丢弃计数 | 队列/worker 吞吐 | `queue.go:199-217` |
-| 云盘有文件但乱码 | 切分/压缩顺序 | `worker.go:465-488`（ADR-003） |
+| 云盘有文件但乱码 | 切分/压缩顺序 | `worker.go`（ADR-003） |
+| 管理端预览/分析报「解压超限」 | 分片上限是否被调过 | 解压上限与分片上限同源（`EffectiveDecompressMaxPlainBytes`）；若不一致说明版本过旧 |
+| 日志出现 `compresses poorly ... re-split` | 内容是已压缩/随机数据 | 正常自适应行为，非故障 |
 | 撤回后还上传 | worker 复查授权 | `worker.go:313-321` |

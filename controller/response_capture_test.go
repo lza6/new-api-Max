@@ -175,3 +175,52 @@ func TestResponseCaptureReturnsCopy(t *testing.T) {
 	assert.Equal(t, "第一次", string(first), "先前取出的内容不得被后续写入影响")
 	assert.Equal(t, "第一次第二次", string(c.bytes()))
 }
+
+// ---------- OpenAI Responses 格式（此前**静默不采集**） ----------
+
+func TestExtractOpenAIResponsesNonStream(t *testing.T) {
+	// Responses 的结构与 chat/completions 完全不同：
+	// output[].content[].{type:output_text, text}，没有 choices。
+	// 不单独处理会让整个 /v1/responses 端点的回复被丢弃。
+	raw := `{"id":"resp_1","output":[{"type":"message","content":[{"type":"output_text","text":"Responses 回答"}]}]}`
+	assert.Equal(t, "Responses 回答", extractAssistantText([]byte(raw)))
+}
+
+func TestExtractOpenAIResponsesStream(t *testing.T) {
+	// 流式的 delta 是**字符串**，不是对象（与 chat 的 delta.content 不同）。
+	raw := strings.Join([]string{
+		`event: response.output_text.delta`,
+		`data: {"type":"response.output_text.delta","delta":"Responses "}`,
+		``,
+		`event: response.output_text.delta`,
+		`data: {"type":"response.output_text.delta","delta":"流式"}`,
+		``,
+	}, "\n")
+	assert.Equal(t, "Responses 流式", extractAssistantText([]byte(raw)))
+}
+
+func TestExtractOpenAIResponsesIgnoresReasoningItems(t *testing.T) {
+	// output[] 里除 message 外还有 reasoning 等条目；只取有 text 的 content。
+	raw := `{"output":[` +
+		`{"type":"reasoning","content":[]},` +
+		`{"type":"message","content":[{"type":"output_text","text":"只取这段"}]}` +
+		`]}`
+	assert.Equal(t, "只取这段", extractAssistantText([]byte(raw)))
+}
+
+// ---------- 实证核对：非流式正文里出现 "data:" 会不会被误判为 SSE ----------
+
+func TestExtractNonStreamContentContainingDataPrefixIsNotMistakenForSSE(t *testing.T) {
+	// 审查提出「正文含 `\ndata:` 会被 looksLikeSSE 误判」。
+	// 实证：JSON 里换行是**转义**的（反斜杠 + n），字节流中**没有**字面换行，
+	// 所以 looksLikeSSE 的字面 `"\ndata:"` 匹配不会命中 —— 不构成缺陷。
+	// 这条用例把这个结论钉住，避免将来有人凭直觉去「修」它。
+	raw := `{"choices":[{"message":{"role":"assistant","content":"第一行\ndata: 这看起来像 SSE 但它不是"}}]}`
+	assert.Equal(t, "第一行\ndata: 这看起来像 SSE 但它不是",
+		extractAssistantText([]byte(raw)),
+		"非流式正文含 data: 前缀时仍须按非流式解析")
+
+	// 反向确认：真正的 SSE 仍被识别（首行就是 data:）。
+	assert.Equal(t, "真 SSE",
+		extractAssistantText([]byte(`data: {"choices":[{"delta":{"content":"真 SSE"}}]}`)))
+}

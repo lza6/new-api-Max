@@ -416,3 +416,31 @@ worker 在**算出增量之后**追加为独立记录。
 - B19 导出两张表已进 AutoMigrate（现已有实现，不再是死表）
 - HTTP 层 p95 压测、浏览器 E2E（需真实渠道/浏览器）
 - Claude 计费两处（需业主拍板）
+
+## 2026-10-17 第四轮：声明/限额一致性（F13 / F14 / F18 / F19）
+
+### 为什么做这一轮
+前三轮修的都是「看得见的错」。这一轮的共同主题是**声明与实现不一致** ——
+代码里写着一个数字/一句承诺，而真实生效的值在别处，生产上表现为
+「功能看着正常、实际永久失效」，最难被用户报上来。
+
+| # | 问题 | 本质 | 修法 | 验证 |
+|---|---|---|---|---|
+| F14 | 免责声明只说「采你的输入」，未说**模型回复同样入库**、**管理员可读可导出原始对话** | 用户在意愿不明的情况下作出了同意 | 新增一条声明 + 7 locale；**并递增 `CurrentPolicyVersion` v1→v2**，使旧同意失效、重新征求 | RED 验证：把版本检查短路后测试立刻失败 |
+| F14b | 改版使用户开关**从「开」静默变成「关」** | 用户会以为功能坏了/误触，甚至怀疑数据被偷偷继续采集 | 新增 `needs_reconsent` 下发 + 界面明示「采集已暂停，请重新确认」+ 7 locale | 2 个用例（改版 true / 从未同意与主动撤回均为 false） |
+| F13 | 解压上限写死 `MaxPartBytes(2MB)*8 = 16MB`，而分片上限是**自适应**的 | 调大分片上限 → 管理端预览/分析**永远解压失败**（看着像数据损坏） | `EffectiveDecompressMaxPlainBytes()` 与分片上限同源 | RED 验证：旧实现下 20MB 合法分片报 `ErrDecompressTooLarge` |
+| F18 | 兜底重切分支切的是**压缩产物**（`splitBySize(blob)`） | 碎片不是合法 gzip member —— 主路径修过、这个分支漏了（ADR-003 同类损坏） | 改为切**原始字节**并逐块重压；`resplitCompressedBetter` 按**实测收敛**（逐块试压+递归），不是按压缩比估算 | RED 验证：忠实模拟旧实现后 3 条不变量全破 |
+| F19 | worker 写死 `OneDriveSimpleUploadMaxBytes`，接口契约却说「上限由调用方保证」 | 抽象层是**谎言**：换 S3 会白白切碎，换更严后端会报错 —— 直接卡住「扩展其它云盘」 | 新增 `PartUploadLimiter` 可选接口 + `EffectiveMaxWritePartBytes(sink)`；OneDrive 声明 4MB，未声明退保守默认 | 3 个用例 + E2E（sink 自报 128KB，实测走进重切分支） |
+
+### 关键证据（真实运行）
+- `TestProcessSignalResplitBranchProducesValidGzip` 日志实测：
+  `part 1 compresses poorly (857256 -> 260407 bytes, limit 131072), re-split into 4 raw chunks`
+  —— 证明重切分支**真的被走到**且产出合法 gzip。
+- 解压上限：`TestDecompressPartTracksBudgetNotACompileTimeConstant` 在旧实现下失败、
+  新实现下通过（20MB 合法分片）。
+
+### 仍未闭环（如实）
+- 多实例协调、Claude 计费两处（需业主拍板）
+- HTTP 层 p95 压测、浏览器 E2E（需真实渠道/浏览器）
+- controller 全量测试在本机 600s 超时（jsplugin/sobek 用例耗时，**非本次改动引起**；
+  单跑该用例通过、training-data 相关用例全过）

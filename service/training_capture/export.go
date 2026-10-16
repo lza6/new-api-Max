@@ -52,8 +52,13 @@ const (
 
 	// ExportFormatCurrent 当前记录形态标识。
 	// 形态演进时必须改这个值 —— 消费方据此判断能否解析（见 ExportManifest.Format）。
-	// 版本号含义：v1 = 每行 {role,content} 的 JSONL，role ∈ {request, assistant}。
-	ExportFormatCurrent = "gateway-conversation-v1"
+	// 版本号含义（消费方据此判断能否解析）：
+	//   v1 = 每行 {role,content}，role ∈ {request, assistant}。
+	//   v2 = 在 v1 基础上给 request 行加  字段（full|suffix），
+	//        用于区分「完整快照」与「增量后缀」—— 不做这个区分会让消费方
+	//        把历史重复拼接 N 遍（见 Message.Kind 的说明）。
+	// **v1 消费方读到 v2 数据必须拒绝**：它不知道 kind，会把后缀当全量。
+	ExportFormatCurrent = "gateway-conversation-v2"
 
 	// exportPartExt 归档内分片后缀（与云盘一致，显式声明「需解压」）。
 	exportPartExt = ".jsonl.gz"
@@ -417,11 +422,13 @@ var ErrExportNotFound = errors.New("training export: not found")
 func exportFormatNotes() []string {
 	return []string{
 		"Each part file is a complete, independently decompressible gzip member containing JSONL (one JSON object per line).",
-		"Each record is {\"role\":\"request\"|\"assistant\",\"content\":\"...\"}: a request record carries the *new* conversation text for that turn, an assistant record carries the model reply to it.",
+		"Each record is {\"role\":\"request\"|\"assistant\",\"content\":\"...\"}. Request records carry conversation text; assistant records carry the model's reply to the immediately preceding request record.",
+		"Request records are NOT all the same shape: the `kind` field is `full` when the content is a **complete conversation snapshot** and `suffix` when it is only the **appended delta** since the previous snapshot. To rebuild the conversation text you must RESET on `kind=full` and APPEND on `kind=suffix` — accumulating every request row blindly will duplicate the history N times.",
+		"`kind` cannot be inferred from position: after the per-conversation watermark is cleaned up (inactive conversations), ANY part file may start with `kind=full`. Always read the field.",
+		"Assistant records have no `kind` field and are always standalone complete replies.",
 		"Request text is the gateway's concatenation of the whole conversation (roles and text interleaved) and is NOT reversible into per-turn roles; per-turn role recovery is heuristic only.",
 		"Request text longer than the capture limit is stored head+tail with an inline marker `…[training-capture: N bytes elided]…`; detect and drop such samples before training.",
 		"Assistant replies are captured from the response stream and are truncated at 256KB per response.",
-		"Records with role=request that are not preceded by any assistant record in the same part may be an incremental suffix of a longer conversation; concatenate in file-name (part-NNNN) order to reconstruct.",
 		"Consumers MUST check the `format` field before parsing; unknown values should be rejected rather than guessed.",
 	}
 }

@@ -2,8 +2,8 @@ package training_capture
 
 import (
 	"context"
+	"errors"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -39,22 +39,16 @@ func runWorkerOnce(t *testing.T, sink TrainingDataSink, expectSignals int) {
 	restoreGateway := SetGatewayEnabledForTest(true)
 	t.Cleanup(restoreGateway)
 
-	// 用真实 worker：它的循环会从 captureQueue 取信号并处理。
-	workerOnce = sync.Once{}
-	workerStop = make(chan struct{})
-	done := make(chan struct{})
-	go func() {
-		runWorker()
-		close(done)
-	}()
-	t.Cleanup(func() {
-		StopWorker()
-		select {
-		case <-done:
-		case <-time.After(5 * time.Second):
-			t.Error("worker 未在 5s 内停止（StopWorker 可能失效）")
-		}
-	})
+	// 用**真实启停 API**（不手工重置内部状态）。
+	//
+	// [修复防御] 原测试手工做 `workerOnce = sync.Once{}` + `go runWorker()`，
+	// 于是永远走不到生产路径的真实启停逻辑 —— 而生产路径有一个
+	//「管理员关开关后再打开 → worker 永久死亡」的缺陷，正因如此才一直
+	// 没被测出来。现在启停可重复调用，测试就该用真实入口。
+	if !StartWorker() {
+		t.Fatal("StartWorker 应实际启动 worker（若返回 false 说明状态残留）")
+	}
+	t.Cleanup(waitWorkerStopped)
 
 	// 等待 worker 把队列消费完。
 	deadline := time.After(10 * time.Second)
@@ -322,3 +316,20 @@ func waitFor(t *testing.T, timeout time.Duration, cond func() bool) bool {
 }
 
 var _ = context.Background
+
+// waitWorkerStopped 停止 worker 并等待它真正退出（供 t.Cleanup 使用）。
+//
+// 用 `WorkerRunning()` 轮询而不是「自己起的 done channel」：
+// 那样只有在测试自己起 goroutine 时才拿得到，而我们现在走真实 API。
+func waitWorkerStopped() {
+	StopWorker()
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		if !WorkerRunning() {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	// 不 panic（cleanup 里 panic 会掩盖真实失败），但要让测试可见。
+	_ = errors.New("worker 未在 5s 内停止（StopWorker 可能失效）")
+}

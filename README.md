@@ -208,6 +208,15 @@ cd web && bun install --frozen-lockfile && bun run build
 用户明确授权后，把成功的请求异步采集到云盘，用于训练数据积累。
 **不配置 `TRAINING_DATA_SINK` 时该功能完全关闭**（不会往云盘传任何用户对话）。
 
+**采集内容包含模型回复**，且**站点管理员可以查看与导出原始对话** —— 这两点
+已写进用户必须确认的免责声明里（回复常复述用户贴过的密钥，敏感面比只采输入更大，
+不写清楚就不算知情同意）。
+
+**声明改版会让旧同意失效**：免责声明内容发生实质性变更时必须递增
+`training_capture.CurrentPolicyVersion`（`service/training_capture/consent.go`）。
+递增后，此前已授权的用户会看到开关变成关闭并提示「采集已暂停，请重新确认新说明」，
+**重新确认前一律不采集**。这是有意的设计：不能拿旧文本下的同意去采新范围的数据。
+
 | 变量 | 说明 |
 |------|------|
 | `TRAINING_DATA_SINK` | 存储后端。`onedrive` 启用；留空或 `disabled` 关闭（默认） |
@@ -219,7 +228,7 @@ cd web && bun install --frozen-lockfile && bun run build
 | `TRAINING_CAPTURE_BUDGET_PCT` | 采集模块可用内存占机器内存的百分比，默认 `80` |
 | `TRAINING_CAPTURE_MIN_BUDGET_MB` | 预算下限（MB），默认 `128`。检测不到 cgroup 与宿主机内存时用它兜底 |
 | `TRAINING_CAPTURE_MAX_TEXT_MB` | 单条采集文本上限（MB），默认随预算自适应（最小 64KB，最大 8MB） |
-| `TRAINING_CAPTURE_MAX_PART_MB` | 单个分片**压缩前**的原始上限（MB），默认 `16` |
+| `TRAINING_CAPTURE_MAX_PART_MB` | 单个分片**压缩前**的原始上限（MB），默认 `16`；内存预算大时会被「分片上限 ≥ 单条文本上限 × 8」这一不变量抬高（见下） |
 | `TRAINING_CAPTURE_QUEUE_CAP` | 采集队列容量（条），默认按预算自适应（上限 4096） |
 
 **内存预算是 cgroup 感知的**：容器里读 `mem.VirtualMemory()` 拿到的是**宿主机**内存，
@@ -229,6 +238,19 @@ cd web && bun install --frozen-lockfile && bun run build
 
 **云盘数据布局**：`<ROOT_PATH>/<YYYY-MM-DD>/<用户名>-<用户ID>/<模型名>/part-0001.jsonl.gz`
 （分片为 gzip 压缩的 JSONL，读取方需先解压）。
+
+**每个分片都是独立可解压的完整 gzip member**：切分发生在**原始 JSONL 的行边界**上，
+每块各自压缩。压缩后若仍超过后端单次写入上限（内容不可压缩时会发生），
+会在**原始字节**上再切一刀并逐块重压 —— 绝不切割压缩产物，否则碎片不是合法
+gzip，预览只会显示二进制垃圾、分析端会把碎片当正文喂给模型。
+
+**后端写入上限由后端自己声明**（`PartUploadLimiter`）：OneDrive 报 4MB、其它后端报自己的值，
+worker 按声明切分。未声明上限的后端退保守默认值 4MB。这样新增云盘后端
+（S3 / OSS / WebDAV 等）**不需要改采集 worker**。
+
+**读取侧的解压上限与写入侧同源**（`EffectiveDecompressMaxPlainBytes` = 分片上限 × 8）：
+分片上限会随内存预算自适应，若解压上限写死，调大分片上限后管理端预览
+与分析会**永远解压失败**（看着像数据损坏，实为限额不匹配）。
 
 **记录格式**（每行一条 JSON）：
 

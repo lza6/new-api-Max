@@ -155,6 +155,17 @@ export function TrainingDataPreferencesCard() {
                   })}
                 </p>
               )}
+              {/*
+                声明改版 → 旧同意失效。开关会从「开」变成「关」，
+                必须说明**为什么**，否则用户会以为功能坏了、自己误触了，
+                甚至怀疑数据在被偷偷继续采集。 */}
+              {status.needs_reconsent && (
+                <p className='text-xs text-amber-600 dark:text-amber-500'>
+                  {t(
+                    'The collection notice was updated. Collection is paused until you review and agree to the new notice.'
+                  )}
+                </p>
+              )}
             </div>
             <div className='flex shrink-0 items-center gap-2'>
               {busy && (
@@ -202,6 +213,12 @@ export function TrainingDataPreferencesCard() {
           ),
           t(
             'Collected content is uploaded to cloud storage configured by the site administrator, and is used to improve model quality.'
+          ),
+          // 敏感面必须讲全：只讲「采你的输入」会让人以为回复不算内容。
+          // 回复常复述用户贴过的密钥/凭据，且管理员可读可导出原始对话 ——
+          // 这两点不写清楚，用户的「同意」就不算知情同意。
+          t(
+            'Both your messages and the model replies are stored. Site administrators can read and export the raw conversation, so never send secrets, credentials or personal data you are not willing to have reviewed.'
           ),
           t(
             'Your conversations are also sent to the upstream AI models you use, since that is how you get a reply. Additionally, the site administrator may send a collected conversation to a model for quality analysis.'

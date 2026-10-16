@@ -158,6 +158,11 @@ func NewOneDriveSink(cfg OneDriveConfig) *oneDriveSink {
 
 func (s *oneDriveSink) Name() string { return "onedrive" }
 
+// MaxWritePartBytes 声明 Graph 简单上传的硬上限（4MB）。
+//
+// worker 据此切分，不再猜后端类型 —— 这正是 `PartUploadLimiter` 存在的理由。
+func (s *oneDriveSink) MaxWritePartBytes() int { return OneDriveSimpleUploadMaxBytes }
+
 // ---------- token ----------
 
 // token 返回有效的 access token（带缓存与提前续期）。

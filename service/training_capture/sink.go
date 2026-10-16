@@ -78,6 +78,41 @@ type TrainingDataSink interface {
 	Stat(ctx context.Context) (SinkStat, error)
 }
 
+// PartUploadLimiter 后端可选的**单次写入上限**声明。
+//
+// ## 为什么必须由后端声明，不能由 worker 猜
+//
+// `WritePart` 的契约是「调用方保证 data 不超过后端单次上传上限」——
+// 但每个后端的上限是**不同的**：OneDrive Graph 简单上传 4MB、S3 单次 PUT
+// 5GB、OSS 5GB、WebDAV 取决于服务端配置。worker 里写死 4MB 时，
+// 抽象就等于失效：换成 S3 会**白白把分片切到 4MB 以下**（文件数暴涨、
+// 上传次数暴涨），换成限制更严的后端则会在 WritePart 里报错。
+//
+// 实现该接口即可让 worker 按真实上限切分。**不实现**的后端退到
+// `defaultMaxWritePartBytes`（保守值），行为与今天一致、不会变坏。
+type PartUploadLimiter interface {
+	// MaxWritePartBytes 单次 WritePart 允许的最大字节数（必须 > 0）。
+	MaxWritePartBytes() int
+}
+
+// defaultMaxWritePartBytes 后端未声明上限时的保守默认值。
+//
+// 取 4MB 而不是「很大」：猜大了会在 WritePart 里炸，猜小了只是多切几片。
+// 多切片的代价（文件数、请求数）远小于上传失败重试的代价。
+const defaultMaxWritePartBytes = 4 << 20
+
+// EffectiveMaxWritePartBytes 返回**当前后端**允许的单次写入上限。
+//
+// nil sink 返回默认值（调用方通常在 sink 就绪前算限额）。
+func EffectiveMaxWritePartBytes(sink TrainingDataSink) int {
+	if limiter, ok := sink.(PartUploadLimiter); ok {
+		if v := limiter.MaxWritePartBytes(); v > 0 {
+			return v
+		}
+	}
+	return defaultMaxWritePartBytes
+}
+
 // SinkReader 云盘**读取**能力（可选接口，供管理端浏览/预览文件）。
 //
 // 刻意**不**并入 TrainingDataSink 主接口：写入是采集的必需能力，

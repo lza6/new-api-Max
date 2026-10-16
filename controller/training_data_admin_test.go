@@ -382,6 +382,10 @@ func TestBuildExportRefusesTruncatedListing(t *testing.T) {
 	require.Error(t, err, "枚举被截断时必须**明确报错**，而不是产出看似完整的半包")
 	assert.Contains(t, err.Error(), "truncated",
 		"错误信息要说明是截断导致的，并给出可行建议")
+	// **不得**声称一个具体条目上限：sink 会把请求值夹到自己的硬顶，
+	// 报具体数字等于报一个无法核实的值（曾写死 100000 而后端实际 5000）。
+	assert.NotContains(t, err.Error(), "100000",
+		"错误信息不得包含未经核实的条目上限数字")
 	assert.Contains(t, err.Error(), "narrow the date range",
 		"必须告诉管理员下一步怎么做（收窄范围），否则他无从下手")
 }

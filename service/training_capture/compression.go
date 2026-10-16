@@ -51,11 +51,14 @@ func gzipCompress(payload []byte) ([]byte, error) {
 // gzipDecompress 解压分片（管理端分析 / 读取侧用）。
 //
 // 用 io.LimitReader 防 zip-bomb：一个恶意构造的 gzip 文件解压后可以是
-// 无界的（解压比可达 1000:1 以上）。读上限取「单分片原始上限的 4 倍」，
-// 正常数据远达不到；超过即报错 —— 拒绝解压比 OOM 好。
+// 无界的（解压比可达 1000:1 以上）。超过上限即报错 ——
+// 拒绝解压比 OOM 好。
+//
+// maxPlain <= 0 时走 `EffectiveDecompressMaxPlainBytes()`（按**当前预算**
+// 推导，见该函数说明）；**不再退回编译期常量**。
 func gzipDecompress(data []byte, maxPlain int64) ([]byte, error) {
 	if maxPlain <= 0 {
-		maxPlain = int64(MaxPartBytes) * 8
+		maxPlain = EffectiveDecompressMaxPlainBytes()
 	}
 	zr, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
@@ -72,12 +75,43 @@ func gzipDecompress(data []byte, maxPlain int64) ([]byte, error) {
 	return plain, nil
 }
 
+// decompressPlainMultiplier 解压上限相对**单分片原始上限**的倍数。
+//
+// 8 倍：正常分片解压后绝不会超过自己的原始上限（分片就是按这个上限切的），
+// 留 8 倍余量是为了容忍「分片是旧上限切的、期间上限被调小」这类跨版本场景。
+// 仍然有界，zip-bomb 照挡。
+const decompressPlainMultiplier = 8
+
+// EffectiveDecompressMaxPlainBytes 解压后明文的上限（按当前预算推导）。
+//
+// ## 为什么不能用编译期常量
+//
+// 旧实现写死 `MaxPartBytes(2MB) * 8 = 16MB`。但**分片上限是自适应的**：
+// `CAPTURE_MAX_PART_MB` 可调，且 `deriveLimits` 还受内存预算与
+// 「分片上限 ≥ 文本上限 × 8」这条不变量影响（内存大的机器上可到 128MB+）。
+//
+// 后果是双向的、且都在生产才暴露：
+//   - 上限被调大 → 分片原始大小超过 16MB → **管理端预览与分析永远解压失败**，
+//     报 ErrDecompressTooLarge，而数据本身完全正常（看起来像数据损坏）；
+//   - 上限被调小 → 白白放宽了 zip-bomb 的窗口，多算出来的余量没有任何用处。
+//
+// 现在与 `EffectiveMaxPartRawBytes` 同源，读写两侧的上限始终一致。
+func EffectiveDecompressMaxPlainBytes() int64 {
+	base := EffectiveMaxPartRawBytes()
+	if base <= 0 {
+		// 理论上不可达（EffectiveMaxPartRawBytes 自身有兜底推导），
+		// 但仍给一个正数，避免 maxPlain<=0 把防 bomb 的闸门整个关掉。
+		base = MaxPartBytes
+	}
+	return int64(base) * decompressPlainMultiplier
+}
+
 // DecompressPart 解压一个分片（导出给接口层用）。
 //
-// 上限固定为「单分片原始上限的 8 倍」：正常数据远达不到，
+// 上限取 `EffectiveDecompressMaxPlainBytes()`（随预算自适应），
 // 超限即 ErrDecompressTooLarge（防 zip-bomb）。
 func DecompressPart(data []byte) ([]byte, error) {
-	return gzipDecompress(data, int64(MaxPartBytes)*8)
+	return gzipDecompress(data, EffectiveDecompressMaxPlainBytes())
 }
 
 // CompressPartForTest 暴露压缩给跨包测试（controller 层要造真实的

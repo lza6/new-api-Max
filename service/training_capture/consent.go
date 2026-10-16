@@ -45,7 +45,12 @@ const (
 	//
 	// **声明内容实质性变更时必须递增它**，使旧同意失效并重新征求同意。
 	// 见 `model.ListGrantedTrainingDataUserIds` 的版本过滤。
-	CurrentPolicyVersion = "v1"
+	//
+	// v2：声明新增「模型回复同样入库」与「管理员可查看/导出原始对话」两条。
+	// 这是采集范围的**实质性扩张**（既扩大了采集面，也把可读范围讲明）——
+	// 在 v1 文本下作出的同意不能覆盖它，故递增版本使旧同意失效，
+	// 用户重新看到新声明并再次确认后才会恢复采集。
+	CurrentPolicyVersion = "v2"
 )
 
 // ErrGatewayDisabled 管理员关闭了采集总开关。
@@ -334,6 +339,13 @@ type ConsentStatus struct {
 	PolicyVersion string `json:"policy_version"`
 	// GrantedAt 最近一次同意时间（unix 秒）；未同意为 0。
 	GrantedAt int64 `json:"granted_at"`
+	// NeedsReconsent 声明改版导致旧同意失效，需要用户**重新确认**。
+	//
+	// 与「从未同意」和「主动撤回」在界面上必须区分：前两者开关本就是关的，
+	// 用户不会有疑问；而这里是**开关从「开」悄悄变成「关」** ——
+	// 若不解释，用户会以为功能坏了或自己误触，甚至怀疑数据被偷偷继续采集。
+	// 前端据此展示「声明已更新，请重新确认」而非静默关闭。
+	NeedsReconsent bool `json:"needs_reconsent"`
 }
 
 // GetConsentStatus 读取用户授权状态（供接口层）。
@@ -364,6 +376,9 @@ func GetConsentStatus(userId int) (ConsentStatus, error) {
 		status.GrantedAt = consent.GrantedAt
 		// 只有「已授权」**且**「同意的是当前版本」才算真正授权。
 		status.Granted = consent.Granted && consent.PolicyVersion == CurrentPolicyVersion
+		// 已授权但版本不匹配 = 声明改版后失效（不是用户自己撤回的）。
+		// 仅在此种情况下提示重新确认：主动撤回或从未同意时提示是多余的。
+		status.NeedsReconsent = consent.Granted && !status.Granted
 	}
 	return status, nil
 }

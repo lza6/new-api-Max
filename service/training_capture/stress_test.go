@@ -51,18 +51,12 @@ func runCaptureStress(t *testing.T, cfg captureStressConfig) (enqueued, dropped,
 	// 用**真实 worker**：生产端与消费端并发是压测的核心，
 	// 只压队列不压 worker 会漏掉「worker 处理慢导致队列满」这条真实路径。
 	if cfg.withWorker {
-		workerOnce = sync.Once{}
-		workerStop = make(chan struct{})
-		done := make(chan struct{})
-		go func() { runWorker(); close(done) }()
-		t.Cleanup(func() {
-			StopWorker()
-			select {
-			case <-done:
-			case <-time.After(10 * time.Second):
-				t.Error("worker 未能在 10s 内停止（压测后停机失效）")
-			}
-		})
+		// 走**真实启停 API**：手工重置内部状态会绕过生产路径，
+		// 而那正是「关后再开 worker 永久死亡」这类缺陷的藏身处。
+		if !StartWorker() {
+			t.Fatal("StartWorker 应实际启动 worker")
+		}
+		t.Cleanup(waitWorkerStopped)
 	}
 
 	// 所有写者共用一个授权用户（授权判定走缓存，不会成为瓶颈）。
@@ -194,18 +188,10 @@ func TestStressTogglingGatewayDuringLoad(t *testing.T) {
 	captureQueue = NewCaptureQueue(256)
 	t.Cleanup(func() { captureQueue = originalQueue })
 
-	workerOnce = sync.Once{}
-	workerStop = make(chan struct{})
-	done := make(chan struct{})
-	go func() { runWorker(); close(done) }()
-	t.Cleanup(func() {
-		StopWorker()
-		select {
-		case <-done:
-		case <-time.After(10 * time.Second):
-			t.Error("worker 未能在 10s 内停止")
-		}
-	})
+	if !StartWorker() {
+		t.Fatal("StartWorker 应实际启动 worker")
+	}
+	t.Cleanup(waitWorkerStopped)
 
 	const userId = 70002
 	SetGatewayEnabled(true)

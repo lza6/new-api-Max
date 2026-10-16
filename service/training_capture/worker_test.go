@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/relaykit/types"
+	"github.com/stretchr/testify/assert"
 	"strings"
 	"sync"
 	"testing"
@@ -32,6 +34,19 @@ type memSink struct {
 	writeCalls int
 	listCalls  int
 	dirCalls   int
+
+	// maxWritePart 本 sink 自报的单次写入上限（0 → 用 defaultMaxWritePartBytes）。
+	// 可调小以在测试里触发「压缩后超限 → 重切」路径，而不必造几十 MB 数据。
+	maxWritePart int
+}
+
+// MaxWritePartBytes 实现 PartUploadLimiter：让测试 sink 像真实后端一样
+// 声明自己的上限，worker 才会按它切分。
+func (m *memSink) MaxWritePartBytes() int {
+	if m.maxWritePart > 0 {
+		return m.maxWritePart
+	}
+	return defaultMaxWritePartBytes
 }
 
 func newMemSink() *memSink {
@@ -62,9 +77,12 @@ func (m *memSink) WritePart(_ context.Context, path string, data []byte) (string
 	if len(data) == 0 {
 		return "", fmt.Errorf("mem sink: empty payload")
 	}
-	// 与 OneDrive 一致：超过简单上传上限必须报错，不能截断。
-	if len(data) > OneDriveSimpleUploadMaxBytes {
-		return "", fmt.Errorf("mem sink: %d bytes exceeds simple-upload limit %d", len(data), OneDriveSimpleUploadMaxBytes)
+	// 与真实后端一致：超过**自报上限**必须报错，不能截断。
+	// 用 MaxWritePartBytes() 而不是 OneDrive 常量：本 sink 通过
+	// memSinkMaxWritePartBytes 声明自己的上限，测试才能覆盖
+	// 「worker 是否真的按后端声明的上限切分」。
+	if maxWrite := m.MaxWritePartBytes(); maxWrite > 0 && len(data) > maxWrite {
+		return "", fmt.Errorf("mem sink: %d bytes exceeds declared write limit %d", len(data), maxWrite)
 	}
 	m.files[path] = append([]byte(nil), data...)
 	return path, nil
@@ -827,4 +845,340 @@ func firstN(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+// 回归（盲点 F10）：worker 启停必须可以**任意次往返**。
+//
+// 原实现用 `workerOnce.Do` + 关闭 stop channel：
+// 「管理员关开关 → 再打开」后第二次 `StartWorker` 是 no-op，
+// 而 stop channel 已关闭 → **没有消费者，采集永久停摆**，
+// 而管理端仍显示 enabled（典型的「看起来在工作其实没工作」）。
+//
+// 这个缺陷长期未被发现，是因为测试都**手工重置内部状态**
+// （`workerOnce = sync.Once{}` + `go runWorker()`），绕过了真实启停路径。
+func TestWorkerCanRestartAfterStop(t *testing.T) {
+	if err := ensureTestDB(t); err != nil {
+		t.Fatalf("初始化测试 DB 失败：%v", err)
+	}
+	originalQueue := captureQueue
+	captureQueue = NewCaptureQueue(64)
+	t.Cleanup(func() { captureQueue = originalQueue })
+	t.Cleanup(waitWorkerStopped)
+
+	// 第一轮：启 → 停。
+	if !StartWorker() {
+		t.Fatal("首次 StartWorker 应返回 true")
+	}
+	if !WorkerRunning() {
+		t.Fatal("启动后 WorkerRunning 应为 true")
+	}
+	if StartWorker() {
+		t.Fatal("重复 StartWorker 应是 no-op（返回 false）")
+	}
+	if !StopWorker() {
+		t.Fatal("StopWorker 应返回 true（确实停了一个）")
+	}
+	waitWorkerStopped()
+	if WorkerRunning() {
+		t.Fatal("停止后 WorkerRunning 应为 false")
+	}
+
+	// **第二轮：再启** —— 这是原实现失效的地方。
+	if !StartWorker() {
+		t.Fatal("停止后再次 StartWorker 必须能真正启动（原实现在这里是 no-op）")
+	}
+	if !WorkerRunning() {
+		t.Fatal("重启后 WorkerRunning 应为 true —— 否则采集静默停摆")
+	}
+
+	// 更进一步：重启后的 worker 必须**真的在消费队列**。
+	// 只断言 WorkerRunning 不足以证明「有消费者」。
+	sink := withMemSink(t)
+	restoreGateway := SetGatewayEnabledForTest(true)
+	t.Cleanup(restoreGateway)
+	const uid = 91001
+	grantForTest(t, uid)
+
+	sig := BuildSignal(CaptureInput{
+		UserId: uid, Username: "restart", Model: "m", ConversationID: "conv-restart",
+		Meta:      &types.TokenCountMeta{CombineText: "重启之后必须还能采集"},
+		CreatedAt: 1791937800,
+	})
+	if sig == nil {
+		t.Fatal("BuildSignal 返回 nil")
+	}
+	if !MaybeCapture(*sig) {
+		t.Fatal("重启后 MaybeCapture 应能入队")
+	}
+	if !waitFor(t, 10*time.Second, func() bool { return sink.writeCallsCount() > 0 }) {
+		t.Fatal("重启后的 worker **没有消费队列** —— 这正是原缺陷的表现")
+	}
+}
+
+// 回归：一条坏数据 panic 后，worker 必须**继续处理后续信号**，
+// 而不是整个停摆。
+func TestWorkerSurvivesPanicInOneSignal(t *testing.T) {
+	if err := ensureTestDB(t); err != nil {
+		t.Fatalf("初始化测试 DB 失败：%v", err)
+	}
+	// 让第 1 条信号 panic、之后的正常。
+	sink := &panicOnceSink{}
+	restoreSink := SetSinkForTest(sink)
+	t.Cleanup(restoreSink)
+
+	originalQueue := captureQueue
+	captureQueue = NewCaptureQueue(64)
+	t.Cleanup(func() { captureQueue = originalQueue })
+
+	restoreGateway := SetGatewayEnabledForTest(true)
+	t.Cleanup(restoreGateway)
+	if !StartWorker() {
+		t.Fatal("StartWorker 应启动")
+	}
+	t.Cleanup(waitWorkerStopped)
+
+	const uid = 91002
+	grantForTest(t, uid)
+	meta := &types.TokenCountMeta{CombineText: "一条会触发 panic 的数据"}
+
+	for i := range 2 {
+		sig := BuildSignal(CaptureInput{
+			UserId: uid, Username: "panic", Model: "m",
+			ConversationID: "conv-panic-" + itoaSmall(i),
+			Meta:           meta, CreatedAt: 1791937800,
+		})
+		if sig == nil || !MaybeCapture(*sig) {
+			t.Fatalf("第 %d 条应能入队", i)
+		}
+	}
+
+	// 第 2 条（panic 之后的那条）必须被成功处理。
+	if !waitFor(t, 10*time.Second, func() bool { return sink.successCount() > 0 }) {
+		t.Fatal("panic 之后 worker 未继续处理后续信号 —— 采集因一条坏数据永久停摆")
+	}
+	if !WorkerRunning() {
+		t.Fatal("单条 panic 不应让 worker 退出")
+	}
+}
+
+// panicOnceSink 第一次写入时 panic，之后正常。
+type panicOnceSink struct {
+	mu       sync.Mutex
+	written  int
+	panicked bool
+}
+
+func (p *panicOnceSink) Name() string { return "panic-once" }
+func (p *panicOnceSink) EnsureDir(context.Context, string) error {
+	return nil
+}
+
+func (p *panicOnceSink) WritePart(context.Context, string, []byte) (string, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if !p.panicked {
+		p.panicked = true
+		panic("injected panic from sink")
+	}
+	p.written++
+	return "ref", nil
+}
+
+func (p *panicOnceSink) List(context.Context, string) ([]string, error) { return nil, nil }
+func (p *panicOnceSink) Stat(context.Context) (SinkStat, error) {
+	return SinkStat{Provider: "panic-once"}, nil
+}
+
+func (p *panicOnceSink) successCount() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.written
+}
+
+// 回归（审查 #6）：**生产唯一形态**下的助手回复追加分支。
+//
+// 生产路径是「1 条 role=request + ResponseText」（见 hotpath.go），
+// 走 `useTextIncrement && reply != ""` 那条分支。此前**没有任何用例覆盖它**：
+//   - worker_test 的 reply 用例传的是 Role:"user"（2 条）→ 走**消息级**路径；
+//   - e2e_test 走 BuildSignal 但 ResponseText 恒空。
+//
+// 也就是说：这条分支若坏了，全套测试仍然全绿。
+func TestProcessSignalAppendsReplyInProductionShape(t *testing.T) {
+	sink := withMemSink(t)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
+	ctx := context.Background()
+
+	// 用真实生产形态：单条 request + 回复。
+	build := func(text, reply string) CaptureSignal {
+		sig := BuildSignal(CaptureInput{
+			UserId: 92001, Username: "prod", Model: "m",
+			ConversationID: "conv-prod-shape",
+			Meta:           &types.TokenCountMeta{CombineText: text},
+			ResponseText:   reply,
+			CreatedAt:      1791937800,
+		})
+		if sig == nil {
+			t.Fatal("BuildSignal 返回 nil")
+		}
+		return *sig
+	}
+
+	// 第一次：全量请求 + 回复。
+	sig1 := build("第一轮提问", "第一轮回答")
+	n1, _, err := processSignal(ctx, sig1, limiter)
+	if err != nil {
+		t.Fatalf("首次：%v", err)
+	}
+	if n1 != 2 {
+		t.Fatalf("首次应上传 2 条（请求 + 回复），实际 %d —— "+
+			"若为 1 说明回复没被追加（生产形态的回复会丢）", n1)
+	}
+	if got := sink.totalLines(); got != 2 {
+		t.Fatalf("云盘上应有 2 行，实际 %d", got)
+	}
+
+	// 第二次：请求文本增长 → 只传新增请求文本 + 该轮回复。
+	sig2 := build("第一轮提问\n第一轮回答\n第二轮提问", "第二轮回答")
+	n2, _, err := processSignal(ctx, sig2, limiter)
+	if err != nil {
+		t.Fatalf("第二次：%v", err)
+	}
+	if n2 != 2 {
+		t.Fatalf("第二次应为「新增请求 + 回复」= 2 条，实际 %d", n2)
+	}
+	if got := sink.totalLines(); got != 4 {
+		t.Fatalf("累计应有 4 行（2 + 2），实际 %d —— 回复被重复或漏传", got)
+	}
+
+	// 第三次：请求**完全没变** → 不传任何东西（含回复）。
+	// 这防止「同一条回复每轮被反复上传」。
+	before := sink.totalLines()
+	n3, _, err := processSignal(ctx, sig2, limiter)
+	if err != nil {
+		t.Fatalf("第三次：%v", err)
+	}
+	if n3 != 0 {
+		t.Fatalf("请求未推进时不应上传任何内容，实际 %d 条", n3)
+	}
+	if after := sink.totalLines(); after != before {
+		t.Fatalf("请求未推进时云盘行数不应变化：%d → %d", before, after)
+	}
+}
+
+// 回复必须携带 role=assistant，且**不带** kind 字段
+// （kind 只对请求行有意义；给回复加 kind 会让消费方误判）。
+func TestReplyRecordShapeIsCorrect(t *testing.T) {
+	sink := withMemSink(t)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
+
+	sig := BuildSignal(CaptureInput{
+		UserId: 92002, Username: "shape", Model: "m", ConversationID: "conv-shape",
+		Meta:         &types.TokenCountMeta{CombineText: "提问"},
+		ResponseText: "回答",
+		CreatedAt:    1791937800,
+	})
+	if _, _, err := processSignal(context.Background(), *sig, limiter); err != nil {
+		t.Fatalf("processSignal：%v", err)
+	}
+
+	var sawRequest, sawAssistant bool
+	for name, data := range sink.snapshot() {
+		// 分片是 gzip 压缩的，解析前必须先解压（否则会读到二进制垃圾）。
+		if strings.HasSuffix(name, ".gz") {
+			plain, err := gzipDecompress(data, 1<<30)
+			if err != nil {
+				t.Fatalf("分片 %s 不是合法 gzip：%v", name, err)
+			}
+			data = plain
+		}
+		for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+			if line == "" {
+				continue
+			}
+			var rec map[string]any
+			if err := common.Unmarshal([]byte(line), &rec); err != nil {
+				t.Fatalf("不是合法 JSON：%v", err)
+			}
+			role, _ := rec["role"].(string)
+			switch role {
+			case "request":
+				sawRequest = true
+				if rec["kind"] != KindRequestFull {
+					t.Fatalf("首次采集的请求行 kind 应为 %q，实际 %v", KindRequestFull, rec["kind"])
+				}
+			case "assistant":
+				sawAssistant = true
+				if _, has := rec["kind"]; has {
+					t.Fatal("回复行**不应**带 kind 字段（kind 只对请求行有意义）")
+				}
+			}
+		}
+	}
+	if !sawRequest || !sawAssistant {
+		t.Fatalf("应同时产出 request 与 assistant 行：request=%v assistant=%v", sawRequest, sawAssistant)
+	}
+}
+
+// TestProcessSignalResplitBranchProducesValidGzip 覆盖**兜底重切**分支。
+//
+// 场景：内容**压缩后仍超过后端自报的写入上限**（已压缩内容/随机数据）。
+// 旧实现在这里直接切**压缩产物** —— 碎片不是合法 gzip，云盘上出现
+// 二进制垃圾。主路径修了、这个分支没修，等于把同一个 bug 留在
+// 最难触发（只有高压缩比内容才进来）也最难排查的地方。
+//
+// 做法：用 memSink **自报一个小上限**（128KB），让 1MB 分片必然走进重切，
+// 而不必造几十 MB 数据。这也顺带证明 worker 真的读了后端声明的上限。
+func TestProcessSignalResplitBranchProducesValidGzip(t *testing.T) {
+	sink := withMemSink(t)
+	sink.maxWritePart = 128 << 10 // 自报 128KB 上限，强制触发重切
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
+	ctx := context.Background()
+
+	ResetBudgetForTest()
+	t.Setenv(EnvCaptureMaxPartMB, "1")
+	t.Cleanup(ResetBudgetForTest)
+
+	// 不可压缩内容：压缩比≈1 → 1MB 原始压出来仍 ~1MB ≫ 128KB → 必走重切。
+	var msgs []Message
+	for i := range 200 {
+		var b strings.Builder
+		for j := 0; b.Len() < 4096; j++ {
+			fmt.Fprintf(&b, "%08x%08x%08x\n", i*131+j, i*7919+j, i*2654435761+j)
+		}
+		msgs = append(msgs, Message{Role: "user", Content: b.String()})
+	}
+
+	n, _, err := processSignal(ctx, signal(902, "resplit", "m", "conv-resplit", msgs, ""), limiter)
+	if err != nil {
+		t.Fatalf("processSignal：%v", err)
+	}
+	if n != len(msgs) {
+		t.Fatalf("应上传 %d 条，实际 %d", len(msgs), n)
+	}
+
+	files := sink.snapshot()
+	if len(files) < 2 {
+		t.Fatalf("128KB 上限下必然多分片，实际 %d 个", len(files))
+	}
+	for name, data := range files {
+		assert.LessOrEqual(t, len(data), sink.maxWritePart,
+			"分片 %s 超过后端自报上限 —— worker 没按后端声明的上限切分", name)
+		plain, derr := gzipDecompress(data, 64<<20)
+		if derr != nil {
+			t.Fatalf("重切产生的分片 %s 不是合法 gzip（%v）—— "+
+				"这正是「切压缩产物」会造成的碎片化损坏", name, derr)
+		}
+		for _, line := range strings.Split(strings.TrimRight(string(plain), "\n"), "\n") {
+			if line == "" {
+				continue
+			}
+			var rec struct {
+				Role    string `json:"role"`
+				Content string `json:"content"`
+			}
+			if err := common.Unmarshal([]byte(line), &rec); err != nil {
+				t.Fatalf("分片 %s 里有被切碎的记录：%v", name, err)
+			}
+		}
+	}
 }

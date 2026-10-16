@@ -161,7 +161,6 @@ func (s *oneDriveSink) ListTree(ctx context.Context, root string, maxEntries int
 func (s *oneDriveSink) ListTreeWithTruncation(
 	ctx context.Context, root string, maxEntries int,
 ) ([]TreeEntry, bool, error) {
-	requested := maxEntries
 	if maxEntries <= 0 {
 		maxEntries = onedriveTreeMaxEntries
 	}
@@ -173,7 +172,6 @@ func (s *oneDriveSink) ListTreeWithTruncation(
 	if err != nil {
 		return nil, false, err
 	}
-	_ = requested
 
 	// 归一化 root（去掉首尾斜杠），用于判断「相对 root 的路径」。
 	rootTrimmed := strings.Trim(root, "/")

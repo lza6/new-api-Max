@@ -178,10 +178,16 @@ func buildExport(ctx context.Context, reader training_capture.SinkReader, rec *m
 		return manifest, fmt.Errorf("list cloud drive: %w", err)
 	}
 	if truncated {
+		// [修复防御] **不报具体数字**。
+		//
+		// 原错误串写「limit 100000 entries reached」，但 sink 内部会把
+		// 请求值夹到自己的硬顶（OneDrive 当前是 5000）——
+		// 于是那个 100000 永远不成立，运维照它调参只会更困惑。
+		// 报一个自己无法核实的数字，比不给数字更糟。
 		return manifest, fmt.Errorf(
-			"cloud drive listing was truncated (limit %d entries reached, or deep directories were not expanded); "+
-				"narrow the date range or add a user/model filter so the export stays complete",
-			training_capture.ExportListTreeMaxEntries)
+			"cloud drive listing was truncated: the storage backend's own listing limit was reached, " +
+				"or deep directories were not expanded, so the export would be silently incomplete; " +
+				"narrow the date range or add a user/model filter")
 	}
 
 	sel := training_capture.ExportSelection{

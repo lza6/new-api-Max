@@ -129,6 +129,61 @@ func TestGzipCompressEmptyAndSmall(t *testing.T) {
 	}
 }
 
+// TestDecompressPartTracksBudgetNotACompileTimeConstant 锁定
+// 「解压上限必须与分片上限同源」。
+//
+// 旧实现写死 `MaxPartBytes(2MB) * 8 = 16MB`，而分片上限是**自适应**的
+// （`CAPTURE_MAX_PART_MB` 可调 + 内存预算 + 「分片上限 ≥ 文本上限 × 8」不变量）。
+// 后果在生产才暴露且方向相反：上限调大 → 合法分片永远解压失败
+// （看着像数据损坏）；上限调小 → 白白放宽 zip-bomb 窗口。
+//
+// 用手工构造的 20MB 明文（**远小于**调大后的 32MB 分片上限）证明这一点。
+func TestDecompressPartTracksBudgetNotACompileTimeConstant(t *testing.T) {
+	defer ResetBudgetForTest()
+
+	// 20MB 明文：合法数据，旧实现下必被 16MB 硬上限拒绝。
+	plain := bytes.Repeat([]byte("0123456789abcdef"), 20<<20/16)
+	blob := gzipMust(t, string(plain))
+
+	// 预算：分片原始上限调到 32MB（模拟大内存机器/运维调参）。
+	t.Setenv(EnvCaptureMaxPartMB, "32")
+	initResourceBudget(0)
+	if got := EffectiveMaxPartRawBytes(); got != 32<<20 {
+		t.Fatalf("前置条件不成立：分片上限应为 32MB，实际 %d", got)
+	}
+
+	dec, err := DecompressPart(blob)
+	if err != nil {
+		t.Fatalf("合法分片必须能解压（旧实现的 16MB 硬上限会在这里失败）：%v", err)
+	}
+	if !bytes.Equal(dec, plain) {
+		t.Fatalf("解压后与原文不一致：%d vs %d 字节", len(dec), len(plain))
+	}
+}
+
+// TestDecompressPartStillRejectsZipBombUnderBudget 确认上限仍**有界** ——
+// 改成自适应不能把防 zip-bomb 的闸门一起拆掉。
+//
+// 用**小预算**而不是小明文：上限随预算缩放，所以把分片上限压到 1MB
+// （解压上限随之 = 8MB）就能用几十 MB 的明文验证闸门，不必分配 512MB。
+func TestDecompressPartStillRejectsZipBombUnderBudget(t *testing.T) {
+	defer ResetBudgetForTest()
+
+	t.Setenv(EnvCaptureMaxPartMB, "1")
+	initResourceBudget(0)
+
+	limit := EffectiveDecompressMaxPlainBytes()
+	if limit != 8<<20 {
+		t.Fatalf("前置条件不成立：解压上限应为 8MB，实际 %d", limit)
+	}
+
+	// 解压后 32MB > 8MB 上限 —— 必须拒绝而不是读满内存。
+	bomb := gzipMust(t, strings.Repeat("A", 32<<20))
+	if _, err := DecompressPart(bomb); err != ErrDecompressTooLarge {
+		t.Fatalf("超限解压必须返回 ErrDecompressTooLarge，实际 %v", err)
+	}
+}
+
 // ---------- 工具 ----------
 
 func gzipMust(t *testing.T, s string) []byte {
