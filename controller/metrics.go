@@ -7,6 +7,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service"
+	"github.com/lza6/new-api-Max/service/training_capture"
 )
 
 // RegisterMetricsGaugeProvider B3-1：把派生型瞬时指标（渠道健康分 / 熔断状态 /
@@ -51,6 +52,32 @@ func RegisterMetricsGaugeProvider() {
 		// G3 工具抽屉收益度量。
 		for k, v := range ToolDrawerMetrics() {
 			common.MetricsSetGauge(k, nil, v)
+		}
+
+		// 训练数据采集健康度（盲点 B18）。
+		//
+		// 为什么必须进 /metrics：采集是**尽力而为**的旁路功能，
+		// 它的失效（未授权用户增多、队列持续满、云盘挂、文本取不到）
+		// 在业务指标上**完全看不出来** —— 请求照常成功，只是数据没采到。
+		// 没有这里的指标，运维只能靠「某天发现云盘是空的」来发现，
+		// 而那可能已经是几周以后。
+		//
+		// 用 captured_* 前缀与业务指标区分；全部是进程内原子量，
+		// **不依赖 DB**，任何情况下都能输出。
+		if stats := training_capture.GetCaptureStats(); stats.Day != "" {
+			common.MetricsSetGauge("training_capture_enqueued_total", nil, float64(stats.TotalEnqueued))
+			common.MetricsSetGauge("training_capture_dropped_total", nil, float64(stats.TotalDropped))
+			common.MetricsSetGauge("training_capture_upload_errors_total", nil, float64(stats.TotalUploadErrors))
+			common.MetricsSetGauge("training_capture_skipped_no_consent_total", nil, float64(stats.SkippedNoConsent))
+			// skipped_no_text > 0 且持续增长 → 很可能 CountToken 被关了
+			// （CombineText 为空），采集会一条不出。这是那个静默失效的信号。
+			common.MetricsSetGauge("training_capture_skipped_no_text_total", nil, float64(stats.SkippedNoText))
+			common.MetricsSetGauge("training_capture_queue_len", nil, float64(stats.QueueLen))
+			common.MetricsSetGauge("training_capture_queue_capacity", nil, float64(stats.QueueCapacity))
+			common.MetricsSetGauge("training_capture_in_flight_bytes", nil, float64(stats.InFlightBytes))
+			common.MetricsSetGauge("training_capture_bytes_uploaded_today", nil, float64(stats.BytesUploaded))
+			common.MetricsSetGauge("training_capture_users_today", nil, float64(stats.Users))
+			common.MetricsSetGauge("training_capture_messages_today", nil, float64(stats.MessagesUploaded))
 		}
 
 		// 渠道健康分 + 熔断状态。查询失败（DB 未就绪等）时静默跳过，不影响计数/直方图输出。
