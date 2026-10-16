@@ -358,3 +358,35 @@ glm-5.3-flash 同形态展开为 `$0.004 / $0.005 / $0.006`。
 - 逐轮 role 只能启发式还原
 - 计费修复（需拍板）
 - 多云端对接（仅接口抽象，只有 OneDrive 实现）
+
+## 2026-10-16 续：助手回复采集（补齐 SFT 数据可行性）+ 真实 E2E
+
+### 为什么做
+此前记录里**只有用户侧文本**，数据无法直接用于 SFT/蒸馏（没有训练目标）。
+用户明确要「一键导出做训练」——没有回复就没有可训练目标。
+
+### 实现：包装 ResponseWriter 做有界 tee
+`controller/relay.go` 已用 `countingResponseWriter` 包 `c.Writer`（原只数字节），
+**那个点覆盖所有 relay 格式** → 在此 tee 一份，一次拿到全部格式的回复，
+不必改 12+ 个 adaptor（那条路每新增格式都要记得实现）。
+- 覆盖 OpenAI / Claude / Gemini 的**流式与非流式**
+- SSE 各块 delta **按序拼接**
+- **不认识就不提取**（把协议帧当训练正文是污染，比少采更糟）
+- 有界 256KB；未开启时零分配零复制
+
+### 🔴 真实 E2E 抓出一个致命缺口
+**`WriteString` 未覆写** —— 而 `gin.ResponseWriter` 的**流式路径大量走 WriteString**，
+Go 不会自动转发到 `Write`。后果：**生产主力（流式）的回复一个字节都采不到**，
+非流式却正常。手写假 writer 的单测**永远发现不了**（假 writer 只调 Write）。
+→ 覆写 WriteString + 新增**真实 gin.Engine** 驱动的 E2E
+（含「写客户端失败仍拿到文本」证明 tee 顺序必要）。
+
+### 连带修复
+回复若并入 `Messages` 会让 `isSingleRequestBlob` 判假 → 增量从文本前缀
+**退化成消息级** → 每轮全量重传。修法：回复放 `ResponseText`，
+worker 在**算出增量之后**追加为独立记录。
+
+### 验证
+- `go test ./controller/ -run 'TestE2ECapture|TestExtract|TestResponseCapture'` → 全 PASS（含真实 gin E2E）
+- `go test ./service/training_capture/` → 全 PASS
+- README 已更新记录格式与边界（256KB 上限、逐轮角色仅启发式）
