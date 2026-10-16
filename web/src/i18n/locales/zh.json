@@ -68,7 +68,7 @@
     "New requests will stop being collected immediately. Data already uploaded is kept. Users will no longer see the consent switch.": "新的请求将立即停止采集。已上传的数据会保留。用户侧将不再显示授权开关。",
     "Cloud storage files": "云盘文件",
     "Conversation analysis": "对话深度分析",
-    "Analysis sends the conversation to a model and consumes quota billed to your admin account. Records contain the user text as concatenated by the gateway: verbatim user content is preserved, but per-turn roles are only heuristically recoverable.": "分析会把对话发送给模型，并消耗额度（记在你的管理员账号上）。记录中的用户原文是网关拼接后的文本：用户原话逐字保留，但逐轮角色只能启发式还原。",
+    "Analysis sends the conversation to a model and consumes quota billed to your admin account. Both the user messages and the model replies are included, each labelled by role, so quoted user statements are reliable. The request side is the gateway-concatenated text of all turns, so per-turn pairing can only be approximated.": "分析会把对话发送给模型，并消耗额度（记在你的管理员账号上）。记录**同时包含用户消息与模型回复，并按角色逐行标注**，因此引用的用户原话是可靠的。但请求侧是网关拼接后的全部轮次文本，逐轮配对只能近似还原。",
     "Pick a file in the browser, then run an analysis.": "先在文件列表里选一个文件，然后开始分析。",
     "Target file": "目标文件",
     "Model (optional)": "模型（可选）",

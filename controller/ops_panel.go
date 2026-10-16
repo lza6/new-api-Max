@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"fmt"
 	"strconv"
 	"time"
 
@@ -33,6 +34,9 @@ import (
 //     即「按最近 average_over_days 天的平均消耗速度，当前全体普通用户的剩余额度还能撑多少天」。
 //     日均消耗为 0（窗口内无消耗）时返回 null（JSON null），而不是 +Inf——没有消耗就没有
 //     「耗尽」的概念。
+//   - 消耗排行榜（/consumption-ranking）：同样**只统计 role < RoleAdminUser**，
+//     与 total_remaining_quota 口径一致。管理员常用自己账号跑分析/测试，
+//     混进榜单会长期霸榜，且与「剩余额度不含管理员」自相矛盾。
 const (
 	opsDefaultAverageDays = 14
 	opsMaxAverageDays     = 365
@@ -41,6 +45,17 @@ const (
 	opsMaxRankDays        = 365
 	opsMaxRankLimit       = 100
 	opsOverviewCacheTTL   = time.Minute
+
+	// opsMaxInlineAdminIds 排行榜排除管理员时允许内联的最大 ID 数。
+	// 超过则退化为 Go 侧过滤（结果仍正确，但可能少于 limit 条并记日志）。
+	// 取 500：本站管理员是个位数到几十的量级，内联 `NOT IN (...)` 的
+	// 解析与传输代价可忽略；而设成无上限会让一个被误配成管理员的大批量
+	// 账号把 SQL 撑成几千个占位符。
+	opsMaxInlineAdminIds = 500
+
+	// opsMaxRankingOverscan Go 侧过滤时的取行上限（防止一次巨量扫描）。
+	// 超限时榜单可能少于 limit 条 —— 那时记日志说明，比拖垮日志库好。
+	opsMaxRankingOverscan = 2000
 )
 
 // opsOverviewData 是 /api/ops/overview 的响应体（字段名即口径，见文件头注释）。
@@ -171,11 +186,40 @@ func GetOpsOverview(c *gin.Context) {
 	common.ApiSuccess(c, data)
 }
 
+// opsAdminUserIds 取所有管理员（role >= RoleAdminUser）的用户 ID。
+//
+// 用于把管理员从**消耗排行榜**里剔除，使其与 `total_remaining_quota`
+// （同样只统计 role < RoleAdminUser）口径一致。
+// 软删除用户由 `Model(&model.User{})` 自动过滤。
+func opsAdminUserIds() ([]int, error) {
+	var ids []int
+	err := model.DB.Model(&model.User{}).
+		Where("role >= ?", common.RoleAdminUser).
+		Pluck("id", &ids).Error
+	return ids, err
+}
+
 // GetOpsConsumptionRanking GET /api/ops/consumption-ranking?days=7&limit=20
 // 消耗排行榜：按用户聚合窗口内 consume 额度，降序限量。
+//
+// **排除管理员**（与 `total_remaining_quota` 同口径）：两处若口径不一致，
+// 运营者会看到「排行榜第一名消耗最多，但他的额度不计入剩余额度」这种自相矛盾的数字。
+// 管理员常用自己的账号跑分析/测试，混进来会长期占据榜首，让榜单失去意义。
+//
+// 为什么在 SQL 里用 NOT IN 而不是拉回来再过滤：日志库可能是**另一个库**
+// （ClickHouse），没法 JOIN users 表；而若在 Go 侧过滤，`Limit(limit)` 先削了
+// 行数，过滤后可能不足 limit 条 —— 榜单会莫名少人。
+// 管理员数量极少（远小于用户数），内联 ID 列表的代价可忽略；超上限时
+// 退化为 Go 侧过滤（仍然正确，只是可能少于 limit 条）并记日志。
 func GetOpsConsumptionRanking(c *gin.Context) {
 	days := parseOpsIntParam(c, "days", opsDefaultRankDays, opsMaxRankDays)
 	limit := parseOpsIntParam(c, "limit", opsDefaultRankLimit, opsMaxRankLimit)
+
+	adminIds, err := opsAdminUserIds()
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to resolve admin users: "+err.Error())
+		return
+	}
 
 	start := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
 	type rankRow struct {
@@ -186,17 +230,57 @@ func GetOpsConsumptionRanking(c *gin.Context) {
 	var rows []rankRow
 	// 按 user_id 分组（稳定身份；username 可能被改名），ORDER BY 用完整表达式而非输出
 	// 别名以规避方言差异（与 model/usage_report.go 同法）。
-	if err := model.LOG_DB.Model(&model.Log{}).
+	q := model.LOG_DB.Model(&model.Log{}).
 		Select("user_id AS user_id",
 			"COALESCE(SUM(quota), 0) AS quota",
 			"COUNT(*) AS requests").
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
-		Group("user_id").
+		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start)
+
+	inlineAdmins := len(adminIds) > 0 && len(adminIds) <= opsMaxInlineAdminIds
+	if inlineAdmins {
+		q = q.Where("user_id NOT IN ?", adminIds)
+	}
+	// 回退路径必须**多取** `len(adminIds)` 行再过滤。
+	//
+	// 只按 limit 取再过滤是错的：管理员若消耗大，会占满前 limit 个位置，
+	// 过滤后剩下 0 行 —— 真正的消耗大户**完全不可见**，
+	// 而这恰恰是运营者最需要看到的人。多取的余量刚好覆盖「排在前面的管理员数」，
+	// 因此过滤后仍能凑满 limit（除非普通用户总数本就不足）。
+	// 上限兜底：管理员数量异常大时不能把日志库拖进一次巨量扫描。
+	fetchLimit := limit
+	if !inlineAdmins && len(adminIds) > 0 {
+		fetchLimit = limit + len(adminIds)
+		if fetchLimit > opsMaxRankingOverscan {
+			fetchLimit = opsMaxRankingOverscan
+		}
+	}
+	if err := q.Group("user_id").
 		Order("COALESCE(SUM(quota), 0) DESC, user_id ASC").
-		Limit(limit).
+		Limit(fetchLimit).
 		Scan(&rows).Error; err != nil {
 		common.ApiErrorMsg(c, "failed to query consumption ranking: "+err.Error())
 		return
+	}
+
+	// 回退路径：管理员过多，无法安全内联 → 在 Go 侧剔除。
+	if !inlineAdmins && len(adminIds) > 0 {
+		adminSet := make(map[int]bool, len(adminIds))
+		for _, id := range adminIds {
+			adminSet[id] = true
+		}
+		kept := make([]rankRow, 0, len(rows))
+		for _, r := range rows {
+			if !adminSet[r.UserID] {
+				kept = append(kept, r)
+			}
+		}
+		rows = kept
+		if len(rows) > limit {
+			rows = rows[:limit]
+		}
+		common.SysLog(fmt.Sprintf(
+			"ops ranking: %d admin accounts exceeded inline limit %d; filtered in memory (fetched %d rows, kept %d)",
+			len(adminIds), opsMaxInlineAdminIds, fetchLimit, len(rows)))
 	}
 
 	// 用 users 表当前用户名覆盖日志里固化的旧名（改名后仍显示当前名）。

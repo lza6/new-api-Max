@@ -68,7 +68,7 @@
     "New requests will stop being collected immediately. Data already uploaded is kept. Users will no longer see the consent switch.": "New requests will stop being collected immediately. Data already uploaded is kept. Users will no longer see the consent switch.",
     "Cloud storage files": "Cloud storage files",
     "Conversation analysis": "Conversation analysis",
-    "Analysis sends the conversation to a model and consumes quota billed to your admin account. Records contain the user text as concatenated by the gateway: verbatim user content is preserved, but per-turn roles are only heuristically recoverable.": "Analysis sends the conversation to a model and consumes quota billed to your admin account. Records contain the user text as concatenated by the gateway: verbatim user content is preserved, but per-turn roles are only heuristically recoverable.",
+    "Analysis sends the conversation to a model and consumes quota billed to your admin account. Both the user messages and the model replies are included, each labelled by role, so quoted user statements are reliable. The request side is the gateway-concatenated text of all turns, so per-turn pairing can only be approximated.": "Analysis sends the conversation to a model and consumes quota billed to your admin account. Both the user messages and the model replies are included, each labelled by role, so quoted user statements are reliable. The request side is the gateway-concatenated text of all turns, so per-turn pairing can only be approximated.",
     "Pick a file in the browser, then run an analysis.": "Pick a file in the browser, then run an analysis.",
     "Target file": "Target file",
     "Model (optional)": "Model (optional)",

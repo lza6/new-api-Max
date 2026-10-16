@@ -91,9 +91,13 @@ function extractAssistantText(payload: unknown): string | null {
  *
  * 1. **这是真实调用模型**：会消耗额度，记在**发起分析的管理员**账上。
  *    不提示的话，管理员会以为这只是「看看数据」。
- * 2. **数据边界**：采集记录里是上游拼接后的整段文本。用户原话在其中，
- *    但**逐轮角色只能启发式还原**（见服务端 conversation.go 的说明），
- *    且 assistant 回复当前不采集 —— 报告里不要宣称能还原完整双向对话。
+ * 2. **数据边界**（随采集能力演进更新）：
+ *    - **请求侧与模型回复都会被采集**，服务端会给正文加角色标注，
+ *      模型据此区分发言方 —— 所以「用户原话」可靠，不会被模型回复冒充。
+ *    - 但请求侧那一行是上游**拼接后的整段文本**（历史多轮的用户/助手
+ *      文本混在一起），**逐轮配对只能启发式还原**，不可断言
+ *      「用户第 N 轮说了 X 之后模型回了 Y」。
+ *    - 记录有长度上限，超限时服务端会**如实标注截断**。
  */
 export function AnalysisPanel(props: { path: string | null }) {
   const { t } = useTranslation()
@@ -170,7 +174,7 @@ export function AnalysisPanel(props: { path: string | null }) {
           <AlertTriangle className='mt-0.5 size-3.5 shrink-0' />
           <span>
             {t(
-              'Analysis sends the conversation to a model and consumes quota billed to your admin account. Records contain the user text as concatenated by the gateway: verbatim user content is preserved, but per-turn roles are only heuristically recoverable.'
+              'Analysis sends the conversation to a model and consumes quota billed to your admin account. Both the user messages and the model replies are included, each labelled by role, so quoted user statements are reliable. The request side is the gateway-concatenated text of all turns, so per-turn pairing can only be approximated.'
             )}
           </span>
         </div>

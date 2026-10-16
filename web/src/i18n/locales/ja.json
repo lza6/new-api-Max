@@ -38,7 +38,7 @@
     "New requests will stop being collected immediately. Data already uploaded is kept. Users will no longer see the consent switch.": "新しいリクエストの収集は直ちに停止します。アップロード済みのデータは保持されます。ユーザー側に同意スイッチは表示されなくなります。",
     "Cloud storage files": "クラウドストレージのファイル",
     "Conversation analysis": "会話の詳細分析",
-    "Analysis sends the conversation to a model and consumes quota billed to your admin account. Records contain the user text as concatenated by the gateway: verbatim user content is preserved, but per-turn roles are only heuristically recoverable.": "分析は会話をモデルへ送信し、管理者アカウントに課金されるクォータを消費します。記録にはゲートウェイが連結したユーザーテキストが含まれます。ユーザーの発言自体は逐語で保持されますが、ターンごとの役割はヒューリスティックにしか復元できません。",
+    "Analysis sends the conversation to a model and consumes quota billed to your admin account. Both the user messages and the model replies are included, each labelled by role, so quoted user statements are reliable. The request side is the gateway-concatenated text of all turns, so per-turn pairing can only be approximated.": "分析は会話をモデルへ送信し、管理者アカウントに課金されるクォータを消費します。記録には**ユーザーのメッセージとモデルの返信の両方が含まれ、役割ごとに行単位でラベル付け**されるため、引用したユーザー発言は信頼できます。ただしリクエスト側はゲートウェイが連結した全ターンのテキストであり、ターン単位の対応付けは近似に留まります。",
     "Pick a file in the browser, then run an analysis.": "ブラウザでファイルを選んでから分析を実行してください。",
     "Target file": "対象ファイル",
     "Model (optional)": "モデル（任意）",
