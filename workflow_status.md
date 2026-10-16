@@ -390,3 +390,29 @@ worker 在**算出增量之后**追加为独立记录。
 - `go test ./controller/ -run 'TestE2ECapture|TestExtract|TestResponseCapture'` → 全 PASS（含真实 gin E2E）
 - `go test ./service/training_capture/` → 全 PASS
 - README 已更新记录格式与边界（256KB 上限、逐轮角色仅启发式）
+
+## 2026-10-16 盲点扫描后的第二/三轮修复
+
+### 已修（含验证）
+| # | 盲点 | 修法 | 验证 |
+|---|---|---|---|
+| B5 | 归档不自描述 | manifest 加 `format`(带版本)/`part_encoding`/`extract_hint`/`format_notes`（7 条，明说三处局限） | 单测断言说明**必须**含「不可逆/启发式/省略/256KB」 |
+| B6 | 用户注销不清理采集数据（**ID 复用会继承授权**） | `DeleteTrainingDataForUser` + 在 `HardDeleteUserById` 删主体前调用 | 4 用例含 ID 复用场景 |
+| B7 | 导出产物无自动清理（磁盘黑洞） | `CleanupExportArtifacts`（TTL 7 天 + 20GB 硬顶 + **只碰自己前缀的文件**） | 6 子用例含「绝不删别人的文件」 |
+| B10 | 同意书未声明上游处理 | 免责声明明确披露「对话会发给上游模型」「管理员分析会发给模型」 | 7 locale |
+| B13 | 导出枚举**静默截断**成半包 | `ListTreeWithTruncation` 如实报告；导出遇截断**明确报错**并给建议；后端不支持报告则**保守拒绝** | 单测 + **真实 OneDrive 双向验证** |
+| B15 | 两个「今日」口径不同且未标注 | 下发 `today_quota_timezone`，前端卡片显示时区 | typecheck + i18n |
+| B18 | 采集不进 /metrics（静默停采不可见） | 11 个 `training_capture_*` gauge，含关键的 `skipped_no_text` | build + 测试 |
+
+### 审查方**误判**的一项（如实记录，不制造问题）
+**B14**「直链下载的『谁下载了』恒为未知」—— 实际**已正确处理**：
+`issuerID` 纳入 HMAC 签名（改 `iss` 即失配，**无法嫁祸他人**），
+无会话时归到签发者。审查方没看到这段回退逻辑。
+
+### 仍未修（如实）
+- B1/B2 多实例协调（已加启动告警 + README 约束，**未实现跨实例协调**）
+- B16 时钟回拨对令牌桶的影响（P3，自愈）
+- B17 导出直链在多实例下的签名失效（依赖 `SESSION_SECRET`，P3）
+- B19 导出两张表已进 AutoMigrate（现已有实现，不再是死表）
+- HTTP 层 p95 压测、浏览器 E2E（需真实渠道/浏览器）
+- Claude 计费两处（需业主拍板）
