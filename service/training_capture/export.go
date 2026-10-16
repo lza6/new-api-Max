@@ -50,6 +50,11 @@ const (
 	// exportManifestName 归档内的元数据成员名。
 	exportManifestName = "manifest.json"
 
+	// ExportFormatCurrent 当前记录形态标识。
+	// 形态演进时必须改这个值 —— 消费方据此判断能否解析（见 ExportManifest.Format）。
+	// 版本号含义：v1 = 每行 {role,content} 的 JSONL，role ∈ {request, assistant}。
+	ExportFormatCurrent = "gateway-conversation-v1"
+
 	// exportPartExt 归档内分片后缀（与云盘一致，显式声明「需解压」）。
 	exportPartExt = ".jsonl.gz"
 
@@ -202,6 +207,26 @@ type ExportManifest struct {
 	GeneratedAt   int64  `json:"generated_at"`
 	// Provider 数据来源云盘后端名（便于追溯是哪个后端采集的）。
 	Provider string `json:"provider"`
+
+	// ---- 格式自描述（盲点 B5 的修复）----
+	//
+	// 数据一旦离开本站（导出给训练管线/第三方），消费方**无从得知**
+	// 记录是什么形态、要不要解压、增量语义是什么。此前这些只存在于
+	// 代码注释里 —— 对消费方等于不存在，会导致静默误读/误训。
+	// 因此把契约写进 manifest，让归档**自描述**。
+	//
+	// 这些字段是给机器读的（稳定标识），配套的散文说明见 FormatNotes。
+
+	// Format 记录形态标识。当前恒为 "gateway-conversation-v1"。
+	// **消费方应先判 Format 再解析**：将来形态演进时此值会变，
+	// 不认识就应拒绝而不是猜。
+	Format string `json:"format"`
+	// PartEncoding 分片编码："gzip-jsonl"（需先 gunzip 再按行解析）。
+	PartEncoding string `json:"part_encoding"`
+	// ExtractHint 给人/脚本看的一步到位解压命令。
+	ExtractHint string `json:"extract_hint"`
+	// FormatNotes 诚实说明数据的形态与局限（消费方必读）。
+	FormatNotes []string `json:"format_notes"`
 }
 
 // ExportBuilder 把选中的云盘分片流式写入一个 tar 归档。
@@ -282,6 +307,11 @@ func (b *ExportBuilder) Build(ctx context.Context, sel ExportSelection, parts []
 		TotalBytes:    totalBytes,
 		GeneratedAt:   now(),
 		Provider:      b.Provider,
+		// 格式自描述（见 ExportManifest 的说明）。
+		Format:       ExportFormatCurrent,
+		PartEncoding: "gzip-jsonl",
+		ExtractHint:  "for f in $(find . -name 'part-*.jsonl.gz'); do gzip -dc \"$f\" >> all.jsonl; done",
+		FormatNotes:  exportFormatNotes(),
 	}
 	manifestBytes, err := common.Marshal(manifest)
 	if err != nil {
@@ -382,3 +412,16 @@ func countJSONLines(data []byte) int {
 
 // ErrExportNotFound 导出或产物不存在。
 var ErrExportNotFound = errors.New("training export: not found")
+
+// exportFormatNotes 返回给消费方看的诚实说明（单一真源，构造与测试共用）。
+func exportFormatNotes() []string {
+	return []string{
+		"Each part file is a complete, independently decompressible gzip member containing JSONL (one JSON object per line).",
+		"Each record is {\"role\":\"request\"|\"assistant\",\"content\":\"...\"}: a request record carries the *new* conversation text for that turn, an assistant record carries the model reply to it.",
+		"Request text is the gateway's concatenation of the whole conversation (roles and text interleaved) and is NOT reversible into per-turn roles; per-turn role recovery is heuristic only.",
+		"Request text longer than the capture limit is stored head+tail with an inline marker `…[training-capture: N bytes elided]…`; detect and drop such samples before training.",
+		"Assistant replies are captured from the response stream and are truncated at 256KB per response.",
+		"Records with role=request that are not preceded by any assistant record in the same part may be an incremental suffix of a longer conversation; concatenate in file-name (part-NNNN) order to reconstruct.",
+		"Consumers MUST check the `format` field before parsing; unknown values should be rejected rather than guessed.",
+	}
+}

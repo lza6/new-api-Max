@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -269,4 +270,156 @@ func IfRangeMatches(ifRange string, modTime time.Time, etag string) bool {
 	}
 	// 允许 1 秒粒度误差：文件系统的 mtime 精度与 HTTP-date 的秒级精度不同。
 	return !modTime.After(t.Add(time.Second))
+}
+
+// ---------- 产物清理（盲点 B7） ----------
+//
+// 导出产物是**几十 GB 级**的本地文件，且只增不减：
+// `training_data_exports` 每次导出落一个 tar，`training_data_export_downloads`
+// 每次下载落一行。这正是本项目反复踩过的「磁盘黑洞」
+// （记忆里生产磁盘真凶就是无界增长）。
+//
+// 策略：按**文件 mtime** 清理超过 TTL 的产物，并对目录设**总量硬上限**
+// （超限时从最旧的开始删）。两条同时生效 —— 只靠 TTL 挡不住
+// 「一天导出 100 次」；只靠总量挡不住「长期不导出但留着一堆老文件」。
+
+const (
+	// exportArtifactTTL 产物默认保留时长。
+	//
+	// 默认 7 天：够管理员下载/重下，又不至于长期占盘。
+	// 注意**只清本地产物**，云盘上的源分片不受影响（那是采集数据本身）。
+	exportArtifactTTL = 7 * 24 * time.Hour
+
+	// exportArtifactMaxBytes 产物目录总量上限（默认 20GB）。
+	//
+	// 超过就从**最旧的**开始删，直到降到 target ratio。
+	// 取 20GB：单次导出通常几十 MB～几 GB，够留若干次；
+	// 而生产磁盘余量有限，必须有硬顶。
+	exportArtifactMaxBytes = int64(20) << 30
+
+	// exportArtifactTargetRatio 超限后回落到上限的百分比。
+	// 一次多删一点，避免刚清完又立刻超限、每次都要清。
+	exportArtifactTargetRatio = 0.8
+
+	// exportFilePrefix 本模块产物的文件名前缀。
+	// **只清自己产生的文件**：目录可由运维指向共享路径，
+	// 删别人的文件是不可接受的风险。
+	exportFilePrefix = "export-"
+)
+
+// exportArtifactInfo 一个产物的元信息。
+type exportArtifactInfo struct {
+	name    string
+	path    string
+	size    int64
+	modTime time.Time
+}
+
+// selectExportArtifactsToDelete 是**纯函数**：给定产物列表与限制，算出该删哪些。
+//
+// 抽成纯函数是为了能不碰文件系统就把边界测穷举 ——
+// 这个函数算错就是删错文件，或该删的没删（磁盘照样涨）。
+//
+// 返回按「先该删」排序的列表（最旧优先）。
+func selectExportArtifactsToDelete(
+	files []exportArtifactInfo,
+	now time.Time,
+	ttl time.Duration,
+	maxBytes int64,
+	targetRatio float64,
+) []exportArtifactInfo {
+	if len(files) == 0 {
+		return nil
+	}
+	// 先按 mtime 升序（最旧在前）。
+	sorted := make([]exportArtifactInfo, len(files))
+	copy(sorted, files)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].modTime.Before(sorted[j].modTime)
+	})
+
+	doomed := make([]exportArtifactInfo, 0, len(sorted))
+	kept := make([]exportArtifactInfo, 0, len(sorted))
+
+	// 第一轮：TTL 过期的一律删。
+	var total int64
+	for _, f := range sorted {
+		if ttl > 0 && now.Sub(f.modTime) > ttl {
+			doomed = append(doomed, f)
+			continue
+		}
+		kept = append(kept, f)
+		total += f.size
+	}
+
+	// 第二轮：总量仍超限 → 从最旧的开始继续删，直到回落到 target。
+	if maxBytes > 0 && total > maxBytes {
+		target := int64(float64(maxBytes) * targetRatio)
+		for len(kept) > 0 && total > target {
+			oldest := kept[0]
+			kept = kept[1:]
+			total -= oldest.size
+			doomed = append(doomed, oldest)
+		}
+	}
+	return doomed
+}
+
+// CleanupExportArtifacts 清理本地导出产物。返回 (删除数, 释放字节, error)。
+//
+// **best-effort**：单个文件删失败只记录，不中断整体
+// （部分清理也比不清理好）。
+func CleanupExportArtifacts(now time.Time) (int, int64, error) {
+	store := ExportStoreInstance()
+	if store == nil || !store.enabled {
+		return 0, 0, nil // 未启用导出存储：无事可做
+	}
+	entries, err := os.ReadDir(store.root)
+	if err != nil {
+		return 0, 0, fmt.Errorf("read export dir: %w", err)
+	}
+
+	files := make([]exportArtifactInfo, 0, len(entries))
+	for _, e := range entries {
+		if e.IsDir() || !strings.HasPrefix(e.Name(), exportFilePrefix) {
+			// **只碰自己的产物**：目录可能被运维指向共享路径。
+			continue
+		}
+		info, err := e.Info()
+		if err != nil {
+			continue
+		}
+		files = append(files, exportArtifactInfo{
+			name:    e.Name(),
+			path:    filepath.Join(store.root, e.Name()),
+			size:    info.Size(),
+			modTime: info.ModTime(),
+		})
+	}
+
+	doomed := selectExportArtifactsToDelete(
+		files, now, exportArtifactTTL, exportArtifactMaxBytes, exportArtifactTargetRatio)
+
+	var deleted int
+	var freed int64
+	for _, f := range doomed {
+		if err := os.Remove(f.path); err != nil {
+			common.SysError(fmt.Sprintf(
+				"training export cleanup: failed to remove %s: %s", f.name, err.Error()))
+			continue
+		}
+		deleted++
+		freed += f.size
+	}
+	return deleted, freed, nil
+}
+
+// ---------- 测试接缝 ----------
+
+// setExportStoreForTest 把导出存储指向临时目录（仅测试用）。
+// 返回恢复函数。
+func setExportStoreForTest(root string) func() {
+	prev := activeExportStore
+	activeExportStore = &ExportStore{root: root, enabled: true}
+	return func() { activeExportStore = prev }
 }

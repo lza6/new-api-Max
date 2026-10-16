@@ -358,3 +358,54 @@ func (f *fakeReader) ListTree(context.Context, string, int) ([]TreeEntry, error)
 	}
 	return out, nil
 }
+
+// 归档必须**自描述**（盲点 B5）：数据一旦离开本站，
+// 消费方无从得知记录形态、要不要解压、增量语义是什么。
+// 这些此前只存在于代码注释里 —— 对消费方等于不存在。
+func TestExportManifestIsSelfDescribing(t *testing.T) {
+	m := ExportManifest{
+		Format:       ExportFormatCurrent,
+		PartEncoding: "gzip-jsonl",
+		ExtractHint:  "gzip -dc part-0001.jsonl.gz",
+		FormatNotes:  []string{"note"},
+	}
+	raw, err := common.Marshal(m)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// 反序列化后必须能读出格式标识与说明（消费方就是这样用的）。
+	var back map[string]any
+	if err := common.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"format", "part_encoding", "extract_hint", "format_notes"} {
+		if _, ok := back[key]; !ok {
+			t.Fatalf("manifest 缺少自描述字段 %q —— 消费方无法判断怎么读", key)
+		}
+	}
+	if back["format"] != ExportFormatCurrent {
+		t.Fatalf("format 标识不符：%v", back["format"])
+	}
+	// 格式标识必须带版本（形态演进时消费方能据此拒绝，而不是猜）。
+	if !strings.Contains(ExportFormatCurrent, "-v") {
+		t.Fatalf("格式标识必须含版本号，实际 %q", ExportFormatCurrent)
+	}
+}
+
+// 诚实性：manifest 的说明必须**明说**数据的局限，
+// 否则消费方会以为拿到的是逐轮结构化的完整双向对话。
+func TestExportManifestNotesDiscloseLimitations(t *testing.T) {
+	// 大小写无关比对：验的是**语义**（有没有披露这个局限），不是措辞。
+	notes := strings.ToLower(strings.Join(exportFormatNotes(), " "))
+	for _, must := range []string{
+		"not reversible", // 拼接文本不可逆
+		"heuristic",      // 逐轮角色只能启发式
+		"elided",         // 超限有省略标记
+		"256kb",          // 回复有截断上限
+	} {
+		if !strings.Contains(notes, must) {
+			t.Errorf("manifest 说明必须披露 %q 这一局限（否则消费方会误以为数据完整）", must)
+		}
+	}
+}

@@ -122,23 +122,33 @@ func StartTrainingDataCapture() {
 // （一条带索引的 DELETE），一天一次足够；调快没有收益。
 const trainingDataCleanupInterval = 24 * time.Hour
 
-// startTrainingDataCleanupLoop 定期清理过期水位。
+// startTrainingDataCleanupLoop 定期清理水位与导出产物。
 //
-// 不加这个循环，`training_data_watermarks` 会随会话数无界增长 ——
-// 这是「表无界增长」类问题的典型来源，且初期完全不可见。
+// 不加这个循环会有两处**无界增长**：
+//  1. `training_data_watermarks` 随会话数增长；
+//  2. 本地导出产物（几十 GB 级 tar）只增不减 ——
+//     这正是本项目反复踩过的「磁盘黑洞」。
 func startTrainingDataCleanupLoop() {
 	go func() {
-		// 启动后先等一个周期再清理：避免与启动期的迁移/首次请求抢 DB。
+		// 启动后先等一个周期再清理：避免与启动期的迁移/首次请求抢 DB/IO。
 		ticker := time.NewTicker(trainingDataCleanupInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			count, err := training_capture.CleanupStaleWatermarks()
 			if err != nil {
 				common.SysError("training data capture: watermark cleanup failed: " + err.Error())
-				continue
-			}
-			if count > 0 {
+			} else if count > 0 {
 				common.SysLog("training data capture: cleaned " + strconv.FormatInt(count, 10) + " stale watermarks")
+			}
+
+			// 导出产物：同时按 TTL 与总量上限清理（见 export_store.go）。
+			deleted, freed, err := training_capture.CleanupExportArtifacts(time.Now())
+			if err != nil {
+				common.SysError("training data capture: export artifact cleanup failed: " + err.Error())
+			} else if deleted > 0 {
+				common.SysLog(fmt.Sprintf(
+					"training data capture: cleaned %d export artifact(s), freed %.1f MB",
+					deleted, float64(freed)/(1<<20)))
 			}
 		}
 	}()
