@@ -18,7 +18,11 @@ import (
 //   - 金额换算：本接口只返回原始 quota 整数。前端用 lib/currency 的 formatQuota 统一换算为
 //     站点配置的展示货币（USD/CNY/CUSTOM/TOKENS），Go 侧不做 float 换算——SQL 侧整数 SUM，
 //     避免在 Go 里用 float 累加 quota 导致的精度损失。
-//   - today_quota：本地时区当天 00:00:00 起至今的 consume 额度。
+//   - today_quota：**服务器本地时区**当天 00:00:00 起至今的 consume 额度。
+//     ⚠️ 与训练数据采集的「今日」（UTC，见 CaptureStats.day）**不是同一个今天**：
+//     中国时区下两者在跨零点后的 8 小时内不一致。响应里分别下发
+//     today_quota_timezone / capture_stats.day 让运营者能区分，而不是并排显示两个
+//     「今日」却不说口径。
 //   - total_quota：全部时间内 consume 额度之和（无时间上限）。
 //   - total_remaining_quota：users.quota 之和，仅统计 role < RoleAdminUser（排除管理员与
 //     超级管理员），不含软删除用户。
@@ -41,7 +45,10 @@ const (
 
 // opsOverviewData 是 /api/ops/overview 的响应体（字段名即口径，见文件头注释）。
 type opsOverviewData struct {
-	TodayQuota             int64    `json:"today_quota"`
+	TodayQuota int64 `json:"today_quota"`
+	// TodayQuotaTimezone 上面 today_quota 所用的时区名（如 "Local" / "Asia/Shanghai"）。
+	// 采集统计用的是 UTC 日，两者不同口径，必须分别标注。
+	TodayQuotaTimezone     string   `json:"today_quota_timezone"`
 	TotalQuota             int64    `json:"total_quota"`
 	TotalRemainingQuota    int64    `json:"total_remaining_quota"`
 	UserCount              int64    `json:"user_count"`
@@ -141,7 +148,9 @@ func GetOpsOverview(c *gin.Context) {
 
 	dailyAverage := float64(windowQuota) / float64(days)
 	data := opsOverviewData{
-		TodayQuota:          todayQuota,
+		TodayQuota: todayQuota,
+		// 明确标注口径：前端并排展示两个「今日」时不会误导（盲点 B15）。
+		TodayQuotaTimezone:  now.Location().String(),
 		TotalQuota:          totalQuota,
 		TotalRemainingQuota: remaining.Total,
 		UserCount:           remaining.UserCount,

@@ -58,7 +58,11 @@ function buildCards(overview: OpsOverview, t: TFunction): OverviewCard[] {
       label: t("Today's Consumption"),
       value: formatQuota(overview.today_quota),
       fullValue: formatQuota(overview.today_quota),
-      desc: t('Today'),
+      // 明白标注时区：同一面板上的采集统计用的是 UTC 日，
+      // 不标注会让运营者以为两个"今日"是同一口径（盲点 B15）。
+      desc: overview.today_quota_timezone
+        ? t('Today ({{tz}} time)', { tz: overview.today_quota_timezone })
+        : t('Today'),
       icon: CalendarClock,
       tone: 'info',
     },

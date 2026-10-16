@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Today ({{tz}} time)": "今日（{{tz}} タイムゾーン）",
+    "Your conversations are also sent to the upstream AI models you use, since that is how you get a reply. Additionally, the site administrator may send a collected conversation to a model for quality analysis.": "あなたの会話は、返答を得るために使用する上流の AI モデルにも送信されます。さらに、サイト管理者が収集した会話を品質分析のためにモデルへ送信する場合があります。",
     "Training Data": "トレーニングデータ",
     "Failed to update": "更新に失敗しました",
     "Failed to delete": "削除に失敗しました",

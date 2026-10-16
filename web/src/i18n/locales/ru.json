@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Today ({{tz}} time)": "Сегодня (часовой пояс {{tz}})",
+    "Your conversations are also sent to the upstream AI models you use, since that is how you get a reply. Additionally, the site administrator may send a collected conversation to a model for quality analysis.": "Ваши диалоги также отправляются используемым вами вышестоящим ИИ-моделям, поскольку иначе ответ получить невозможно. Кроме того, администратор сайта может отправить собранный диалог модели для анализа качества.",
     "Training Data": "Данные для обучения",
     "Failed to update": "Не удалось обновить",
     "Failed to delete": "Не удалось удалить",

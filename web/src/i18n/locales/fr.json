@@ -1,5 +1,7 @@
 {
   "translation": {
+    "Today ({{tz}} time)": "Aujourd'hui (fuseau {{tz}})",
+    "Your conversations are also sent to the upstream AI models you use, since that is how you get a reply. Additionally, the site administrator may send a collected conversation to a model for quality analysis.": "Vos conversations sont également envoyées aux modèles d'IA en amont que vous utilisez, puisque c'est ainsi que vous obtenez une réponse. De plus, l'administrateur du site peut envoyer une conversation collectée à un modèle pour analyse qualité.",
     "Training Data": "Données d'entraînement",
     "Failed to update": "Échec de la mise à jour",
     "Failed to delete": "Échec de la suppression",

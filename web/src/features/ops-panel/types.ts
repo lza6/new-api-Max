@@ -23,6 +23,8 @@ For commercial licensing, please contact support@quantumnous.com
 export interface OpsOverview {
   /** 本地时区当天 00:00 起至今的 consume 额度。 */
   today_quota: number
+  /** today_quota 所用时区名。采集统计用 UTC 日，两者口径不同，必须分别展示。 */
+  today_quota_timezone?: string
   /** 全部时间累计 consume 额度。 */
   total_quota: number
   /** 非管理员用户剩余额度之和（排除管理员/超管）。 */

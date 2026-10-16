@@ -204,6 +204,9 @@ export function TrainingDataPreferencesCard() {
             'Collected content is uploaded to cloud storage configured by the site administrator, and is used to improve model quality.'
           ),
           t(
+            'Your conversations are also sent to the upstream AI models you use, since that is how you get a reply. Additionally, the site administrator may send a collected conversation to a model for quality analysis.'
+          ),
+          t(
             'Collection never blocks or slows down your requests: it runs asynchronously with a bandwidth limit of about 10% of the server uplink.'
           ),
           t(
