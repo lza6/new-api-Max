@@ -29,3 +29,23 @@ func (w *countingResponseWriter) Write(data []byte) (int, error) {
 	}
 	return n, err
 }
+
+// WriteString 必须**单独实现**。
+//
+// [修复防御] `gin.ResponseWriter` 的流式路径（SSE）大量走
+// `WriteString` 而不是 `Write`。Go 不会自动把 WriteString 转发到 Write ——
+// 如果我们只覆写 Write，流式响应**一个字节都捕获不到**（真实 E2E 抓到了
+// 这个缺口：非流式能提取、流式得到空串）。
+//
+// 这类"看起来覆盖了其实没覆盖"的缺口，只能靠**真实 writer**的端到端验证
+// 发现，手写假 writer 的单元测试永远不会暴露它。
+func (w *countingResponseWriter) WriteString(s string) (int, error) {
+	if w.capture != nil {
+		w.capture.append([]byte(s))
+	}
+	n, err := w.ResponseWriter.WriteString(s)
+	if w.bytes != nil {
+		*w.bytes += int64(n)
+	}
+	return n, err
+}
