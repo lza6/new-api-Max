@@ -162,12 +162,17 @@ func BuildSignal(in CaptureInput) *CaptureSignal {
 		Role:    "request",
 		Content: stored,
 	})
-	if reply := strings.TrimSpace(in.ResponseText); reply != "" {
-		messages = append(messages, Message{
-			Role:    "assistant",
-			Content: truncateText(reply, currentMaxTextBytes()),
-		})
-	}
+
+	// [修复防御] 助手回复**不并进 Messages**，而是单独放在 ResponseText。
+	//
+	// 并进去会让 len(Messages)==2 → `isSingleRequestBlob` 判假 →
+	// 增量逻辑从「文本前缀」退化到「消息级」，而消息级对「每轮内容都在变的
+	// 拼接文本」会前缀不匹配 → **每轮全量重传、去重静默失效**。
+	// 这正是盲点扫描预警的潜伏缺陷（B6）：一旦有人接线 ResponseText 就会触发。
+	//
+	// 保持 Messages 只有请求一条 → 增量逻辑不变；
+	// reply 由 worker 在算出增量后**追加**为一条独立记录。
+	reply := strings.TrimSpace(in.ResponseText)
 
 	return &CaptureSignal{
 		UserID:         in.UserId,
@@ -175,7 +180,7 @@ func BuildSignal(in CaptureInput) *CaptureSignal {
 		Model:          in.Model,
 		ConversationID: in.ConversationID,
 		Messages:       messages,
-		ResponseText:   "", // 已并入 messages，避免 worker 侧重复追加
+		ResponseText:   truncateText(reply, currentMaxTextBytes()),
 		// TailOnly 非空表示文本超限被截断：worker 用**尾部**做增量
 		// （新内容在尾部；对整段做前缀比对会因省略标记长度变化而每次都全量重传）。
 		TailOnly:  tail,

@@ -381,12 +381,22 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 		return 0, 0, nil
 	}
 
-	// 组装完整消息序列：请求里的对话 + 助手回复。
-	// 助手回复作为最后一条 assistant 消息（可能为空——见 plan §10.3 的诚实边界）。
-	messages := make([]Message, 0, len(signal.Messages)+1)
-	messages = append(messages, signal.Messages...)
-	if strings.TrimSpace(signal.ResponseText) != "" {
-		messages = append(messages, Message{Role: "assistant", Content: signal.ResponseText})
+	// 组装消息序列。
+	//
+	// [修复防御] 助手回复**按增量路径区别对待**，不能一刀切：
+	//
+	//   - **文本前缀路径**（当前生产形态：单条拼接文本）：
+	//     回复**不并入** messages —— 并进去会让消息数变成 2、
+	//     `isSingleRequestBlob` 判假、增量从「文本前缀」退化成
+	//     「消息级」→ 每轮全量重传（去重静默失效）。
+	//     回复在增量算出**之后**追加为一条记录。
+	//   - **消息级路径**（将来的结构化消息）：回复本身就是一条真实消息，
+	//     必须并入 messages 才能被水位正确追踪。
+	reply := strings.TrimSpace(signal.ResponseText)
+	messages := append([]Message(nil), signal.Messages...)
+	useTextIncrement := isSingleRequestBlob(messages)
+	if !useTextIncrement && reply != "" {
+		messages = append(messages, Message{Role: "assistant", Content: reply})
 	}
 
 	conversationId := strings.TrimSpace(signal.ConversationID)
@@ -422,7 +432,7 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 		//
 		// 保留消息级路径是为了真实结构化消息（将来扩展 dto.Request 后）
 		// 仍走原来的、更强的逐条语义。
-		if isSingleRequestBlob(messages) {
+		if useTextIncrement {
 			// 超限截断的会话：新内容在**尾部**，而存储文本含「省略 N 字节」
 			// 标记（N 每轮都变）。对整段做前缀比对会退化成每次全量重传，
 			// 所以这里改用 `TailOnly` 做真正的尾部增量。
@@ -450,6 +460,20 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 
 	if len(increment) == 0 {
 		return 0, 0, nil
+	}
+
+	// 把**助手回复**追加到本批增量里（它是这次请求产出的、与新增请求内容配套）。
+	//
+	// 为什么放在这里而不是并进 Messages：
+	// 并进 Messages 会让 `isSingleRequestBlob` 判假 → 增量从「文本前缀」
+	// 退化到「消息级」→ 每轮全量重传（见 hotpath.go 的说明）。
+	// 放在增量算出**之后**追加，既拿到回复又不影响增量语义。
+	//
+	// 规则：**只在请求侧有新增内容时才带回复**。若请求内容没变
+	// （对话没推进），则什么都不传 —— 这与「增量」语义一致，
+	// 不会把同一条回复反复上传。
+	if useTextIncrement && reply != "" {
+		increment = append(increment, Message{Role: "assistant", Content: reply})
 	}
 
 	// 目录：日期 / 用户名 / 模型

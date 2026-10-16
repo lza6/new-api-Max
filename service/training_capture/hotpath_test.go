@@ -72,19 +72,20 @@ func TestBuildSignalMapsFieldsToSignal(t *testing.T) {
 	if signal.CreatedAt != 1791937800 {
 		t.Fatalf("时间戳未被沿用（应由调用方决定归属日期）：%d", signal.CreatedAt)
 	}
-	if len(signal.Messages) != 2 {
-		t.Fatalf("应有「请求 + 回复」两条消息，实际 %d 条：%+v", len(signal.Messages), signal.Messages)
+	// [约定变更] 助手回复**不并进 Messages**，而是单独放在 ResponseText。
+	//
+	// 为什么不并：并进去会让消息数变成 2 → `isSingleRequestBlob` 判假 →
+	// 增量从「文本前缀」退化成「消息级」→ 每轮全量重传（去重静默失效）。
+	// worker 在算出增量之后再把回复追加为一条独立记录。
+	if len(signal.Messages) != 1 {
+		t.Fatalf("Messages 应只有请求一条（回复走 ResponseText），实际 %d 条：%+v",
+			len(signal.Messages), signal.Messages)
 	}
 	if signal.Messages[0].Role != "request" || signal.Messages[0].Content != "用户的提问" {
 		t.Fatalf("请求文本映射错误：%+v", signal.Messages[0])
 	}
-	if signal.Messages[1].Role != "assistant" || signal.Messages[1].Content != "助手的回答" {
-		t.Fatalf("回复文本映射错误：%+v", signal.Messages[1])
-	}
-	// 回复已并入 Messages，ResponseText 必须清空，
-	// 否则 worker 会把同一条回复**再追加一次**（重复数据）。
-	if signal.ResponseText != "" {
-		t.Fatalf("ResponseText 必须清空以免 worker 重复追加，实际 %q", signal.ResponseText)
+	if signal.ResponseText != "助手的回答" {
+		t.Fatalf("回复应放在 ResponseText，实际 %q", signal.ResponseText)
 	}
 }
 

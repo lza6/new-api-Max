@@ -276,7 +276,20 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	relayInfo.RetryIndex = 0
 	relayInfo.LastError = nil
 	used429Retries := 0
-	countingW := &countingResponseWriter{ResponseWriter: c.Writer, bytes: &relayInfo.ResponseBytes}
+	// 响应体包装：既统计字节数（原用途），也**可选地** tee 一份
+	// 供训练数据采集提取助手回复（见 response_capture.go）。
+	//
+	// 只在采集开启时挂 capture：未开启的部署在响应路径上
+	// 只多一次 nil 判断，不产生任何分配与复制。
+	var responseCaptureBuffer *responseCapture
+	if training_capture.HotPathEnabled() {
+		responseCaptureBuffer = newResponseCapture()
+	}
+	countingW := &countingResponseWriter{
+		ResponseWriter: c.Writer,
+		bytes:          &relayInfo.ResponseBytes,
+		capture:        responseCaptureBuffer,
+	}
 	c.Writer = countingW
 
 	for ; retryParam.GetRetry() <= common.RetryTimes; retryParam.IncreaseRetry() {
@@ -335,7 +348,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			// 放在 gopool.Go 里是为了让「构造信号 + 入队」彻底离开响应返回路径
 			// —— 响应体此刻已经写完，再花几微秒只会推迟连接复用。
 			// 该 goroutine 内**不做任何 IO**（不查库/不联网），见 hotpath.go。
-			maybeCaptureTrainingData(c, relayInfo, meta)
+			// 把 tee 到的响应体里的**助手回复**一并交给采集
+			// （此前只采请求侧，导致数据无法用于 SFT —— 见 response_capture.go）。
+			maybeCaptureTrainingData(c, relayInfo, meta, extractAssistantText(responseCaptureBuffer.bytes()))
 			return
 		}
 
@@ -538,7 +553,7 @@ func evaluateRequestPolicy(c *gin.Context, relayInfo *relaycommon.RelayInfo, met
 //     （重新解析是热路径上最昂贵的一种「顺手」）。
 //
 // 采集未启用时（绝大多数请求）开销 ≈ 一次 `gopool.Go` + 两次原子读。
-func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, meta *types.TokenCountMeta) {
+func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, meta *types.TokenCountMeta, assistantReply string) {
 	if relayInfo == nil || meta == nil {
 		return
 	}
@@ -574,6 +589,11 @@ func maybeCaptureTrainingData(c *gin.Context, relayInfo *relaycommon.RelayInfo, 
 			Model:          model,
 			ConversationID: convId,
 			Meta:           meta,
+			// 助手回复（从 tee 的响应体提取）。为空表示未取到
+			// （格式不认识 / 纯工具调用 / 响应体超限被截断），
+			// 此时记录里就只有请求侧 —— 与修复前的行为一致，
+			// 不会因为提取失败而少采或写坏。
+			ResponseText: assistantReply,
 		})
 		if signal == nil {
 			return

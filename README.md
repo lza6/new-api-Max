@@ -230,6 +230,25 @@ cd web && bun install --frozen-lockfile && bun run build
 **云盘数据布局**：`<ROOT_PATH>/<YYYY-MM-DD>/<用户名>-<用户ID>/<模型名>/part-0001.jsonl.gz`
 （分片为 gzip 压缩的 JSONL，读取方需先解压）。
 
+**记录格式**（每行一条 JSON）：
+
+```json
+{"role":"request","content":"<该轮新增的请求文本>"}
+{"role":"assistant","content":"<模型对该轮的回复>"}
+```
+
+助手回复通过**包装 ResponseWriter 做有界 tee** 从响应体提取
+（覆盖 OpenAI / Claude / Gemini 的流式与非流式形态），
+因此**无需为每个渠道适配**。提取失败时该条记录只有请求侧 ——
+不会因为提取失败而少采或写坏。
+
+**已知边界（如实声明）**：
+- 请求文本是上游 `TokenCountMeta.CombineText` —— 把整段对话的 role 与文本
+  拼接后的**一个字符串**，不可逆，因此**逐轮角色只能启发式还原**；
+- 文本超限时保留**头 + 尾**并插入省略标记
+  （`…[training-capture: N bytes elided]…`），中间内容会丢失；
+- 响应体捕获上限 256KB，超长回复的尾部会被截掉。
+
 **管理端**：`/training-data` 页面提供总开关、今日采集统计、云盘配额与文件浏览，
 并支持对某段对话做深度分析（**会真实调用模型、消耗管理员额度**）。
 
