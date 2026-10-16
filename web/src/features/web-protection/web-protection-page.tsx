@@ -22,10 +22,12 @@ import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
+import { SectionPageLayout } from "@/components/layout"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
@@ -245,20 +247,44 @@ function SettingsTab({ t }: { t: (k: string) => string }) {
 export function WebProtectionPage() {
   const { t } = useTranslation()
   const [tab, setTab] = useState("settings")
-  const tabBtn = (id: string, label: string) => (
-    <Button type="button" variant={tab === id ? "default" : "outline"} onClick={() => setTab(id)}>{t(label)}</Button>
-  )
+
+  /*
+    [修复] 必须套 `SectionPageLayout`。
+
+    DataTable 默认把分页控件 portal 到**页脚容器**（`paginationInFooter` 默认 true），
+    而那个容器由 `SectionPageLayout` 通过 `PageFooterProvider` 提供；
+    没有 Provider 时 `PageFooterPortal` 直接 `return null`。
+
+    本页原先根节点是裸 `<div>` → 分页控件渲染为 null →
+    表格实际有服务端分页（后端返回 total、前端也算了 pageCount），
+    但界面上**一个页码都看不到**。这正是用户反馈的「没有翻页」。
+
+    换成 `SectionPageLayout` 同时补齐页面标题（原先没有标题/面包屑，
+    是「不够高级、比较简陋」的直接观感来源）。
+  */
   return (
-    <div className="space-y-4 p-4 sm:p-6">
-      <ServerStatsCard t={t} />
-      <div className="flex flex-wrap items-center gap-2">
-        {tabBtn("settings", "Web Protection")}
-        {tabBtn("logs", "Web request logs")}
-        {tabBtn("banned", "Banned IPs")}
-      </div>
-      {tab === "settings" ? <SettingsTab t={t} /> : null}
-      {tab === "logs" ? <WebRequestLogsTable /> : null}
-      {tab === "banned" ? <BannedIPsTable /> : null}
-    </div>
+    <SectionPageLayout fixedContent>
+      <SectionPageLayout.Title>{t('Web Protection')}</SectionPageLayout.Title>
+      <SectionPageLayout.Content>
+        <ServerStatsCard t={t} />
+        {/* 复用项目 Tabs 组件，不再手搓 Button 切换（AGENTS.md 复用优先） */}
+        <Tabs value={tab} onValueChange={setTab} className='mt-4'>
+          <TabsList>
+            <TabsTrigger value='settings'>{t('Settings')}</TabsTrigger>
+            <TabsTrigger value='logs'>{t('Web request logs')}</TabsTrigger>
+            <TabsTrigger value='banned'>{t('Banned IPs')}</TabsTrigger>
+          </TabsList>
+          <TabsContent value='settings'>
+            <SettingsTab t={t} />
+          </TabsContent>
+          <TabsContent value='logs'>
+            <WebRequestLogsTable />
+          </TabsContent>
+          <TabsContent value='banned'>
+            <BannedIPsTable />
+          </TabsContent>
+        </Tabs>
+      </SectionPageLayout.Content>
+    </SectionPageLayout>
   )
 }

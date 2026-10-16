@@ -42,8 +42,18 @@ type ConversationPart struct {
 
 // AssemblyResult 一次「多分片 → 对话文本」的还原结果。
 type AssemblyResult struct {
-	// Text 完整对话文本（所有分片按序号拼接）。
+	// Text 完整对话文本（所有分片按序号拼接），**忠实拼接、不加任何标注**。
 	Text string
+	// AnnotatedText 与 Text 同源，但每行带**角色标注**（见 renderLineForPrompt）。
+	//
+	// 专门给「送进模型做分析」的提示词用：分析要求「逐字引用用户原话」，
+	// 而不加标注的 Text 里用户侧与模型回复混在一起，模型会把模型自己的
+	// 回复当成用户原话引用 —— 报告从根上不可信且管理员看不出来。
+	//
+	// 保留 Text 不合并的理由：Text 是**数据保真视图**（将来若要让用户
+	// 导出/查看自己的数据，可分析的原文不该夹带我们加的中文标签）。
+	// 两者由同一次扫描产出，不存在重复解析或状态漂移。
+	AnnotatedText string
 	// Parts 各分片的信息（按序号升序）。
 	Parts []ConversationPart
 	// TotalLines 总记录行数。
@@ -60,6 +70,37 @@ type AssemblyResult struct {
 type lineRecord struct {
 	Role    string `json:"role"`
 	Content string `json:"content"`
+}
+
+// renderLineForPrompt 把一行记录渲染成**带角色标注**的文本，供分析提示词使用。
+//
+// ## 为什么必须标注角色
+//
+// 采集记录里现在有两类行（见 dedup.go 的 `kind` 与 worker 的回复写入）：
+//   - `role:"request"`  —— 上游拼接后的请求侧文本（含历史各轮）
+//   - `role:"assistant"` —— 模型对该轮的回复
+//
+// 而分析提示词要求「**逐字引用用户原话**」。若把两类行不加区分地
+// 顺序拼接，模型无法判断某段文本是用户说的还是模型说的 ——
+// 于是「用户原话摘录」会把**模型自己的回复**当成用户原话引用，
+// 分析报告从根上不可信，而管理员看不出这一点。
+//
+// 标注是**数据结构事实**（role 字段就是这么存的），不是猜测 ——
+// 与 `HeuristicTurns` 的启发式切分是两件事，不要混淆。
+func renderLineForPrompt(rec lineRecord) string {
+	switch rec.Role {
+	case "assistant":
+		return "【模型回复】" + rec.Content
+	case "request":
+		// request 行内部混合了多轮 role，逐轮无法可靠还原
+		// （见本文件头部说明），故只标注「这是请求侧」。
+		return "【请求侧（含历史各轮拼接，逐轮角色不可靠）】" + rec.Content
+	default:
+		if rec.Role == "" {
+			return rec.Content
+		}
+		return "【" + rec.Role + "】" + rec.Content
+	}
 }
 
 // AssembleConversation 把多分片还原成对话文本。
@@ -94,8 +135,11 @@ func AssembleConversation(objects map[string][]byte, maxBytes int) AssemblyResul
 
 	var result AssemblyResult
 	var sb strings.Builder
+	// 第二个 builder：与 sb 逐行同源，但带角色标注（供分析提示词用）。
+	var annotated strings.Builder
 	if maxBytes > 0 {
 		sb.Grow(min(maxBytes, 1<<20))
+		annotated.Grow(min(maxBytes, 1<<20))
 	}
 
 	for _, name := range names {
@@ -126,7 +170,10 @@ func AssembleConversation(objects map[string][]byte, maxBytes int) AssemblyResul
 				continue
 			}
 			// 超限：记录事实后停止追加（不报错）。
-			if maxBytes > 0 && sb.Len() >= maxBytes {
+			// 两个视图各自按自己的长度判定 —— 标注会加前缀，两者长度不同，
+			// 用其中一个的值去卡另一个会让实际下发的正文与上限不符。
+			overBudget := maxBytes > 0 && (sb.Len() >= maxBytes || annotated.Len() >= maxBytes)
+			if overBudget {
 				result.Truncated = true
 				continue
 			}
@@ -134,6 +181,11 @@ func AssembleConversation(objects map[string][]byte, maxBytes int) AssemblyResul
 				sb.WriteByte('\n')
 			}
 			sb.WriteString(rec.Content)
+
+			if annotated.Len() > 0 {
+				annotated.WriteByte('\n')
+			}
+			annotated.WriteString(renderLineForPrompt(rec))
 		}
 		result.Parts = append(result.Parts, part)
 		result.TotalLines += part.LineCount
@@ -154,6 +206,13 @@ func AssembleConversation(objects map[string][]byte, maxBytes int) AssemblyResul
 	// 二次确认：即使没走到上面的提前判定，也要如实反映「内容被切过」。
 	if maxBytes > 0 && len(result.Text) > maxBytes {
 		result.Text = truncateText(result.Text, maxBytes)
+		result.Truncated = true
+	}
+
+	result.AnnotatedText = annotated.String()
+	// 同一道二次确认用在标注视图上（它更长，可能先于正文触顶）。
+	if maxBytes > 0 && len(result.AnnotatedText) > maxBytes {
+		result.AnnotatedText = truncateText(result.AnnotatedText, maxBytes)
 		result.Truncated = true
 	}
 	return result

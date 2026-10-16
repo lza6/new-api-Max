@@ -209,3 +209,82 @@ func TestSplitHeuristicTurnsIsDocumentedAsLossy(t *testing.T) {
 			"若切分算法改了请同步更新本用例与 hotpath/conversation 的注释", len(turns))
 	}
 }
+
+// TestAnnotatedTextDistinguishesRequestFromAssistant 锁定「送进分析提示词的正文
+// 必须能区分用户侧与模型回复」。
+//
+// 这是回复采集上线后的**下游集成不变量**：
+// 分析提示词要求「逐字引用用户原话」，若正文不加标注，模型会把**它自己的回复**
+// 当成用户原话引用 —— 报告从根上不可信，而管理员完全看不出来。
+// 旧实现只写 rec.Content（丢掉 role），正是这个缺陷。
+func TestAnnotatedTextDistinguishesRequestFromAssistant(t *testing.T) {
+	payload := jsonlLine(t, "request", "用户问的问题") +
+		jsonlLine(t, "assistant", "模型给的答案")
+	got := AssembleConversation(map[string][]byte{"part-0001.jsonl.gz": []byte(payload)}, 0)
+
+	// 保真视图保持原样（不夹带我们加的标签）。
+	if got.Text != "用户问的问题\n模型给的答案" {
+		t.Fatalf("保真视图被污染：%q", got.Text)
+	}
+
+	// 标注视图必须让两类发言可区分。
+	if !strings.Contains(got.AnnotatedText, "用户问的问题") ||
+		!strings.Contains(got.AnnotatedText, "模型给的答案") {
+		t.Fatalf("标注视图丢了内容：%q", got.AnnotatedText)
+	}
+	lines := strings.Split(got.AnnotatedText, "\n")
+	if len(lines) != 2 {
+		t.Fatalf("标注视图行数应为 2，实际 %d：%q", len(lines), got.AnnotatedText)
+	}
+	reqLine, asstLine := lines[0], lines[1]
+	if !strings.Contains(reqLine, "用户问的问题") || !strings.Contains(asstLine, "模型给的答案") {
+		t.Fatalf("行序被破坏：\n第 1 行 %q\n第 2 行 %q", reqLine, asstLine)
+	}
+	// 关键：请求侧那一行的标注里必须**没有**「模型回复」字样，
+	// 否则模型会把用户的话当成自己说过的话（或反之）。
+	if strings.Contains(reqLine, "模型回复") {
+		t.Fatalf("请求侧被标成模型回复：%q", reqLine)
+	}
+	if !strings.Contains(asstLine, "模型回复") {
+		t.Fatalf("助手行未被标注为模型回复：%q", asstLine)
+	}
+}
+
+// TestAnnotatedTextPreservesUnknownRoles 未知/空角色不得被误标成两类之一。
+func TestAnnotatedTextPreservesUnknownRoles(t *testing.T) {
+	payload := jsonlLine(t, "system", "系统提示") + jsonlLine(t, "tool", "工具结果")
+	got := AssembleConversation(map[string][]byte{"part-0001.jsonl.gz": []byte(payload)}, 0)
+
+	// system/tool 不得被冒充成 request 或 assistant。
+	if strings.Contains(got.AnnotatedText, "模型回复") {
+		t.Fatalf("system/tool 被误标为模型回复：%q", got.AnnotatedText)
+	}
+	if strings.Contains(got.AnnotatedText, "请求侧") {
+		t.Fatalf("system/tool 被误标为请求侧：%q", got.AnnotatedText)
+	}
+	for _, want := range []string{"系统提示", "工具结果"} {
+		if !strings.Contains(got.AnnotatedText, want) {
+			t.Fatalf("内容丢失 %q：%q", want, got.AnnotatedText)
+		}
+	}
+}
+
+// TestAnnotatedTextTruncationIsReported 标注视图更长，可能先触顶；
+// 触顶必须如实置 Truncated（不能悄悄少内容）。
+func TestAnnotatedTextTruncationIsReported(t *testing.T) {
+	var sb strings.Builder
+	for range 50 {
+		sb.WriteString(jsonlLine(t, "assistant", strings.Repeat("回复内容", 40)))
+	}
+	got := AssembleConversation(map[string][]byte{"part-0001.jsonl.gz": []byte(sb.String())}, 2000)
+
+	if !got.Truncated {
+		t.Fatal("被截断必须置 Truncated（两个视图任一触顶都算）")
+	}
+	if len(got.AnnotatedText) > 2000 {
+		t.Fatalf("标注视图超过上限：%d", len(got.AnnotatedText))
+	}
+	if len(got.Text) > 2000 {
+		t.Fatalf("保真视图超过上限：%d", len(got.Text))
+	}
+}
