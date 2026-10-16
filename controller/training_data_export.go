@@ -149,10 +149,41 @@ func CreateTrainingDataExport(c *gin.Context) {
 func buildExport(ctx context.Context, reader training_capture.SinkReader, rec *model.TrainingDataExport) (training_capture.ExportManifest, error) {
 	var manifest training_capture.ExportManifest
 
-	entries, err := reader.ListTree(ctx, "", training_capture.ExportListTreeMaxEntries)
+	// [修复防御] 枚举必须用**带截断报告**的版本，并在截断时**明确报错**。
+	//
+	// 盲点 B13：`ListTree` 内部会把条目夹到全局硬顶（5000），
+	// 而导出请求的是 100000。旧写法只拿到列表、无从知道被截断，
+	// 于是会产出一个**看似完整、实为前 5000 项**的归档，
+	// manifest 里的 PartCount 还是那个偏小的数 ——
+	// 管理员拿它去训练，以为拿到了全量数据。
+	//
+	// 明确失败比产出半包好：半包不会报错，只会静默少数据。
+	truncator, ok := reader.(interface {
+		ListTreeWithTruncation(ctx context.Context, root string, maxEntries int) ([]training_capture.TreeEntry, bool, error)
+	})
+	var (
+		entries   []training_capture.TreeEntry
+		truncated bool
+		err       error
+	)
+	if ok {
+		entries, truncated, err = truncator.ListTreeWithTruncation(ctx, "", training_capture.ExportListTreeMaxEntries)
+	} else {
+		// 后端不支持截断报告：**保守处理** —— 无法证明完整性就不导出，
+		// 而不是赌它没截断。
+		return manifest, fmt.Errorf(
+			"the configured sink cannot report listing truncation; refusing to build an export that may be silently incomplete")
+	}
 	if err != nil {
 		return manifest, fmt.Errorf("list cloud drive: %w", err)
 	}
+	if truncated {
+		return manifest, fmt.Errorf(
+			"cloud drive listing was truncated (limit %d entries reached, or deep directories were not expanded); "+
+				"narrow the date range or add a user/model filter so the export stays complete",
+			training_capture.ExportListTreeMaxEntries)
+	}
+
 	sel := training_capture.ExportSelection{
 		DateFrom: rec.DateFrom,
 		DateTo:   rec.DateTo,

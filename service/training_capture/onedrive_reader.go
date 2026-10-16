@@ -135,7 +135,33 @@ func (s *oneDriveSink) DeleteFile(ctx context.Context, path string) error {
 // 前缀就丢了（`2026-10-14/alice-7` 会退化成 `gpt-4o`），
 // 导致后续目录全部列举失败、树是不完整的。改为**全程携带完整相对路径**：
 // 队列里存的就是要传给 Graph 的完整路径，避免任何拼接歧义。
+// ListTree 列举目录树（丢弃截断标志的便捷包装）。
+//
+// 只用于**明确不在意截断**的调用方（如管理端浏览，它本来就要分页下钻）。
+// 需要知道「是否拿到全部」的调用方（如**导出**）必须用
+// `ListTreeWithTruncation` —— 把截断结果当全量打包会产出半包数据。
 func (s *oneDriveSink) ListTree(ctx context.Context, root string, maxEntries int) ([]TreeEntry, error) {
+	entries, _, err := s.ListTreeWithTruncation(ctx, root, maxEntries)
+	return entries, err
+}
+
+// ListTreeWithTruncation 同 ListTree，但**如实报告是否被截断**。
+//
+// [修复防御] 盲点 B13：`ListTree` 内部会把条目夹到全局硬顶，
+// 但调用方无从知道「我拿到的是全部还是前 N 项」。
+//
+// 对**导出**而言这是数据损坏级问题：导出按枚举结果打包，
+// 截断时会产出一个**看似完整、实为前 5000 项**的归档，
+// 而 manifest 里的 PartCount 还是那个偏小的数。
+// 管理员会拿它去训练，以为拿到了全量数据。
+//
+// 因此这里把截断事实**显式返回**，让导出方能在截断时明确报错
+// （而不是产出半包）。与 `List`/`CountItems` 的既有约定一致 ——
+// 它们都已经用下界标志表达「这不是全部」。
+func (s *oneDriveSink) ListTreeWithTruncation(
+	ctx context.Context, root string, maxEntries int,
+) ([]TreeEntry, bool, error) {
+	requested := maxEntries
 	if maxEntries <= 0 {
 		maxEntries = onedriveTreeMaxEntries
 	}
@@ -145,8 +171,9 @@ func (s *oneDriveSink) ListTree(ctx context.Context, root string, maxEntries int
 
 	token, err := s.token(ctx)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
+	_ = requested
 
 	// 归一化 root（去掉首尾斜杠），用于判断「相对 root 的路径」。
 	rootTrimmed := strings.Trim(root, "/")
@@ -166,18 +193,29 @@ func (s *oneDriveSink) ListTree(ctx context.Context, root string, maxEntries int
 	}
 	queue := []queueItem{{fullPath: root, depth: 0}}
 	out := make([]TreeEntry, 0, 64)
+	// truncated: 是否因上限而**未列完**（可能是条目到顶，也可能是目录没走完）。
+	truncated := false
 
-	for len(queue) > 0 && len(out) < maxEntries {
+	for len(queue) > 0 {
+		if len(out) >= maxEntries {
+			// 还有待访问目录 → 一定没列完。
+			truncated = true
+			break
+		}
 		item := queue[0]
 		queue = queue[1:]
 
 		entries, err := s.fetchEntriesWithMeta(ctx, token, item.fullPath)
 		if err != nil {
 			// 单目录失败不中断整体（部分结果比没有有用）——与 CountItems 一致。
+			// **但必须标记截断**：少读了一个目录意味着结果不完整，
+			// 不标记会让调用方（导出）把残缺当全量。
+			truncated = true
 			continue
 		}
 		for _, e := range entries {
 			if len(out) >= maxEntries {
+				truncated = true
 				break
 			}
 			// 子项的**完整路径**：父路径 + 名字（父为空则是根下的直接子项）。
@@ -200,10 +238,12 @@ func (s *oneDriveSink) ListTree(ctx context.Context, root string, maxEntries int
 					Path:  toRel(full) + "/",
 					IsDir: true,
 				})
+				// 深度到顶也是「没列完」—— 导出方需要知道。
+				truncated = true
 			}
 		}
 	}
-	return out, nil
+	return out, truncated, nil
 }
 
 // entryMeta 带元数据的目录项（内部用）。

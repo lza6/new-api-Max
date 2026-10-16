@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/service/training_capture"
 )
 
@@ -352,4 +353,60 @@ func TestSortPartPathsOrdersNumerically(t *testing.T) {
 		"d/part-0010.jsonl.gz",
 	}
 	assert.Equal(t, want, paths, "分片必须按数值序拼接（字典序会把 0010 排到 0009 前）")
+}
+
+// ---------- 导出：枚举截断必须明确报错（盲点 B13） ----------
+
+// truncatingReaderSink 报告「枚举被截断」，用于验证导出会拒绝产出半包。
+type truncatingReaderSink struct {
+	fakeReaderSink
+}
+
+func (f *truncatingReaderSink) ListTreeWithTruncation(
+	ctx context.Context, root string, maxEntries int,
+) ([]training_capture.TreeEntry, bool, error) {
+	entries, err := f.ListTree(ctx, root, maxEntries)
+	return entries, true, err // 恒报截断
+}
+
+func TestBuildExportRefusesTruncatedListing(t *testing.T) {
+	setupTrainingDataTestDB(t)
+
+	sink := &truncatingReaderSink{fakeReaderSink{files: map[string][]byte{
+		"2026-10-14/a-1/m/part-0001.jsonl.gz": []byte("x"),
+	}}}
+
+	rec := &model.TrainingDataExport{DateFrom: "2026-10-14", DateTo: "2026-10-14"}
+	_, err := buildExport(context.Background(), sink, rec)
+
+	require.Error(t, err, "枚举被截断时必须**明确报错**，而不是产出看似完整的半包")
+	assert.Contains(t, err.Error(), "truncated",
+		"错误信息要说明是截断导致的，并给出可行建议")
+	assert.Contains(t, err.Error(), "narrow the date range",
+		"必须告诉管理员下一步怎么做（收窄范围），否则他无从下手")
+}
+
+// 不支持截断报告的后端：**保守拒绝**，不赌它没截断。
+type noTruncationReaderSink struct {
+	fakeReaderSink
+}
+
+func (f *noTruncationReaderSink) ListTreeOnly(
+	ctx context.Context, root string, maxEntries int,
+) ([]training_capture.TreeEntry, error) {
+	return f.ListTree(ctx, root, maxEntries)
+}
+
+func TestBuildExportRefusesSinkWithoutTruncationReporting(t *testing.T) {
+	setupTrainingDataTestDB(t)
+
+	sink := &noTruncationReaderSink{fakeReaderSink{files: map[string][]byte{
+		"2026-10-14/a-1/m/part-0001.jsonl.gz": []byte("x"),
+	}}}
+
+	rec := &model.TrainingDataExport{DateFrom: "2026-10-14", DateTo: "2026-10-14"}
+	_, err := buildExport(context.Background(), sink, rec)
+
+	require.Error(t, err, "无法证明完整性的后端必须拒绝导出（宁可不导，不可半包）")
+	assert.Contains(t, err.Error(), "cannot report listing truncation")
 }

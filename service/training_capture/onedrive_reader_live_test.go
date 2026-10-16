@@ -139,3 +139,45 @@ func TestOneDriveReaderLive(t *testing.T) {
 		}
 	})
 }
+
+// 真实 API 下的**截断报告**（盲点 B13）。
+//
+// 必须真测：截断判定依赖「队列里还有没有待访问目录」，
+// 而那是 BFS 状态 —— mock 只能证明我假设的状态成立，
+// 不能证明真实 Graph 返回的树会让判定正确。
+func TestOneDriveListTreeTruncationReportingLive(t *testing.T) {
+	cfg, err := LoadOneDriveConfigFromEnv()
+	if err != nil {
+		t.Skipf("OneDrive 未配置，跳过：%v", err)
+	}
+	sink := NewOneDriveSink(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+
+	t.Run("上限充足时不报截断", func(t *testing.T) {
+		_, truncated, err := sink.ListTreeWithTruncation(ctx, cfg.RootPath, 5000)
+		if err != nil {
+			t.Fatalf("列举失败：%v", err)
+		}
+		if truncated {
+			t.Fatal("5000 条上限下报了截断 —— 截断判定过于保守，会让正常导出被拒")
+		}
+	})
+
+	t.Run("上限极小时确实报截断", func(t *testing.T) {
+		// 取 1 条：真实云盘根目录下必然不止一个条目，
+		// 因此**必须**报告截断。若不报，说明判定失效 ——
+		// 导出会拿这份残缺当全量。
+		entries, truncated, err := sink.ListTreeWithTruncation(ctx, cfg.RootPath, 1)
+		if err != nil {
+			t.Fatalf("列举失败：%v", err)
+		}
+		if len(entries) == 0 {
+			t.Skip("云盘根目录为空，无法验证截断（需先有采集数据）")
+		}
+		if !truncated {
+			t.Fatalf("上限 1 条却未报告截断（返回 %d 条）—— "+
+				"导出会把残缺当全量打包", len(entries))
+		}
+	})
+}
