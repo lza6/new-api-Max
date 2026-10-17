@@ -121,15 +121,10 @@ type ExportSelection struct {
 	Model string
 }
 
-// isCanonicalDate 报告 s 是否为补零的 `YYYY-MM-DD`。
+// IsCanonicalDate 判断字符串是否为**规范化**的 `YYYY-MM-DD` 日期。
 //
 // parse 后 round-trip 必须相等：既排除了非日期字符串，也排除了
 // `2026-10-1`（parse 成功但 Format 回 `2026-10-01` 不等）、`2026-1-01` 等。
-func isCanonicalDate(s string) bool {
-	return IsCanonicalDate(s)
-}
-
-// IsCanonicalDate 判断字符串是否为**规范化**的 `YYYY-MM-DD` 日期。
 //
 // 导出的理由：日期是本模块的**目录名格式**（`DateDirName` 恒产出补零形式），
 // 而调用方（HTTP 层）也要校验用户传来的日期。若各写各的，
@@ -187,7 +182,7 @@ func SelectExportParts(entries []TreeEntry, sel ExportSelection) []ExportPart {
 		// 它与 `2026-10-01` 的**字符串比较会串味**：`"2026-10-1"` 既 > `"2026-10-01"`
 		// 又 < `"2026-10-14"`，会被错误地纳入 `2026-10-01..2026-10-14` 范围。
 		// 因此先做格式校验（parse 后 round-trip 相等），不规范的直接跳过。
-		if !isCanonicalDate(date) {
+		if !IsCanonicalDate(date) {
 			continue
 		}
 		if date < sel.DateFrom || date > sel.DateTo {
@@ -433,8 +428,9 @@ func exportFormatNotes() []string {
 	return []string{
 		"Each part file is a complete, independently decompressible gzip member containing JSONL (one JSON object per line).",
 		"Each record is {\"role\":\"request\"|\"assistant\",\"content\":\"...\"}. Request records carry conversation text; assistant records carry the model's reply to the immediately preceding request record.",
-		"Request records are NOT all the same shape: the `kind` field is `full` when the content is a **complete conversation snapshot** and `suffix` when it is only the **appended delta** since the previous snapshot. To rebuild the conversation text you must RESET on `kind=full` and APPEND on `kind=suffix` — accumulating every request row blindly will duplicate the history N times.",
+		"Request records are NOT all the same shape. The `kind` field has three values: `full` = a **complete conversation snapshot** (RESET your accumulated text); `suffix` = only the **appended delta** since the previous snapshot (APPEND it); `message` = **one or more complete messages** produced by the structured-message path (APPEND with message boundaries, do NOT treat it as a snapshot and do NOT concatenate it without separators). Accumulating every request row blindly will duplicate the history N times.",
 		"`kind` cannot be inferred from position: after the per-conversation watermark is cleaned up (inactive conversations), ANY part file may start with `kind=full`. Always read the field.",
+		"Parts written **before** `kind` existed (older deployments) have request rows with no `kind`. For those legacy parts only, apply the pre-v2 rule: the first request row is a full snapshot and every later one is a suffix. Never mix this fallback with rows that do carry `kind`.",
 		"Assistant records have no `kind` field and are always standalone complete replies.",
 		"Request text is the gateway's concatenation of the whole conversation (roles and text interleaved) and is NOT reversible into per-turn roles; per-turn role recovery is heuristic only.",
 		"Request text longer than the capture limit is stored head+tail with an inline marker `…[training-capture: N bytes elided]…`; detect and drop such samples before training.",
@@ -495,7 +491,7 @@ func AggregateDailyStats(entries []TreeEntry) []DailyCaptureStat {
 		date := segments[0]
 		// 必须规范化（补零）：目录树里的历史/手工目录可能写成 `2026-10-1`，
 		// 直接当日期会与 `2026-10-01` 分成两天。
-		if !isCanonicalDate(date) {
+		if !IsCanonicalDate(date) {
 			continue
 		}
 		user := segments[1]

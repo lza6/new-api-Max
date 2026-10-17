@@ -157,5 +157,4 @@ type sinkCounts struct {
 	Folders   int
 	Files     int
 	Truncated bool
-	Err       string
 }

@@ -581,10 +581,15 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 			}
 		} else {
 			increment, nextWatermark = SelectIncrement(messages, current)
+			// 消息级路径同样必须写 `kind`：否则导出声明为 v2 的分片里
+			// 会出现「没有 kind 的 request 行」，消费方无法判断如何拼接
+			// （见 KindRequestMessage 的说明）。
+			markRequestKind(increment, KindRequestMessage)
 		}
 	} else {
 		// 退化路径：拿不到会话 id 时按内容指纹全局去重。
 		increment = GlobalDedup(messages, globalSeenFingerprints)
+		markRequestKind(increment, KindRequestMessage)
 	}
 
 	if len(increment) == 0 {
@@ -1030,6 +1035,22 @@ func requestKindFor(suffix, whole string) string {
 		return KindRequestFull
 	}
 	return KindRequestSuffix
+}
+
+// markRequestKind 给一批**已产出的增量消息**里的请求行打上形态标记。
+//
+// 用于消息级路径（`SelectIncrement`）与无会话 id 的全局去重路径
+// （`GlobalDedup`）：这两条路径产出的是结构化消息，既不是「对话快照」
+// 也不是「文本后缀」，必须标记成 `KindRequestMessage`，
+// 否则导出声明为 v2 的分片里会出现**没有 kind 的 request 行**。
+//
+// assistant 行不打标（回复总是完整的，见 `Message.Kind` 的说明）。
+func markRequestKind(msgs []Message, kind string) {
+	for i := range msgs {
+		if msgs[i].Role == "request" && msgs[i].Kind == "" {
+			msgs[i].Kind = kind
+		}
+	}
 }
 
 // processSignalSafely 在**单条信号**外包裹 panic 恢复。

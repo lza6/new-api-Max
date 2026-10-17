@@ -60,11 +60,26 @@ type Message struct {
 }
 
 // 内容形态常量。写进 JSONL 的 `kind` 字段。
+//
+// **每一类都必须写**：`kind` 缺失时消费方无法判断如何拼接，
+// 只能要么丢弃、要么按旧规则累加（导致历史重复 N 遍）。
+// 因此凡是 `role:"request"` 的行，三条代码路径都必须带上它。
 const (
-	// KindRequestFull 请求行是完整对话快照。
+	// KindRequestFull 请求行是**完整对话快照**（首次采集 / 历史被改动后的
+	// 保守全量 / 水位过期清理后重新开始）。消费方应**重置**累积文本。
 	KindRequestFull = "full"
-	// KindRequestSuffix 请求行是增量后缀。
+	// KindRequestSuffix 请求行是**相对上一次的新增后缀**。消费方应**追加**。
 	KindRequestSuffix = "suffix"
+	// KindRequestMessage 请求行是**若干条完整消息**（消息级增量 / 无会话 id
+	// 的全局去重路径）。消费方应**按消息边界追加**，不要当作对话快照重置。
+	//
+	// 为什么不能简单标成 full 或 suffix：
+	//   - 标 full → 消费方会重置，丢掉此前累积的历史；
+	//   - 标 suffix → 消费方会把它接到上一段文本末尾而不加分隔，
+	//     消息之间会被粘成一句话。
+	// 这两种路径产出的是**结构化消息**而非拼接文本，形态确实不同，
+	// 所以必须有自己的标记，而不是硬塞进已有两类。
+	KindRequestMessage = "message"
 )
 
 // RequestKindField 写进 JSONL 的字段名（消费方契约的一部分）。

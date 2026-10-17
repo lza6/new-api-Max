@@ -1182,3 +1182,86 @@ func TestProcessSignalResplitBranchProducesValidGzip(t *testing.T) {
 		}
 	}
 }
+
+// ---------- `kind` 契约：每一类请求行都必须带 ----------
+
+// TestMarkRequestKindTagsOnlyRequestRows 标记只作用于请求行，
+// 且不覆盖已有标记（消息级路径不应把已判定的 full/suffix 改掉）。
+func TestMarkRequestKindTagsOnlyRequestRows(t *testing.T) {
+	msgs := []Message{
+		{Role: "request", Content: "a"},
+		{Role: "assistant", Content: "b"},
+		{Role: "request", Content: "c", Kind: KindRequestFull},
+	}
+	markRequestKind(msgs, KindRequestMessage)
+
+	assert.Equal(t, KindRequestMessage, msgs[0].Kind, "无标记的请求行应被打上")
+	assert.Equal(t, "", msgs[1].Kind, "assistant 行不得被打标")
+	assert.Equal(t, KindRequestFull, msgs[2].Kind, "已有标记不得被覆盖")
+}
+
+// TestGlobalDedupPathWritesKind 无会话 id 的退化路径（GlobalDedup）产出的
+// request 行**必须带 kind**。
+//
+// 导出声明为 `gateway-conversation-v2` 且格式说明要求消费方
+// 「Always read the field」；若这些行没有 kind，消费方无法判断如何拼接 ——
+// 要么丢弃、要么按旧规则累加导致历史重复。
+func TestGlobalDedupPathWritesKind(t *testing.T) {
+	sink := withMemSink(t)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, nil)
+
+	// convId 为空 → 走全局指纹去重路径。
+	// 生产形态：BuildSignal 产出的请求侧消息 role 恒为 "request"。
+	sig := signal(93001, "noconv", "m", "", []Message{
+		{Role: "request", Content: "没有会话 id 的提问"},
+	}, "")
+	if _, _, err := processSignal(context.Background(), sig, limiter); err != nil {
+		t.Fatalf("processSignal：%v", err)
+	}
+
+	sawRequest := false
+	for name, data := range sink.snapshot() {
+		if strings.HasSuffix(name, ".gz") {
+			plain, err := gzipDecompress(data, 1<<30)
+			if err != nil {
+				t.Fatalf("分片 %s 不是合法 gzip：%v", name, err)
+			}
+			data = plain
+		}
+		for _, line := range strings.Split(strings.TrimRight(string(data), "\n"), "\n") {
+			if line == "" {
+				continue
+			}
+			var rec map[string]any
+			if err := common.Unmarshal([]byte(line), &rec); err != nil {
+				t.Fatalf("不是合法 JSON：%v", err)
+			}
+			if rec["role"] != "request" {
+				continue
+			}
+			sawRequest = true
+			if rec[RequestKindField] != KindRequestMessage {
+				t.Fatalf("全局去重路径的请求行 kind 应为 %q，实际 %v",
+					KindRequestMessage, rec[RequestKindField])
+			}
+		}
+	}
+	if !sawRequest {
+		t.Fatal("没有写出任何请求行，用例未覆盖目标路径")
+	}
+}
+
+// TestExportFormatNotesDescribeEveryKind 导出的格式说明是**消费方契约**。
+// 实现了三种 kind 却只写两种，消费方会按错的规则拼接。
+func TestExportFormatNotesDescribeEveryKind(t *testing.T) {
+	notes := strings.Join(exportFormatNotes(), "\n")
+	for _, kind := range []string{KindRequestFull, KindRequestSuffix, KindRequestMessage} {
+		if !strings.Contains(notes, "`"+kind+"`") {
+			t.Errorf("格式说明未描述 kind=%q —— 消费方无法知道该形态怎么拼", kind)
+		}
+	}
+	// 历史数据（无 kind）必须给出回退规则，否则旧分片无法被正确消费。
+	if !strings.Contains(notes, "no `kind`") {
+		t.Error("格式说明未说明「缺 kind 的历史数据」如何处理")
+	}
+}
