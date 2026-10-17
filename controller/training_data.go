@@ -179,13 +179,23 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 		// 而 CountItems 只在「访问到的目录里」数文件。用布局层数（3）会让
 		// 模型目录只被计入 folders、永不被展开 → files 恒为 0。
 		// 见 `training_capture.CaptureLayoutDepth` 的说明。
-		folders, files, truncated, err := counter.CountItems(
-			ctx, training_capture.CaptureLayoutDepth+1)
-		if err != nil {
-			out.LastError = err.Error()
+		//
+		// 走缓存：总览每 5s 轮询，而 CountItems 要遍历几十~几百个目录。
+		// 不缓存的话「管理员开着页面」就会持续烧云盘配额，把采集 worker
+		// 打到限流（两者共用配额）。缓存 TTL 见 trainingSinkCountsTTL。
+		counts, cerr := trainingSinkCountsCache.get(func() (sinkCounts, error) {
+			folders, files, truncated, cErr := counter.CountItems(
+				context.Background(), training_capture.CaptureLayoutDepth+1)
+			if cErr != nil {
+				return sinkCounts{}, cErr
+			}
+			return sinkCounts{Folders: folders, Files: files, Truncated: truncated}, nil
+		})
+		if cerr != nil {
+			out.LastError = cerr.Error()
 			return out
 		}
-		out.Folders, out.Files, out.Truncated = folders, files, truncated
+		out.Folders, out.Files, out.Truncated = counts.Folders, counts.Files, counts.Truncated
 	}
 	return out
 }
@@ -223,34 +233,55 @@ func GetTrainingDataByDate(c *gin.Context) {
 	}
 
 	// 云盘目录树聚合（管理员要的「几月几日采了多少」）。
-	if reader, err := trainingDataReader(); err == nil {
-		if lister, ok := reader.(interface {
-			ListTreeWithTruncation(ctx context.Context, root string, maxEntries int) ([]training_capture.TreeEntry, bool, error)
-		}); ok {
-			entries, truncated, lerr := lister.ListTreeWithTruncation(
-				c.Request.Context(), "", training_capture.ExportListTreeMaxEntries)
-			if lerr != nil {
-				// 云盘读不到不该让「今日计数」一起失败 —— 如实标注即可。
-				out["daily_error"] = lerr.Error()
-			} else {
-				days := training_capture.AggregateDailyStats(entries)
-				// 列举被截断 → 聚合出来的数字是**下界**，必须披露
-				// （否则管理员会拿偏小的数当真实规模）。
-				out["daily_truncated"] = truncated
-				if date != "" {
-					// 指定日期：只返回那一天（没数据时返回空数组而非错误 ——
-					// 「那天没采」是正常结果，不是故障）。
-					filtered := make([]training_capture.DailyCaptureStat, 0, 1)
-					for _, d := range days {
-						if d.Date == date {
-							filtered = append(filtered, d)
-						}
+	//
+	// 走**进程内缓存 + 单飞**：这里是全量目录列举，而前端会轮询。
+	// 直接每次列举会持续烧云盘速率配额，进而把**采集 worker** 打到 429
+	// （两者共用同一份配额）—— 表现为「采集莫名开始失败」，根因却在管理页。
+	if _, err := trainingDataReader(); err != nil {
+		// 云盘后端不可用：不缓存错误，直接如实下发（恢复后立刻能看到数据）。
+		out["daily_error"] = err.Error()
+	} else {
+		res, lerr := trainingDailyStatsCache.get(func() (trainingDailyStatsResult, error) {
+			reader, rerr := trainingDataReader()
+			if rerr != nil {
+				return trainingDailyStatsResult{}, rerr
+			}
+			lister, ok := reader.(interface {
+				ListTreeWithTruncation(ctx context.Context, root string, maxEntries int) ([]training_capture.TreeEntry, bool, error)
+			})
+			if !ok {
+				return trainingDailyStatsResult{}, errSinkCannotReportTruncation
+			}
+			entries, truncated, terr := lister.ListTreeWithTruncation(
+				context.Background(), "", training_capture.ExportListTreeMaxEntries)
+			if terr != nil {
+				return trainingDailyStatsResult{}, terr
+			}
+			return trainingDailyStatsResult{
+				Days:      training_capture.AggregateDailyStats(entries),
+				Truncated: truncated,
+			}, nil
+		})
+		if lerr != nil {
+			// 云盘读不到不该让「今日计数」一起失败 —— 如实标注即可。
+			out["daily_error"] = lerr.Error()
+		} else {
+			// 列举被截断 → 聚合出来的数字是**下界**，必须披露
+			// （否则管理员会拿偏小的数当真实规模）。
+			out["daily_truncated"] = res.Truncated
+			if date != "" {
+				// 指定日期：只返回那一天（没数据时返回空数组而非错误 ——
+				// 「那天没采」是正常结果，不是故障）。
+				filtered := make([]training_capture.DailyCaptureStat, 0, 1)
+				for _, d := range res.Days {
+					if d.Date == date {
+						filtered = append(filtered, d)
 					}
-					out["days"] = filtered
-					out["date"] = date
-				} else {
-					out["days"] = days
 				}
+				out["days"] = filtered
+				out["date"] = date
+			} else {
+				out["days"] = res.Days
 			}
 		}
 	}

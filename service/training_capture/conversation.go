@@ -86,7 +86,8 @@ type lineRecord struct {
 // 分析报告从根上不可信，而管理员看不出这一点。
 //
 // 标注是**数据结构事实**（role 字段就是这么存的），不是猜测 ——
-// 与 `HeuristicTurns` 的启发式切分是两件事，不要混淆。
+// 与 `SplitHeuristicTurns` 那种「从拼接文本里猜角色」是两件事，不要混淆：
+// 那个是启发式（会误判），这个是读取现成字段（不会误判）。
 func renderLineForPrompt(rec lineRecord) string {
 	switch rec.Role {
 	case "assistant":
