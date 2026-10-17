@@ -54,15 +54,20 @@ func TestTimedCacheReloadsAfterTTL(t *testing.T) {
 	assert.Equal(t, int32(2), calls.Load())
 }
 
-// TestTimedCacheDoesNotCacheErrors 错误**不得**被缓存：
-// 云盘短暂故障恢复后，管理员应该立刻看到数据，而不是继续吃 5 分钟的旧错误。
-func TestTimedCacheDoesNotCacheErrors(t *testing.T) {
+// TestTimedCacheNegativeCachesErrorsBriefly 失败结果只**短暂**负缓存。
+//
+// 完全不缓存 → 云盘持续故障（尤其 429 限流）时，每个轮询都重新打一次，
+// 等于持续加压，让限流更难解除；而采集 worker 共用同一份配额，会被一起拖住。
+// 永久缓存 → 云盘恢复后管理员继续看到旧错误。
+// 折中：负缓存 negativeTTL，到点自动重试。
+func TestTimedCacheNegativeCachesErrorsBriefly(t *testing.T) {
 	c := newTimedCache[int](time.Minute)
+	c.negativeTTL = 20 * time.Millisecond
 	var calls atomic.Int32
-
-	// 第一次失败，第二次成功。
+	shouldFail := true
 	load := func() (int, error) {
-		if calls.Add(1) == 1 {
+		calls.Add(1)
+		if shouldFail {
 			return 0, errors.New("cloud drive temporarily unavailable")
 		}
 		return 7, nil
@@ -70,11 +75,56 @@ func TestTimedCacheDoesNotCacheErrors(t *testing.T) {
 
 	_, err := c.get(load)
 	require.Error(t, err, "第一次应把错误如实返回")
+	require.Equal(t, int32(1), calls.Load())
 
+	// 负缓存窗口内：直接返回同一个错误，**不再打云盘**。
+	_, err = c.get(load)
+	require.Error(t, err)
+	assert.Equal(t, int32(1), calls.Load(), "负缓存窗口内不得重试（防重试风暴）")
+
+	// 窗口过期后自动重试；此时云盘已恢复 → 必须拿到数据。
+	time.Sleep(30 * time.Millisecond)
+	shouldFail = false
 	v, err := c.get(load)
-	require.NoError(t, err, "错误不该被缓存，第二次应重新加载并成功")
+	require.NoError(t, err, "负缓存过期后必须重试并恢复")
 	assert.Equal(t, 7, v)
 	assert.Equal(t, int32(2), calls.Load())
+}
+
+// TestTimedCacheSuccessClearsNegativeCache 成功加载后必须清掉负缓存记录。
+//
+// 不清的后果：之后某次独立失败时，会命中**更早那次**的旧错误，
+// 管理员看到的时间点与内容都对不上，排障被误导。
+func TestTimedCacheSuccessClearsNegativeCache(t *testing.T) {
+	// 成功值 ttl 很短，负缓存很长 —— 让我们能在负缓存仍有效时走到成功路径。
+	c := newTimedCache[int](time.Millisecond)
+	c.negativeTTL = time.Hour
+
+	firstErr := errors.New("first failure")
+	_, err0 := c.get(func() (int, error) { return 0, firstErr })
+	require.Error(t, err0)
+
+	// 负缓存很长，此时应直接返回 firstErr（且不再 load）。
+	var calls atomic.Int32
+	_, err := c.get(func() (int, error) { calls.Add(1); return 1, nil })
+	require.Error(t, err)
+	assert.Equal(t, int32(0), calls.Load(), "负缓存窗口内不得 load")
+
+	// 把负缓存窗口缩短到已过期，再让加载成功 → 成功应清掉 lastErr。
+	c.mu.Lock()
+	c.failedAt = time.Now().Add(-2 * time.Hour)
+	c.mu.Unlock()
+	v, err := c.get(func() (int, error) { return 1, nil })
+	require.NoError(t, err)
+	assert.Equal(t, 1, v)
+
+	// 成功之后 ttl 到期再失败：必须是**新的**错误，而不是更早的 firstErr。
+	time.Sleep(5 * time.Millisecond)
+	secondErr := errors.New("second failure")
+	_, err = c.get(func() (int, error) { return 0, secondErr })
+	require.Error(t, err)
+	assert.EqualError(t, err, secondErr.Error(),
+		"成功之后应记录新错误，不能沿用更早的负缓存")
 }
 
 // TestTimedCacheCollapsesConcurrentMisses 并发未命中必须合并成**一次**加载。

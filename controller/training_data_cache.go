@@ -80,23 +80,47 @@ type timedCache[T any] struct {
 	ok       bool
 	loadedAt time.Time
 	ttl      time.Duration
-	sf       singleflight.Group
+	// 负缓存：记录上次失败与时间，避免「云盘持续故障时每个轮询都重试」。
+	//
+	// 为什么必须有：管理端会轮询（总览 5s / 每日历史 30s）。若云盘正在
+	// 限流（429），「失败后下次立刻重试」等于**持续加压**，反而让限流
+	// 更难解除 —— 而采集 worker 共用同一份配额，会被一起拖住。
+	// 负缓存让失败后安静一段时间（见 negativeTTL），到点自动重试，
+	// 因此「恢复后有限时间内可见」这个性质仍然成立。
+	lastErr  error
+	failedAt time.Time
+	// negativeTTL 失败结果的缓存时长（0 表示不启用负缓存）。
+	negativeTTL time.Duration
+	sf          singleflight.Group
 }
 
+// defaultNegativeTTL 失败结果的默认缓存时长。
+//
+// 取 15s：比总览轮询（5s）长，能真正把重试压到约 1/3；
+// 又短到「云盘恢复后最多 15 秒就能看到数据」。
+const defaultNegativeTTL = 15 * time.Second
+
 func newTimedCache[T any](ttl time.Duration) *timedCache[T] {
-	return &timedCache[T]{ttl: ttl}
+	return &timedCache[T]{ttl: ttl, negativeTTL: defaultNegativeTTL}
 }
 
 // get 返回缓存值；未命中时调用 load 并缓存。
 //
-// load 返回 error 时**不缓存**（错误不该被记住 5 分钟 —— 云盘恢复后
-// 应该立刻能看到数据，而不是继续展示旧错误）。
+// 成功结果缓存 ttl；**失败结果只缓存 negativeTTL**（防重试风暴），
+// 到点自动重试 —— 因此不会出现「云盘恢复了但还一直显示旧错误」。
 func (c *timedCache[T]) get(load func() (T, error)) (T, error) {
 	c.mu.RLock()
 	if c.ok && time.Since(c.loadedAt) < c.ttl {
 		v := c.value
 		c.mu.RUnlock()
 		return v, nil
+	}
+	// 负缓存命中：直接返回上次的错误，不再打云盘。
+	if c.lastErr != nil && c.negativeTTL > 0 && time.Since(c.failedAt) < c.negativeTTL {
+		err := c.lastErr
+		c.mu.RUnlock()
+		var zero T
+		return zero, err
 	}
 	c.mu.RUnlock()
 
@@ -113,12 +137,17 @@ func (c *timedCache[T]) get(load func() (T, error)) (T, error) {
 
 		v, lerr := load()
 		if lerr != nil {
+			c.mu.Lock()
+			c.lastErr = lerr
+			c.failedAt = time.Now()
+			c.mu.Unlock()
 			return v, lerr
 		}
 		c.mu.Lock()
 		c.value = v
 		c.ok = true
 		c.loadedAt = time.Now()
+		c.lastErr = nil // 成功后清掉负缓存，避免下次误命中
 		c.mu.Unlock()
 		return v, nil
 	})
