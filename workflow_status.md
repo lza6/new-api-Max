@@ -62,7 +62,16 @@
 
 ## 5. 发布与部署
 
-（执行后回填：commit SHA、tag、release URL、镜像 tag、部署时间、线上验收结果、回滚点。）
+- commit：`cdb715275484d32fbdb80b83774303bb93995f13`（已推送 `origin/main`）
+- tag / release：`v1.3.148`；https://github.com/lza6/new-api-Max/releases/tag/v1.3.148
+- 镜像：`new-api:v1.3.148`（服务器构建，源码来自 `git archive HEAD`）
+- 部署：2026-10-18 01:17 UTC+8，蓝绿 `3001 → 3000`，旧容器已停
+- 线上验收：公网 HTTPS 200、`X-New-Api-Version: v1.3.148`、`/healthz`/`/readyz` 200；
+  `/en/pricing` canonical=`https://freeapi.tingfengai.art/en/pricing` + 3 条 hreflang；
+  `/sign-in` noindex；`/zh/pricing` 301→`/pricing`；sitemap 含 en 变体；
+  MCP 未认证 401（默认关）；磁盘 9.7G/78G (13%)；容器内存 462MB/900MB
+- 新表：`action_approvals`、`mcp_sessions`、`open_ai_ops_objects`（GORM 命名）
+- 回滚镜像：`new-api:v1.3.147`（部署脚本保留最近 4 个版本）
 
 ## 6. 独立审查与修复
 

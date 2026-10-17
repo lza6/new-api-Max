@@ -56,3 +56,15 @@
 - Go：2 P1（审批未绑定参数、请求体多次物化）→ 已修。
 - 前端：4 P1（失败误报成功、错误当空列表、存量语言与 canonical、未翻译前缀 lang）→ 已修。
 - 仍未验证：MySQL/PostgreSQL conformance、真实上游 fine-tune/batch、真实 MCP 客户端、生产环境。
+
+## 生产部署验收（2026-10-18）
+| 项 | 命令/证据 | 结果 |
+|---|---|---|
+| 公网版本 | `curl -sI https://freeapi.tingfengai.art/api/status` | `X-New-Api-Version: v1.3.148`，HTTP 200 |
+| 健康探针 | 服务器侧 `/healthz` `/readyz` | 均 200 |
+| SEO /en/pricing | 服务器侧抓 HTML | `lang=en`、canonical=`https://freeapi.tingfengai.art/en/pricing`、3 条 hreflang |
+| 登录页 noindex | `/sign-in` 抓 HTML | `robots: noindex, nofollow` |
+| 语言重定向 | `/zh/pricing` | 301 → `/pricing` |
+| MCP 默认关 | `POST /mcp` 未认证 | 401（认证后由默认 false 返回 404） |
+| 新表 | PostgreSQL pg_tables | action_approvals / mcp_sessions / open_ai_ops_objects |
+| 资源 | `docker stats` / `df -h` | 内存 462MB/900MB；磁盘 9.7G/78G(13%) |
