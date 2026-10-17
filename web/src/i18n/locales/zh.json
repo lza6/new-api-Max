@@ -105,6 +105,7 @@
     "Ranked by quota consumed in the last {{days}} days": "按最近 {{days}} 天消耗额度排序",
     "No consumption data in this period": "该时间段内暂无消耗数据",
     "Training Data Collection": "训练数据采集",
+    "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.": "已跳过 {{count}} 个取不到文本的请求。该数字持续增长通常说明 token 计数被关闭了，因此不会产出对话文本。",
     "Daily capture history": "每日采集历史",
     "No captured data yet": "还没有采集到数据",
     "Cloud drive read failed": "云盘读取失败",

@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Сортировка по расходу квоты за последние {{days}} дн.",
     "No consumption data in this period": "За этот период нет данных о расходе",
     "Training Data Collection": "Сбор данных для обучения",
+    "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.": "Пропущено запросов без извлекаемого текста: {{count}}. Неуклонный рост обычно означает, что подсчёт токенов отключён, поэтому текст диалога не формируется.",
     "Daily capture history": "История сбора по дням",
     "No captured data yet": "Пока нет собранных данных",
     "Cloud drive read failed": "Не удалось прочитать облачное хранилище",

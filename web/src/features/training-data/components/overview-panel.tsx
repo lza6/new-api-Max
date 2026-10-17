@@ -182,6 +182,20 @@ function StatsCard(props: { stats: CaptureStats }) {
         </div>
 
         {/*
+          「取不到文本」要单独显示：这个数字持续增长通常不是用户没发文本，
+          而是 CountToken 被关了 —— 功能开着却一个人都采不到。
+          不显示的话，这类**配置型静默失效**只能靠翻 /metrics 才发现。
+        */}
+        {s.skipped_no_text > 0 && (
+          <p className='text-muted-foreground text-[11px] leading-relaxed'>
+            {t(
+              'Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.',
+              { count: s.skipped_no_text }
+            )}
+          </p>
+        )}
+
+        {/*
           **必须披露**：统计是进程内计数，重启归零。
           不写这句，管理员会以为「昨天没采到数据」。
         */}

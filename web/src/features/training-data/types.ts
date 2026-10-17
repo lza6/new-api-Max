@@ -51,6 +51,15 @@ export interface CaptureStats {
   total_dropped: number
   total_upload_errors: number
   skipped_no_consent: number
+  /**
+   * 因**取不到任何文本**而跳过的次数。
+   *
+   * 这个数字持续增长通常不是「用户没发文本」，而是 `CountToken` 被关闭
+   * （关闭后上游不产出 `CombineText`）—— 即「功能开着但一个人都采不到」。
+   * 后端已把它接入 /metrics（`training_capture_skipped_no_text_total`），
+   * 管理端也要能看到，否则这类配置型静默失效只能靠翻监控发现。
+   */
+  skipped_no_text: number
   queue_len: number
   queue_capacity: number
   /** 当前**正在上传**的字节数（瞬时值）。 */
