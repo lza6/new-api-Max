@@ -64,6 +64,14 @@ type AssemblyResult struct {
 	// MalformedLines 无法解析的 JSON 行数。
 	// 非零说明数据有损伤；调用方应提示而不是静默忽略。
 	MalformedLines int
+	// SkippedParts 读取或解压**失败**、因而未参与还原的分片数。
+	//
+	// 调用方必须据此披露：分析报告基于**不完整的**对话，
+	// 而模型若不知道这一点会把残缺当完整（本模块反复强调的反面）。
+	SkippedParts int
+	// ListTruncated 为 true 表示**列举本身**被截断（达到上限），
+	// 即可能有分片根本没被发现，更不用说读取。
+	ListTruncated bool
 }
 
 // lineRecord JSONL 一行的结构。

@@ -87,7 +87,9 @@ const analyzeSystemPrompt = `你是一名资深的产品与运营分析师。下
 5. **产品改进建议**：基于这段对话，给产品/运营的具体可执行建议。
 
 注意：
-- 若我标注了「对话文本被截断」或「记录行数被截断」，请在报告开头说明你的分析仅基于可见部分。
+- 若我标注了「对话文本被截断」「记录行数被截断」「有分片读取或解压失败」
+  或「分片列举被截断」，请在报告开头说明你的分析仅基于可见部分，
+  并指出可能缺失哪类内容（不要假装你看到了全部对话）。
 - **逐轮问答的配对不可靠**：请求侧那一行是拼接文本，不要断言"用户第 N 轮说了 X 之后模型回了 Y"这种精确对齐。
 - 不要编造记录里没有的内容。引用原话时保持逐字准确。`
 
@@ -228,22 +230,48 @@ func loadConversationForAnalysis(
 	maxBytes int,
 ) (training_capture.AssemblyResult, error) {
 	var objectPaths []string
+	// 三个「不完整」信号：列举被截断 / 分片数超上限 / 单个分片读失败。
+	// 任何一项都必须传给模型，否则报告看起来完整、实际缺了整段对话。
+	var listTruncated bool
+	var partsOverLimit bool
+	var skippedParts int
 
 	if strings.HasSuffix(path, ".jsonl.gz") || strings.HasSuffix(path, ".jsonl") {
 		// 单文件
 		objectPaths = []string{path}
 	} else {
 		// 目录：取其下全部条目，只保留分片文件。
-		entries, err := reader.ListTree(ctx, path, analyzeMaxParts*4)
-		if err != nil {
-			return training_capture.AssemblyResult{}, err
-		}
-		for _, e := range entries {
-			if e.IsDir {
-				continue
+		//
+		// 用**带截断报告**的列举：`ListTree` 会把结果夹到内部硬顶而不告知，
+		// 于是我们既不知道少列了，也没法告诉模型。
+		if lister, ok := reader.(interface {
+			ListTreeWithTruncation(ctx context.Context, root string, maxEntries int) ([]training_capture.TreeEntry, bool, error)
+		}); ok {
+			entries, truncated, err := lister.ListTreeWithTruncation(ctx, path, analyzeMaxParts*4)
+			if err != nil {
+				return training_capture.AssemblyResult{}, err
 			}
-			if strings.HasSuffix(e.Path, ".jsonl.gz") || strings.HasSuffix(e.Path, ".jsonl") {
-				objectPaths = append(objectPaths, e.Path)
+			listTruncated = truncated
+			for _, e := range entries {
+				if e.IsDir {
+					continue
+				}
+				if strings.HasSuffix(e.Path, ".jsonl.gz") || strings.HasSuffix(e.Path, ".jsonl") {
+					objectPaths = append(objectPaths, e.Path)
+				}
+			}
+		} else {
+			entries, err := reader.ListTree(ctx, path, analyzeMaxParts*4)
+			if err != nil {
+				return training_capture.AssemblyResult{}, err
+			}
+			for _, e := range entries {
+				if e.IsDir {
+					continue
+				}
+				if strings.HasSuffix(e.Path, ".jsonl.gz") || strings.HasSuffix(e.Path, ".jsonl") {
+					objectPaths = append(objectPaths, e.Path)
+				}
 			}
 		}
 		if len(objectPaths) == 0 {
@@ -252,6 +280,7 @@ func loadConversationForAnalysis(
 		// 按分片序号升序，并限制数量（超出的部分不参与，避免读几百个分片）。
 		sortPartPaths(objectPaths)
 		if len(objectPaths) > analyzeMaxParts {
+			partsOverLimit = true
 			objectPaths = objectPaths[:analyzeMaxParts]
 		}
 	}
@@ -261,7 +290,9 @@ func loadConversationForAnalysis(
 	for _, p := range objectPaths {
 		raw, err := reader.ReadFile(ctx, p, 64<<20)
 		if err != nil {
-			// 单个分片读失败不中断整体（部分分析比没有分析有用）。
+			// 单个分片读失败不中断整体（部分分析比没有分析有用），
+			// 但**必须计数**：否则报告看起来完整、实际缺了整段对话。
+			skippedParts++
 			continue
 		}
 		plain := raw
@@ -269,7 +300,10 @@ func loadConversationForAnalysis(
 			if dec, derr := training_capture.DecompressPart(raw); derr == nil {
 				plain = dec
 			} else {
-				continue // 解压失败：跳过该分片，而不是把压缩字节当文本喂给模型
+				// 解压失败：跳过该分片（不把压缩字节当文本喂给模型），
+				// 同样必须计数并披露。
+				skippedParts++
+				continue
 			}
 		}
 		// 只取文件名（Assembly 内部按分片序号排序）。
@@ -280,7 +314,12 @@ func loadConversationForAnalysis(
 		objects[name] = plain
 	}
 
-	return training_capture.AssembleConversation(objects, maxBytes), nil
+	assembled := training_capture.AssembleConversation(objects, maxBytes)
+	assembled.SkippedParts = skippedParts
+	// 列举被截断或分片数超上限 → 都可能存在**没被读到的分片**，
+	// 与「文本被截断」一样必须让模型知道。
+	assembled.ListTruncated = listTruncated || partsOverLimit
+	return assembled, nil
 }
 
 // sortPartPaths 按分片序号排序（与 AssembleConversation 同口径）。
@@ -312,6 +351,21 @@ func buildAnalysisSystemMessage(a training_capture.AssemblyResult) string {
 	if a.MalformedLines > 0 {
 		sb.WriteString(fmt.Sprintf(
 			"\n- 有 %d 行数据损坏无法解析，可能缺失内容。", a.MalformedLines))
+	}
+	// [修复防御] 分片缺失必须告诉模型。
+	//
+	// 读取失败/解压失败的分片、以及「列举被截断/分片数超上限」导致的未读分片，
+	// 都意味着**整段对话可能根本没进来**。不披露的后果：
+	// 报告看起来完整，实际基于残缺数据，管理员据此做决策 ——
+	// 这正是本模块反复强调的「不假装完整」的反面。
+	if a.SkippedParts > 0 {
+		sb.WriteString(fmt.Sprintf(
+			"\n- **有 %d 个分片读取或解压失败，未能参与本次分析**，你可能看不到那部分对话。",
+			a.SkippedParts))
+	}
+	if a.ListTruncated {
+		sb.WriteString(
+			"\n- **分片列举被截断或分片数超过上限**，可能存在未被读取的分片。")
 	}
 	sb.WriteString("\n\n---\n对话记录正文：\n")
 	// 用**角色标注版**而不是保真原文：提示词要求「逐字引用用户原话」，

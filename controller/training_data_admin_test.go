@@ -26,8 +26,10 @@ type fakeReaderSink struct {
 	files map[string][]byte
 	// deleted 记录被删的路径（验证越权/非分片路径被拦住）。
 	deleted []string
-	// readErr 注入读取失败。
+	// readErr 注入读取失败（全部）。
 	readErr error
+	// failPaths 只让**指定路径**读取失败（用于「部分分片读不到」场景）。
+	failPaths map[string]bool
 }
 
 func newFakeReaderSink() *fakeReaderSink {
@@ -54,6 +56,9 @@ func (f *fakeReaderSink) Stat(ctx context.Context) (training_capture.SinkStat, e
 func (f *fakeReaderSink) ReadFile(ctx context.Context, path string, maxBytes int64) ([]byte, error) {
 	if f.readErr != nil {
 		return nil, f.readErr
+	}
+	if f.failPaths[path] {
+		return nil, assert.AnError
 	}
 	data, ok := f.files[path]
 	if !ok {
@@ -444,4 +449,78 @@ func TestAnalyzeRequiresModel(t *testing.T) {
 			assert.Contains(t, env.Message, "required")
 		})
 	}
+}
+
+// TestAnalysisSystemMessageDisclosesIncompleteData 锁定「不假装完整」：
+// 分片读取/解压失败、或列举被截断/分片数超限时，
+// 系统消息**必须**告诉模型数据可能残缺。
+//
+// 不披露的后果：模型把残缺当完整、给出自信的分析报告，
+// 管理员据此做决策 —— 这正是本模块反复强调的反面。
+func TestAnalysisSystemMessageDisclosesIncompleteData(t *testing.T) {
+	t.Run("分片读取失败要披露且给出数量", func(t *testing.T) {
+		msg := buildAnalysisSystemMessage(training_capture.AssemblyResult{
+			AnnotatedText: "正文", TotalLines: 2, SkippedParts: 3,
+		})
+		assert.Contains(t, msg, "3 个分片读取或解压失败")
+		assert.Contains(t, msg, "未能参与本次分析")
+	})
+
+	t.Run("列举被截断要披露", func(t *testing.T) {
+		msg := buildAnalysisSystemMessage(training_capture.AssemblyResult{
+			AnnotatedText: "正文", ListTruncated: true,
+		})
+		assert.Contains(t, msg, "分片列举被截断或分片数超过上限")
+	})
+
+	t.Run("完整数据不得产生任何残缺声明", func(t *testing.T) {
+		msg := buildAnalysisSystemMessage(training_capture.AssemblyResult{
+			AnnotatedText: "正文", TotalLines: 2,
+		})
+		// 只看**元信息段**：提示词里本身就会写「若我标注了…」这类指令，
+		// 在整段消息上断言 NotContains 会误判。
+		meta := msg[strings.Index(msg, "对话记录元信息："):]
+		assert.NotContains(t, meta, "未能参与本次分析")
+		assert.NotContains(t, meta, "分片列举被截断")
+		assert.NotContains(t, meta, "对话文本被截断")
+	})
+
+	t.Run("提示词要求模型声明可见范围", func(t *testing.T) {
+		// 仅写元信息不够：必须要求模型在报告里说明「只基于可见部分」。
+		assert.Contains(t, analyzeSystemPrompt, "分片读取或解压失败")
+		assert.Contains(t, analyzeSystemPrompt, "仅基于可见部分")
+	})
+}
+
+// TestAnalysisDisclosesSkippedParts 端到端：某个分片读不到时，
+// 系统消息必须披露「有分片未能参与分析」。
+//
+// 这是「不假装完整」的接线验证 —— 仅单测 buildAnalysisSystemMessage 不够，
+// 要证明 loadConversationForAnalysis 真的把计数传了上去。
+func TestAnalysisDisclosesSkippedParts(t *testing.T) {
+	setupTrainingDataTestDB(t)
+	sink := newFakeReaderSink()
+	plain := []byte("{\"role\":\"request\",\"content\":\"可读的对话\"}\n")
+	compressed, err := training_capture.CompressPartForTest(plain)
+	require.NoError(t, err)
+	sink.files["2026-10-14/a-1/m/part-0001.jsonl.gz"] = compressed
+	// 第二个分片存在（会被列举到）但读取失败。
+	sink.files["2026-10-14/a-1/m/part-0002.jsonl.gz"] = compressed
+	sink.failPaths = map[string]bool{"2026-10-14/a-1/m/part-0002.jsonl.gz": true}
+	defer training_capture.SetSinkForTest(sink)()
+
+	assembled, err := loadConversationForAnalysis(
+		context.Background(), sink, "2026-10-14/a-1/m", 1<<20)
+	require.NoError(t, err)
+
+	// 关键断言 1：失败的分片被**计数**（而不是静默 continue）。
+	assert.Equal(t, 1, assembled.SkippedParts,
+		"读取失败的分片必须被计数，否则报告会看起来完整")
+	// 关键断言 2：可读的那份仍参与还原（部分分析比没有分析有用）。
+	assert.Contains(t, assembled.AnnotatedText, "可读的对话")
+
+	// 关键断言 3：该事实必须出现在发给模型的系统消息里。
+	msg := buildAnalysisSystemMessage(assembled)
+	meta := msg[strings.Index(msg, "对话记录元信息："):]
+	assert.Contains(t, meta, "1 个分片读取或解压失败")
 }
