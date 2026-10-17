@@ -30,6 +30,28 @@
 
 ---
 
+## 一·B、2026-10-18 独立审查线程（9 提交）发现的阻塞与修复
+
+> 由独立只读审查线程（六维度：需求完整性/逻辑/边界/质量/测试/实际运行）产出。
+> **这一轮的价值在于它推翻了我自己的一条验证声明**（见下）。
+
+| 级别 | 问题 | 根因 | 状态 |
+|---|---|---|---|
+| **P0** | `/by-date` 默认路径（前端不传 date）返回 **HTTP 200 空 body** | 分支里 `return` 前漏了 `common.ApiSuccess`；历史日期分支正常，故极易误判成前端问题 | 已修 + RED |
+| **P0** | worker 启停**数据竞争 + 僵尸 worker**（`go test -race` FAIL） | `runWorker` 无同步读包级 `workerStop`；Stop 关 C1 后 Start 换 C2，旧 goroutine 读到未关闭的 C2 → 永不退出 → 两个消费者并发写同一会话水位 | 已修 + 整包 `-race` PASS |
+| **P1** | 深度分析**默认操作仍失败**：UI 标 `Model (optional)`，relay 对空 model 直接 400 | 界面的承诺与后端校验不一致 | 已修（前端必填 + 后端点名 model 的错误） |
+| P1 | 分析**静默丢分片**（读/解压失败、列举截断、超上限都不计数） | 三处 `continue` 且用 `ListTree` 而非带截断报告的版本 → 报告看似完整 | 已修 + RED |
+| P1 | 导出声明 v2，但两条路径**不写 `kind`** | 格式说明要求「Always read the field」，缺失则消费方只能丢弃或按旧规则累加（历史重复） | 已修（新增 `kind=message`）|
+| P1 | `countTree` 把**目录读取失败**伪装成完整结果 | `continue` 后 `truncated=false`，与「文件数恒为 0」同一类「自信但错误」 | 已修（并入 truncated）|
+| P1 | `CountItems(maxDepth<=0)` 的默认值仍是**错答案**（布局层数） | 把缺陷留作默认值，未来调用方会再踩 | 已修（`+1`）|
+| P2 | 云盘**持续故障**时每个轮询都重试（若是 429 会加剧限流） | 「错误不缓存」没考虑持续故障 | 已修（15s 负缓存）|
+| P2 | 缓存的类型断言失败 `return zero, nil` | 把异常伪装成空数据 | 已修（返回显式错误）|
+
+### ⚠️ 我此前的一条**不实声明**（记录以免重犯）
+上一批提交信息里写了「`-race` 同范围 PASS」—— 那次用的是**窄 `-run` 过滤**，
+恰好没包含 `TestWorkerCanRestartAfterStop`。整包 `-race` 当时实际是 **FAIL**。
+**教训：验证声明的「范围」必须与结论的范围一致；说「全包通过」就必须跑全包。**
+
 ## 二、既有测试失败噪声表（勿误判为回归）
 
 | 范围 | 现象 | 判定 |
@@ -57,6 +79,11 @@
 | 日志分片轮转 | `go test ./logger/` | 全 PASS（6.3 实际早已落地） |
 | 管理端云盘查询缓存 | `go test ./controller/ -run TestTimedCache` | 5/5 PASS（含 16 并发合并为 1 次） |
 | HTML 报告测验 | Node DOM stub 模拟作答 | 全对→pass、全错→fail、漏答→fail（判分逻辑已实证） |
+| 采集包整包竞态 | `go test ./service/training_capture/ -race -count=1` | **PASS（111s）**——修 C 前为 FAIL |
+| 分析缺片披露 | `go test ./controller/ -run TestAnalysis` | PASS（含端到端：一个分片读不到→SkippedParts==1 且写入系统消息） |
+| kind 契约 | `go test ./service/training_capture/ -run TestMarkRequestKind|TestGlobalDedupPath|TestExportFormatNotes` | PASS |
+| by-date 默认路径 | `go test ./controller/ -run TestByDate` | PASS（含「不传 date / 查今天 必须有响应体」） |
+| 负缓存 | `go test ./controller/ -run TestTimedCache` | 6/6 PASS |
 
 ---
 
