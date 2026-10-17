@@ -18,6 +18,8 @@
 | 2026-10-17 | **占位/死链路扫描（ops-panel + web-protection）** | grep `mock\|fake\|dummy\|hardcod\|TODO\|FIXME\|sample` | 零命中 | — |
 | 2026-10-17 | **分页控件不可见排查（全 feature 首页）** | 逐页比对是否套 `SectionPageLayout` | 只有 web-protection 与 training-data 两个**页级**表格受影响（均已修）；`pricing` 用客户端分页且显式渲染 `DataTablePagination`、`system-settings` 的表格在对话框内 —— 两者**不需要**该布局 | 新增页级分页表格时按此判据自查 |
 | 2026-10-17 | **回复采集的下游集成（分析链路）** | 代码审计 + RED 测试 | **发现真实缺陷**：`AssembleConversation` 丢 `role` → 分析提示词要求「引用用户原话」却分不清用户/模型 → 模型会把自己的回复当用户原话。已修（新增 `AnnotatedText`） | 改动 `service/training_capture/conversation.go` 或分析提示词 |
+| 2026-10-17 | **训练数据管理端全链路**（前端 ↔ 路由 ↔ controller） | 只读静态审计 + 契约测试比对 | **发现 2 处真实缺陷**：① 深度分析成功路径必抛错（判 `!res.success`，而后端返回原始 relay 体无 `success`）→ 分析/报告/追问全不可用；② `CountItems(ctx,3)` 深度不足致文件数恒为 0。均已修并 RED 验证 | 改动 `training_data_analyze.go`、`training-data/api.ts`、`CountItems` 调用处 |
+| 2026-10-17 | **用户侧采集开关链路** | 只读静态审计 | 主流程已闭环（授权/撤回/免责声明/不可用隐藏均正确）；**发现 2 处 P2 静默失败**（读取失败无提示、无加载态）已修 | 改动 `training-data-preferences-card.tsx` |
 
 ### 关键的「根因 vs 表象」（避免误判）
 - **「web 防护没有翻页」**：不是后端缺分页（后端三张表全部支持 `page/size` 且返回 `total`），
@@ -49,6 +51,10 @@
 | i18n 一致性 | `cd web && npm run i18n:check` | 0 missing |
 | 路由契约 | `go test ./router/ -run 'TrainingDataRouter'` | PASS（会扫描前端源码里的 `/api/` 字面量与 gin 路由表比对） |
 | Web 防护页 | `npx vitest run src/features/web-protection/` | 2/2 PASS |
+| 分析接口契约 | `npx vitest run src/features/training-data/api.test.ts` | 3/3 PASS（锁定原始 relay 体，不做信封解包） |
+| 每日采集聚合 | `go test ./service/training_capture/ -run TestAggregateDailyStats` | 5/5 PASS |
+| 目录计数深度语义 | `go test ./service/training_capture/ -run TestCountTree` | 6/6 PASS（含 maxDepth=1..9 穷举） |
+| 日志分片轮转 | `go test ./logger/` | 全 PASS（6.3 实际早已落地） |
 
 ---
 
