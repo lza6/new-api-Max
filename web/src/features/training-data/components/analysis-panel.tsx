@@ -131,11 +131,23 @@ export function AnalysisPanel(props: { path: string | null }) {
         messages: messages.length > 0 ? messages : undefined,
       })
 
-      if (!res.success) {
+      // 两种形态都是 HTTP 200，只能按**形状**区分：
+      //  - 错误（参数/读取失败等）：`common.ApiErrorMsg` → `{success:false, message}`
+      //  - 成功：relay 直接写上游原始体 → `{choices:[...]}`，**没有 success 字段**
+      // 因此判据必须是 `success === false`，**不能**写 `!res.success` ——
+      // 后者在成功时会因 `undefined` 而判真，让成功路径必然抛错
+      // （这正是本面板此前「分析永远失败」的根因）。
+      if (res.success === false) {
         throw new Error(res.message || t('Analysis failed'))
       }
+      // 另一种错误形态：请求过了参数校验、但在 relay 内部失败
+      // （无可用渠道 / 上游报错）。relay 以非 200 写 `{"error":{...}}`，
+      // 大多会被 axios 拦截抛错；这里再兜一次，避免异常形态下静默无输出。
+      if (res.error) {
+        throw new Error(res.error.message || t('Analysis failed'))
+      }
 
-      const text = extractAssistantText(res.data)
+      const text = extractAssistantText(res)
       if (!text) {
         // 不静默失败：明确提示，便于排查渠道差异。
         toast.error(t('The model returned no readable text.'))

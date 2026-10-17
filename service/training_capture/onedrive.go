@@ -562,25 +562,73 @@ func (s *oneDriveSink) Stat(ctx context.Context) (SinkStat, error) {
 	return stat, nil
 }
 
+// countTree 在给定目录树上统计目录数与文件数（**纯函数**，便于穷举边界）。
+//
+// 抽出来的理由：这个统计错了会让管理员看到**自信但错误**的数字
+// （「N 个目录 / 0 个文件」且 truncated=false），而真机上复现它需要
+// 真实的 OneDrive 目录层级。纯函数让「深度语义」可以离线钉死。
+//
+// 语义（与调用方约定）：
+//   - 只**列出**深度 < maxDepth 的目录；被列出目录里的**非目录项**计入 files。
+//   - 因此要数到第 N 层的文件，maxDepth 必须 ≥ N（目录自身在第 N 层时，
+//     需要 maxDepth ≥ N+1 才会被展开）。
+//   - 被计入 folders 但未展开的目录，其内部文件**不计入** —— 这是
+//     「最多遍历 maxDepth 层」的必然结果，不是 bug；调用方要为此选对深度。
+//   - visitedLimit > 0 时最多访问这么多个目录；**队列未排空**即表示数字是下界。
+func countTree(list func(path string) ([]dirEntry, error), maxDepth, visitedLimit int) (folders, files int, truncated bool) {
+	if maxDepth <= 0 {
+		maxDepth = CaptureLayoutDepth
+	}
+	type queueItem struct {
+		path  string
+		depth int
+	}
+	queue := []queueItem{{path: "", depth: 0}}
+	visited := 0
+
+	for len(queue) > 0 && (visitedLimit <= 0 || visited < visitedLimit) {
+		item := queue[0]
+		queue = queue[1:]
+		visited++
+
+		entries, err := list(item.path)
+		if err != nil {
+			// 单个目录读失败不中断整体统计（部分结果比没有结果有用）。
+			continue
+		}
+		for _, entry := range entries {
+			if !entry.isFolder {
+				files++
+				continue
+			}
+			folders++
+			if item.depth+1 < maxDepth {
+				child := entry.name
+				if item.path != "" {
+					child = item.path + "/" + entry.name
+				}
+				queue = append(queue, queueItem{path: child, depth: item.depth + 1})
+			}
+		}
+	}
+	// 队列里还有待访问目录 → 达到了访问上限，数字是下界。
+	return folders, files, len(queue) > 0
+}
+
 // CountItems 统计本程序根目录下的目录数与文件数（供管理员视图）。
 //
 // 只遍历到 maxDepth 层、且**最多访问 onedriveCountMaxDirs 个目录**
 // ——完整遍历整个 5TB 云盘既慢又会打爆 API 配额，而管理员视图只需要「大概规模」。
+//
+// **调用方必须传 `CaptureLayoutDepth + 1`**：分片文件在**模型目录内部**，
+// 传布局层数本身会让模型目录只被计数、不被展开 → files 恒为 0。
 //
 // [修复防御] 返回 truncated：达到上限就说明数字是**下界**而非总量。
 // 不披露这一点会让管理员把 undercount 当成真实值去做扩缩容决策。
 // 这与 `List` / `Stat` 的既有约定一致（未知用 0/标志表达，不假装是真实值）。
 func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, files int, truncated bool, err error) {
 	if maxDepth <= 0 {
-		maxDepth = 3
-	}
-	// 注意：这里**不再**取 s.cfg.RootPath —— 实际请求路径由 itemPath()
-	// 统一拼 RootPath | 目录层级由 queueItem.path 逐级累积。
-	// （原先的 `if root == "" { root = "" }` 是空操作，已删。）
-
-	type queueItem struct {
-		path  string
-		depth int
+		maxDepth = CaptureLayoutDepth
 	}
 	// [修复防御] 队列起点必须是**空串**，不是 `s.cfg.RootPath`。
 	//
@@ -588,37 +636,12 @@ func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, f
 	// RootPath，实际请求变成 `/{Root}/.../{Root}/...` → Graph 404 →
 	// `fetchEntries` 把 404 当「空目录」→ 本函数**静默返回 0/0/0**，
 	// 而管理端会把这个 0 当权威值显示成「0 个目录 / 0 个文件」。
-	// 目录层级由 queueItem.path 逐级累积，与 RootPath 前缀无关。
-	queue := []queueItem{{path: "", depth: 0}}
-	visited := 0
-
-	for len(queue) > 0 && visited < onedriveCountMaxDirs {
-		item := queue[0]
-		queue = queue[1:]
-		visited++
-
-		entries, err := s.listEntries(ctx, item.path)
-		if err != nil {
-			// 单个目录读失败不中断整体统计（部分结果比没有结果有用）。
-			continue
-		}
-		for _, entry := range entries {
-			if entry.isFolder {
-				folders++
-				if item.depth+1 < maxDepth {
-					child := entry.name
-					if item.path != "" {
-						child = item.path + "/" + entry.name
-					}
-					queue = append(queue, queueItem{path: child, depth: item.depth + 1})
-				}
-			} else {
-				files++
-			}
-		}
-	}
-	// 队列里还有待访问目录 → 达到了访问上限，数字是下界。
-	truncated = len(queue) > 0
+	// 目录层级由队列里的 path 逐级累积，与 RootPath 前缀无关。
+	folders, files, truncated = countTree(func(path string) ([]dirEntry, error) {
+		return s.listEntries(ctx, path)
+	}, maxDepth, onedriveCountMaxDirs)
+	// 单个目录读失败已在 countTree 内部跳过（部分结果比没有结果有用），
+	// 因此这里不产生 error —— 保持既有签名与「尽力统计」语义。
 	return folders, files, truncated, nil
 }
 

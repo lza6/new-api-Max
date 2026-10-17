@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Сортировка по расходу квоты за последние {{days}} дн.",
     "No consumption data in this period": "За этот период нет данных о расходе",
     "Training Data Collection": "Сбор данных для обучения",
+    "Could not load your collection status.": "Не удалось загрузить состояние сбора.",
     "Help improve model quality with your conversations": "Помогите улучшить качество модели своими диалогами",
     "Collection is on": "Сбор включён",
     "Collection is off": "Сбор выключен",

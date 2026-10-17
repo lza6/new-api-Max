@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "直近 {{days}} 日間の消費クォータ順",
     "No consumption data in this period": "この期間の消費データはありません",
     "Training Data Collection": "トレーニングデータ収集",
+    "Could not load your collection status.": "収集ステータスを読み込めませんでした。",
     "Help improve model quality with your conversations": "会話を通じてモデル品質の改善にご協力ください",
     "Collection is on": "収集はオンです",
     "Collection is off": "収集はオフです",

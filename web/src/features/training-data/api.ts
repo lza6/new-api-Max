@@ -85,11 +85,25 @@ export async function deleteTrainingDataFile(
  * ⚠️ 这是**真实调用模型**的接口：会消耗额度（记在发起分析的管理员账上）。
  * 前端必须在按钮上明确提示这一点。
  */
+/**
+ * 对话深度分析 / 继续追问。
+ *
+ * **返回值是上游的原始 chat completion 体，不是本项目的 `{success,data}` 信封。**
+ * 该接口把请求交给 relay 栈处理（渠道选择/计费/日志/重试都由它负责），
+ * relay 直接写下上游响应 —— 所以**没有 `success` 字段**，`choices` 在顶层。
+ *
+ * 这与 Playground 的 `sendChatCompletion` 是同一种形态（那边也是直接读
+ * `choices`，不判 `success`）。曾经这里按信封解包并让调用方判 `res.success`，
+ * 结果是**成功路径必然抛错**（`!undefined === true`）—— 分析、报告、追问
+ * 三条功能在整个链路上都不可用，而单测只覆盖错误路径，从未暴露。
+ *
+ * 因此这里返回原始体，由调用方按 chat completion 的形态读取。
+ */
 export async function analyzeTrainingDataConversation(payload: {
   path: string
   model?: string
   messages?: { role: string; content: string }[]
-}): Promise<ApiEnvelope<AnalysisResponse>> {
+}): Promise<AnalysisResponse> {
   const res = await api.post('/api/admin/training-data/analyze', payload)
   return res.data
 }

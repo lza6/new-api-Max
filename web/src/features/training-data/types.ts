@@ -104,6 +104,16 @@ export interface FilePreviewResponse {
   line_count: number
 }
 
+/**
+ * 对话分析接口的响应。**三种形态共用一个 HTTP 200**，只能按字段区分：
+ *  - 成功：上游原始 chat completion（`choices` 在顶层，**无 `success`**）
+ *    —— 该接口把请求交给 relay 栈，relay 直接写下上游响应。
+ *  - 参数/读取错误：本项目的信封 `{success:false, message}`
+ *  - relay 内部失败（无可用渠道/上游报错）：`{error:{message}}`
+ *
+ * 判据必须写 `success === false`，**不能**写 `!success` ——
+ * 后者在成功时因 `undefined` 判真，会让成功路径必然抛错。
+ */
 export interface AnalysisResponse {
   // 分析走 relay 栈，返回体是标准的 chat completion，
   // 这里不逐字段建模（不同渠道可能有差异），由调用方按需读取。
@@ -111,6 +121,10 @@ export interface AnalysisResponse {
     message?: { role?: string; content?: string }
     delta?: { content?: string }
   }[]
+  // 本项目信封（错误路径）。
+  success?: boolean
+  message?: string
+  // relay 内部失败。
   error?: { message?: string }
 }
 

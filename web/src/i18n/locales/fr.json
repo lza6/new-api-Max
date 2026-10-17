@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Classé par quota consommé sur les {{days}} derniers jours",
     "No consumption data in this period": "Aucune donnée de consommation sur cette période",
     "Training Data Collection": "Collecte des données d'entraînement",
+    "Could not load your collection status.": "Impossible de charger l’état de votre collecte.",
     "Help improve model quality with your conversations": "Améliorez la qualité du modèle grâce à vos conversations",
     "Collection is on": "Collecte activée",
     "Collection is off": "Collecte désactivée",

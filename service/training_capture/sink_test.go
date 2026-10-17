@@ -230,3 +230,127 @@ func TestResplitLeavesCompressibleDataAlone(t *testing.T) {
 	require.Len(t, chunks, 1, "能放下就不该切")
 	assert.Equal(t, body, chunks[0])
 }
+
+// ---------- 目录/文件计数（管理员视图的「N 个目录 / M 个文件」） ----------
+
+// layoutTree 按真实采集布局造一棵树：
+// `<date>/<user-id>/<model>/part-0001.jsonl.gz`，两层日期/两个模型。
+func layoutTree() func(string) ([]dirEntry, error) {
+	tree := map[string][]dirEntry{
+		"": {
+			{name: "2026-10-16", isFolder: true},
+			{name: "2026-10-17", isFolder: true},
+		},
+		"2026-10-16": {
+			{name: "alice-1", isFolder: true},
+		},
+		"2026-10-16/alice-1": {
+			{name: "gpt-4o", isFolder: true},
+		},
+		"2026-10-16/alice-1/gpt-4o": {
+			{name: "part-0001.jsonl.gz"},
+			{name: "part-0002.jsonl.gz"},
+		},
+		"2026-10-17": {
+			{name: "bob-2", isFolder: true},
+		},
+		"2026-10-17/bob-2": {
+			{name: "claude", isFolder: true},
+		},
+		"2026-10-17/bob-2/claude": {
+			{name: "part-0001.jsonl.gz"},
+		},
+	}
+	return func(path string) ([]dirEntry, error) { return tree[path], nil }
+}
+
+// TestCountTreeWithLayoutDepthMissesFiles 锁定**曾经的真实缺陷**：
+// 用布局层数（3）作遍历深度，会把模型目录计入目录数、却从不展开它，
+// 于是文件数恒为 0 —— 管理员看到「N 个文件夹 / 0 个文件」这个
+// 自信但错误的数字（而 truncated=false 让错误更像真的）。
+func TestCountTreeWithLayoutDepthMissesFiles(t *testing.T) {
+	folders, files, truncated := countTree(layoutTree(), CaptureLayoutDepth, 0)
+
+	// 目录数：2 个日期 + 2 个用户 + 2 个模型 = 6（模型目录被计数）。
+	assert.Equal(t, 6, folders, "目录数应含未展开的模型目录")
+	// 这正是缺陷：分片在模型目录**内部**，深度不够就一个也数不到。
+	assert.Equal(t, 0, files, "布局层数作深度时文件数恒为 0（这就是缺陷本身）")
+	assert.False(t, truncated, "队列排空了，可错误值看起来完全『可信』")
+}
+
+// TestCountTreeWithLayoutDepthPlusOneCountsFiles 锁定正确用法：
+// 生产调用方必须传 `CaptureLayoutDepth + 1`。
+func TestCountTreeWithLayoutDepthPlusOneCountsFiles(t *testing.T) {
+	folders, files, truncated := countTree(layoutTree(), CaptureLayoutDepth+1, 0)
+
+	assert.Equal(t, 6, folders)
+	// 3 个分片文件全部数到。
+	assert.Equal(t, 3, files, "展开到模型目录内部才数得到分片")
+	assert.False(t, truncated)
+}
+
+// TestCountTreeDepthBoundaries 穷举深度语义：maxDepth=1 只看根的直接子项，
+// 依此类推。防止将来有人改判断方向（`<` 改 `<=`）造成静默偏移。
+func TestCountTreeDepthBoundaries(t *testing.T) {
+	cases := []struct {
+		maxDepth int
+		folders  int
+		files    int
+	}{
+		// 深度 1：只列根 → 2 个日期目录被计数，均不展开。
+		{maxDepth: 1, folders: 2, files: 0},
+		// 深度 2：列日期 → 2 个用户目录被计数。
+		{maxDepth: 2, folders: 4, files: 0},
+		// 深度 3：列用户 → 2 个模型目录被计数（缺陷所在）。
+		{maxDepth: 3, folders: 6, files: 0},
+		// 深度 4：列模型 → 3 个分片文件被计数。
+		{maxDepth: 4, folders: 6, files: 3},
+		// 深度更大：没有更深层级，数字不变。
+		{maxDepth: 9, folders: 6, files: 3},
+	}
+	for _, tc := range cases {
+		folders, files, truncated := countTree(layoutTree(), tc.maxDepth, 0)
+		assert.Equalf(t, tc.folders, folders, "maxDepth=%d 的目录数", tc.maxDepth)
+		assert.Equalf(t, tc.files, files, "maxDepth=%d 的文件数", tc.maxDepth)
+		assert.Falsef(t, truncated, "maxDepth=%d 不应截断（队列可排空）", tc.maxDepth)
+	}
+}
+
+// TestCountTreeReportsTruncationWhenVisitLimitHit 达到访问上限必须报
+// truncated —— 否则管理员把**下界**当总量做扩容决策。
+func TestCountTreeReportsTruncationWhenVisitLimitHit(t *testing.T) {
+	// 只允许访问 1 个目录（根）→ 队列里还剩 2 个日期目录。
+	folders, files, truncated := countTree(layoutTree(), CaptureLayoutDepth+1, 1)
+
+	assert.True(t, truncated, "队列未排空必须报截断")
+	assert.Equal(t, 2, folders, "只展开了根")
+	assert.Equal(t, 0, files)
+}
+
+// TestCountTreeToleratesUnreadableDirectory 单个目录读失败不得中断整体统计
+// （部分结果比没有结果有用），且不得把它算成截断。
+func TestCountTreeToleratesUnreadableDirectory(t *testing.T) {
+	full := layoutTree()
+	flaky := func(path string) ([]dirEntry, error) {
+		if path == "2026-10-16" {
+			return nil, assert.AnError
+		}
+		return full(path)
+	}
+	folders, files, truncated := countTree(flaky, CaptureLayoutDepth+1, 0)
+
+	// 另一支（2026-10-17）仍应被数到。
+	assert.Equal(t, 1, files, "可读的那一支必须仍被统计")
+	assert.False(t, truncated, "读失败不是截断，两者语义不同")
+	assert.Greater(t, folders, 0)
+}
+
+// TestCountTreeEmptyTreeIsZeroNotTruncated 空云盘（采集尚未开始）是正常状态。
+func TestCountTreeEmptyTreeIsZeroNotTruncated(t *testing.T) {
+	empty := func(string) ([]dirEntry, error) { return nil, nil }
+	folders, files, truncated := countTree(empty, CaptureLayoutDepth+1, 0)
+
+	assert.Equal(t, 0, folders)
+	assert.Equal(t, 0, files)
+	assert.False(t, truncated, "空树不是截断——前端才不会误显示『数字是下界』")
+}

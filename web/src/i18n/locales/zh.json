@@ -105,6 +105,7 @@
     "Ranked by quota consumed in the last {{days}} days": "按最近 {{days}} 天消耗额度排序",
     "No consumption data in this period": "该时间段内暂无消耗数据",
     "Training Data Collection": "训练数据采集",
+    "Could not load your collection status.": "无法读取你的采集授权状态。",
     "Help improve model quality with your conversations": "用你的对话帮助改进模型质量",
     "Collection is on": "采集已开启",
     "Collection is off": "采集已关闭",

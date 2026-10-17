@@ -98,10 +98,26 @@ func TestOneDriveLive(t *testing.T) {
 	})
 
 	t.Run("CountItemsCountsFoldersAndFiles", func(t *testing.T) {
-		folders, files, truncated, err := sink.CountItems(ctx, 3)
+		// 深度用「布局层数 + 1」——与生产调用处同源。
+		//
+		// [修复防御] 原先这里传 3，等于只展开到**模型目录**，
+		// 而分片文件在模型目录**内部**，于是 files 恒为 0。
+		// 而本用例当时**只断言了 folders >= 1**，从不断言 files ——
+		// 生产上「N 个文件夹 / 0 个文件」这个错误数字就这么活了下来。
+		folders, files, truncated, err := sink.CountItems(ctx, CaptureLayoutDepth+1)
 		require.NoError(t, err)
 		t.Logf("根目录统计：%d 个目录 / %d 个文件 truncated=%v", folders, files, truncated)
 		assert.GreaterOrEqual(t, folders, 1, "至少应有本次创建的日期目录")
+
+		// 本用例前面已经往里写过分片（见同级用例的 WritePart），
+		// 因此文件数必须 > 0 —— 这条断言就是当初缺的那一条。
+		//
+		// 注意：探针目录可能因历史运行残留而含文件，故只断言
+		// 「不是恒为 0」这一性质，不绑定具体条数。
+		if files == 0 {
+			t.Errorf("文件数为 0 —— 说明遍历深度不足以展开模型目录，" +
+				"或分片未真正落盘。生产上这会显示成「N 个文件夹 / 0 个文件」")
+		}
 	})
 
 	_ = os.Getenv

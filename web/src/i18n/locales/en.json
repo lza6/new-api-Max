@@ -105,6 +105,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Ranked by quota consumed in the last {{days}} days",
     "No consumption data in this period": "No consumption data in this period",
     "Training Data Collection": "Training Data Collection",
+    "Could not load your collection status.": "Could not load your collection status.",
     "Help improve model quality with your conversations": "Help improve model quality with your conversations",
     "Collection is on": "Collection is on",
     "Collection is off": "Collection is off",

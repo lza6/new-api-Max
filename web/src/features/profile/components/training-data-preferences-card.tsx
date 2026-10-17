@@ -24,6 +24,8 @@ import { toast } from 'sonner'
 
 import { ConfirmDialog } from '@/components/confirm-dialog'
 import { RiskAcknowledgementDialog } from '@/components/risk-acknowledgement-dialog'
+import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { TitledCard } from '@/components/ui/titled-card'
 import { handleServerError } from '@/lib/handle-server-error'
@@ -113,13 +115,68 @@ export function TrainingDataPreferencesCard() {
 
   const status = statusQuery.data
 
-  // 不可用（功能未开或云盘未配置）→ 整张卡片不出现。
+  // 加载中：给一个骨架，而不是整块不渲染。
+  //
+  // 直接 return null 会让卡片「凭空弹出」，用户会以为页面在抖 ——
+  // 而且和下面「不可用」的结束态长得一模一样，分不清是还没加载还是真没有。
+  if (statusQuery.isLoading) {
+    return (
+      <TitledCard
+        title={t('Training Data Collection')}
+        description={t('Help improve model quality with your conversations')}
+        icon={<ShieldCheck className='h-4 w-4' />}
+        iconTone='chart-2'
+        disableHoverEffect
+      >
+        <div className='space-y-3'>
+          <Skeleton className='h-5 w-40' />
+          <Skeleton className='h-3 w-full' />
+          <Skeleton className='h-3 w-3/4' />
+        </div>
+      </TitledCard>
+    )
+  }
+
+  // 读取失败：**必须说出来**，不能静默消失。
+  //
+  // 这是「静默失败」的典型场景：请求出错 → data 为 undefined → 卡片不渲染 →
+  // 用户以为「这个功能本来就没有」，永远不知道是自己这边网络/服务出了问题。
+  // 与「管理员关闭」（真不可用）在界面上必须区分，否则排障时无从下手。
+  if (statusQuery.isError) {
+    return (
+      <TitledCard
+        title={t('Training Data Collection')}
+        description={t('Help improve model quality with your conversations')}
+        icon={<ShieldCheck className='h-4 w-4' />}
+        iconTone='chart-2'
+        disableHoverEffect
+      >
+        <div className='space-y-3'>
+          <p className='text-muted-foreground text-sm'>
+            {t('Could not load your collection status.')}
+          </p>
+          <Button
+            type='button'
+            variant='outline'
+            size='sm'
+            disabled={statusQuery.isFetching}
+            onClick={() => statusQuery.refetch()}
+          >
+            {t('Retry')}
+          </Button>
+        </div>
+      </TitledCard>
+    )
+  }
+
+  // 真正不可用（管理员关闭总开关 / 云盘未配置）→ 整张卡片不出现。
+  // 用户明确要求过：管理员关了就**不该**让用户看到一个点了没用的开关。
   if (!status?.available) {
     return null
   }
 
-  const busy =
-    statusQuery.isLoading || grantMutation.isPending || revokeMutation.isPending
+  // 到这里已经过了 loading 早返回，故不必再判 isLoading。
+  const busy = grantMutation.isPending || revokeMutation.isPending
   const granted = status.granted
 
   const handleCheckedChange = (next: boolean) => {

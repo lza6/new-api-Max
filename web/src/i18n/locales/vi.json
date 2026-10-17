@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Xếp theo hạn ngạch tiêu thụ trong {{days}} ngày gần nhất",
     "No consumption data in this period": "Không có dữ liệu tiêu thụ trong khoảng thời gian này",
     "Training Data Collection": "Thu thập dữ liệu huấn luyện",
+    "Could not load your collection status.": "Không tải được trạng thái thu thập của bạn.",
     "Help improve model quality with your conversations": "Giúp cải thiện chất lượng mô hình bằng các cuộc trò chuyện của bạn",
     "Collection is on": "Đang bật thu thập",
     "Collection is off": "Đang tắt thu thập",

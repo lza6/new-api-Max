@@ -175,7 +175,12 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 	if counter, ok := sink.(interface {
 		CountItems(ctx context.Context, maxDepth int) (int, int, bool, error)
 	}); ok {
-		folders, files, truncated, err := counter.CountItems(ctx, 3)
+		// 深度必须是「布局层数 + 1」：分片文件在**模型目录内部**，
+		// 而 CountItems 只在「访问到的目录里」数文件。用布局层数（3）会让
+		// 模型目录只被计入 folders、永不被展开 → files 恒为 0。
+		// 见 `training_capture.CaptureLayoutDepth` 的说明。
+		folders, files, truncated, err := counter.CountItems(
+			ctx, training_capture.CaptureLayoutDepth+1)
 		if err != nil {
 			out.LastError = err.Error()
 			return out
