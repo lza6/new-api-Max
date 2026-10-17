@@ -141,3 +141,38 @@
 
 ### 仍未闭环（延续）
 浏览器真实 E2E（无浏览器工具）、多实例协调、Claude 计费两处（待拍板）、p95 压测（需真实上游）。
+
+## 2026-10-18 第七轮：独立审查线程闭环（含推翻我自己的验证声明）
+
+### 流程
+按用户要求启动**独立只读审查线程**（六维度）复核本批 9 个提交 → 产出 3 阻塞 + 7 建议 →
+主线程逐条复现、修复、RED 验证 → 提交 → **请审查线程复验**（进行中）。
+
+### 审查发现并已修
+
+| 级别 | 问题 | 关键点 |
+|---|---|---|
+| **P0** | `/by-date` 默认路径返回 **HTTP 200 空 body** | 分支 `return` 前漏 `common.ApiSuccess`；前端「每日历史」卡从不传 date → 100% 报错。既有测试只覆盖非法/历史日期，恰好绕开 |
+| **P0** | worker 启停**数据竞争 + 僵尸 worker** | `runWorker` 无同步读包级 `workerStop`；Stop 关 C1 后 Start 换 C2，旧 goroutine 读到未关闭的 C2 → 永不退出 → 双消费者并发写同一会话水位 |
+| P1 | 分析**默认操作仍失败** | UI 标 `Model (optional)`，relay 对空 model 400 |
+| P1 | 分析**静默丢分片** | 读/解压失败、列举截断、超上限都不计数 → 报告看似完整 |
+| P1 | 导出声明 v2 但两条路径**不写 kind** | 新增 `kind=message`（既不能标 full 也不能标 suffix） |
+| P1 | `countTree` 把读失败**伪装成完整** | 并入 truncated |
+| P1 | `CountItems(maxDepth<=0)` 默认值仍是**错答案** | 改为 `CaptureLayoutDepth+1` |
+| P2 | 云盘持续故障时**重试风暴** | 15s 负缓存：压住重试且恢复后 15s 内可见 |
+| P2 | 缓存类型断言失败 `return zero, nil` | 改返回显式错误 |
+
+### ⚠️ 推翻我自己的一条声明
+上一批我写「`-race` 同范围 PASS」——实际用的是**窄 `-run` 过滤**，绕开了
+`TestWorkerCanRestartAfterStop`；整包 `-race` 当时是 **FAIL**。
+已写入 `计划书/audit-ledger.md` 与跨会话记忆，作为「验证范围必须与结论范围一致」的教训。
+
+### 验证
+- `go test ./service/training_capture/ -race -count=1` **整包 PASS**（111s，修前 FAIL）
+- `go test ./router/ -run TrainingData` 4/4 PASS（含扫描前端 `/api/` 字面量的契约测试）
+- `go test ./controller/` 相关用例 PASS；`go build ./...` / `go vet` / `gofmt -l` 干净
+- `bun run typecheck` / `i18n:check` 通过；`oxlint` 仅剩**既有** warning（非本批文件）
+
+### 仍未闭环
+浏览器真实 E2E（无浏览器工具）、多实例协调、Claude 计费两处（待拍板）、
+p95 压测（需真实上游）、累计充值金额（缺三库环境）。
