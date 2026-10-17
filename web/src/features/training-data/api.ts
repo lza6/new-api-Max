@@ -28,6 +28,7 @@ import type {
   ExportDetailResponse,
   TrainingDataExport,
   ExportLinkResponse,
+  TrainingDataByDateResponse,
 } from './types'
 
 // 训练数据采集管理端 API（Spec-008）。
@@ -40,6 +41,22 @@ export async function getTrainingDataOverview(): Promise<
   ApiEnvelope<CaptureOverview>
 > {
   const res = await api.get('/api/admin/training-data/overview')
+  return res.data
+}
+
+/**
+ * 按日期查询采集量。
+ *
+ * 不传 `date` → 返回**全部日期**的云盘聚合（管理员看「哪几天采了多少」）。
+ * 传 `date` → 只返回那一天（无数据时 `days` 为空数组，不是错误）。
+ *
+ * 历史日期下 `stats` 为 null（进程内计数只有今天），但 `days` 仍给出真实数据。
+ */
+export async function getTrainingDataByDate(
+  date?: string
+): Promise<ApiEnvelope<TrainingDataByDateResponse>> {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : ''
+  const res = await api.get(`/api/admin/training-data/by-date${qs}`)
   return res.data
 }
 

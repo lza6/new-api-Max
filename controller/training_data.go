@@ -192,15 +192,23 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 
 // GetTrainingDataByDate 按日期查询采集量。
 //
-// GET /api/training-data/admin/by-date?date=YYYY-MM-DD
+// GET /api/admin/training-data/by-date?date=YYYY-MM-DD
 //
-// 注意：当前实现只返回**当日的进程内计数**（可精确到日），
-// 历史日期无法回溯 —— 进程重启后进程内计数归零。
-// 这一点在前端必须明示，否则管理员会以为「昨天没采到数据」。
+// ## 口径（两条来源，必须让调用方能区分）
+//
+//  1. **当日进程内计数**（`stats`）：精确到「本次进程启动以来」的用户/对话/消息数，
+//     但**重启即归零**——只有今天、且只覆盖本次启动之后。
+//  2. **云盘目录树聚合**（`days`）：由一级目录（日期）聚合出的「每天多少用户/模型/分片/字节」，
+//     是**持久且真实**的落盘记录，可回溯任意历史日期。
+//
+// 为什么不只留一个：两者回答的是不同问题 ——
+// 「今天采了多少」（实时性，进程内更全）与「哪几天采了多少」（持久性，云盘才准）。
+// 只给进程内计数会漏历史；只给云盘聚合会把「已上传」当成「已采集」
+// （上传失败的增量不会出现在云盘里）。因此两个都给，并在字段名与文档里说清。
 func GetTrainingDataByDate(c *gin.Context) {
 	date := strings.TrimSpace(c.Query("date"))
 	if date != "" {
-		if _, err := time.Parse("2006-01-02", date); err != nil {
+		if !training_capture.IsCanonicalDate(date) {
 			common.ApiErrorMsg(c, "invalid date, expected YYYY-MM-DD")
 			return
 		}
@@ -208,23 +216,55 @@ func GetTrainingDataByDate(c *gin.Context) {
 
 	stats := training_capture.GetCaptureStats()
 	today := stats.Day
-	// 请求的日期不是今天 → 明确说明无法提供（而不是返回今天的数字冒充）。
-	if date != "" && date != today {
-		common.ApiSuccess(c, gin.H{
-			"date":   date,
-			"today":  today,
-			"known":  false,
-			"reason": "only the current day's counters are kept in memory; historical daily totals are not persisted",
-			"stats":  nil,
-		})
+	out := gin.H{
+		"today": today,
+		"stats": nil,
+		"days":  []training_capture.DailyCaptureStat{},
+	}
+
+	// 云盘目录树聚合（管理员要的「几月几日采了多少」）。
+	if reader, err := trainingDataReader(); err == nil {
+		if lister, ok := reader.(interface {
+			ListTreeWithTruncation(ctx context.Context, root string, maxEntries int) ([]training_capture.TreeEntry, bool, error)
+		}); ok {
+			entries, truncated, lerr := lister.ListTreeWithTruncation(
+				c.Request.Context(), "", training_capture.ExportListTreeMaxEntries)
+			if lerr != nil {
+				// 云盘读不到不该让「今日计数」一起失败 —— 如实标注即可。
+				out["daily_error"] = lerr.Error()
+			} else {
+				days := training_capture.AggregateDailyStats(entries)
+				// 列举被截断 → 聚合出来的数字是**下界**，必须披露
+				// （否则管理员会拿偏小的数当真实规模）。
+				out["daily_truncated"] = truncated
+				if date != "" {
+					// 指定日期：只返回那一天（没数据时返回空数组而非错误 ——
+					// 「那天没采」是正常结果，不是故障）。
+					filtered := make([]training_capture.DailyCaptureStat, 0, 1)
+					for _, d := range days {
+						if d.Date == date {
+							filtered = append(filtered, d)
+						}
+					}
+					out["days"] = filtered
+					out["date"] = date
+				} else {
+					out["days"] = days
+				}
+			}
+		}
+	}
+
+	if date == "" || date == today {
+		// 请求的日期是今天（或未指定）→ 附上进程内计数。
+		out["stats"] = stats
+		out["known"] = true
 		return
 	}
-	common.ApiSuccess(c, gin.H{
-		"date":  today,
-		"today": today,
-		"known": true,
-		"stats": stats,
-	})
+	// 历史日期：进程内计数不可得（重启归零），但云盘的 `days` 已给出真实数据。
+	out["known"] = false
+	out["reason"] = "in-memory counters only cover the current day; the `days` field is aggregated from the cloud drive and is authoritative for historical dates"
+	common.ApiSuccess(c, out)
 }
 
 // SetTrainingDataEnabled 管理端切换总开关。

@@ -32,24 +32,9 @@ import { handleServerError } from '@/lib/handle-server-error'
 
 import { getTrainingDataOverview, setTrainingDataEnabled } from '../api'
 import type { CaptureStats, GatewayStatus, SinkOverview } from '../types'
+import { formatBytes } from '../lib/format'
+import { DailyHistoryCard } from './daily-history-card'
 import { useState } from 'react'
-
-/** 字节 → 人类可读（B/KB/MB/GB/TB）。 */
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return '0 B'
-  }
-  const units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit += 1
-  }
-  // 小数值保留两位；整数不显示小数点，避免「5.00 TB」这种噪声。
-  const rounded = value >= 100 ? Math.round(value) : Math.round(value * 100) / 100
-  return `${rounded} ${units[unit]}`
-}
 
 function StatCard(props: { label: string; value: string; hint?: string }) {
   return (
@@ -300,6 +285,9 @@ export function CaptureOverviewPanel() {
         <StatsCard stats={stats} />
         <SinkCard sink={sink} />
       </div>
+
+      {/* 「几月几日采了多少」——取自云盘目录树，可回溯历史（用户明确要求）。 */}
+      <DailyHistoryCard />
 
       <ConfirmDialog
         open={disableConfirmOpen}

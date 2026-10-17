@@ -126,6 +126,16 @@ type ExportSelection struct {
 // parse 后 round-trip 必须相等：既排除了非日期字符串，也排除了
 // `2026-10-1`（parse 成功但 Format 回 `2026-10-01` 不等）、`2026-1-01` 等。
 func isCanonicalDate(s string) bool {
+	return IsCanonicalDate(s)
+}
+
+// IsCanonicalDate 判断字符串是否为**规范化**的 `YYYY-MM-DD` 日期。
+//
+// 导出的理由：日期是本模块的**目录名格式**（`DateDirName` 恒产出补零形式），
+// 而调用方（HTTP 层）也要校验用户传来的日期。若各写各的，
+// 两处对「`2026-10-1` 算不算合法」的答案可能不一致 ——
+// 那会让「导出的范围」与「校验通过的范围」悄悄错开。
+func IsCanonicalDate(s string) bool {
 	t, err := time.Parse("2006-01-02", s)
 	if err != nil {
 		return false
@@ -431,4 +441,87 @@ func exportFormatNotes() []string {
 		"Assistant replies are captured from the response stream and are truncated at 256KB per response.",
 		"Consumers MUST check the `format` field before parsing; unknown values should be rejected rather than guessed.",
 	}
+}
+
+// DailyCaptureStat 某一天的采集规模（由云盘目录树聚合）。
+type DailyCaptureStat struct {
+	// Date 规范化日期 `YYYY-MM-DD`（与目录名一致）。
+	Date string `json:"date"`
+	// Users 该日期下有采集数据的用户数（二级目录数）。
+	Users int `json:"users"`
+	// Models 该日期下的「用户-模型」组合数（三级目录数之和）。
+	Models int `json:"models"`
+	// Parts 分片文件数。
+	Parts int `json:"parts"`
+	// Bytes 分片文件总字节数（**压缩后**，即云盘实际占用）。
+	Bytes int64 `json:"bytes"`
+}
+
+// AggregateDailyStats 按日期聚合云盘目录树，得到「每天采了多少」。
+//
+// ## 为什么从云盘目录树算，而不是查库或读进程内计数
+//
+// 用户要的是「几月几日采集了多少」。进程内计数**重启即归零**，只反映今天；
+// 而云盘目录树本身就是按日期分层的（一级目录就是日期），
+// 是**唯一持久且真实**的记录 —— 它反映的是「确实落盘了什么」，
+// 而不是「我们以为采了多少」。这也让管理员能把数字与云盘实际内容交叉核对。
+//
+// 口径：只统计符合本程序布局 `<日期>/<用户-ID>/<模型>/<分片>` 的**分片文件**；
+// 非本程序布局的目录/文件一律忽略（同 `SelectExportParts` 的判据）。
+//
+// 返回按日期升序，便于前端直接展示趋势。
+func AggregateDailyStats(entries []TreeEntry) []DailyCaptureStat {
+	type acc struct {
+		users map[string]bool
+		// models 记 `<用户>/<模型>` 组合，避免两个用户同名模型被算成 1。
+		models map[string]bool
+		parts  int
+		bytes  int64
+	}
+	byDate := map[string]*acc{}
+
+	for _, e := range entries {
+		if e.IsDir {
+			continue
+		}
+		if !strings.HasSuffix(e.Path, exportPartExt) && !strings.HasSuffix(e.Path, ".jsonl") {
+			continue
+		}
+		segments := strings.Split(strings.Trim(e.Path, "/"), "/")
+		if len(segments) < 4 {
+			// 期望 `<日期>/<用户>/<模型>/<文件>`；不满足的不是本程序布局。
+			continue
+		}
+		date := segments[0]
+		// 必须规范化（补零）：目录树里的历史/手工目录可能写成 `2026-10-1`，
+		// 直接当日期会与 `2026-10-01` 分成两天。
+		if !isCanonicalDate(date) {
+			continue
+		}
+		user := segments[1]
+		model := segments[2]
+		a := byDate[date]
+		if a == nil {
+			a = &acc{users: map[string]bool{}, models: map[string]bool{}}
+			byDate[date] = a
+		}
+		a.users[user] = true
+		a.models[user+"/"+model] = true
+		a.parts++
+		a.bytes += e.SizeBytes
+	}
+
+	out := make([]DailyCaptureStat, 0, len(byDate))
+	for date, a := range byDate {
+		out = append(out, DailyCaptureStat{
+			Date:   date,
+			Users:  len(a.users),
+			Models: len(a.models),
+			Parts:  a.parts,
+			Bytes:  a.bytes,
+		})
+	}
+	// 日期字符串是补零的 `YYYY-MM-DD`，字典序 == 时间序。
+	sort.Slice(out, func(i, j int) bool { return out[i].Date < out[j].Date })
+	return out
 }

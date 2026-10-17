@@ -78,6 +78,46 @@ export interface CaptureOverview {
   sink: SinkOverview
 }
 
+/**
+ * 某一天的采集规模（由云盘目录树聚合，对应 `DailyCaptureStat`）。
+ *
+ * 与 `CaptureStats` 的区别（两者回答不同问题，不要混用）：
+ *  - `CaptureStats`：**进程内**计数，实时且含未上传成功的量，但重启归零、只有今天。
+ *  - `DailyCaptureStat`：**云盘落盘**聚合，可回溯任意历史日期，但只反映「已上传成功」的量。
+ */
+export interface DailyCaptureStat {
+  /** 规范化日期 YYYY-MM-DD（与一级目录名一致）。 */
+  date: string
+  /** 该日期下有采集数据的用户数。 */
+  users: number
+  /** 该日期下的「用户-模型」组合数。 */
+  models: number
+  /** 分片文件数。 */
+  parts: number
+  /** 分片总字节数（**压缩后**，即云盘实际占用）。 */
+  bytes: number
+}
+
+/** 按日期查询采集量的响应。 */
+export interface TrainingDataByDateResponse {
+  /** 进程内计数所属日期（UTC）。 */
+  today: string
+  /** 进程内计数；仅当查询的是今天时有值，历史日期为 null。 */
+  stats: CaptureStats | null
+  /** 云盘聚合出的每日数据（查询历史日期时为那一天，可能为空数组）。 */
+  days: DailyCaptureStat[]
+  /** 请求的日期（未指定时不返回）。 */
+  date?: string
+  /** 进程内计数是否可用（历史日期为 false）。 */
+  known?: boolean
+  /** `known=false` 时的原因说明。 */
+  reason?: string
+  /** 云盘列举被截断时 true —— 此时 `days` 是**下界**。 */
+  daily_truncated?: boolean
+  /** 云盘读取失败时的错误（不影响 `stats`）。 */
+  daily_error?: string
+}
+
 /** 云盘文件项。 */
 export interface TrainingDataFileEntry {
   path: string

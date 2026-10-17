@@ -409,3 +409,96 @@ func TestExportManifestNotesDiscloseLimitations(t *testing.T) {
 		}
 	}
 }
+
+// ---------- 每日采集量聚合（管理员视图的「几月几日采了多少」） ----------
+
+func entry(path string, size int64) TreeEntry { return TreeEntry{Path: path, SizeBytes: size} }
+
+// TestAggregateDailyStatsGroupsByDateAndLayout 锁定核心口径：
+// 按一级目录（日期）聚合用户数/模型数/分片数/字节。
+func TestAggregateDailyStatsGroupsByDateAndLayout(t *testing.T) {
+	entries := []TreeEntry{
+		entry("2026-10-16/alice-1/gpt-4o/part-0001.jsonl.gz", 100),
+		entry("2026-10-16/alice-1/gpt-4o/part-0002.jsonl.gz", 200),
+		entry("2026-10-16/alice-1/claude/part-0001.jsonl.gz", 50),
+		entry("2026-10-16/bob-2/gpt-4o/part-0001.jsonl.gz", 400),
+		entry("2026-10-17/alice-1/gpt-4o/part-0001.jsonl.gz", 7),
+		// 目录项不计入
+		{Path: "2026-10-16", IsDir: true},
+		{Path: "2026-10-16/alice-1", IsDir: true},
+	}
+
+	got := AggregateDailyStats(entries)
+
+	require.Len(t, got, 2, "应聚出两天：%+v", got)
+	// 升序（日期补零 → 字典序即时间序）
+	require.Equal(t, "2026-10-16", got[0].Date)
+	require.Equal(t, "2026-10-17", got[1].Date)
+
+	d16 := got[0]
+	assert.Equal(t, 2, d16.Users, "10-16 有 alice-1 与 bob-2 两个用户")
+	assert.Equal(t, 3, d16.Models, "alice-1 的两个模型 + bob-2 的一个模型")
+	assert.Equal(t, 4, d16.Parts)
+	assert.Equal(t, int64(750), d16.Bytes, "100+200+50+400")
+
+	d17 := got[1]
+	assert.Equal(t, 1, d17.Users)
+	assert.Equal(t, 1, d17.Models)
+	assert.Equal(t, 1, d17.Parts)
+	assert.Equal(t, int64(7), d17.Bytes)
+}
+
+// TestAggregateDailyStatsModelsAreScopedPerUser 两个用户下的**同名模型**
+// 必须算成两个组合 —— 否则「模型数」会偏小。
+func TestAggregateDailyStatsModelsAreScopedPerUser(t *testing.T) {
+	entries := []TreeEntry{
+		entry("2026-10-16/alice-1/gpt-4o/part-0001.jsonl.gz", 1),
+		entry("2026-10-16/bob-2/gpt-4o/part-0001.jsonl.gz", 1),
+	}
+	got := AggregateDailyStats(entries)
+
+	require.Len(t, got, 1)
+	assert.Equal(t, 2, got[0].Users)
+	assert.Equal(t, 2, got[0].Models, "同名模型在不同用户下是两个组合")
+}
+
+// TestAggregateDailyStatsIgnoresForeignLayout 非本程序布局的内容一律忽略，
+// 不得污染统计（云盘根目录可能混有其它文件）。
+func TestAggregateDailyStatsIgnoresForeignLayout(t *testing.T) {
+	entries := []TreeEntry{
+		entry("2026-10-16/alice-1/gpt-4o/part-0001.jsonl.gz", 100),
+		// 层级不足
+		entry("2026-10-16/readme.txt", 999),
+		entry("notes.md", 999),
+		// 非片段后缀
+		entry("2026-10-16/alice-1/gpt-4o/notes.txt", 999),
+		// 非规范化日期目录（手工产物）
+		entry("2026-10-1/alice-1/gpt-4o/part-0001.jsonl.gz", 999),
+		// 非日期的一级目录
+		entry("misc/alice-1/gpt-4o/part-0001.jsonl.gz", 999),
+	}
+
+	got := AggregateDailyStats(entries)
+
+	require.Len(t, got, 1, "只有规范化日期 + 正确层级 + 片段后缀的那条：%+v", got)
+	assert.Equal(t, "2026-10-16", got[0].Date)
+	assert.Equal(t, 1, got[0].Parts)
+	assert.Equal(t, int64(100), got[0].Bytes, "外部文件不得计入字节")
+}
+
+// TestAggregateDailyStatsHandlesPlainJSONLParts 兼容历史明文分片（`.jsonl`）。
+func TestAggregateDailyStatsHandlesPlainJSONLParts(t *testing.T) {
+	entries := []TreeEntry{
+		entry("2026-10-16/alice-1/gpt-4o/part-0001.jsonl", 42),
+	}
+	got := AggregateDailyStats(entries)
+	require.Len(t, got, 1)
+	assert.Equal(t, 1, got[0].Parts)
+	assert.Equal(t, int64(42), got[0].Bytes)
+}
+
+// TestAggregateDailyStatsEmptyInput 空云盘返回空切片（不是 nil panic、不是 1 条空记录）。
+func TestAggregateDailyStatsEmptyInput(t *testing.T) {
+	assert.Empty(t, AggregateDailyStats(nil))
+	assert.Empty(t, AggregateDailyStats([]TreeEntry{}))
+}

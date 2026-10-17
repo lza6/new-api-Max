@@ -36,24 +36,11 @@ import {
   listTrainingDataFiles,
   previewTrainingDataFile,
 } from '../api'
+import { formatBytes } from '../lib/format'
 import type {
   FilePreviewResponse,
   TrainingDataFileEntry,
 } from '../types'
-
-function formatBytes(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes <= 0) {
-    return '0 B'
-  }
-  const units = ['B', 'KB', 'MB', 'GB', 'TB']
-  let value = bytes
-  let unit = 0
-  while (value >= 1024 && unit < units.length - 1) {
-    value /= 1024
-    unit += 1
-  }
-  return `${value >= 100 ? Math.round(value) : Math.round(value * 100) / 100} ${units[unit]}`
-}
 
 /** 路径 → 面包屑片段（供下钻与返回上级）。 */
 function pathSegments(path: string): string[] {
