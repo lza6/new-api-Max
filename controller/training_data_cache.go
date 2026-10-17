@@ -17,6 +17,13 @@ import (
 var errSinkCannotReportTruncation = errors.New(
 	"the configured sink cannot report listing truncation, so daily totals may be incomplete")
 
+// errCacheTypeMismatch 缓存的 singleflight 返回值类型与期望不符。
+//
+// 正常情况下不可能发生（T 是编译期确定的类型）。定义成显式错误而不是
+// 返回零值，是为了**不把异常变成「看起来正常的空数据」**。
+var errCacheTypeMismatch = errors.New(
+	"training data cache: unexpected value type from cache loader")
+
 // 管理端云盘查询的**进程内缓存 + 请求合并**。
 //
 // ## 为什么必须缓存（这不是优化，是保护）
@@ -120,10 +127,15 @@ func (c *timedCache[T]) get(load func() (T, error)) (T, error) {
 		return zero, err
 	}
 	// singleflight 的返回值是 any，这里做一次受控断言。
+	//
+	// **断言失败必须报错，不能返回零值 + nil error**：那会让调用方把
+	// 「0 个文件 / 空日期列表」当成真实数据展示给管理员 ——
+	// 这正是本项目反复在修的「自信但错误的数字」。
+	// （正常情况下 T 是具体结构体，断言不会失败；这里只为不静默。）
 	v, asserted := res.(T)
 	if !asserted {
 		var zero T
-		return zero, nil
+		return zero, errCacheTypeMismatch
 	}
 	return v, nil
 }
