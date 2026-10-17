@@ -515,8 +515,9 @@ func mcpImageApprovalResource(args map[string]any) string {
 	sum := sha256.Sum256(raw)
 	model, _ := args["model"].(string)
 	size, _ := args["size"].(string)
-	resource := fmt.Sprintf("create_image:model=%s:n=%v:size=%s:sha256=%s",
-		model, args["n"], size, hex.EncodeToString(sum[:6]))
+	// 哈希放在最前：即使 resource 被 191 字节截断，参数绑定也不会丢失。
+	resource := fmt.Sprintf("create_image:sha256=%s:model=%s:n=%v:size=%s",
+		hex.EncodeToString(sum[:6]), model, args["n"], size)
 	if len(resource) > 191 {
 		resource = resource[:191]
 	}

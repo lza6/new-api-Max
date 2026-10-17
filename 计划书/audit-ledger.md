@@ -172,3 +172,9 @@ node e2e-local/v1388-a11y-responsive.cjs                                  # 7/7 
 - `Limit(n).Update/Delete` 在 PostgreSQL 的行为未跑三库验证。
 - 无前缀 URL 在 `Accept-Language: en` 下仍输出英文内容 + 无前缀 canonical（SEO 口径取舍，已记录）。
 - 审批管理接口仍只展示 action/resource；resource 已含 model/n/size/参数哈希，但无独立 payload 预览 UI。
+
+### 复验后追加硬化（v1.3.149）
+- 审批 resource 哈希前置，避免 191 字节截断丢失参数绑定。
+- ops 列表响应 JSON 解析失败时 fail-closed（返回空 data），不再原样透传。
+- list/create 响应超过 8MB 时明确 502，不返回被截断的 JSON。
+- 三位独立审查员复验结论：Go **Approve**、前端 **Approve**、安全 **Approve**。

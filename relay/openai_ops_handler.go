@@ -179,9 +179,16 @@ func OpenAIOpsHandler(c *gin.Context, info *relaycommon.RelayInfo) *relaykittype
 	var copyErr error
 	needBuffer := ref.Action == "list" || ref.Action == "create"
 	if needBuffer {
-		buffered, readErr := io.ReadAll(io.LimitReader(resp.Body, openAIOpsMaxBufferBytes))
+		buffered, readErr := io.ReadAll(io.LimitReader(resp.Body, openAIOpsMaxBufferBytes+1))
 		if readErr != nil {
 			return relaykittypes.NewError(readErr, relaykittypes.ErrorCode("openai_ops_response_read_failed"), relaykittypes.ErrOptionWithSkipRetry())
+		}
+		if len(buffered) > openAIOpsMaxBufferBytes {
+			// 超限时不能返回被截断的 JSON（create 会漏登记 id、list 会损坏）。
+			return relaykittypes.NewErrorWithStatusCode(
+				fmt.Errorf("upstream response exceeds %d bytes", openAIOpsMaxBufferBytes),
+				relaykittypes.ErrorCode("openai_ops_response_too_large"),
+				http.StatusBadGateway, relaykittypes.ErrOptionWithSkipRetry())
 		}
 		if ref.Action == "list" {
 			buffered = filterOwnedOpsList(buffered, info.UserId, ref.Kind)
@@ -304,11 +311,12 @@ func parseOpenAIOpsObjectRef(path, method string) openAIOpsObjectRef {
 func filterOwnedOpsList(body []byte, userId int, kind string) []byte {
 	var m map[string]any
 	if common.Unmarshal(body, &m) != nil {
-		return body
+		// fail-closed：无法解析就不返回上游原始列表，避免泄漏其他用户对象。
+		return []byte(`{"object":"list","data":[]}`)
 	}
 	data, ok := m["data"].([]any)
 	if !ok {
-		return body
+		return []byte(`{"object":"list","data":[]}`)
 	}
 	owned, err := model.OpenAIOpsObjectIDs(userId, kind)
 	if err != nil {
