@@ -1,13 +1,13 @@
 {
-  "task_id": "E2E-FULL-20261017",
+  "task_id": "E2E-FULL-20261018",
   "status": "pass",
-  "timestamp": "2026-10-17T16:43:33.113Z",
-  "environment": "local SQLite + mock upstream (127.0.0.1:18080) + Go server 18131",
+  "timestamp": "2026-10-17T18:44:54.498Z",
+  "environment": "local SQLite + mock upstream + Go server 18131 (final v1.3.149 code)",
   "commands_executed": [
     {
       "cmd": "node web/e2e-local/v13148-full-e2e.cjs",
       "exit_code": 0,
-      "raw_output_tail": "[{\"name\":\"管理员登录\",\"ok\":true,\"detail\":\"http://127.0.0.1:18131/dashboard\"},{\"name\":\"创建 Key 后展示 curl\",\"ok\":true,\"detail\":\"curl http://127.0.0.1:18131/v1/chat/completions \\\\\\n  -H \\\"Authorization: Bearer sk-REDACTED\"},{\"name\":\"MCP 付费工具默认拒绝并生成审批\",\"ok\":true,\"detail\":\"{\\\"status\\\":200,\\\"sid\\\":\\\"e021fa0b9f3c50ba3fe1192da84aeacf0b1b43007bdac47f\\\",\\\"body\\\":{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":2,\\\"error\\\":{\\\"code\\\":-32003,\\\"message\\\":\\\"administrator approval required\\\",\\\"data\\\":{\\\"approval_id\\\":10,\\\"reason\\\":\\\"approval_required\\\",\\\"resource\\\":\\\"create_image:model=dall-e:n=<nil>:size=:sha256=0c2cc21819a1\\\"}}}}\"},{\"name\":\"动作审批页可用且可批准\",\"ok\":true,\"detail\":\"跳到主内容\\nToggle Sidebar\\nnew-api-Max\\n主页\\n控制台\\n模型广场\\n排行榜\\n文档\\n关于\\n搜索\\n⌘\\nK\\n更改语言\\nR\\n聊天\\n游乐场\\n常规\\n概览\\n数据看板\\nAPI 密钥\\n使用日志\\n审计日志\\n任务日志\\n个人\\n钱包\\n个人资料\\n安全与访问\\n管理员\\n渠道\\n模型\\n用户\\n兑换码\\n订阅\\n系统信息\\n任务插件\\nWeb \"},{\"name\":\"/en/pricing 语言与 canonical\",\"ok\":true,\"detail\":\"lang=en canonical=http://localhost:3000/en/pricing\"},{\"name\":\"/en/pricing hreflang\",\"ok\":true,\"detail\":\"count=3\"},{\"name\":\"无致命 console 错误\",\"ok\":true,\"detail\":\"\"}]"
+      "raw_output_tail": "[{\"name\":\"管理员登录\",\"ok\":true,\"detail\":\"http://127.0.0.1:18131/dashboard\"},{\"name\":\"创建 Key 后展示 curl\",\"ok\":true,\"detail\":\"curl http://127.0.0.1:18131/v1/chat/completions \\\\\\n  -H \\\"Authorization: Bearer sk-REDACTED\"},{\"name\":\"MCP 付费工具默认拒绝并生成审批\",\"ok\":true,\"detail\":\"{\\\"status\\\":200,\\\"sid\\\":\\\"f6824d3e357556ed083f13abcf7cabd32089dc5a2fbe8800\\\",\\\"body\\\":{\\\"jsonrpc\\\":\\\"2.0\\\",\\\"id\\\":2,\\\"error\\\":{\\\"code\\\":-32003,\\\"message\\\":\\\"administrator approval required\\\",\\\"data\\\":{\\\"approval_id\\\":11,\\\"reason\\\":\\\"approval_required\\\",\\\"resource\\\":\\\"create_image:sha256=0c2cc21819a1:model=dall-e:n=<nil>:size=\\\"}}}}\"},{\"name\":\"动作审批页可用且可批准\",\"ok\":true,\"detail\":\"跳到主内容\\nToggle Sidebar\\nnew-api-Max\\n主页\\n控制台\\n模型广场\\n排行榜\\n文档\\n关于\\n搜索\\n⌘\\nK\\n更改语言\\nR\\n聊天\\n游乐场\\n常规\\n概览\\n数据看板\\nAPI 密钥\\n使用日志\\n审计日志\\n任务日志\\n个人\\n钱包\\n个人资料\\n安全与访问\\n管理员\\n渠道\\n模型\\n用户\\n兑换码\\n订阅\\n系统信息\\n任务插件\\nWeb \"},{\"name\":\"/en/pricing 语言与 canonical\",\"ok\":true,\"detail\":\"lang=en canonical=http://localhost:3000/en/pricing\"},{\"name\":\"/en/pricing hreflang\",\"ok\":true,\"detail\":\"count=3\"},{\"name\":\"无致命 console 错误\",\"ok\":true,\"detail\":\"\"}]"
     }
   ],
   "files_changed": [
@@ -35,7 +35,7 @@
       "name": "MCP 付费工具默认拒绝并生成审批",
       "type": "browser-e2e",
       "status": "pass",
-      "evidence": "{\"status\":200,\"sid\":\"e021fa0b9f3c50ba3fe1192da84aeacf0b1b43007bdac47f\",\"body\":{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32003,\"message\":\"administrator approval required\",\"data\":{\"approval_id\":10,\"reason\":\"approval_required\",\"resource\":\"create_image:model=dall-e:n=<nil>:size=:sha256=0c2cc21819a1\"}}}}"
+      "evidence": "{\"status\":200,\"sid\":\"f6824d3e357556ed083f13abcf7cabd32089dc5a2fbe8800\",\"body\":{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32003,\"message\":\"administrator approval required\",\"data\":{\"approval_id\":11,\"reason\":\"approval_required\",\"resource\":\"create_image:sha256=0c2cc21819a1:model=dall-e:n=<nil>:size=\"}}}}"
     },
     {
       "name": "动作审批页可用且可批准",
@@ -85,6 +85,6 @@
   "limitations": [
     "mock upstream, not a real provider",
     "SQLite local DB",
-    "production not yet deployed"
+    "production validated separately on v1.3.149"
   ]
 }

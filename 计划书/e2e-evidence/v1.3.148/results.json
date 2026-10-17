@@ -14,7 +14,7 @@
     {
       "name": "MCP 付费工具默认拒绝并生成审批",
       "ok": true,
-      "detail": "{\"status\":200,\"sid\":\"e021fa0b9f3c50ba3fe1192da84aeacf0b1b43007bdac47f\",\"body\":{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32003,\"message\":\"administrator approval required\",\"data\":{\"approval_id\":10,\"reason\":\"approval_required\",\"resource\":\"create_image:model=dall-e:n=<nil>:size=:sha256=0c2cc21819a1\"}}}}"
+      "detail": "{\"status\":200,\"sid\":\"f6824d3e357556ed083f13abcf7cabd32089dc5a2fbe8800\",\"body\":{\"jsonrpc\":\"2.0\",\"id\":2,\"error\":{\"code\":-32003,\"message\":\"administrator approval required\",\"data\":{\"approval_id\":11,\"reason\":\"approval_required\",\"resource\":\"create_image:sha256=0c2cc21819a1:model=dall-e:n=<nil>:size=\"}}}}"
     },
     {
       "name": "动作审批页可用且可批准",
