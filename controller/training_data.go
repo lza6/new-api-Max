@@ -184,8 +184,12 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 		// 不缓存的话「管理员开着页面」就会持续烧云盘配额，把采集 worker
 		// 打到限流（两者共用配额）。缓存 TTL 见 trainingSinkCountsTTL。
 		counts, cerr := trainingSinkCountsCache.get(func() (sinkCounts, error) {
+			// 同样必须有界：不挂在请求 context 上，避免云盘挂起时
+			// singleflight 把所有等待者永久阻塞。
+			cctx, ccancel := context.WithTimeout(context.Background(), trainingCloudListTimeout)
+			defer ccancel()
 			folders, files, truncated, cErr := counter.CountItems(
-				context.Background(), training_capture.CaptureLayoutDepth+1)
+				cctx, training_capture.CaptureLayoutDepth+1)
 			if cErr != nil {
 				return sinkCounts{}, cErr
 			}
@@ -252,8 +256,14 @@ func GetTrainingDataByDate(c *gin.Context) {
 			if !ok {
 				return trainingDailyStatsResult{}, errSinkCannotReportTruncation
 			}
+			// **必须有界**：缓存加载不挂在任何请求的 context 上，若云盘挂起
+			// 而这里用 Background，singleflight 会让**所有**等待者无限阻塞
+			// （后续每个轮询请求都排在同一次永不返回的加载后面）。
+			// 给一个总时限：超时即报错，错误不进缓存，下个请求会重新尝试。
+			ctx, cancel := context.WithTimeout(context.Background(), trainingCloudListTimeout)
+			defer cancel()
 			entries, truncated, terr := lister.ListTreeWithTruncation(
-				context.Background(), "", training_capture.ExportListTreeMaxEntries)
+				ctx, "", training_capture.ExportListTreeMaxEntries)
 			if terr != nil {
 				return trainingDailyStatsResult{}, terr
 			}

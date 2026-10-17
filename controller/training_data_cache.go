@@ -51,6 +51,15 @@ const (
 	// 取 1 分钟：总览每 5s 轮询，但「有多少个文件夹」这种数字
 	// 分钟级足够；队列/在传字节等实时指标走的是内存计数，不受此影响。
 	trainingSinkCountsTTL = time.Minute
+
+	// trainingCloudListTimeout 一次云盘列举/计数的**总时限**。
+	//
+	// 缓存加载不挂在任何请求的 context 上（它是共享资源），因此必须自带
+	// 超时；否则云盘挂起时 singleflight 会让**所有**等待者永久阻塞 ——
+	// 后续每个轮询请求都排在同一次永不返回的加载后面，管理页会一直转圈。
+	//
+	// 取 60s：正常列举在秒级到十几秒；给足余量但仍保证「挂死会自愈」。
+	trainingCloudListTimeout = 60 * time.Second
 )
 
 // timedCache 一个极小的 TTL 缓存，并用 singleflight 合并并发未命中。
