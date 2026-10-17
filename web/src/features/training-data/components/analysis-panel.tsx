@@ -202,16 +202,20 @@ export function AnalysisPanel(props: { path: string | null }) {
             </div>
 
             <div className='flex flex-wrap items-center gap-2'>
+              {/* 模型是**必填**：后端 relay 拒绝空 model（"model is required"）。
+                  原先标成 `Model (optional)`，管理员不改直接点开始必然 400，
+                  且报错与「分析」无关，很难判断该改什么。 */}
               <Input
                 className='max-w-56'
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                placeholder={t('Model (optional)')}
-                aria-label={t('Model (optional)')}
+                placeholder={t('Model (required)')}
+                aria-label={t('Model (required)')}
+                required
               />
               <Button
                 onClick={() => void runAnalysis(null)}
-                disabled={busy}
+                disabled={busy || model.trim() === ''}
                 size='sm'
               >
                 {busy && <Loader2 className='mr-1.5 size-3.5 animate-spin' />}

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
@@ -372,4 +373,43 @@ func (failingStatSink) List(ctx context.Context, path string) ([]string, error) 
 
 func (failingStatSink) Stat(ctx context.Context) (training_capture.SinkStat, error) {
 	return training_capture.SinkStat{}, assert.AnError
+}
+
+// TestByDateDefaultAndTodayPathsReturnABody 锁定一次**真实事故**：
+// 「不传 date」（前端每日历史卡的默认请求）与「查今天」两条最常见路径
+// 曾因 `return` 前漏了 `common.ApiSuccess` 而返回 **HTTP 200 空 body** ——
+// 前端解析失败、整张卡报错，而历史日期分支却正常，
+// 所以很容易被误判成前端问题。
+//
+// 既有测试只覆盖「非法日期」与「历史日期」，恰好绕开了这两条默认路径。
+func TestByDateDefaultAndTodayPathsReturnABody(t *testing.T) {
+	setupTrainingDataTestDB(t)
+
+	today := time.Unix(time.Now().Unix(), 0).UTC().Format("2006-01-02")
+	paths := []string{
+		"/api/training-data/admin/by-date",               // 前端默认（不传 date）
+		"/api/training-data/admin/by-date?date=" + today, // 显式查今天
+	}
+	for _, path := range paths {
+		ctx, recorder := jsonContext(t, http.MethodGet, path, ``, 1)
+		GetTrainingDataByDate(ctx)
+
+		// 关键断言 1：必须真的有响应体，而不是空 body。
+		require.NotEmptyf(t, recorder.Body.String(), "%s 返回了空响应体", path)
+
+		var env apiEnvelope
+		require.NoErrorf(t, common.Unmarshal(recorder.Body.Bytes(), &env),
+			"%s 的响应不是合法 JSON（空 body 会在这里失败）", path)
+		assert.Truef(t, env.Success, "%s 必须返回 success=true", path)
+
+		// 关键断言 2：`days` 字段必须存在（哪怕为空数组）——
+		// 每日历史卡依赖它，字段缺失会让前端拿到 undefined。
+		var payload struct {
+			Days  []any `json:"days"`
+			Known bool  `json:"known"`
+		}
+		require.NoErrorf(t, common.Unmarshal(env.Data, &payload), "%s 的 data 结构不对", path)
+		assert.NotNilf(t, payload.Days, "%s 必须下发 days 字段（可为空数组）", path)
+		assert.Truef(t, payload.Known, "%s 应报告 known=true", path)
+	}
 }

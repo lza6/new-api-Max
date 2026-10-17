@@ -585,6 +585,16 @@ func countTree(list func(path string) ([]dirEntry, error), maxDepth, visitedLimi
 	}
 	queue := []queueItem{{path: "", depth: 0}}
 	visited := 0
+	// readFailed 记录是否有目录**读取失败**。
+	//
+	// [修复防御] 曾经 `continue` 之后什么都不记，于是返回 `truncated=false`，
+	// 管理员看到「N 个目录 / M 个文件」并当成权威规模 —— 而实际上
+	// 有一整棵子树根本没被读到。这与「文件数恒为 0」是同一类错误：
+	// **数字自信、且没有任何标志提示它不可信**。
+	//
+	// 读取失败与「达到访问上限」在语义上是同一件事：数字都是**下界**。
+	// 因此并入 truncated 一并披露（宁可保守地说「至少」，不可假装完整）。
+	readFailed := false
 
 	for len(queue) > 0 && (visitedLimit <= 0 || visited < visitedLimit) {
 		item := queue[0]
@@ -593,7 +603,9 @@ func countTree(list func(path string) ([]dirEntry, error), maxDepth, visitedLimi
 
 		entries, err := list(item.path)
 		if err != nil {
-			// 单个目录读失败不中断整体统计（部分结果比没有结果有用）。
+			// 单个目录读失败不中断整体统计（部分结果比没有结果有用），
+			// 但**必须**让调用方知道结果不完整。
+			readFailed = true
 			continue
 		}
 		for _, entry := range entries {
@@ -611,8 +623,8 @@ func countTree(list func(path string) ([]dirEntry, error), maxDepth, visitedLimi
 			}
 		}
 	}
-	// 队列里还有待访问目录 → 达到了访问上限，数字是下界。
-	return folders, files, len(queue) > 0
+	// 队列里还有待访问目录，或有目录读失败 → 数字是**下界**。
+	return folders, files, len(queue) > 0 || readFailed
 }
 
 // CountItems 统计本程序根目录下的目录数与文件数（供管理员视图）。
@@ -628,7 +640,14 @@ func countTree(list func(path string) ([]dirEntry, error), maxDepth, visitedLimi
 // 这与 `List` / `Stat` 的既有约定一致（未知用 0/标志表达，不假装是真实值）。
 func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, files int, truncated bool, err error) {
 	if maxDepth <= 0 {
-		maxDepth = CaptureLayoutDepth
+		// [修复防御] 默认值必须是**布局层数 + 1**，不是布局层数本身。
+		//
+		// 分片文件在模型目录**内部**；用布局层数作深度只会把模型目录计入
+		// folders、却不展开它 → `files` 恒为 0，且 `truncated=false`
+		// 让这个错误数字看起来完全可信。
+		// 曾经调用处正是踩了这个坑；把错误答案留作默认值，会让**未来**
+		// 的调用方再踩一次，所以默认值必须是正确答案。
+		maxDepth = CaptureLayoutDepth + 1
 	}
 	// [修复防御] 队列起点必须是**空串**，不是 `s.cfg.RootPath`。
 	//
@@ -641,6 +660,7 @@ func (s *oneDriveSink) CountItems(ctx context.Context, maxDepth int) (folders, f
 		return s.listEntries(ctx, path)
 	}, maxDepth, onedriveCountMaxDirs)
 	// 单个目录读失败已在 countTree 内部跳过（部分结果比没有结果有用），
+	// 并已并入 truncated 让调用方知道结果不完整；
 	// 因此这里不产生 error —— 保持既有签名与「尽力统计」语义。
 	return folders, files, truncated, nil
 }

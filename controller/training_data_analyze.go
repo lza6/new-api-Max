@@ -109,6 +109,16 @@ func AnalyzeTrainingDataConversation(c *gin.Context) {
 		common.ApiErrorMsg(c, "invalid path")
 		return
 	}
+	// **模型是必填**，在这里就给出清晰错误。
+	//
+	// 交给 relay 也能拦住（`valid_request.go` 会返回 400 "model is required"），
+	// 但那条错误来自 relay 通用校验，管理员看到的是一句与「分析」无关的提示，
+	// 难以判断该改什么。界面曾把该输入框标成 `Model (optional)`，
+	// 于是「不改直接点开始」→ 必然 400，且提示对不上。
+	if strings.TrimSpace(req.Model) == "" {
+		common.ApiErrorMsg(c, "missing required field: model (choose the model used for analysis)")
+		return
+	}
 
 	reader, err := trainingDataReader()
 	if err != nil {

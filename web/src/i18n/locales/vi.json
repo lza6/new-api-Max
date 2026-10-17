@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Xếp theo hạn ngạch tiêu thụ trong {{days}} ngày gần nhất",
     "No consumption data in this period": "Không có dữ liệu tiêu thụ trong khoảng thời gian này",
     "Training Data Collection": "Thu thập dữ liệu huấn luyện",
+    "Model (required)": "Mô hình (bắt buộc)",
     "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.": "Đã bỏ qua {{count}} yêu cầu không trích xuất được văn bản. Con số tăng dần thường có nghĩa là tính năng đếm token đang tắt, nên không tạo ra văn bản hội thoại.",
     "Daily capture history": "Lịch sử thu thập theo ngày",
     "No captured data yet": "Chưa có dữ liệu thu thập",

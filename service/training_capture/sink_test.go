@@ -328,7 +328,12 @@ func TestCountTreeReportsTruncationWhenVisitLimitHit(t *testing.T) {
 }
 
 // TestCountTreeToleratesUnreadableDirectory 单个目录读失败不得中断整体统计
-// （部分结果比没有结果有用），且不得把它算成截断。
+// （部分结果比没有结果有用），但**必须报告结果不完整**。
+//
+// [修复防御] 本条原先断言 `truncated == false`，等于把缺陷固化成了契约：
+// 读失败时管理员看到「N 个目录 / M 个文件」且没有任何"不完整"标志，
+// 会当成权威规模去做扩缩容决策 —— 而实际有一整棵子树没读到。
+// 这与「文件数恒为 0」是同一类错误：数字自信、无任何提示。
 func TestCountTreeToleratesUnreadableDirectory(t *testing.T) {
 	full := layoutTree()
 	flaky := func(path string) ([]dirEntry, error) {
@@ -341,7 +346,8 @@ func TestCountTreeToleratesUnreadableDirectory(t *testing.T) {
 
 	// 另一支（2026-10-17）仍应被数到。
 	assert.Equal(t, 1, files, "可读的那一支必须仍被统计")
-	assert.False(t, truncated, "读失败不是截断，两者语义不同")
+	assert.True(t, truncated,
+		"读失败意味着数字是**下界**，必须置 truncated，否则管理员会把它当权威值")
 	assert.Greater(t, folders, 0)
 }
 

@@ -105,6 +105,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Ranked by quota consumed in the last {{days}} days",
     "No consumption data in this period": "No consumption data in this period",
     "Training Data Collection": "Training Data Collection",
+    "Model (required)": "Model (required)",
     "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.": "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.",
     "Daily capture history": "Daily capture history",
     "No captured data yet": "No captured data yet",

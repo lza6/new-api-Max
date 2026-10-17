@@ -265,23 +265,60 @@ func MaybeCapture(signal CaptureSignal) bool {
 var (
 	workerMu      sync.Mutex
 	workerStop    chan struct{}
+	workerDone    chan struct{}
 	workerRunning bool
 )
 
+// workerStopWaitTimeout 停止/重启时等待旧 worker 真正退出的上限。
+const workerStopWaitTimeout = 5 * time.Second
+
 // StartWorker 启动采集 worker（**可重复调用**：已运行则 no-op；已停止则重启）。
+//
+// ## 为什么 stop channel 必须**作为参数**传给 goroutine
+//
+// 原实现让 `runWorker` 直接读包级 `workerStop`。于是：
+//  1. 数据竞争 —— `StartWorker` 在锁内写它，而 worker goroutine 在循环里
+//     无同步地读（`go test -race` 直接报 DATA RACE）；
+//  2. **僵尸 worker** —— `StopWorker` 关闭 C1 后，`StartWorker` 立刻把
+//     全局变量换成 C2；尚未被调度的旧 goroutine 读到 C2（未关闭）→ 永不退出
+//     → **两个 goroutine 同时消费同一队列**。两条同会话信号并发处理时，
+//     各自读水位→上传→写水位，后写覆盖前写，可能重复或丢失增量。
+//
+// 现在每次启动把 stop/done 作为**局部值**捕获，循环只认自己那一个。
 //
 // 返回是否**实际启动了**新 worker（供调用方记日志/断言）。
 func StartWorker() bool {
 	workerMu.Lock()
+	if workerRunning {
+		workerMu.Unlock()
+		return false
+	}
+	prevDone := workerDone
+	workerMu.Unlock()
+
+	// 等旧 worker 真正退出，避免「旧消费者还没走、新消费者已来」的窗口。
+	if prevDone != nil {
+		select {
+		case <-prevDone:
+		case <-time.After(workerStopWaitTimeout):
+			// 不假装已停：如实记日志。仍然启动（否则功能不可用），
+			// 但至少让这个异常可见。
+			common.SysError("training capture: previous worker did not exit in time; starting a new one anyway")
+		}
+	}
+
+	workerMu.Lock()
 	defer workerMu.Unlock()
+	// 上面的等待释放过锁，可能有并发的 StartWorker 抢先启动。
 	if workerRunning {
 		return false
 	}
-	// 每次启动都新建 stop channel —— 复用已关闭的 channel 会让
-	// 新起的循环立刻退出（这正是原实现的缺陷）。
-	workerStop = make(chan struct{})
+	stop := make(chan struct{})
+	done := make(chan struct{})
+	workerStop = stop
+	workerDone = done
 	workerRunning = true
-	go runWorker()
+	go runWorker(stop, done)
 	return true
 }
 
@@ -290,16 +327,31 @@ func StartWorker() bool {
 // 通过关闭 stop channel 让 worker 的 `Receive`/限速等待被唤醒并退出 ——
 // 不丢已入队的数据（ReceiveWithStop 在退出前会把缓冲取完）。
 //
+// **会等待 goroutine 真正退出**（有界）：只把标志置 false 就返回，
+// 会让紧接着的 `StartWorker` 在旧消费者仍在跑时启动新消费者 ——
+// 那就是两个 worker 并发读写同一个会话水位。
+//
 // 返回是否**实际停止了**一个在跑的 worker。
 func StopWorker() bool {
 	workerMu.Lock()
-	defer workerMu.Unlock()
 	if !workerRunning {
+		workerMu.Unlock()
 		return false
 	}
 	workerRunning = false
-	if workerStop != nil {
-		close(workerStop)
+	stop := workerStop
+	done := workerDone
+	workerMu.Unlock()
+
+	if stop != nil {
+		close(stop)
+	}
+	if done != nil {
+		select {
+		case <-done:
+		case <-time.After(workerStopWaitTimeout):
+			common.SysError("training capture: worker did not exit within timeout after stop request")
+		}
 	}
 	return true
 }
@@ -315,7 +367,11 @@ func WorkerRunning() bool {
 }
 
 // runWorker 主循环。
-func runWorker() {
+//
+// stop / done 都是**本次启动的局部值**（不读包级变量）——
+// 见 `StartWorker` 关于数据竞争与僵尸 worker 的说明。
+func runWorker(stop <-chan struct{}, done chan<- struct{}) {
+	defer close(done)
 	// [修复防御] **顶层 panic 恢复是必须的，不是可选加固**。
 	//
 	// 后台 goroutine 的 panic 在 Go 里**不会**被 net/http 的 per-connection
@@ -342,26 +398,26 @@ func runWorker() {
 		}
 	}()
 
-	// 把 workerStop 绑进限速器：停机时限速等待也要被打断，
+	// 把**本次启动的** stop 绑进限速器：停机时限速等待也要被打断，
 	// 否则一个正在等 2 分钟的限速会让 StopWorker 卡住。
-	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, workerStop)
+	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, stop)
 	consecutiveErrors := 0
 
 	for {
 		select {
-		case <-workerStop:
+		case <-stop:
 			return
 		default:
 		}
 
-		// 把 workerStop 一并交给 Receive：否则 worker 阻塞在这里等数据时
+		// 把 stop 一并交给 Receive：否则 worker 阻塞在这里等数据时
 		// StopWorker 无法唤醒它（两个是不同的 channel，见 ReceiveWithStop）。
-		signal, ok := captureQueue.ReceiveWithStop(workerStop)
+		signal, ok := captureQueue.ReceiveWithStop(stop)
 		if !ok {
 			// 队列关闭（停机）或暂无数据。Receive 是阻塞的，
 			// 不会走到这里空转；保险起见仍睡一下。
 			select {
-			case <-workerStop:
+			case <-stop:
 				return
 			case <-time.After(workerIdleSleep):
 			}
@@ -404,7 +460,7 @@ func runWorker() {
 				backoff = workerMaxBackoff
 			}
 			select {
-			case <-workerStop:
+			case <-stop:
 				return
 			case <-time.After(backoff):
 			}

@@ -300,6 +300,12 @@ func GetTrainingDataByDate(c *gin.Context) {
 		// 请求的日期是今天（或未指定）→ 附上进程内计数。
 		out["stats"] = stats
 		out["known"] = true
+		// **必须在这里也写响应**：上面所有分支只是往 out 里填字段，
+		// 只有函数末尾才真正下发。早期版本这里直接 `return`，
+		// 导致「不传 date」（前端默认路径）与「查今天」两种最常见请求
+		// 返回 HTTP 200 空 body —— 前端解析失败、每日历史卡 100% 报错，
+		// 而历史日期分支却正常，所以很容易被误判成前端问题。
+		common.ApiSuccess(c, out)
 		return
 	}
 	// 历史日期：进程内计数不可得（重启归零），但云盘的 `days` 已给出真实数据。

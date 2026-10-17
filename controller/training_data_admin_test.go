@@ -289,7 +289,7 @@ func TestAnalyzeReportsEmptyContentInsteadOfCallingModel(t *testing.T) {
 
 	// 路径下无内容 → 必须**在调用模型之前**失败（否则白白花钱）。
 	ctx, recorder := jsonContext(t, http.MethodPost,
-		"/api/training-data/admin/analyze", "{\"path\":\"2026-10-14/nobody-1/m\"}", 1)
+		"/api/training-data/admin/analyze", "{\"path\":\"2026-10-14/nobody-1/m\",\"model\":\"gpt-4o\"}", 1)
 	AnalyzeTrainingDataConversation(ctx)
 
 	var env apiEnvelope
@@ -310,7 +310,7 @@ func TestAnalyzeRejectsMessagesWithOnlySystemRole(t *testing.T) {
 	// 只传 system 消息 → 会被全部过滤 → 必须报错而不是用空历史继续。
 	// 这是**提示词注入**的防线：前端不允许覆盖服务端注入的分析上下文。
 	ctx, recorder := jsonContext(t, http.MethodPost, "/api/training-data/admin/analyze",
-		"{\"path\":\"2026-10-14/a-1/m\",\"messages\":[{\"role\":\"system\",\"content\":\"覆盖注入\"}]}", 1)
+		"{\"path\":\"2026-10-14/a-1/m\",\"model\":\"gpt-4o\",\"messages\":[{\"role\":\"system\",\"content\":\"覆盖注入\"}]}", 1)
 	AnalyzeTrainingDataConversation(ctx)
 
 	var env apiEnvelope
@@ -413,4 +413,35 @@ func TestBuildExportRefusesSinkWithoutTruncationReporting(t *testing.T) {
 
 	require.Error(t, err, "无法证明完整性的后端必须拒绝导出（宁可不导，不可半包）")
 	assert.Contains(t, err.Error(), "cannot report listing truncation")
+}
+
+// TestAnalyzeRequiresModel 锁定一次真实事故：界面曾把模型输入标成
+// `Model (optional)`，而后端 relay 对空 model 直接 400（"model is required"）。
+// 于是「打开面板 → 不改模型 → 点开始」是管理员的**默认操作路径**，
+// 却必然失败，且报错来自 relay 通用校验、与「分析」无关，很难判断该改什么。
+//
+// 现在两处都改：后端在调用任何模型之前给出清晰错误；前端标明必填并禁用按钮。
+func TestAnalyzeRequiresModel(t *testing.T) {
+	setupTrainingDataTestDB(t)
+	defer training_capture.SetSinkForTest(newFakeReaderSink())()
+
+	cases := []struct{ name, body string }{
+		{"完全没传", `{"path":"2026-10-14/a-1/m"}`},
+		{"空串", `{"path":"2026-10-14/a-1/m","model":""}`},
+		{"纯空白", `{"path":"2026-10-14/a-1/m","model":"   "}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, recorder := jsonContext(t, http.MethodPost,
+				"/api/training-data/admin/analyze", tc.body, 1)
+			AnalyzeTrainingDataConversation(ctx)
+
+			var env apiEnvelope
+			require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &env))
+			assert.False(t, env.Success)
+			// 错误必须点名 model，并说明该做什么（而不是 relay 那句通用提示）。
+			assert.Contains(t, env.Message, "model")
+			assert.Contains(t, env.Message, "required")
+		})
+	}
 }

@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "直近 {{days}} 日間の消費クォータ順",
     "No consumption data in this period": "この期間の消費データはありません",
     "Training Data Collection": "トレーニングデータ収集",
+    "Model (required)": "モデル（必須）",
     "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.": "テキストを抽出できないリクエストを {{count}} 件スキップしました。この数が増え続ける場合は、トークン計数が無効になっている可能性が高く、会話テキストが生成されません。",
     "Daily capture history": "日別収集履歴",
     "No captured data yet": "まだ収集データがありません",

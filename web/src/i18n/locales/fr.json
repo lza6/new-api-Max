@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "Classé par quota consommé sur les {{days}} derniers jours",
     "No consumption data in this period": "Aucune donnée de consommation sur cette période",
     "Training Data Collection": "Collecte des données d'entraînement",
+    "Model (required)": "Modèle (obligatoire)",
     "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.": "{{count}} requêtes ignorées faute de texte extractible. Une valeur en hausse constante signifie généralement que le comptage de tokens est désactivé : aucun texte de conversation n’est alors produit.",
     "Daily capture history": "Historique de collecte quotidien",
     "No captured data yet": "Aucune donnée collectée pour le moment",

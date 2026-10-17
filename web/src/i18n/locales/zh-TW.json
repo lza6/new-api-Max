@@ -75,6 +75,7 @@
     "Ranked by quota consumed in the last {{days}} days": "依最近 {{days}} 天消耗額度排序",
     "No consumption data in this period": "此期間內暫無消耗資料",
     "Training Data Collection": "訓練資料採集",
+    "Model (required)": "模型（必填）",
     "Skipped {{count}} requests with no extractable text. A steadily rising number usually means token counting is disabled, so no conversation text is produced.": "已跳過 {{count}} 個取不到文字的請求。此數字持續成長通常表示 token 計數被關閉了，因此不會產出對話文字。",
     "Daily capture history": "每日採集歷史",
     "No captured data yet": "還沒有採集到資料",
