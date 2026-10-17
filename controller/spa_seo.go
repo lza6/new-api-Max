@@ -125,10 +125,132 @@ func spaAcceptLanguageOrder(header string) []string {
 
 // spaHTMLLang 把内部语言代码映射到 `<html lang>` 取值。
 func spaHTMLLang(language string) string {
-	if language == "en" {
+	// 服务端注入的页面文案目前只有英文与简体中文两份。fr/ru/ja/vi 前缀由前端
+	// 运行时切换 UI 语言，但服务端内容仍是英文；声明 lang=fr 会误导搜索引擎，
+	// 因此这些前缀统一按内容语言 en 标注，并在 BuildSPAIndexHTML 中对它们加 noindex。
+	switch strings.ToLower(language) {
+	case "en", "fr", "ru", "ja", "vi":
 		return "en"
+	default:
+		return "zh-CN"
 	}
-	return "zh-CN"
+}
+
+// spaPathLocales 是可以在 URL 路径前缀中出现的语言（默认语言 zh 不放前缀）。
+// key 为小写路径段，value 为内部语言代码。
+var spaPathLocales = map[string]string{
+	"en":    "en",
+	"fr":    "fr",
+	"ru":    "ru",
+	"ja":    "ja",
+	"vi":    "vi",
+	"zh-tw": "zh-TW",
+}
+
+// DefaultLocaleRedirectTarget 把默认语言 zh 的前缀地址 301 到无前缀地址。
+//
+// 默认语言不使用前缀（`/pricing` 就是 zh-CN 的 canonical），因此 `/zh/pricing`
+// 必须重定向，否则同一内容会出现两份可索引 URL。其它语言前缀不重定向。
+func DefaultLocaleRedirectTarget(path string) (string, bool) {
+	if path == "/zh" {
+		return "/", true
+	}
+	if strings.HasPrefix(path, "/zh/") {
+		target := strings.TrimPrefix(path, "/zh")
+		if target == "" {
+			return "/", true
+		}
+		// 防御开放重定向：`/zh//evil.com`、`/zh/%2F%2Fevil.com` 会得到
+		// 协议相对地址 `//evil.com`。只允许站内单斜杠路径，否则回到首页。
+		if !strings.HasPrefix(target, "/") || strings.HasPrefix(target, "//") || strings.HasPrefix(target, `/\`) {
+			return "/", true
+		}
+		return target, true
+	}
+	return "", false
+}
+
+// spaParseLocalePrefix 从请求路径中剥离语言前缀。
+//
+// 例：`/en/pricing` → ("en", "/pricing", true)；`/zh-TW/pricing` → ("zh-TW", "/pricing", true)；
+// `/pricing` → ("", "/pricing", false)。默认语言 zh 不生成前缀，`/zh/...` 由路由层 301
+// 到无前缀地址，避免同一内容出现两份 canonical。
+func spaParseLocalePrefix(path string) (language, rest string, ok bool) {
+	if !strings.HasPrefix(path, "/") {
+		return "", path, false
+	}
+	trimmed := strings.TrimPrefix(path, "/")
+	if trimmed == "" {
+		return "", "/", false
+	}
+	segment, tail, found := strings.Cut(trimmed, "/")
+	lang, exists := spaPathLocales[strings.ToLower(segment)]
+	if !exists {
+		return "", path, false
+	}
+	if !found || tail == "" {
+		return lang, "/", true
+	}
+	return lang, "/" + tail, true
+}
+
+// spaPathLocaleTag 返回某语言在 URL 前缀中使用的写法（默认语言返回空串）。
+func spaPathLocaleTag(language string) string {
+	switch language {
+	case "en", "fr", "ru", "ja", "vi":
+		return language
+	case "zh-TW":
+		return "zh-TW"
+	default:
+		return "" // zh-CN：无前缀
+	}
+}
+
+// spaLocalizedPath 给站内路径加上语言前缀（默认语言 zh 不加）。
+func spaLocalizedPath(language, path string) string {
+	if path == "" {
+		path = "/"
+	}
+	tag := spaPathLocaleTag(language)
+	if tag == "" {
+		return path
+	}
+	if path == "/" {
+		return "/" + tag
+	}
+	return "/" + tag + path
+}
+
+// spaHreflangTag 返回 hreflang 使用的 BCP-47 标签。
+func spaHreflangTag(language string) string {
+	switch language {
+	case "en":
+		return "en"
+	case "zh-TW":
+		return "zh-TW"
+	default:
+		return "zh-CN"
+	}
+}
+
+// spaHreflangLanguages 是**服务端确有对应语言内容**、可以诚实声明 hreflang 的语言。
+//
+// 前端 UI 支持 7 种语言，但服务端注入的页面文案目前只有英文与中文两份；
+// 对 fr/ru/ja/vi 声明 hreflang 会让搜索引擎把英文内容标成法语/俄语等，
+// 属于错误标注。因此这四门语言仍可通过 `/fr/...` 访问（UI 会切换），
+// 但在补齐服务端翻译前**不声明** hreflang。
+var spaHreflangLanguages = []string{"zh", "en"}
+
+const spaDefaultHreflangLanguage = "zh"
+
+// spaIsChinese 报告该语言是否使用中文文案（简繁共用同一份服务端文案）。
+func spaIsChinese(language string) bool {
+	switch strings.ToLower(language) {
+	case "zh", "zh-tw", "zhtw", "zh-cn", "zhcn":
+		return true
+	default:
+		return false
+	}
 }
 
 // spaRouteMetaFor 按语言与路径取路由文案（缺中文时回退英文，避免出现空标题）。
@@ -137,11 +259,33 @@ func spaRouteMetaFor(path, language string) spaRouteMeta {
 	if normalized == "" {
 		normalized = "/"
 	}
-	if language == "zh" {
+	if spaIsChinese(language) {
 		if meta, ok := spaRouteMetaZh[normalized]; ok {
 			return meta
 		}
 		return spaDefaultMetaZh
+	}
+	// 政策页正文来自后台配置，默认不进 sitemap；但页面本身是公开可访问的，
+	// 仍应给出与页面标题一致的 meta（否则爬虫看到的是站点兜底标题）。
+	switch normalized {
+	case "/user-agreement":
+		return spaRouteMeta{
+			Title:       "User Agreement — {site}",
+			Description: "The user agreement configured by the operator of this deployment.",
+			H1:          "User Agreement",
+			NavLabel:    "User Agreement",
+			Summary:     "This page shows the user agreement configured for this deployment. Its content is provided by the operator.",
+			Caveat:      "If the operator has not configured this document, the page may be empty.",
+		}
+	case "/privacy-policy":
+		return spaRouteMeta{
+			Title:       "Privacy Policy — {site}",
+			Description: "The privacy policy configured by the operator of this deployment.",
+			H1:          "Privacy Policy",
+			NavLabel:    "Privacy Policy",
+			Summary:     "This page shows the privacy policy configured for this deployment. Its content is provided by the operator.",
+			Caveat:      "If the operator has not configured this document, the page may be empty.",
+		}
 	}
 	for _, p := range seoPublicPaths {
 		if p.Path == normalized {
@@ -190,7 +334,7 @@ var spaPolicyNavLinks = []struct{ Path, LabelEn, LabelZh string }{
 // 这是修「5 页不可达 / 内部深度 0」的关键：不执行 JS 的爬虫只有拿到真实的
 // `<a href>` 才能发现这些页面。链接文案优先用短的 NavLabel，而不是 "click here"
 // 之类的泛化锚文本；语言跟随访问者。
-func spaInternalLinksHTML(currentPath, siteName, language string) string {
+func spaInternalLinksHTML(currentPath, siteName, language, prefixLanguage string) string {
 	current := strings.TrimRight(currentPath, "/")
 	var b strings.Builder
 	b.WriteString("<nav aria-label=\"Public pages\"><ul>")
@@ -199,7 +343,7 @@ func spaInternalLinksHTML(currentPath, siteName, language string) string {
 			continue // 不给自己加自链接
 		}
 		b.WriteString("<li><a href=\"")
-		b.WriteString(html.EscapeString(p.Path))
+		b.WriteString(html.EscapeString(spaLocalizedPath(prefixLanguage, p.Path)))
 		b.WriteString("\">")
 		b.WriteString(html.EscapeString(spaLinkLabel(p, siteName, language)))
 		b.WriteString("</a></li>")
@@ -210,11 +354,11 @@ func spaInternalLinksHTML(currentPath, siteName, language string) string {
 			continue
 		}
 		label := l.LabelEn
-		if language == "zh" {
+		if spaIsChinese(language) {
 			label = l.LabelZh
 		}
 		b.WriteString("<li><a href=\"")
-		b.WriteString(html.EscapeString(l.Path))
+		b.WriteString(html.EscapeString(spaLocalizedPath(prefixLanguage, l.Path)))
 		b.WriteString("\">")
 		b.WriteString(html.EscapeString(label))
 		b.WriteString("</a></li>")
@@ -229,7 +373,7 @@ func spaInternalLinksHTML(currentPath, siteName, language string) string {
 // 否则占位符会原样出现在页面上（单测已锁死这条）。
 func spaLinkLabel(p seoPublicPath, siteName, language string) string {
 	meta := p.Meta
-	if language == "zh" {
+	if spaIsChinese(language) {
 		if zh, ok := spaRouteMetaZh[p.Path]; ok {
 			meta = zh
 		}
@@ -249,7 +393,7 @@ func spaLinkLabel(p seoPublicPath, siteName, language string) string {
 // 做正确的归属指引，读者可自行核对协议细节。链接均指向提供方**官方**文档站。
 func spaOutboundLinksHTML(language string) string {
 	var b strings.Builder
-	if language == "zh" {
+	if spaIsChinese(language) {
 		b.WriteString("<p>上游协议参考：")
 	} else {
 		b.WriteString("<p>Upstream protocol references: ")
@@ -259,7 +403,7 @@ func spaOutboundLinksHTML(language string) string {
 			b.WriteString(" · ")
 		}
 		label := l.LabelEn
-		if language == "zh" {
+		if spaIsChinese(language) {
 			label = l.LabelZh
 		}
 		b.WriteString("<a href=\"")
@@ -293,7 +437,10 @@ const spaSEORemoverScript = `<script>(function(){` +
 // 定点替换用的正则。壳里的属性可能跨行（如 `description` 的 content 独占一行），
 // 因此所有 `\s` 都要能跨行匹配 —— Go 的 `\s` 默认包含 `\n`。
 var (
-	reSPATitle       = regexp.MustCompile(`(?s)<title>.*?</title>`)
+	// 只匹配**行首**的 `<title>`：index.html 的注释里可能出现字面 `<title>`，
+	// 从注释内开始匹配会把注释尾部吃掉，导致整段 head 被浏览器当注释吞掉
+	// （真实浏览器 E2E 曾观测到 canonical/meta 消失）。
+	reSPATitle       = regexp.MustCompile(`(?m)^[ \t]*<title>.*?</title>`)
 	reSPACanonical   = regexp.MustCompile(`(?s)<link\s+rel="canonical"\s+href="[^"]*"\s*/?>`)
 	reSPAMetaName    = regexp.MustCompile(`(?s)<meta\s+name="description"\s+content="[^"]*"\s*/?>`)
 	reSPAMetaTitle   = regexp.MustCompile(`(?s)<meta\s+name="title"\s+content="[^"]*"\s*/?>`)
@@ -322,12 +469,26 @@ func BuildSPAIndexHTML(c *gin.Context, indexPage []byte) []byte {
 		requestPath = c.Request.URL.Path
 		acceptLanguage = c.GetHeader("Accept-Language")
 	}
+	// 语言前缀优先于 Accept-Language：`/en/pricing` 必须输出英文内容与英文 canonical。
+	// 默认语言 zh 不带前缀；`/zh/...` 由路由层 301 到无前缀地址。
+	// prefixLanguage 只用于**生成链接**：无前缀请求（默认语言或按 Accept-Language
+	// 协商内容）保持无前缀 canonical，避免把现有 URL 全部改写成 /en。
+	language := ""
+	prefixLanguage := ""
+	hasLocalePrefix := false
+	if localeLanguage, rest, ok := spaParseLocalePrefix(requestPath); ok {
+		language = localeLanguage
+		prefixLanguage = localeLanguage
+		requestPath = rest
+		hasLocalePrefix = true
+	} else {
+		language = spaResolveLanguage(acceptLanguage)
+	}
 	base := spaSiteBaseForSEO()
 	siteName := strings.TrimSpace(common.SystemName)
 	if siteName == "" {
 		siteName = "New API"
 	}
-	language := spaResolveLanguage(acceptLanguage)
 
 	meta := spaRouteMetaFor(requestPath, language)
 	title := spaExpandSite(meta.Title, siteName)
@@ -336,24 +497,40 @@ func BuildSPAIndexHTML(c *gin.Context, indexPage []byte) []byte {
 	caveat := spaExpandSite(meta.Caveat, siteName)
 	description := spaExpandSite(meta.Description, siteName)
 
-	canonical := absoluteSEOURL(base, requestPath)
+	canonical := absoluteSEOURL(base, spaLocalizedPath(prefixLanguage, requestPath))
 	esc := html.EscapeString
 
 	// ---- meta 替换 ----
-	page = reSPATitle.ReplaceAllString(page, "<title>"+esc(title)+"</title>")
-	page = reSPAMetaTitle.ReplaceAllString(page, `<meta name="title" content="`+esc(title)+`" />`)
-	page = reSPAMetaName.ReplaceAllString(page, `<meta name="description" content="`+esc(description)+`" />`)
-	page = reSPACanonical.ReplaceAllString(page, `<link rel="canonical" href="`+esc(canonical)+`" />`)
-	page = reSPAOGTitle.ReplaceAllString(page, `<meta property="og:title" content="`+esc(title)+`" />`)
-	page = reSPAOGDesc.ReplaceAllString(page, `<meta property="og:description" content="`+esc(description)+`" />`)
+	// ReplaceAllString 会把替换串里的 $1/${name} 当捕获组展开；URL/标题里
+	// 出现 $ 时必须转义为 $$，否则 canonical/meta 会被静默改写。
+	safe := func(v string) string { return strings.ReplaceAll(v, "$", "$$") }
+	page = reSPATitle.ReplaceAllString(page, "<title>"+safe(esc(title))+"</title>")
+	page = reSPAMetaTitle.ReplaceAllString(page, `<meta name="title" content="`+safe(esc(title))+`" />`)
+	page = reSPAMetaName.ReplaceAllString(page, `<meta name="description" content="`+safe(esc(description))+`" />`)
+	page = reSPACanonical.ReplaceAllString(page, `<link rel="canonical" href="`+safe(esc(canonical))+`" />`)
+	page = reSPAOGTitle.ReplaceAllString(page, `<meta property="og:title" content="`+safe(esc(title))+`" />`)
+	page = reSPAOGDesc.ReplaceAllString(page, `<meta property="og:description" content="`+safe(esc(description))+`" />`)
 	// og:locale 壳里**没有** —— 与 og:url 一起追加（否则要单独插一条无从匹配的正则）。
 	page = reSPAOGURL.ReplaceAllString(page,
-		`<meta property="og:url" content="`+esc(canonical)+`" />`+
-			"\n    "+`<meta property="og:locale" content="`+esc(spaOGLocale(language))+`" />`)
-	page = reSPATwTitle.ReplaceAllString(page, `<meta name="twitter:title" content="`+esc(title)+`" />`)
-	page = reSPATwDesc.ReplaceAllString(page, `<meta name="twitter:description" content="`+esc(description)+`" />`)
+		`<meta property="og:url" content="`+safe(esc(canonical))+`" />`+
+			"\n    "+`<meta property="og:locale" content="`+safe(esc(spaOGLocale(language)))+`" />`)
+	page = reSPATwTitle.ReplaceAllString(page, `<meta name="twitter:title" content="`+safe(esc(title))+`" />`)
+	page = reSPATwDesc.ReplaceAllString(page, `<meta name="twitter:description" content="`+safe(esc(description))+`" />`)
 	// 壳里的 `<html lang="en">` 是写死的：内容语言与 `lang` 不一致会被判为语言标注错误。
 	page = reSPAHTMLTag.ReplaceAllString(page, `<html lang="`+esc(spaHTMLLang(language))+`">`)
+
+	// hreflang：只对**服务端确有对应语言内容**的语言声明（见 spaHreflangLanguages）。
+	// 同一条内容的不同语言 URL 必须互相列出，并给出 x-default。
+	if spaShouldAdvertiseHreflang(requestPath) {
+		page = strings.Replace(page, "</head>",
+			spaHreflangLinks(base, requestPath)+"\n  </head>", 1)
+	}
+
+	// TODO SEO-ITEM-1.4：登录/注册/找回密码等入口页不参与索引。
+	// 这些页面没有对搜索者有用的公开内容，被收录只会挤占站点配额并与登录页重复。
+	if spaNoIndexPath(requestPath) || (hasLocalePrefix && !spaHasServerTranslation(language)) {
+		page = strings.Replace(page, "</head>", `<meta name="robots" content="noindex, nofollow" />`+"\n  </head>", 1)
+	}
 
 	// ---- 内容块注入 ----
 	// 可见的附加内容必须放进 `#spa-seo-content`，否则移除脚本不会删掉它。
@@ -361,15 +538,55 @@ func BuildSPAIndexHTML(c *gin.Context, indexPage []byte) []byte {
 	if strings.TrimRight(requestPath, "/") == "/pricing" {
 		extraHTML = spaPricingTableHTML(c, language)
 	}
-	block := spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, extraHTML)
+	block := spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, prefixLanguage, extraHTML)
 	// 结构化数据（JSON-LD）刻意留在容器**外**：它是 `<script>`、不渲染给用户，
 	// 而移除脚本会在 React 挂载后删掉整个 `#spa-seo-content` —— 放进容器里会连它一起删掉。
-	block += spaJSONLDScript(meta, requestPath, siteName, language, description, !spaCustomHomeContentConfigured())
+	block += spaJSONLDScript(meta, requestPath, siteName, language, prefixLanguage, description, !spaCustomHomeContentConfigured())
 	if loc := reSPABodyOpenTag.FindStringIndex(page); loc != nil {
 		page = page[:loc[1]] + block + page[loc[1]:]
 	}
 
 	return []byte(page)
+}
+
+// spaHasServerTranslation 报告服务端是否有该语言的页面文案。
+// 只有 zh-CN 与 en 两份；其余语言前缀仍是英文内容，必须 noindex。
+func spaHasServerTranslation(language string) bool {
+	switch language {
+	case "zh", "en":
+		return true
+	default:
+		return false
+	}
+}
+
+// spaShouldAdvertiseHreflang 报告该路径是否应输出 hreflang 链接。
+// 只覆盖公开内容页与两份政策页；认证入口页是 noindex，不参与。
+func spaShouldAdvertiseHreflang(path string) bool {
+	if spaNoIndexPath(path) {
+		return false
+	}
+	if spaIsPublicPath(path) {
+		return true
+	}
+	return path == "/user-agreement" || path == "/privacy-policy"
+}
+
+// spaHreflangLinks 生成 `<link rel="alternate" hreflang=...>` 组（含 x-default）。
+func spaHreflangLinks(base, path string) string {
+	var b strings.Builder
+	for _, lang := range spaHreflangLanguages {
+		b.WriteString(`<link rel="alternate" hreflang="`)
+		b.WriteString(html.EscapeString(spaHreflangTag(lang)))
+		b.WriteString(`" href="`)
+		b.WriteString(html.EscapeString(absoluteSEOURL(base, spaLocalizedPath(lang, path))))
+		b.WriteString(`" />`)
+		b.WriteString("\n    ")
+	}
+	b.WriteString(`<link rel="alternate" hreflang="x-default" href="`)
+	b.WriteString(html.EscapeString(absoluteSEOURL(base, spaLocalizedPath(spaDefaultHreflangLanguage, path))))
+	b.WriteString(`" />`)
+	return b.String()
 }
 
 // spaPricingModelsForCrawler 取「未登录访客视角」的价目列表 —— 与页面上的
@@ -400,7 +617,7 @@ func spaPricingTableHTML(c *gin.Context, language string) string {
 	if len(pricing) == 0 {
 		return ""
 	}
-	zh := language == "zh"
+	zh := spaIsChinese(language)
 	esc := html.EscapeString
 
 	head := []string{"Model", "Billing mode", "Price"}
@@ -520,10 +737,22 @@ func itoaForSEO(v int) string { return strconv.Itoa(v) }
 
 // spaOGLocale 返回 og:locale 取值。
 func spaOGLocale(language string) string {
-	if language == "en" {
+	switch strings.ToLower(language) {
+	case "en":
 		return "en_US"
+	case "fr":
+		return "fr_FR"
+	case "ru":
+		return "ru_RU"
+	case "ja":
+		return "ja_JP"
+	case "vi":
+		return "vi_VN"
+	case "zh-tw", "zhtw":
+		return "zh_TW"
+	default:
+		return "zh_CN"
 	}
-	return "zh_CN"
 }
 
 // spaBuildContentBlock 构造给爬虫看的内容块。
@@ -547,7 +776,7 @@ func spaOGLocale(language string) string {
 // `extraHTML` 是**可见**的附加内容（目前只有 /pricing 的价目表），必须写在
 // `</div>` 之前：移除脚本删的是整个 `#spa-seo-content`，落在容器外的可见内容
 // 不会被删掉，会一直留在页面上（生产事故，见 spaSEORemoverScript 注释）。
-func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, extraHTML string) string {
+func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, prefixLanguage, extraHTML string) string {
 	esc := html.EscapeString
 	var b strings.Builder
 	b.WriteString(`<div id="spa-seo-content">`)
@@ -564,7 +793,7 @@ func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, 
 		b.WriteString(esc(caveat))
 		b.WriteString("</p>")
 	}
-	b.WriteString(spaInternalLinksHTML(requestPath, siteName, language))
+	b.WriteString(spaInternalLinksHTML(requestPath, siteName, language, prefixLanguage))
 	b.WriteString(spaOutboundLinksHTML(language))
 	b.WriteString(extraHTML)
 	b.WriteString("</div>")
@@ -578,7 +807,7 @@ func spaBuildContentBlock(h1, summary, caveat, requestPath, siteName, language, 
 // 使正文里出现 limitation/caveat 类语义锚点，便于读者与机器识别页面边界。
 // **内容仍然只是 Caveat 原文，一个字都不新增。**
 func spaLimitationHeading(language string) string {
-	if language == "zh" {
+	if spaIsChinese(language) {
 		return "限制与边界"
 	}
 	return "Limitations"
@@ -611,6 +840,25 @@ func spaExpandSite(s, siteName string) string {
 // spaJSONLDContext 是所有结构化数据共用的 @context。
 const spaJSONLDContext = "https://schema.org"
 
+// spaNoIndexPath 报告该路径是否应禁止搜索引擎索引。
+//
+// 只覆盖「没有公开内容、被收录只会造成重复/低质页面」的入口页：
+// 登录、注册、找回/重置密码、OTP、OAuth 回调与首次安装向导。
+// 公开内容页（首页/定价/榜单等）**绝不**加 noindex。
+func spaNoIndexPath(path string) bool {
+	clean := strings.TrimRight(path, "/")
+	if clean == "" {
+		return false
+	}
+	switch clean {
+	case "/sign-in", "/sign-up", "/login", "/register",
+		"/forgot-password", "/reset", "/otp", "/oauth",
+		"/user/reset", "/setup":
+		return true
+	}
+	return strings.HasPrefix(clean, "/oauth/")
+}
+
 // spaRouteSchemaType 返回路由对应的 schema.org 页面类型。
 //
 // 首页是站点入口，用 `WebSite` 正确。**刻意不加 `SearchAction`** —— 本站没有
@@ -632,7 +880,7 @@ func spaRouteSchemaType(path string) string {
 // FAQ accordion（见 spaCustomHomeContentConfigured）。
 //
 // 序列化失败（理论上不会）时跳过该条：宁可少一段结构化数据，也不把坏 JSON 送上页面。
-func spaJSONLDScript(meta spaRouteMeta, requestPath, siteName, language, description string, includeFAQ bool) string {
+func spaJSONLDScript(meta spaRouteMeta, requestPath, siteName, language, prefixLanguage, description string, includeFAQ bool) string {
 	base := spaSiteBaseForSEO()
 	schemaType := spaRouteSchemaType(requestPath)
 
@@ -643,7 +891,7 @@ func spaJSONLDScript(meta spaRouteMeta, requestPath, siteName, language, descrip
 			"@context":   spaJSONLDContext,
 			"@type":      schemaType,
 			"name":       siteName,
-			"url":        absoluteSEOURL(base, "/"),
+			"url":        absoluteSEOURL(base, spaLocalizedPath(prefixLanguage, "/")),
 			"inLanguage": spaHTMLLang(language),
 		}
 	} else {
@@ -652,7 +900,7 @@ func spaJSONLDScript(meta spaRouteMeta, requestPath, siteName, language, descrip
 			"@type":       schemaType,
 			"name":        spaExpandSite(meta.Title, siteName),
 			"description": description,
-			"url":         absoluteSEOURL(base, requestPath),
+			"url":         absoluteSEOURL(base, spaLocalizedPath(prefixLanguage, requestPath)),
 			"inLanguage":  spaHTMLLang(language),
 		}
 	}
@@ -668,10 +916,57 @@ func spaJSONLDScript(meta spaRouteMeta, requestPath, siteName, language, descrip
 		b.WriteString("</script>")
 	}
 	writeScript(graph)
+	if schemaType == "WebSite" {
+		// TODO SEO-ITEM-3.1：站点身份（Organization）与 WebSite 并列声明。
+		// 只写我们**确实拥有**的事实：站点名与站点地址，不编造作者、地址或资质。
+		writeScript(map[string]any{
+			"@context": spaJSONLDContext,
+			"@type":    "Organization",
+			"name":     siteName,
+			"url":      absoluteSEOURL(base, spaLocalizedPath(prefixLanguage, "/")),
+		})
+	}
+	if schemaType != "WebSite" && spaIsPublicPath(requestPath) {
+		// TODO SEO-ITEM-3.4：公开内容页给出一条真实可跟随的层级路径（首页 → 当前页）。
+		// 只在确实存在于 sitemap 的公开页生成，未知路径不伪造面包屑。
+		writeScript(map[string]any{
+			"@context": spaJSONLDContext,
+			"@type":    "BreadcrumbList",
+			"itemListElement": []any{
+				map[string]any{
+					"@type":    "ListItem",
+					"position": 1,
+					"name":     siteName,
+					"item":     absoluteSEOURL(base, spaLocalizedPath(prefixLanguage, "/")),
+				},
+				map[string]any{
+					"@type":    "ListItem",
+					"position": 2,
+					"name":     spaExpandSite(meta.Title, siteName),
+					"item":     absoluteSEOURL(base, spaLocalizedPath(prefixLanguage, requestPath)),
+				},
+			},
+		})
+	}
 	if schemaType == "WebSite" && includeFAQ {
 		writeScript(spaFAQJSONLD(language))
 	}
 	return b.String()
+}
+
+// spaIsPublicPath 报告路径是否属于 sitemap 收录的公开内容页。
+// 面包屑等结构化数据只在真实公开页上生成，避免为任意 SPA 路径编造层级。
+func spaIsPublicPath(path string) bool {
+	clean := strings.TrimRight(path, "/")
+	if clean == "" {
+		return true // 首页
+	}
+	for _, p := range seoPublicPaths {
+		if strings.TrimRight(p.Path, "/") == clean {
+			return true
+		}
+	}
+	return false
 }
 
 // spaCustomHomeContentConfigured 报告本部署是否配置了自定义首页内容。
@@ -752,7 +1047,7 @@ var spaFAQItemsZH = [][2]string{
 // spaFAQJSONLD 生成首页的 FAQPage 结构化数据（与页面上的 FAQ accordion 同文案）。
 func spaFAQJSONLD(language string) map[string]any {
 	items := spaFAQItemsEN
-	if language == "zh" {
+	if spaIsChinese(language) {
 		items = spaFAQItemsZH
 	}
 	entities := make([]map[string]any, 0, len(items))

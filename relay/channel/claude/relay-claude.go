@@ -232,20 +232,21 @@ func countClaudeStreamBillableTools(c *gin.Context, info *relaycommon.RelayInfo,
 }
 
 func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, claudeInfo *ClaudeResponseInfo) {
-	if claudeInfo.Usage.PromptTokens == 0 {
-		//上游出错
-	}
 	if claudeInfo.Usage.CompletionTokens == 0 || !claudeInfo.Done {
 		if common.DebugEnabled {
 			common.SysLog("claude response usage is not complete, maybe upstream error")
 		}
-		// 只补缺失字段，不整份覆盖——保留 message_start 已拿到的 cache 字段
+		// 只补缺失字段，不整份覆盖——保留 message_start 已拿到的 cache 字段。
+		// 关键：input_tokens=0 且 cache_read/cache_creation>0 是**合法的全命中缓存**
+		// usage，不能用估算值覆盖，否则会把真实的 cache 用量记成估算 input。
+		hasCacheUsage := claudeInfo.Usage.PromptTokensDetails.CachedTokens > 0 ||
+			claudeInfo.Usage.PromptTokensDetails.CacheCreationTokensTotal() > 0
 		fallback := service.ResponseText2Usage(c, claudeInfo.ResponseText.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
 		if claudeInfo.Usage.CompletionTokens == 0 ||
 			(!claudeInfo.Done && fallback.CompletionTokens > claudeInfo.Usage.CompletionTokens) {
 			claudeInfo.Usage.CompletionTokens = fallback.CompletionTokens
 		}
-		if claudeInfo.Usage.PromptTokens == 0 {
+		if claudeInfo.Usage.PromptTokens == 0 && !hasCacheUsage {
 			claudeInfo.Usage.PromptTokens = fallback.PromptTokens
 		}
 		claudeInfo.Usage.TotalTokens = claudeInfo.Usage.PromptTokens + claudeInfo.Usage.CompletionTokens

@@ -133,6 +133,17 @@ func UpdateFeatureSwitch(c *gin.Context) {
 // 返回错误时调用方负责回滚内存值。
 func activateFeatureSwitch(key, value string) error {
 	if value != "true" {
+		// 关闭渠道密钥加密前必须确认库里没有密文：否则 AfterFind 会跳过解密，
+		// 密文被直接发往上游，所有渠道 401（服务中断，不是安全降级）。
+		if key == common.FlagChannelKeyEncryption {
+			count, err := model.CountEncryptedChannelKeys()
+			if err != nil {
+				return fmt.Errorf("check encrypted channel keys before disabling: %w", err)
+			}
+			if count > 0 {
+				return fmt.Errorf("cannot disable CHANNEL_KEY_ENCRYPTION: %d encrypted channel keys exist; decrypt them back to plaintext first", count)
+			}
+		}
 		return nil
 	}
 	switch key {

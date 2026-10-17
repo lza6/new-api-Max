@@ -357,5 +357,10 @@ describe('API keys mutate drawer Auto group integration', () => {
     // The form's save button is replaced by the result-step actions.
     expect(findButton('Save changes', false)).toBe(null)
     expect(findButton('Go to Playground', true)).toBeTruthy()
+    // B4-2：结果页必须给出一条可直接运行的 curl（含真实 key 与正确的 /v1 路径）。
+    const curlBlock = screen.getByTestId('created-key-curl')
+    expect(curlBlock).toHaveTextContent('/v1/chat/completions')
+    expect(curlBlock).toHaveTextContent('sk-abc123')
+    expect(curlBlock).toHaveTextContent('Authorization: Bearer')
   })
 })

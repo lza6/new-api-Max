@@ -1,7 +1,10 @@
 package model
 
 import (
+	"errors"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/lza6/new-api-Max/common"
 )
@@ -21,6 +24,11 @@ import (
 func migrateChannelKeyEncryption() error {
 	if !common.ChannelKeyEncryptionEnabledValue() {
 		return nil
+	}
+	// 没有显式持久化的 CRYPTO_SECRET 时禁止迁移：进程重启会换随机密钥，
+	// 已加密渠道将永久无法解密（全部 401，且不可逆）。
+	if strings.TrimSpace(os.Getenv("CRYPTO_SECRET")) == "" {
+		return errors.New("CHANNEL_KEY_ENCRYPTION requires an explicitly configured CRYPTO_SECRET; refusing to migrate")
 	}
 	// 逐行读**原始 key 列**（Model+Select+Scan 不触发 AfterFind 解密），
 	// 判断是否已加密，再对明文行显式加密写回。避免 Find(&Channel{}) 触发
@@ -92,4 +100,14 @@ func AssertChannelKeyEncryptionState() {
 			"(falling back to SESSION_SECRET). If SESSION_SECRET is also unset, the per-process random " +
 			"secret changes on every restart and all encrypted channel keys become undecryptable.")
 	}
+}
+
+// CountEncryptedChannelKeys 返回库中带 enc:v1: 前缀的渠道数（原始列查询）。
+func CountEncryptedChannelKeys() (int64, error) {
+	if DB == nil {
+		return 0, nil
+	}
+	var count int64
+	err := DB.Model(&Channel{}).Where("key LIKE ?", common.ChannelKeyEncryptedPrefixPattern()).Count(&count).Error
+	return count, err
 }

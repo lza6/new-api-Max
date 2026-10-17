@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import {
   Activity,
   Box,
+  ClipboardCheck,
   ClipboardList,
   CreditCard,
   Database,
@@ -171,6 +172,13 @@ export function useSidebarData(): SidebarData {
             url: '/web-protection',
             icon: ShieldCheck,
             requiredRole: ROLE.SUPER_ADMIN,
+          },
+          {
+            // G5-3：MCP 付费动作的一次性审批队列。
+            title: t('Action Approvals'),
+            url: '/action-approvals',
+            icon: ClipboardCheck,
+            requiredRole: ROLE.ADMIN,
           },
           {
             // 运营面板：每日/总消耗、消耗排行、剩余额度与可运营天数。

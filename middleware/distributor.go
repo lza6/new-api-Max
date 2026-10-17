@@ -525,6 +525,15 @@ func getModelRequest(c *gin.Context) (*ModelRequest, bool, error) {
 		}
 		modelRequest.Model = req.Model
 	}
+	// /v1/files、/v1/fine-tunes、/v1/batches 不属于 chat 协议：files 可能是
+	// multipart，batches 根本不含 model。模型名按 header → query → JSON body
+	// → OPENAI_OPS_DEFAULT_MODEL 解析；都没有则明确拒绝（不能随机挑渠道）。
+	if relayconstant.Path2RelayMode(c.Request.URL.Path) == relayconstant.RelayModeOpenAIOps {
+		modelRequest.Model = getOpenAIOpsModel(c)
+		if modelRequest.Model == "" {
+			return nil, false, errors.New("model is required for /v1/files, /v1/fine-tunes and /v1/batches: send X-New-API-Model, ?model=, a JSON \"model\" field, or configure OPENAI_OPS_DEFAULT_MODEL")
+		}
+	}
 	if strings.HasPrefix(c.Request.URL.Path, "/v1/realtime") {
 		//wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-10-01
 		modelRequest.Model = c.Query("model")
@@ -773,4 +782,53 @@ func extractModelNameFromGeminiPath(path string) string {
 
 	// 返回模型名部分
 	return path[startIndex : startIndex+colonIndex]
+}
+
+// TokenModelLimitAllows 报告令牌的模型白名单是否放行该模型。
+//
+// 供复杂度路由 enforce 的候选校验复用：enforce 会改变最终模型，必须用与
+// 渠道分发**同一条**白名单判断，否则会出现「令牌只允许 A，路由却把请求发到 B」。
+func TokenModelLimitAllows(c *gin.Context, model string) bool {
+	if !common.GetContextKeyBool(c, constant.ContextKeyTokenModelLimitEnabled) {
+		return true
+	}
+	s, ok := common.GetContextKey(c, constant.ContextKeyTokenModelLimit)
+	if !ok {
+		return false
+	}
+	limit, ok := s.(map[string]bool)
+	if !ok {
+		return false
+	}
+	return tokenModelLimitAllows(limit, model)
+}
+
+// getOpenAIOpsModel 解析 /v1/files、/v1/fine-tunes、/v1/batches 选渠道用的模型名。
+//
+// 优先级：X-New-API-Model 头 → ?model= → JSON body.model → OPENAI_OPS_DEFAULT_MODEL。
+// files 上传是 multipart，不是 JSON；因此这里只尝试解析 body，失败不算错误。
+func getOpenAIOpsModel(c *gin.Context) string {
+	if model := strings.TrimSpace(c.GetHeader("X-New-API-Model")); model != "" {
+		return model
+	}
+	if model := strings.TrimSpace(c.Query("model")); model != "" {
+		return model
+	}
+	if storage, err := common.GetBodyStorage(c); err == nil {
+		if reader, err := storage.NewReader(); err == nil {
+			prefix, _ := io.ReadAll(io.LimitReader(reader, 64<<10))
+			_ = reader.Close()
+			if len(prefix) > 0 {
+				var body struct {
+					Model string `json:"model"`
+				}
+				if common.Unmarshal(prefix, &body) == nil {
+					if model := strings.TrimSpace(body.Model); model != "" {
+						return model
+					}
+				}
+			}
+		}
+	}
+	return strings.TrimSpace(common.GetEnvOrDefaultString("OPENAI_OPS_DEFAULT_MODEL", ""))
 }

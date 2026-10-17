@@ -108,3 +108,28 @@ func TestGetSiteOverviewAggregatesConsumeLogs(t *testing.T) {
 		}
 	}
 }
+
+// 多语言 sitemap：中英两份 URL 互指，并声明 x-default。
+func TestGetSitemapXmlIncludesLocaleAlternates(t *testing.T) {
+	prev := system_setting.ServerAddress
+	t.Cleanup(func() { system_setting.ServerAddress = prev })
+	system_setting.ServerAddress = "https://japi.example.com"
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	GetSitemapXml(c)
+	body := w.Body.String()
+
+	for _, want := range []string{
+		"<loc>https://japi.example.com/pricing</loc>",
+		"<loc>https://japi.example.com/en/pricing</loc>",
+		`hreflang="zh-CN"`,
+		`hreflang="en"`,
+		`hreflang="x-default"`,
+		`xmlns:xhtml="http://www.w3.org/1999/xhtml"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Fatalf("sitemap missing %q:\n%s", want, body)
+		}
+	}
+}

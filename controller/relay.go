@@ -204,24 +204,60 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 	// 7 维规则打分并映射 simple/medium/complex 档位。打分只读已抽取的文本信号，
 	// 不调外部模型、<1ms。结果缓存到 context 供日志与前端回显复用。
 	//
-	// 注意：本步骤**只打分不改路由**——渠道选择仍由既有逻辑决定（复杂度档位
-	// 目前用于观测与可解释展示）。这与 litellm 的 complexity router 一致：
-	// 先让档位在日志中可见、可校准，再按需接入实际选模。
+	// G4 阶段 A（shadow）：记录「本应路由到哪」但**不改**实际模型。
+	// G4 阶段 B（enforce）：ROUTING_MODE=enforce 时按候选模型改选渠道；
+	// 候选必须同时通过用户分组、令牌模型白名单与订阅矩阵校验（见 recordRoutingShadow）。
+	originalModelBeforeRouting := relayInfo.OriginModelName
+	enforcedModel := ""
 	if service.ComplexityRoutingEnabled() {
 		if score, ok := scoreRequestComplexity(request, meta); ok {
 			common.SetContextKey(c, constant.ContextKeyComplexityScore, score)
-			// G4 阶段 A（shadow）：据档位算出「本应路由到哪」并记录，
-			// **不改实际选渠道**。硬约束见 service/routing_policy.go：
-			// 候选必须过用户可用分组白名单；无可用候选则回退原模型。
 			if service.RoutingEnabled() {
-				recordRoutingShadow(c, score.Tier, relayInfo)
+				decision := recordRoutingShadow(c, score.Tier, relayInfo)
+				if service.RoutingMode() == service.RoutingModeEnforce {
+					if finalModel := service.ApplyEnforceGuard(decision, relayInfo.OriginModelName); finalModel != relayInfo.OriginModelName {
+						enforcedModel = finalModel
+						relayInfo.OriginModelName = finalModel
+						relayInfo.UpstreamModelName = finalModel
+						common.SetContextKey(c, constant.ContextKeyOriginalModel, finalModel)
+						common.SetContextKey(c, constant.ContextKeyRoutingEnforced, true)
+						if relayInfo.Request != nil {
+							relayInfo.Request.SetModelName(finalModel)
+						}
+						logger.LogInfo(c, fmt.Sprintf("complexity routing enforce: %s -> %s (tier=%s)",
+							originalModelBeforeRouting, finalModel, score.Tier))
+					}
+				}
 			}
 		}
 	}
-	priceData, err := helper.ModelPriceHelper(c, relayInfo, tokens, meta)
+	var priceData hosttypes.PriceData
+	if relayFormat == types.RelayFormatOpenAIOps {
+		// /v1/files、/v1/fine-tunes、/v1/batches 不按 token 计价：
+		// 元数据操作免费；创建 fine-tune/batch 必须显式配置按次额度。
+		priceData, err = relay.OpenAIOpsPriceData(c.Request.Method, c.Request.URL.Path)
+	} else {
+		priceData, err = helper.ModelPriceHelper(c, relayInfo, tokens, meta)
+	}
 	if err != nil {
-		newAPIError = types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
-		return
+		// enforce 的候选可能没有配置价格（新模型/未定价）：此时**回退原模型**，
+		// 不能让一次路由优化把本来可用的请求变成 400。
+		if enforcedModel != "" {
+			logger.LogWarn(c, fmt.Sprintf("complexity routing enforce fallback: candidate %s has no usable price (%v), reverting to %s",
+				enforcedModel, err, originalModelBeforeRouting))
+			relayInfo.OriginModelName = originalModelBeforeRouting
+			relayInfo.UpstreamModelName = originalModelBeforeRouting
+			common.SetContextKey(c, constant.ContextKeyOriginalModel, originalModelBeforeRouting)
+			common.SetContextKey(c, constant.ContextKeyRoutingEnforced, false)
+			if relayInfo.Request != nil {
+				relayInfo.Request.SetModelName(originalModelBeforeRouting)
+			}
+			priceData, err = helper.ModelPriceHelper(c, relayInfo, tokens, meta)
+		}
+		if err != nil {
+			newAPIError = types.NewError(err, types.ErrorCodeModelPriceError, types.ErrOptionWithStatusCode(http.StatusBadRequest))
+			return
+		}
 	}
 
 	// common.SetContextKey(c, constant.ContextKeyTokenCountMeta, meta)
@@ -333,6 +369,8 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 			newAPIError = relay.ClaudeHelper(c, relayInfo)
 		case types.RelayFormatGemini:
 			newAPIError = geminiRelayHandler(c, relayInfo)
+		case types.RelayFormatOpenAIOps:
+			newAPIError = relay.OpenAIOpsHandler(c, relayInfo)
 		default:
 			newAPIError = relayHandler(c, relayInfo)
 		}
@@ -498,19 +536,30 @@ func scoreRequestComplexity(request dto.Request, meta *types.TokenCountMeta) (se
 //
 // 这里传 retry=0 与空 filters：只问「存在可用候选吗」，不真的占用或改变任何状态
 // （该函数是只读的候选查询，不修改冷却/计数）。
-func recordRoutingShadow(c *gin.Context, tier service.ComplexityTier, relayInfo *relaycommon.RelayInfo) {
+func recordRoutingShadow(c *gin.Context, tier service.ComplexityTier, relayInfo *relaycommon.RelayInfo) service.RoutingShadowDecision {
 	if relayInfo == nil {
-		return
+		return service.RoutingShadowDecision{}
 	}
 	group := relayInfo.UsingGroup
 	if group == "" {
 		group = "default"
 	}
 	decision := service.ResolveRoutingShadow(tier, relayInfo.OriginModelName, func(candidate string) bool {
+		// shadow 模式只记录，不做额外鉴权查询；enforce 会真正改模型，
+		// 因此必须同时通过令牌白名单与订阅矩阵（缺一即为越权或必然失败）。
+		if service.RoutingMode() == service.RoutingModeEnforce {
+			if !middleware.TokenModelLimitAllows(c, candidate) {
+				return false
+			}
+			if allowed, _, err := service.CheckSubscriptionModelAccess(relayInfo.UserId, candidate); err == nil && !allowed {
+				return false
+			}
+		}
 		channel, err := model.GetRandomSatisfiedChannel(group, candidate, 0, nil)
 		return err == nil && channel != nil && channel.Id > 0
 	})
 	common.SetContextKey(c, constant.ContextKeyRoutingShadow, decision)
+	return decision
 }
 
 // evaluateRequestPolicy T10：为统一策略中心组装一次判定的输入。
@@ -716,7 +765,7 @@ func getChannel(c *gin.Context, info *relaycommon.RelayInfo, retryParam *service
 			}
 		}
 	}
-	if info.ChannelMeta == nil {
+	if info.ChannelMeta == nil && !common.GetContextKeyBool(c, constant.ContextKeyRoutingEnforced) {
 		autoBan := c.GetBool("auto_ban")
 		autoBanInt := 1
 		if !autoBan {

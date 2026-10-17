@@ -381,7 +381,7 @@ func TestSPAPricingTableOnlyOnPricingRoute(t *testing.T) {
 func TestSPASEOVisibleExtrasStayInsideContainer(t *testing.T) {
 	// 直接驱动内容块构造函数，验证它对 extraHTML 的容器边界契约。
 	page := spaBuildContentBlock(
-		"Pricing", "summary", "caveat", "/pricing", "Example", "en",
+		"Pricing", "summary", "caveat", "/pricing", "Example", "en", "",
 		`<table id="spa-seo-pricing"><tr><td>model</td></tr></table>`,
 	)
 
@@ -717,4 +717,173 @@ func spaLoadFrontendLocale(t *testing.T, name string) map[string]string {
 	require.NoError(t, common.Unmarshal(raw, &doc))
 	require.NotEmptyf(t, doc.Translation, "%s 的 translation 段为空", name)
 	return doc.Translation
+}
+
+// TODO SEO-ITEM-1.4：认证入口页必须 noindex，公开内容页必须**不**被误伤。
+func TestSPASEOAuthEntryPagesAreNoIndex(t *testing.T) {
+	isolateHomePageOption(t, "")
+
+	noIndexPaths := []string{
+		"/sign-in", "/sign-up", "/login", "/register",
+		"/forgot-password", "/reset", "/otp", "/setup",
+		"/user/reset", "/oauth", "/oauth/github",
+	}
+	for _, path := range noIndexPaths {
+		page := buildFixture(t, path)
+		assert.Containsf(t, page, `<meta name="robots" content="noindex, nofollow" />`,
+			"%s 是认证入口页，必须 noindex", path)
+	}
+
+	for _, path := range []string{"/", "/pricing", "/about", "/rankings", "/status"} {
+		page := buildFixture(t, path)
+		assert.NotContainsf(t, page, `name="robots"`,
+			"%s 是公开内容页，不得被 noindex 误伤", path)
+	}
+}
+
+// TODO SEO-ITEM-3.1：首页声明 Organization（只写站点名与站点地址，不编造资质）。
+func TestSPASEOHomeDeclaresOrganization(t *testing.T) {
+	isolateHomePageOption(t, "")
+
+	page := buildFixture(t, "/")
+	var org map[string]any
+	for _, doc := range spaJSONLDDocs(t, page) {
+		if doc["@type"] == "Organization" {
+			org = doc
+			break
+		}
+	}
+	require.NotNil(t, org, "首页必须声明 Organization")
+	assert.NotEmpty(t, org["name"], "Organization 必须有站点名")
+	assert.Contains(t, org["url"], "http", "Organization 必须有绝对站点地址")
+	for _, forbidden := range []string{"address", "founder", "award", "vatID"} {
+		assert.NotContains(t, org, forbidden, "不得声明我们没有的资质字段 %s", forbidden)
+	}
+}
+
+// TODO SEO-ITEM-3.4：公开内容页给真实面包屑；未知 SPA 路径不伪造层级。
+func TestSPASEOPublicPagesDeclareBreadcrumb(t *testing.T) {
+	isolateHomePageOption(t, "")
+
+	page := buildFixture(t, "/pricing")
+	var crumb map[string]any
+	for _, doc := range spaJSONLDDocs(t, page) {
+		if doc["@type"] == "BreadcrumbList" {
+			crumb = doc
+			break
+		}
+	}
+	require.NotNil(t, crumb, "/pricing 必须声明 BreadcrumbList")
+	items, ok := crumb["itemListElement"].([]any)
+	require.True(t, ok, "BreadcrumbList 必须有 itemListElement")
+	require.Len(t, items, 2, "面包屑应为 首页 → 当前页 两级")
+	first, _ := items[0].(map[string]any)
+	second, _ := items[1].(map[string]any)
+	assert.Equal(t, float64(1), first["position"])
+	assert.Equal(t, float64(2), second["position"])
+	assert.Contains(t, second["item"], "/pricing")
+
+	unknown := buildFixture(t, "/some-unknown-spa-path")
+	assert.NotContains(t, unknown, `"BreadcrumbList"`,
+		"未知路径不在 sitemap 中，不得伪造面包屑")
+}
+
+// hreflang / 语言路径前缀：/en/... 输出英文内容、英文 canonical 与互指链接。
+func TestSPASEOLocalePrefixEnglish(t *testing.T) {
+	isolateHomePageOption(t, "")
+
+	page := buildFixture(t, "/en/pricing")
+	assert.Contains(t, page, `<html lang="en">`)
+	assert.Contains(t, page, `href="https://`)
+	assert.Contains(t, page, `/en/pricing" />`, "canonical 必须带语言前缀")
+	assert.Contains(t, page, `hreflang="en"`)
+	assert.Contains(t, page, `hreflang="zh-CN"`)
+	assert.Contains(t, page, `hreflang="x-default"`)
+	assert.Contains(t, page, `href="/en/about"`, "站内导航必须保留语言前缀")
+	assert.NotContains(t, page, `href="/about"`, "英文页不得把用户带回无前缀（中文）地址")
+}
+
+// 前缀页 noindex：/en/sign-in 仍必须被识别为认证入口。
+func TestSPASEOLocalePrefixKeepsNoIndex(t *testing.T) {
+	isolateHomePageOption(t, "")
+	page := buildFixture(t, "/en/sign-in")
+	assert.Contains(t, page, `<meta name="robots" content="noindex, nofollow" />`)
+}
+
+// 只有服务端确有文案的语言才声明 hreflang；fr 可通过前缀访问但不得被标成法语内容。
+func TestSPASEODoesNotAdvertiseUntranslatedHreflang(t *testing.T) {
+	isolateHomePageOption(t, "")
+	page := buildFixture(t, "/fr/pricing")
+	// 服务端内容仍是英文，因此 lang 必须与内容一致（en），不能假装是 fr。
+	assert.Contains(t, page, `<html lang="en">`)
+	assert.Contains(t, page, `/fr/pricing" />`)
+	assert.NotContains(t, page, `hreflang="fr"`,
+		"服务端没有法语页面文案，不得声明 fr hreflang")
+	assert.Contains(t, page, `content="noindex, nofollow"`,
+		"未翻译的服务端内容必须 noindex，避免错误语言标注被收录")
+}
+
+// 默认语言 zh 的前缀必须 301 到无前缀地址。
+func TestSPASEODefaultLocaleRedirect(t *testing.T) {
+	target, ok := DefaultLocaleRedirectTarget("/zh/pricing")
+	require.True(t, ok)
+	assert.Equal(t, "/pricing", target)
+
+	target, ok = DefaultLocaleRedirectTarget("/zh")
+	require.True(t, ok)
+	assert.Equal(t, "/", target)
+
+	_, ok = DefaultLocaleRedirectTarget("/en/pricing")
+	assert.False(t, ok)
+}
+
+// 回归：注入后的 HTML 注释必须闭合，且 canonical 不能落在注释里。
+//
+// 真实浏览器 E2E 曾发现：index.html 注释里出现字面 `<title>`，标题正则从注释内
+// 开始匹配并吃掉注释尾部，导致浏览器把 canonical/meta 整段当注释吞掉。
+func TestSPASEOGeneratedHTMLCommentsBalancedAndCanonicalVisible(t *testing.T) {
+	isolateHomePageOption(t, "")
+	for _, path := range []string{"/", "/pricing", "/en/pricing"} {
+		page := buildFixture(t, path)
+		assert.Equalf(t, strings.Count(page, "<!--"), strings.Count(page, "-->"),
+			"%s 的 HTML 注释必须成对闭合", path)
+
+		idx := strings.Index(page, `<link rel="canonical"`)
+		require.Greaterf(t, idx, 0, "%s 必须有 canonical", path)
+		assert.Falsef(t, insideHTMLComment(page, idx),
+			"%s 的 canonical 被包在 HTML 注释里（浏览器会忽略）", path)
+	}
+}
+
+// insideHTMLComment 报告 pos 是否处于一个未闭合的 `<!-- ... -->` 区间内。
+func insideHTMLComment(page string, pos int) bool {
+	inComment := false
+	for i := 0; i < pos; i++ {
+		switch {
+		case !inComment && strings.HasPrefix(page[i:], "<!--"):
+			inComment = true
+			i += 3
+		case inComment && strings.HasPrefix(page[i:], "-->"):
+			inComment = false
+			i += 2
+		}
+	}
+	return inComment
+}
+
+// 开放重定向回归：/zh//evil.com 等协议相对地址必须回落到站内首页。
+func TestSPASEODefaultLocaleRedirectRejectsProtocolRelative(t *testing.T) {
+	for _, path := range []string{"/zh//evil.com", `/zh/\evil.com`, "/zh///evil.com"} {
+		target, ok := DefaultLocaleRedirectTarget(path)
+		require.True(t, ok)
+		assert.Equalf(t, "/", target, "%s 不得重定向到站外", path)
+	}
+}
+
+// 回归：路径/标题里的 `$1` 不得被正则替换当作捕获组展开。
+func TestSPASEOReplacementDollarIsLiteral(t *testing.T) {
+	isolateHomePageOption(t, "")
+	page := buildFixture(t, "/pricing$1")
+	assert.Contains(t, page, `href="http://localhost:3000/pricing$1"`,
+		"canonical 中的 $1 必须原样保留")
 }

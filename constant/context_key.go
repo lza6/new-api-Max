@@ -102,6 +102,10 @@ const (
 	// （service.RoutingShadowDecision）。阶段 A 只记录「本应路由到哪」，
 	// 不改变实际选渠道；供日志回显与 shadow 期误报率统计。
 	ContextKeyRoutingShadow ContextKey = "routing_shadow"
+	// ContextKeyRoutingEnforced 标记本次请求已按复杂度路由**改变最终模型**。
+	// getChannel 据此跳过「复用分发中间件已选渠道」的快路径，改为按新模型重新选渠道；
+	// 否则会出现「计费/日志用新模型，实际请求仍发往旧模型的渠道」。
+	ContextKeyRoutingEnforced ContextKey = "routing_enforced"
 
 	// ContextKeyRelayAuditFindings 收集中继一致性自检的四类发现
 	// （service.RelayAuditFinding）。流式/非流式响应处理过程中追加，请求结束时

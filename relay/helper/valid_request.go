@@ -3,6 +3,7 @@ package helper
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net/url"
 	"strconv"
@@ -40,6 +41,8 @@ func GetAndValidateRequest(c *gin.Context, format types.RelayFormat) (request dt
 		request, err = GetAndValidateResponsesCompactionRequest(c)
 	case types.RelayFormatOpenAIAlphaSearch:
 		request, err = GetAndValidateAlphaSearchRequest(c)
+	case types.RelayFormatOpenAIOps:
+		request, err = GetAndValidateOpenAIOpsRequest(c)
 
 	case types.RelayFormatOpenAIImage:
 		request, err = GetAndValidOpenAIImageRequest(c, relayMode)
@@ -166,6 +169,42 @@ func GetAndValidateAlphaSearchRequest(c *gin.Context) (*dto.AlphaSearchRequest, 
 	}
 	request.RawBody = rawBody
 	return request, nil
+}
+
+// GetAndValidateOpenAIOpsRequest 解析 /v1/files、/v1/fine-tunes、/v1/batches
+// 选渠道所需的模型名。
+//
+// **不把请求体物化到内存**：files 上传可能是几十/上百 MB，body storage 会溢写磁盘；
+// 这里只读最多 64KB 前缀用于提取 JSON `model`，其余原样留在 storage 里由 handler
+// 通过 `NewReader()` 流式转发。multipart/非 JSON body 不做严格解析。
+func GetAndValidateOpenAIOpsRequest(c *gin.Context) (*dto.OpenAIOpsRequest, error) {
+	model := strings.TrimSpace(c.GetHeader("X-New-API-Model"))
+	if model == "" {
+		model = strings.TrimSpace(c.Query("model"))
+	}
+	if model == "" {
+		if storage, err := common.GetBodyStorage(c); err == nil {
+			if reader, err := storage.NewReader(); err == nil {
+				prefix, _ := io.ReadAll(io.LimitReader(reader, 64<<10))
+				_ = reader.Close()
+				if len(prefix) > 0 {
+					var body struct {
+						Model string `json:"model"`
+					}
+					if common.Unmarshal(prefix, &body) == nil {
+						model = strings.TrimSpace(body.Model)
+					}
+				}
+			}
+		}
+	}
+	if model == "" {
+		model = strings.TrimSpace(common.GetEnvOrDefaultString("OPENAI_OPS_DEFAULT_MODEL", ""))
+	}
+	if model == "" {
+		return nil, errors.New("model is required for /v1/files, /v1/fine-tunes and /v1/batches: send X-New-API-Model, ?model=, a JSON \"model\" field, or configure OPENAI_OPS_DEFAULT_MODEL")
+	}
+	return &dto.OpenAIOpsRequest{Model: model}, nil
 }
 
 func GetAndValidateResponsesCompactionRequest(c *gin.Context) (*dto.OpenAIResponsesCompactionRequest, error) {

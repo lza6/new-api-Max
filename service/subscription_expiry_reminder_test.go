@@ -137,3 +137,68 @@ func TestScanSubscriptionExpiryReminderSendsOnceAndDedups(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, subs) // 再次扫描不再命中
 }
+
+// 多阈值：默认 3 天/1 天两次提醒，第二次不得被第一次的去重条件吞掉。
+func TestParseSubscriptionExpiryReminderDays(t *testing.T) {
+	assert.Equal(t, []int{3, 1}, parseSubscriptionExpiryReminderDays("3,1"))
+	assert.Equal(t, []int{7, 3, 1}, parseSubscriptionExpiryReminderDays("1, 3,7,3,0,-1,x"))
+	assert.Empty(t, parseSubscriptionExpiryReminderDays(""))
+}
+
+func TestGetDueExpiryReminderSubscriptionsBetweenWindows(t *testing.T) {
+	db := seedExpiryReminderDB(t)
+	now := common.GetTimestamp()
+
+	createExpiryReminderSub(t, db, 8501, 85001, now+2*86400, "active", 0) // 落在 3 天窗口
+	createExpiryReminderSub(t, db, 8502, 85002, now+12*3600, "active", 0) // 不足 1 天
+	createExpiryReminderSub(t, db, 8503, 85003, now+12*3600, "active", 3) // 已收 3 天提醒，应进 1 天窗口
+
+	threeDay, err := model.GetDueExpiryReminderSubscriptionsBetween(100, 1, 3)
+	require.NoError(t, err)
+	ids := make([]int, 0, len(threeDay))
+	for i := range threeDay {
+		ids = append(ids, threeDay[i].Id)
+	}
+	assert.Equal(t, []int{8501}, ids, "3 天窗口只应覆盖 (>1d, <=3d]，不得抢先打扰不足 1 天的订阅")
+
+	oneDay, err := model.GetDueExpiryReminderSubscriptionsBetween(100, 0, 1)
+	require.NoError(t, err)
+	ids = ids[:0]
+	for i := range oneDay {
+		ids = append(ids, oneDay[i].Id)
+	}
+	assert.ElementsMatch(t, []int{8502, 8503}, ids, "1 天窗口应覆盖未提醒与已收 3 天提醒的订阅")
+}
+
+func TestScanSubscriptionExpiryReminderSendsTwoThresholds(t *testing.T) {
+	db := seedExpiryReminderDB(t)
+	now := common.GetTimestamp()
+	require.NoError(t, db.Create(&model.User{Id: 86001, Username: "remind-two", Status: common.UserStatusEnabled}).Error)
+	createExpiryReminderSub(t, db, 8601, 86001, now+2*86400, "active", 0)
+
+	prevRedis := common.RedisEnabled
+	common.RedisEnabled = false
+	t.Cleanup(func() { common.RedisEnabled = prevRedis })
+	prevNotifyLimit := constant.NotifyLimitCount
+	constant.NotifyLimitCount = 5
+	t.Cleanup(func() { constant.NotifyLimitCount = prevNotifyLimit })
+
+	t.Setenv("SUBSCRIPTION_EXPIRY_REMIND_DAYS", "3,1")
+
+	scanSubscriptionExpiryReminder()
+	var sub model.UserSubscription
+	require.NoError(t, db.Where("id = ?", 8601).First(&sub).Error)
+	assert.Equal(t, 3, sub.ReminderDaysNotified, "先进入 3 天窗口")
+
+	// 模拟时间推进到 12 小时后：同一条订阅应再收到一次 1 天提醒。
+	require.NoError(t, db.Model(&model.UserSubscription{}).Where("id = ?", 8601).
+		Update("end_time", now+12*3600).Error)
+	scanSubscriptionExpiryReminder()
+	require.NoError(t, db.Where("id = ?", 8601).First(&sub).Error)
+	assert.Equal(t, 1, sub.ReminderDaysNotified, "进入 1 天窗口后必须再提醒一次")
+
+	// 第三次扫描不得重复发送。
+	scanSubscriptionExpiryReminder()
+	require.NoError(t, db.Where("id = ?", 8601).First(&sub).Error)
+	assert.Equal(t, 1, sub.ReminderDaysNotified)
+}

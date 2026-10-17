@@ -356,7 +356,14 @@ func DoApiRequest(a Adaptor, c *gin.Context, info *common.RelayInfo, requestBody
 	// 的字节（-1 表示不可测），供实时面板/日志展示，避免调用方自行猜测。
 	// compressed=true 时必须在本次请求结束前 Close 存储，并设置
 	// Content-Encoding: gzip。fail-open：任何异常都退回明文，绝不拒绝请求。
-	requestBody, compressed, compressionCloser, originalBytes, compressedBytes := common.MaybeCompressOutboundBody(c, info, requestBody)
+	// multipart/form-data 不能 gzip：boundary 与上游解析都按原始字节处理，
+	// 压缩会改变 Content-Type 语义。仅对非 multipart 请求启用出站压缩。
+	compressed := false
+	var compressionCloser io.Closer
+	originalBytes, compressedBytes := int64(-1), int64(-1)
+	if !strings.HasPrefix(strings.ToLower(c.Request.Header.Get("Content-Type")), "multipart/form-data") {
+		requestBody, compressed, compressionCloser, originalBytes, compressedBytes = common.MaybeCompressOutboundBody(c, info, requestBody)
+	}
 	if compressionCloser != nil {
 		defer compressionCloser.Close()
 	}

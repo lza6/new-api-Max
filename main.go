@@ -461,6 +461,18 @@ func InitResources() error {
 
 	model.CheckSetup()
 
+	// B1-2：渠道密钥加密的启动接线。
+	// 1) 自检：库中已有 enc:v1: 密文但开关被关 → 渠道会拿密文发上游并全部 401，
+	//    必须显式告警（只告警，不改行为）。
+	// 2) 迁移：开关开启时把所有存量明文 Key 幂等加密；默认关时是 no-op。
+	// 只由 master 执行迁移，避免多副本同时改写同一行。
+	model.AssertChannelKeyEncryptionState()
+	if common.IsMasterNode {
+		if err := model.MigrateChannelKeyEncryption(); err != nil {
+			common.SysError("failed to migrate channel key encryption: " + err.Error())
+		}
+	}
+
 	// Initialize options, should after model.InitDB()
 	if common.IsMasterNode {
 		if err := model.MigrateRetiredFrontendOptions(); err != nil {

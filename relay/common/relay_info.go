@@ -675,6 +675,11 @@ func GenRelayInfo(c *gin.Context, relayFormat types.RelayFormat, request dto.Req
 			return GenRelayInfoAlphaSearch(c, request), nil
 		}
 		return nil, errors.New("request is not a AlphaSearchRequest")
+	case types.RelayFormatOpenAIOps:
+		if request, ok := request.(*dto.OpenAIOpsRequest); ok {
+			return GenRelayInfoOpenAIOps(c, request), nil
+		}
+		return nil, errors.New("request is not a OpenAIOpsRequest")
 	case types.RelayFormatTask:
 		info = genBaseRelayInfo(c, nil)
 		info.TaskRelayInfo = &TaskRelayInfo{}
@@ -766,9 +771,25 @@ func GenRelayInfoAlphaSearch(c *gin.Context, request *dto.AlphaSearchRequest) *R
 	return info
 }
 
-//func (info *RelayInfo) SetPromptTokens(promptTokens int) {
-//	info.promptTokens = promptTokens
-//}
+// GenRelayInfoOpenAIOps 构造 /v1/files、/v1/fine-tunes、/v1/batches 的请求信息。
+//
+// 这些端点的上游路径必须**原样**保留（含子资源 id 与 query），因此
+// RequestURLPath 取 `c.Request.URL.String()`；模型名用于选渠道与计费，
+// 由分发中间件从 header/body/default 解析后写入 original_model。
+func GenRelayInfoOpenAIOps(c *gin.Context, request *dto.OpenAIOpsRequest) *RelayInfo {
+	info := genBaseRelayInfo(c, request)
+	info.RelayMode = relayconstant.RelayModeOpenAIOps
+	info.RelayFormat = types.RelayFormatOpenAIOps
+	info.RequestURLPath = c.Request.URL.String()
+	if info.OriginModelName == "" && request != nil {
+		info.OriginModelName = request.Model
+	}
+	// 不要在这里访问 info.UpstreamModelName：它属于嵌入的 *ChannelMeta，
+	// 此时 ChannelMeta 尚未初始化（InitChannelMeta 在 handler 内才调用），
+	// 直接访问会 nil dereference 并 panic。UpstreamModelName 由
+	// InitChannelMeta 从 context 的 original_model 回填。
+	return info
+}
 
 func (info *RelayInfo) SetEstimatePromptTokens(promptTokens int) {
 	if info == nil {

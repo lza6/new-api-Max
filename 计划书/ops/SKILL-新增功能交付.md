@@ -44,7 +44,7 @@ description: new-api 网关「端到端新增一个功能/接口」的交付工�
 | 1 | 根 `AGENTS.md`（用 Read 工具读，不要靠 `@import`） | 硬纪律全集：JSON 封装、三库、计费安全、relaykit、ASVS、i18n、受保护标识 | 对照 `AGENTS.md` 提到的 file:line 是否还在（如 `common/json.go`、`model/main.go`） |
 | 2 | `web/AGENTS.md`（若碰前端） | 组件复用、i18n、测试、构建门禁 | `web/package.json` 里的脚本名是否仍匹配文中命令 |
 | 3 | 本目录 `new-api-add-feature` SKILL.md | 领域细节与历史批次教训（v1.3.59–133） | 文中 `file:line` 与开关默认值是否仍成立 |
-| 4 | `计划书/workflow_status.md`（仓库根） | 本次相关主题是否已闭环、有没有「别重复跑/改过」的记录 | 末尾章节的日期与 `VERSION` 对照 |
+| 4 | `计划书/audit-ledger.md`（仓库根） | 本次相关主题是否已闭环、有没有「别重复跑/改过」的记录 | 末尾章节的日期与 `VERSION` 对照 |
 | 5 | 跨会话记忆 `memory/*.md`（尤其 `new-api-verification-ledger-*`） | 哪些验证已 PASS（勿重跑）、哪些失败是**既有噪声**（勿误判回归） | 记忆里的 VERSION 与当前 `VERSION` 对照 |
 | 6 | 本目录 `计划书/ops/SOP-*.md`、`计划书/adr/*.md` | 交付/排障/回滚 SOP 与既有架构决策 | 各文件头部「最后核对」版本号 |
 
@@ -185,7 +185,7 @@ description: new-api 网关「端到端新增一个功能/接口」的交付工�
 
 - [ ] 每个新端点有一条真实 E2E（起本地网关 `SQL_DSN=local SQLITE_PATH=... PORT=18100` 打新端点）
 - [ ] 新增 key 在 7 个语言文件里齐全（`i18n:check` 缺失=0）
-- [ ] 回填 `计划书/workflow_status.md` + 记忆台账 +（必须时）`计划书/ops/SOP-回滚.md` 覆盖到新东西
+- [ ] 回填 `计划书/audit-ledger.md` + 记忆台账 +（必须时）`计划书/ops/SOP-回滚.md` 覆盖到新东西
 - [ ] 每条断言都用**实际运行输出**支撑；未跑的命令标「未验证」，不写「通过」
 
 ---
@@ -227,7 +227,7 @@ description: new-api 网关「端到端新增一个功能/接口」的交付工�
 
 1. 走 §4 验收清单，逐条留下**真实输出**。
 2. 起一个**独立审查**子代理（不继承实现者结论），对需求完整性/边界/安全/测试缺口逐条复验。
-3. 回填文档：`计划书/workflow_status.md` + 记忆台账；新东西若影响回滚，更新
+3. 回填文档：`计划书/audit-ledger.md` + 记忆台账；新东西若影响回滚，更新
    `计划书/ops/SOP-回滚.md`。必要时把新的架构取舍写成 `计划书/adr/ADR-*.md`。
 4. `graft build` 刷新知识图（若项目用 graft）。
 5. 交付说明用四级标签：`已验证`（实际运行）/ `静态确认`（读码）/ `合理推断` / `待验证`。

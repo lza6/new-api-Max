@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"os"
 	"strings"
@@ -392,6 +393,22 @@ var spaRouteMetaZh = map[string]spaRouteMeta{
 		Summary:     "本页展示本部署对自身的观测结果：主库、日志库与缓存的探测状态；近 24 小时记录的请求量与错误条数及其得出的成功比例（仅在开启错误日志时给出）；各后台任务的最近一次心跳；以及进程已运行时长。所有数字均由本实例自身测得，不是第三方监控服务。",
 		Caveat:      "这些是对网关自身的测量，不构成可用性承诺或服务等级保证：本站不采样、也不保留可用性历史，数字按固定间隔刷新而非实时。",
 	},
+	"/user-agreement": {
+		Title:       "用户协议 — {site}",
+		Description: "本部署运营方配置的用户协议。",
+		H1:          "用户协议",
+		NavLabel:    "用户协议",
+		Summary:     "本页展示本部署运营方配置的用户协议；正文由运营方提供。",
+		Caveat:      "若运营方尚未配置该文档，页面可能为空。",
+	},
+	"/privacy-policy": {
+		Title:       "隐私政策 — {site}",
+		Description: "本部署运营方配置的隐私政策。",
+		H1:          "隐私政策",
+		NavLabel:    "隐私政策",
+		Summary:     "本页展示本部署运营方配置的隐私政策；正文由运营方提供。",
+		Caveat:      "若运营方尚未配置该文档，页面可能为空。",
+	},
 }
 
 // spaExternalDocLinks 是内容块里的上游官方文档外链（两种语言共用，地址不翻译）。
@@ -448,14 +465,28 @@ func GetSitemapXml(c *gin.Context) {
 	base := seoSiteBase()
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n")
+	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\" xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n")
+	// 只为**服务端确有对应语言内容**的语言生成 URL（见 spaHreflangLanguages）。
+	// fr/ru/ja/vi 目前只有前端 UI 翻译，服务端页面文案仍是英文，收录会形成重复内容。
 	for _, p := range seoPublicPaths {
-		b.WriteString("  <url><loc>")
-		b.WriteString(base)
-		b.WriteString(p.Path)
-		b.WriteString("</loc><priority>")
-		b.WriteString(p.Priority)
-		b.WriteString("</priority></url>\n")
+		for _, lang := range spaHreflangLanguages {
+			b.WriteString("  <url><loc>")
+			b.WriteString(html.EscapeString(absoluteSEOURL(base, spaLocalizedPath(lang, p.Path))))
+			b.WriteString("</loc>")
+			for _, alt := range spaHreflangLanguages {
+				b.WriteString(`<xhtml:link rel="alternate" hreflang="`)
+				b.WriteString(html.EscapeString(spaHreflangTag(alt)))
+				b.WriteString(`" href="`)
+				b.WriteString(html.EscapeString(absoluteSEOURL(base, spaLocalizedPath(alt, p.Path))))
+				b.WriteString(`"/>`)
+			}
+			b.WriteString(`<xhtml:link rel="alternate" hreflang="x-default" href="`)
+			b.WriteString(html.EscapeString(absoluteSEOURL(base, spaLocalizedPath(spaDefaultHreflangLanguage, p.Path))))
+			b.WriteString(`"/>`)
+			b.WriteString("<priority>")
+			b.WriteString(p.Priority)
+			b.WriteString("</priority></url>\n")
+		}
 	}
 	b.WriteString("</urlset>\n")
 	c.Header("Cache-Control", "public, max-age=3600")

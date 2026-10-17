@@ -32,6 +32,7 @@ import { DirectionProvider } from './context/direction-provider'
 import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
 import i18n, { i18nReady } from './i18n/config'
+import { routeLocaleBasepath } from './i18n/languages'
 // Generated Routes
 import { routeTree } from './routeTree.gen'
 
@@ -48,8 +49,15 @@ const queryClient = createAppQueryClient(() => {
 })
 
 // Create a new router instance
+// SEO 多语言：`/en/...`、`/fr/...` 等前缀由 TanStack Router 的 basepath 剥离。
+// 默认语言 zh-CN 不带前缀（basepath undefined），现有 URL 不受影响。
+const localeBasepath =
+  typeof window === 'undefined'
+    ? undefined
+    : routeLocaleBasepath(window.location.pathname)
 const router = createRouter({
   routeTree,
+  ...(localeBasepath ? { basepath: localeBasepath } : {}),
   context: { queryClient },
   defaultPreload: 'intent',
   defaultPreloadStaleTime: 30_000,

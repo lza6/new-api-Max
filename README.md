@@ -61,9 +61,9 @@
 
 ### 运维与本地化
 - 前端 zh / zh-TW 汉化；系统信息页 CPU/内存/状态真实上报
-- 部署/回滚/验收/E2E 复现：见 `计划书/ops/deployment-sop.md`、`计划书/workflow_status.md`、`计划书/audit/final-audit-v1.3.46.md`
+- 部署/回滚/验收/E2E 复现：见 `计划书/ops/SOP-运维手册.md`、`计划书/audit-ledger.md`、`计划书/e2e-evidence/`
 
-### 生产安全加固与报表（007 批次，2026-10-04，**未部署**）
+### 生产安全加固与报表（007 批次，2026-10-04）
 - **登录暴力破解防护**：登录限流默认开启（`login_rate_limit.enabled` 默认 true）；**失败登录写审计**（`audit_logs`，`success=false` + `status` + `reason`，去敏不含密码）——OWASP 反暴力破解基线
 - **账号级登录失败锁定**（OWASP Authentication Cheat Sheet — Account Lockout：失败计数必须归属**账号**而非来源 IP）：`login_lockout`（默认开启，`threshold`=20 次 / `window_seconds`=1200s，退避 `base_lock_seconds`=300s → `max_lock_seconds`=900s 封顶）。仅拒绝该账号的**密码**登录（OAuth/passkey/2FA 不受影响），锁定期内尝试不累加、不延长锁定，任意一次成功登录立即清零——因此**不能被用来永久锁死他人账号**。锁定写审计（`account_locked`，解锁由成功登录的既有审计体现），面向调用方的响应与"密码错误/账号不存在"完全一致（反枚举）
 - **私网判定一致**：`common.IsPrivateIP` 补齐 CGNAT `100.64.0.0/10`、link-local、保留段，与 SSRF 判定同集
@@ -75,7 +75,7 @@
 - **站内图床（本地磁盘产物存储）**：`TASK_ARTIFACT_STORE_MODE=local` 启用；存生成产物与参考素材；
   **防盗刷**（HMAC 签名 capability URL + 下载限流 10/min + `attachment`/`nosniff` + 防目录穿越）；
   **每 5 分钟自动清理**已完成任务超过保留期的素材（`TASK_ARTIFACT_RETENTION_SECONDS`，默认 300s）
-- 规范：`.specify/specs/007-prod-safety-audit-report/`（spec/plan/tasks）
+- 安全审计结论与验证记录：见 `计划书/audit-ledger.md` 与 `计划书/audit/`
 - **领域感知路由（4.8.1，默认关）**：`DOMAIN_ROUTE_ENABLED` + `DOMAIN_ROUTE_MAP=tag:group,...`；请求头 `X-Route-Tag` 命中白名单即覆盖分组（**不越权**：仅限用户可用分组）
 - **轻量用户记忆（4.7.1）**：记录用户最近使用模型（`UserSetting.last_used_model`，JSON 列无需迁移），供前端回填默认模型
 - **媒体能力注册表（4.6.1）**：`GET /api/system-info/media-providers` 返回媒体能力目录（文生视频/图生视频/图像生成/TTS/ASR × 渠道）
@@ -191,6 +191,11 @@ cd web && bun install --frozen-lockfile && bun run build
 | `CHANNEL_CIRCUIT_BREAKER` | 渠道级熔断开关 |
 | `ENABLE_PPROF` | 启用 pprof（`127.0.0.1:8005`），仅排障时开 |
 | `METRICS_ENABLED` | 启用 Prometheus 指标端点 `/metrics` |
+| `CHANNEL_KEY_ENCRYPTION` | 渠道密钥 AES-256-GCM 加密存储（默认 `false`）。启用前**必须**先固定 `CRYPTO_SECRET`，详见下方「渠道密钥加密启用步骤」 |
+| `READYZ_CHECK_REDIS` | `/readyz` 是否把 Redis 不可达判为不就绪（默认 `true`；Redis 仅作加速缓存时可设 `false`） |
+| `TRUSTED_PROXIES` | 受信反向代理 IP/CIDR 列表；**默认仅信任环回与私网**。设 `none` 表示不信任任何转发头；配置错误会拒绝启动 |
+| `OPENAI_OPS_DEFAULT_MODEL` | `/v1/files`、`/v1/fine-tunes`、`/v1/batches` 在请求未带模型时用于选渠道的默认模型名。**不配置且请求也未带模型时，这些端点返回 400**（网关不能随机挑渠道） |
+| `OPENAI_OPS_FLAT_QUOTA` | 创建 fine-tune / batch 的按次额度（同一套 quota 单位）。**不配置时这两个创建操作返回 400**，避免免费放行上游真实费用；查询/列表/下载等元数据操作始终免费 |
 
 ### 产物存储与日志
 
@@ -202,6 +207,35 @@ cd web && bun install --frozen-lockfile && bun run build
 | `LOG_DIR` | 日志目录（也可用命令行参数 `--log-dir`） |
 | `UMAMI_WEBSITE_ID` / `UMAMI_SCRIPT_URL` | 接入 Umami 统计（可选） |
 | `GOOGLE_ANALYTICS_ID` | 接入 Google Analytics（可选） |
+
+### MCP Gateway（可选，默认关闭）
+
+设置 `MCP_GATEWAY_ENABLED=true` 后，`POST /mcp` 提供 MCP Streamable HTTP（JSON-RPC 2.0）：
+
+- 认证：与 `/v1/*` 相同的 API token（`Authorization: Bearer sk-...`）。
+- 会话：`initialize` 返回 `Mcp-Session-Id`，后续请求必须携带；会话落库，蓝绿部署期间跨实例可用。
+- 工具：`list_models`、`chat_completion`、`embed_text`、`create_image`，以及部署启用时的 `web_search`。
+  **所有工具都通过本机 `/v1/*` 调回网关**，计费、限流、日志与直接调用 HTTP 完全一致。
+- 付费动作：`create_image` 默认拒绝，管理员需在「动作审批」页逐条批准，**一次批准只授权一次调用**。
+- 关闭开关后 `/mcp` 立即返回 404，现有会话失效。
+- `MCP_INTERNAL_BASE_URL` 可覆盖内部回环地址（默认 `http://127.0.0.1:$PORT`），仅在反向代理/特殊部署时需要。
+
+### 渠道密钥加密启用步骤（`CHANNEL_KEY_ENCRYPTION`）
+
+> **默认关闭**。启用后渠道 `key` 列写入 `enc:v1:` 前缀的 AES-256-GCM 密文，读取时自动解密；
+> 不改列类型、不新增列，三库兼容。**关闭开关不等于回滚**：库中一旦有密文，关闭后
+> 渠道会把密文直接发往上游并全部 401。启动自检会检测该状态并打印明确错误日志。
+
+1. **先固定密钥**：为 `CRYPTO_SECRET` 设置一个稳定、跨节点一致的随机值并备份。
+   若未显式设置，代码会回退到 `SESSION_SECRET`；两者都为空时进程每次重启都会换随机密钥，
+   **已加密的渠道将永久无法解密**。
+2. **备份数据库**（至少 `channels` 表）。
+3. 设置 `CHANNEL_KEY_ENCRYPTION=true` 并重启 master 节点。启动时会自动执行一次
+   **幂等迁移**：把所有存量明文 Key 加密落库（已加密行跳过）。
+4. 验证：`SELECT id, LEFT(key, 7) FROM channels;` 应看到 `enc:v1:` 前缀；
+   发起一次真实转发确认渠道可用。
+5. **不要在生产直接关闭该开关**。确需回退时，保持开关开启，用原始明文覆盖对应渠道
+   （管理端保存会自动加密），或先上线解密回写工具后再关闭。
 
 ### 训练数据采集（可选功能，默认关闭）
 

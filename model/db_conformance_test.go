@@ -131,6 +131,9 @@ func conformanceModels() []any {
 		&TrainingDataConsent{}, &TrainingDataWatermark{},
 		// 训练数据导出与下载记录（一键导出增量需求）。同样需三库 idempotency 覆盖。
 		&TrainingDataExport{}, &TrainingDataExportDownload{},
+		// G5-3 动作审批 + G11 MCP 会话。两者都只用标准列类型、无数据库特有特性，
+		// 但仍必须证明二次迁移不改 schema。
+		&ActionApproval{}, &McpSession{}, &OpenAIOpsObject{},
 	}
 }
 

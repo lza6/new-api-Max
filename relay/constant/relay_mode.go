@@ -53,6 +53,11 @@ const (
 	RelayModeResponsesCompact
 
 	RelayModeAlphaSearch
+
+	// RelayModeOpenAIOps 覆盖 /v1/files、/v1/fine-tunes、/v1/batches。
+	// 这些端点共享「原始 body 透传 + 按次计费」语义，具体子路径由
+	// relayInfo.RequestURLPath 决定（见 relay/openai_ops_handler.go）。
+	RelayModeOpenAIOps
 )
 
 func Path2RelayMode(path string) int {
@@ -81,6 +86,12 @@ func Path2RelayMode(path string) int {
 		relayMode = RelayModeResponses
 	} else if strings.HasPrefix(path, "/v1/alpha/search") {
 		relayMode = RelayModeAlphaSearch
+	} else if strings.HasPrefix(path, "/v1/files") {
+		relayMode = RelayModeOpenAIOps
+	} else if strings.HasPrefix(path, "/v1/fine-tunes") {
+		relayMode = RelayModeOpenAIOps
+	} else if strings.HasPrefix(path, "/v1/batches") {
+		relayMode = RelayModeOpenAIOps
 	} else if strings.HasPrefix(path, "/v1/audio/speech") {
 		relayMode = RelayModeAudioSpeech
 	} else if strings.HasPrefix(path, "/v1/audio/transcriptions") {

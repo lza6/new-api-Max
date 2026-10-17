@@ -285,3 +285,16 @@ func TestInitChannelMetaResetsPerAttemptStreamStateAndPreservesRequestState(t *t
 func ptr[T any](value T) *T {
 	return &value
 }
+
+// 回归：OpenAI 运维端点构造 RelayInfo 时 ChannelMeta 尚未初始化，
+// 不能直接访问嵌入的 UpstreamModelName（会 nil dereference panic）。
+func TestGenRelayInfoOpenAIOpsDoesNotDereferenceNilChannelMeta(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("GET", "/v1/files", nil)
+
+	info := GenRelayInfoOpenAIOps(c, &dto.OpenAIOpsRequest{Model: "ops-model"})
+	require.NotNil(t, info)
+	assert.Equal(t, "ops-model", info.OriginModelName)
+	assert.Nil(t, info.ChannelMeta, "构造阶段 ChannelMeta 仍应为 nil，由 handler 初始化")
+}

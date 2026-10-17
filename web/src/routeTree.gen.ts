@@ -38,6 +38,7 @@ import { Route as RankingsIndexRouteImport } from './routes/rankings/index'
 import { Route as SetupIndexRouteImport } from './routes/setup/index'
 import { Route as StatusIndexRouteImport } from './routes/status/index'
 import { Route as authUserResetRouteImport } from './routes/(auth)/user/reset'
+import { Route as AuthenticatedActionApprovalsIndexRouteImport } from './routes/_authenticated/action-approvals/index'
 import { Route as AuthenticatedChannelsIndexRouteImport } from './routes/_authenticated/channels/index'
 import { Route as AuthenticatedChatChatIdRouteImport } from './routes/_authenticated/chat/$chatId'
 import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authenticated/dashboard/index'
@@ -227,6 +228,12 @@ const authUserResetRoute = authUserResetRouteImport.update({
   path: '/user/reset',
   getParentRoute: () => authRouteRoute,
 } as any)
+const AuthenticatedActionApprovalsIndexRoute =
+  AuthenticatedActionApprovalsIndexRouteImport.update({
+    id: '/action-approvals/',
+    path: '/action-approvals/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedChannelsIndexRoute =
   AuthenticatedChannelsIndexRouteImport.update({
     id: '/channels/',
@@ -522,6 +529,7 @@ export interface FileRoutesByFullPath {
   '/profile/insights': typeof AuthenticatedProfileInsightsRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
+  '/action-approvals/': typeof AuthenticatedActionApprovalsIndexRoute
   '/channels/': typeof AuthenticatedChannelsIndexRoute
   '/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/keys/': typeof AuthenticatedKeysIndexRoute
@@ -594,6 +602,7 @@ export interface FileRoutesByTo {
   '/profile/insights': typeof AuthenticatedProfileInsightsRoute
   '/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
+  '/action-approvals': typeof AuthenticatedActionApprovalsIndexRoute
   '/channels': typeof AuthenticatedChannelsIndexRoute
   '/dashboard': typeof AuthenticatedDashboardIndexRoute
   '/keys': typeof AuthenticatedKeysIndexRoute
@@ -670,6 +679,7 @@ export interface FileRoutesById {
   '/_authenticated/profile/insights': typeof AuthenticatedProfileInsightsRoute
   '/_authenticated/usage-logs/$section': typeof AuthenticatedUsageLogsSectionRoute
   '/_authenticated/usage-logs/audit': typeof AuthenticatedUsageLogsAuditRoute
+  '/_authenticated/action-approvals/': typeof AuthenticatedActionApprovalsIndexRoute
   '/_authenticated/channels/': typeof AuthenticatedChannelsIndexRoute
   '/_authenticated/dashboard/': typeof AuthenticatedDashboardIndexRoute
   '/_authenticated/keys/': typeof AuthenticatedKeysIndexRoute
@@ -745,6 +755,7 @@ export interface FileRouteTypes {
     | '/profile/insights'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
+    | '/action-approvals/'
     | '/channels/'
     | '/dashboard/'
     | '/keys/'
@@ -817,6 +828,7 @@ export interface FileRouteTypes {
     | '/profile/insights'
     | '/usage-logs/$section'
     | '/usage-logs/audit'
+    | '/action-approvals'
     | '/channels'
     | '/dashboard'
     | '/keys'
@@ -892,6 +904,7 @@ export interface FileRouteTypes {
     | '/_authenticated/profile/insights'
     | '/_authenticated/usage-logs/$section'
     | '/_authenticated/usage-logs/audit'
+    | '/_authenticated/action-approvals/'
     | '/_authenticated/channels/'
     | '/_authenticated/dashboard/'
     | '/_authenticated/keys/'
@@ -1159,6 +1172,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/user/reset'
       preLoaderRoute: typeof authUserResetRouteImport
       parentRoute: typeof authRouteRoute
+    }
+    '/_authenticated/action-approvals/': {
+      id: '/_authenticated/action-approvals/'
+      path: '/action-approvals'
+      fullPath: '/action-approvals/'
+      preLoaderRoute: typeof AuthenticatedActionApprovalsIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/channels/': {
       id: '/_authenticated/channels/'
@@ -1570,6 +1590,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProfileInsightsRoute: typeof AuthenticatedProfileInsightsRoute
   AuthenticatedUsageLogsSectionRoute: typeof AuthenticatedUsageLogsSectionRoute
   AuthenticatedUsageLogsAuditRoute: typeof AuthenticatedUsageLogsAuditRoute
+  AuthenticatedActionApprovalsIndexRoute: typeof AuthenticatedActionApprovalsIndexRoute
   AuthenticatedChannelsIndexRoute: typeof AuthenticatedChannelsIndexRoute
   AuthenticatedDashboardIndexRoute: typeof AuthenticatedDashboardIndexRoute
   AuthenticatedKeysIndexRoute: typeof AuthenticatedKeysIndexRoute
@@ -1601,6 +1622,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProfileInsightsRoute: AuthenticatedProfileInsightsRoute,
   AuthenticatedUsageLogsSectionRoute: AuthenticatedUsageLogsSectionRoute,
   AuthenticatedUsageLogsAuditRoute: AuthenticatedUsageLogsAuditRoute,
+  AuthenticatedActionApprovalsIndexRoute:
+    AuthenticatedActionApprovalsIndexRoute,
   AuthenticatedChannelsIndexRoute: AuthenticatedChannelsIndexRoute,
   AuthenticatedDashboardIndexRoute: AuthenticatedDashboardIndexRoute,
   AuthenticatedKeysIndexRoute: AuthenticatedKeysIndexRoute,

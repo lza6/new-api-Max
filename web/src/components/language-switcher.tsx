@@ -30,6 +30,8 @@ import {
 import {
   INTERFACE_LANGUAGE_OPTIONS,
   normalizeInterfaceLanguage,
+  pathWithLanguage,
+  type InterfaceLanguageCode,
 } from '@/i18n/languages'
 import { setLanguage } from '@/i18n/config'
 import { api } from '@/lib/api'
@@ -50,6 +52,19 @@ export function LanguageSwitcher() {
         } catch {
           // Best-effort persistence; don't block the UI on failure
         }
+      }
+      // SEO 多语言：语言与 URL 前缀必须一致，否则 canonical/hreflang 会指向
+      // 与页面实际语言不同的地址。切换后整页跳转到对应前缀（默认语言 zhCN 无前缀）。
+      if (typeof window === 'undefined') {
+        return
+      }
+      const nextPath = pathWithLanguage(
+        window.location.pathname,
+        code as InterfaceLanguageCode
+      )
+      const nextURL = nextPath + window.location.search + window.location.hash
+      if (nextURL !== window.location.pathname + window.location.search + window.location.hash) {
+        window.location.assign(nextURL)
       }
     },
     [user]

@@ -187,17 +187,27 @@ func SetRelayRouter(router *gin.Engine) {
 			controller.Relay(c, types.RelayFormatOpenAI)
 		})
 
-		// not implemented
-		httpRouter.GET("/files", controller.RelayNotImplemented)
-		httpRouter.POST("/files", controller.RelayNotImplemented)
-		httpRouter.DELETE("/files/:id", controller.RelayNotImplemented)
-		httpRouter.GET("/files/:id", controller.RelayNotImplemented)
-		httpRouter.GET("/files/:id/content", controller.RelayNotImplemented)
-		httpRouter.POST("/fine-tunes", controller.RelayNotImplemented)
-		httpRouter.GET("/fine-tunes", controller.RelayNotImplemented)
-		httpRouter.GET("/fine-tunes/:id", controller.RelayNotImplemented)
-		httpRouter.POST("/fine-tunes/:id/cancel", controller.RelayNotImplemented)
-		httpRouter.GET("/fine-tunes/:id/events", controller.RelayNotImplemented)
+		// OpenAI 运维类端点：/v1/files、/v1/fine-tunes、/v1/batches。
+		// 原始 body 透传（files 可能是 multipart）；模型名由 X-New-API-Model /
+		// ?model= / JSON model / OPENAI_OPS_DEFAULT_MODEL 提供，用于选渠道。
+		// 元数据操作免费；fine-tune/batch 创建必须配置 OPENAI_OPS_FLAT_QUOTA。
+		openAIOps := func(c *gin.Context) {
+			controller.Relay(c, types.RelayFormatOpenAIOps)
+		}
+		httpRouter.GET("/files", openAIOps)
+		httpRouter.POST("/files", openAIOps)
+		httpRouter.DELETE("/files/:id", openAIOps)
+		httpRouter.GET("/files/:id", openAIOps)
+		httpRouter.GET("/files/:id/content", openAIOps)
+		httpRouter.POST("/fine-tunes", openAIOps)
+		httpRouter.GET("/fine-tunes", openAIOps)
+		httpRouter.GET("/fine-tunes/:id", openAIOps)
+		httpRouter.POST("/fine-tunes/:id/cancel", openAIOps)
+		httpRouter.GET("/fine-tunes/:id/events", openAIOps)
+		httpRouter.POST("/batches", openAIOps)
+		httpRouter.GET("/batches", openAIOps)
+		httpRouter.GET("/batches/:id", openAIOps)
+		httpRouter.POST("/batches/:id/cancel", openAIOps)
 		httpRouter.DELETE("/models/:model", controller.RelayNotImplemented)
 	}
 

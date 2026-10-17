@@ -1,0 +1,16 @@
+{
+  "ts": "2026-10-17T16:18:37.371Z",
+  "endpoint": "/v1/chat/completions",
+  "concurrency": 50,
+  "duration_s": 21.097,
+  "requests": 420,
+  "qps": 19.908043797696354,
+  "p50_ms": 1136.5695,
+  "p95_ms": 5797.0385,
+  "p99_ms": 6407.3661,
+  "max_ms": 7001.9774,
+  "error_rate": 0,
+  "status_codes": {
+    "200": 420
+  }
+}

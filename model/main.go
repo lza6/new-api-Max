@@ -385,6 +385,9 @@ func migrateDB() error {
 		&TrainingDataExport{}, &TrainingDataExportDownload{},
 		&EventDelivery{},
 		&WebhookEndpoint{},
+		&ActionApproval{},
+		&McpSession{},
+		&OpenAIOpsObject{},
 	}
 	if os.Getenv("LOG_SQL_DSN") == "" {
 		mainTables = append(mainTables, &Log{})
@@ -434,7 +437,7 @@ func BackupTables() []any {
 		&SystemInstance{}, &SystemTask{}, &SystemTaskLock{}, &CasbinRule{},
 		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &SiteDailyVisitor{},
 		&TrainingDataConsent{}, &TrainingDataWatermark{}, &EventDelivery{},
-		&WebhookEndpoint{},
+		&WebhookEndpoint{}, &ActionApproval{}, &McpSession{}, &OpenAIOpsObject{},
 	}
 }
 

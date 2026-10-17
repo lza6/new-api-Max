@@ -43,7 +43,7 @@
 - 交付：主题 commit → push → tag → GitHub Release → 生产部署（备份 + 回滚命令）。
 
 ## 治理
-- 本宪法优先于其他临时实践；改动需在 `workflow_status.md` 留痕并更新证据账本。
+- 本宪法优先于其他临时实践；改动需在 `计划书/audit-ledger.md` 留痕并更新证据账本。
 - 复用验证记录：已跑过的审计/基准（慢查询、压测、契约）记入 `计划书/audit-ledger.md`，避免重复无意义重跑；改动相关区域时优先引用账本。
 - 复杂任务按 Spec-Kit 7 阶段：Constitution → Specify → Clarify → Plan → Tasks → Analyze → Implement。
 

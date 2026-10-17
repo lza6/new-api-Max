@@ -189,6 +189,14 @@ var registry = []FeatureSwitch{
 		RollbackHint: "Turn off to return to streaming responses.",
 	},
 	{
+		Key: common.FlagMcpGatewayEnabled, Kind: KindBool, Default: "false",
+		TitleKey:       "MCP Gateway",
+		DescriptionKey: "Exposes the gateway as a Model Context Protocol server (Streamable HTTP). Read-only tools/resources are available to the caller; paid tools (image generation) require an administrator approval for every call. Turning this off makes /mcp unreachable.",
+		Risk:           RiskHigh, AdminEditable: true,
+		MetricKeys:   []string{},
+		RollbackHint: "Turn off to close the MCP endpoint. Existing sessions stop working immediately.",
+	},
+	{
 		Key: common.FlagResponseCacheEnabled, Kind: KindBool, Default: "false",
 		TitleKey:       "Response Cache",
 		DescriptionKey: "Serves byte-identical non-streaming requests from an in-process (or Redis) cache instead of calling the upstream again. Caching is limited to the models you list in the response cache settings; entries are isolated per user unless you explicitly allow sharing.",

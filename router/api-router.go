@@ -349,6 +349,15 @@ func SetApiRouter(router *gin.Engine) {
 			redemptionRoute.DELETE("/:id", controller.DeleteRedemption)
 		}
 		apiRouter.GET("/audit", middleware.DisableCache(), middleware.AdminAuth(), middleware.RequirePermission(authz.AuditRead), controller.GetAuditLogs)
+
+		// G5-3：动作级审批（MCP 付费 tool 默认拒绝，需管理员逐条批准）。
+		actionApprovalRoute := apiRouter.Group("/action-approvals")
+		actionApprovalRoute.Use(middleware.AdminAuth())
+		{
+			actionApprovalRoute.GET("/", controller.GetActionApprovals)
+			actionApprovalRoute.POST("/:id/approve", controller.ApproveActionApproval)
+			actionApprovalRoute.POST("/:id/deny", controller.DenyActionApproval)
+		}
 		apiRouter.GET("/audit/self", middleware.DisableCache(), middleware.UserAuth(), controller.GetAuditLogs)
 		logRoute := apiRouter.Group("/log")
 		logRoute.GET("/", middleware.AdminAuth(), controller.GetAllLogs)

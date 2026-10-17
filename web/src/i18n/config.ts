@@ -19,7 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 
-import { convertDetectedLanguage } from './languages'
+import {
+  convertDetectedLanguage,
+  languageFromPathPrefix,
+  pathWithLanguage,
+  type InterfaceLanguageCode,
+} from './languages'
 // [性能] 所有语言包（含 fallback en）统一按需动态 import。en 不再静态打包：
 // 其键就是英文源串，某语言缺键时会自然回退为英文键文本，无需把整份 en 压进
 // 首屏 bundle。首屏只下载当前语言（实测各语言键数与 en 完全一致，6842/6842）。
@@ -99,6 +104,14 @@ function readStoredLanguage(): string | null {
   }
 }
 
+/** 读取 URL 路径前缀里的语言（`/en/...`、`/zh-TW/...`）；无前缀返回 null。 */
+function readPathLanguage(): string | null {
+  if (typeof window === 'undefined' || !window.location) {
+    return null
+  }
+  return languageFromPathPrefix(window.location.pathname)
+}
+
 /** 写入用户显式选择的语言到 localStorage。 */
 export function persistLanguage(code: string): void {
   if (typeof window === 'undefined') {
@@ -138,10 +151,56 @@ export async function setLanguage(code: string): Promise<void> {
 
 export const resources = {} as const
 
-// 初始语言：显式选择优先，否则默认简体中文。
-// 不使用 LanguageDetector 的浏览器语言检测——避免非中文浏览器被带到英文；
-// 显式选择由 persistLanguage 写入 localStorage，此处直接读取决定 lng。
-const initialLanguage = readStoredLanguage() ?? DEFAULT_LANGUAGE
+/** 服务端注入内容的公开页：这些页面的 canonical/hreflang 必须与 URL 语言一致。 */
+const PUBLIC_SEO_PATHS = new Set([
+  '/',
+  '/pricing',
+  '/about',
+  '/rankings',
+  '/model-test',
+  '/tool-setup',
+  '/status',
+  '/user-agreement',
+  '/privacy-policy',
+])
+
+/**
+ * 存量用户偏好与无前缀公开页冲突时，先跳到对应语言前缀再渲染。
+ *
+ * 例：用户存过 en，直接打开外链 `/pricing`（服务端 canonical=/pricing、hreflang
+ * zh-CN），若首屏渲染英文就会与 canonical 矛盾。跳转到 `/en/pricing` 后，
+ * URL、内容、canonical、hreflang 四者一致。
+ */
+function redirectToPreferredLocale(): void {
+  if (typeof window === 'undefined' || !window.location) {
+    return
+  }
+  const pathname = window.location.pathname
+  if (languageFromPathPrefix(pathname)) {
+    return
+  }
+  const normalized =
+    pathname.length > 1 ? pathname.replace(/\/+$/, '') : pathname
+  if (!PUBLIC_SEO_PATHS.has(normalized)) {
+    return
+  }
+  const stored = readStoredLanguage()
+  if (!stored || stored === DEFAULT_LANGUAGE) {
+    return
+  }
+  const target = pathWithLanguage(pathname, stored as InterfaceLanguageCode)
+  window.location.replace(
+    target + window.location.search + window.location.hash
+  )
+}
+
+redirectToPreferredLocale()
+
+// 初始语言优先级：URL 语言前缀 → 显式选择（localStorage）→ 默认简体中文。
+// URL 前缀必须优先：`/en/pricing` 是分享出去的英文页，不能因为访客本地存过中文
+// 就渲染成中文（那会让页面语言与 canonical/hreflang 不一致）。
+const initialLanguage =
+  readPathLanguage() ?? readStoredLanguage() ?? DEFAULT_LANGUAGE
 
 i18n.use(initReactI18next).init({
   resources,

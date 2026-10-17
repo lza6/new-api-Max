@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"fmt"
+	"sort"
+	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -105,25 +108,46 @@ func runSubscriptionQuotaResetOnce() {
 	}
 }
 
-// scanSubscriptionExpiryReminder 扫描到期前 N 天（SUBSCRIPTION_EXPIRY_REMIND_DAYS，默认 3）
-// 的 active 订阅，对命中用户发送一次到期提醒（含续费链接），并记录 ReminderDaysNotified，
-// 防止每个 tick 重复发送。与过期/重置任务共用 runSubscriptionQuotaResetOnce 的 CAS 锁，
-// 仅 MasterNode 单跑，天然并发安全。
+// scanSubscriptionExpiryReminder 扫描到期前多个阈值（SUBSCRIPTION_EXPIRY_REMIND_DAYS，
+// 逗号分隔，默认 "3,1"）的 active 订阅，对命中用户发送到期提醒（含续费链接），
+// 并按阈值记录 ReminderDaysNotified，防止每个 tick 重复发送。
+//
+// 多阈值语义：3 天扫描只覆盖 (>1d, <=3d]；进入 1 天窗口后再发一次。
+// 这样「3 天/1 天两次提醒」不会互相吞掉，也不会把不足 1 天的订阅先用 3 天文案打扰。
+// 与过期/重置任务共用 runSubscriptionQuotaResetOnce 的 CAS 锁，仅 MasterNode 单跑。
 func scanSubscriptionExpiryReminder() {
-	notifyDays := common.GetEnvOrDefault("SUBSCRIPTION_EXPIRY_REMIND_DAYS", 3)
-	if notifyDays <= 0 {
+	days := parseSubscriptionExpiryReminderDays(
+		common.GetEnvOrDefaultString("SUBSCRIPTION_EXPIRY_REMIND_DAYS", "3,1"),
+	)
+	if len(days) == 0 {
 		return
 	}
 	ctx := context.Background()
 	reminded := 0
+	for i, notifyDays := range days {
+		lowerDays := 0
+		if i+1 < len(days) {
+			lowerDays = days[i+1]
+		}
+		reminded += scanExpiryReminderWindow(ctx, lowerDays, notifyDays)
+	}
+	if common.DebugEnabled && reminded > 0 {
+		logger.LogDebug(ctx, "subscription expiry reminder: notified=%d, thresholds=%v", reminded, days)
+	}
+}
+
+// scanExpiryReminderWindow 处理一个阈值窗口，返回成功通知数。分批直到没有命中。
+func scanExpiryReminderWindow(ctx context.Context, lowerDays, notifyDays int) int {
+	reminded := 0
 	for {
-		subs, err := model.GetDueExpiryReminderSubscriptions(subscriptionResetBatchSize, notifyDays)
+		subs, err := model.GetDueExpiryReminderSubscriptionsBetween(
+			subscriptionResetBatchSize, lowerDays, notifyDays)
 		if err != nil {
 			logger.LogWarn(ctx, fmt.Sprintf("subscription expiry reminder scan failed: %v", err))
-			return
+			return reminded
 		}
 		if len(subs) == 0 {
-			break
+			return reminded
 		}
 		for i := range subs {
 			if err := notifySubscriptionExpiryReminder(&subs[i], notifyDays); err != nil {
@@ -133,12 +157,33 @@ func scanSubscriptionExpiryReminder() {
 			reminded++
 		}
 		if len(subs) < subscriptionResetBatchSize {
-			break
+			return reminded
 		}
 	}
-	if common.DebugEnabled && reminded > 0 {
-		logger.LogDebug(ctx, "subscription expiry reminder: notified=%d, notify_days=%d", reminded, notifyDays)
+}
+
+// parseSubscriptionExpiryReminderDays 解析逗号分隔的提醒阈值：
+// 只保留正整数，去重并按从大到小排序（扫描顺序必须是 3 天 → 1 天）。
+func parseSubscriptionExpiryReminderDays(raw string) []int {
+	seen := make(map[int]struct{})
+	days := make([]int, 0, 4)
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" {
+			continue
+		}
+		n, err := strconv.Atoi(part)
+		if err != nil || n <= 0 {
+			continue
+		}
+		if _, ok := seen[n]; ok {
+			continue
+		}
+		seen[n] = struct{}{}
+		days = append(days, n)
 	}
+	sort.Sort(sort.Reverse(sort.IntSlice(days)))
+	return days
 }
 
 // notifySubscriptionExpiryReminder 对单个订阅发送到期提醒（邮件/渠道文案含到期时间与续费

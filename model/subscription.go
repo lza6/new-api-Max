@@ -1113,6 +1113,7 @@ func AdminDeleteUserSubscription(userSubscriptionId int) (string, error) {
 //     GetPlanForSubscription can still resolve billing/limiter config after the
 //     plan row is gone;
 //   - the plan row is then removed so the management list can move on.
+//
 // subscription_orders / redemption codes keep their plan_id as history.
 func AdminDeleteSubscriptionPlan(planId int) (affectedUserIds []int, err error) {
 	if planId <= 0 {
@@ -1403,24 +1404,37 @@ func DueExpiryReminderWindowEnd(now int64, notifyDays int) int64 {
 
 // GetDueExpiryReminderSubscriptions returns active subscriptions that expire within
 // notifyDays days from now and have not been reminded for that window yet
-// (reminder_days_notified < notifyDays). Ordered by end_time so the most urgent
+// (reminder_days_notified <> notifyDays). Ordered by end_time so the most urgent
 // ones are processed first within a batch.
 func GetDueExpiryReminderSubscriptions(limit int, notifyDays int) ([]UserSubscription, error) {
+	return GetDueExpiryReminderSubscriptionsBetween(limit, 0, notifyDays)
+}
+
+// GetDueExpiryReminderSubscriptionsBetween 返回到期时间落在
+// (now+lowerDays, now+upperDays] 且**尚未针对 upperDays 这个阈值**提醒过的活跃订阅。
+//
+// lowerDays 用于多阈值提醒：配置 [3,1] 时，3 天扫描只覆盖 (>1d, <=3d]，
+// 避免把「不到 1 天」的订阅先用 3 天文案提醒一次、随后又立刻提醒 1 天。
+// lowerDays <= 0 表示不设下界（单阈值场景与旧行为一致）。
+//
+// 去重条件用 `<> upperDays` 而不是 `<`：这样 3 天提醒过的订阅（值=3）
+// 仍能在进入 1 天窗口时收到第二次提醒；同一阈值重复扫描则不会重复发送。
+func GetDueExpiryReminderSubscriptionsBetween(limit int, lowerDays int, upperDays int) ([]UserSubscription, error) {
 	if limit <= 0 {
 		limit = 300
 	}
-	if notifyDays <= 0 {
+	if upperDays <= 0 {
 		return nil, nil
 	}
 	now := GetDBTimestamp()
-	windowEnd := DueExpiryReminderWindowEnd(now, notifyDays)
+	windowEnd := DueExpiryReminderWindowEnd(now, upperDays)
+	query := DB.Where("status = ? AND end_time > ? AND end_time <= ? AND reminder_days_notified <> ?",
+		"active", now, windowEnd, upperDays)
+	if lowerDays > 0 {
+		query = query.Where("end_time > ?", DueExpiryReminderWindowEnd(now, lowerDays))
+	}
 	var subs []UserSubscription
-	err := DB.Where("status = ? AND end_time > ? AND end_time <= ? AND reminder_days_notified < ?",
-		"active", now, windowEnd, notifyDays).
-		Order("end_time asc, id asc").
-		Limit(limit).
-		Find(&subs).Error
-	if err != nil {
+	if err := query.Order("end_time asc, id asc").Limit(limit).Find(&subs).Error; err != nil {
 		return nil, err
 	}
 	return subs, nil
@@ -1428,14 +1442,15 @@ func GetDueExpiryReminderSubscriptions(limit int, notifyDays int) ([]UserSubscri
 
 // MarkSubscriptionReminderNotified records that subscription id was reminded for
 // the given notifyDays window, preventing duplicate reminders on every tick.
-// The reminder_days_notified < notifyDays guard makes the update idempotent even
-// if two scanners race on the same subscription.
+// The reminder_days_notified <> notifyDays guard makes the update idempotent even
+// if two scanners race on the same subscription, while still allowing a later,
+// smaller threshold (3 days → 1 day) to fire exactly once.
 func MarkSubscriptionReminderNotified(id int, notifyDays int) error {
 	if id <= 0 || notifyDays <= 0 {
 		return nil
 	}
 	return DB.Model(&UserSubscription{}).
-		Where("id = ? AND reminder_days_notified < ?", id, notifyDays).
+		Where("id = ? AND reminder_days_notified <> ?", id, notifyDays).
 		Update("reminder_days_notified", notifyDays).Error
 }
 
@@ -1691,11 +1706,11 @@ type SubscriptionPlanInfo struct {
 // 活跃订阅保存的套餐配置快照（plan_id 已删除，后续计费/限流/访问判定靠它
 // 继续工作；订阅永久化，绝不因删除套餐而剥夺权益）。一张订阅一行。
 type SubscriptionPlanGrant struct {
-	Id        int    `json:"id" gorm:"primaryKey"`
-	PlanId    int    `json:"plan_id" gorm:"index"`
-	Title     string `json:"title"`
-	Subtitle  string `json:"subtitle"`
-	TotalAmount int64 `json:"total_amount"`
+	Id          int    `json:"id" gorm:"primaryKey"`
+	PlanId      int    `json:"plan_id" gorm:"index"`
+	Title       string `json:"title"`
+	Subtitle    string `json:"subtitle"`
+	TotalAmount int64  `json:"total_amount"`
 	// 完整序列化套餐配置（含 Models/UpgradeGroup/DowngradeGroup/档位/重置周期）。
 	Payload string `json:"payload" gorm:"type:text"`
 }

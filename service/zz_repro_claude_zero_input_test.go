@@ -78,10 +78,11 @@ func TestRepro_AllCachedClaudeRequest_StillBillable(t *testing.T) {
 //
 // 这是缺陷 A 的最尖锐形态：整份 usage 只有 cache_read_input_tokens>0，
 // 其余都是 0。
-//   期望行为（上游已修）：cache write/read 计入可计费用量，应照常计费。
-//   当前行为（疑似缺陷）：hasBillableUsage() 只看 TotalTokens，
-//     而 TotalTokens = PromptTokens + CompletionTokens = 0，
-//     于是 summary.Quota 被强行清零（见 text_quota.go:383-387 与 472-484）。
+//
+//	期望行为（上游已修）：cache write/read 计入可计费用量，应照常计费。
+//	当前行为（疑似缺陷）：hasBillableUsage() 只看 TotalTokens，
+//	  而 TotalTokens = PromptTokens + CompletionTokens = 0，
+//	  于是 summary.Quota 被强行清零（见 text_quota.go:383-387 与 472-484）。
 func TestRepro_ZeroInputZeroOutputButCacheRead_NotZeroedByHasBillableUsage(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
@@ -119,10 +120,10 @@ func TestRepro_ZeroInputZeroOutputButCacheRead_NotZeroedByHasBillableUsage(t *te
 	require.Equal(t, 0, summary.TotalTokens)
 	// 期望行为（上游已修）：应为 true（cache_read 是可计费用量）。
 	// 当前行为（疑似缺陷）：false。
-	require.False(t, summary.hasBillableUsage(),
-		"CURRENT BEHAVIOR: hasBillableUsage() ignores cache read/creation when input&output are 0")
-	require.Equal(t, 0, summary.Quota,
-		"CURRENT BEHAVIOR: quota is zeroed even though 2000 cache-read tokens were consumed")
+	require.True(t, summary.hasBillableUsage(),
+		"FIXED: cache read/creation counts as billable even when input&output are 0")
+	require.Greater(t, summary.Quota, 0,
+		"FIXED: 2000 cache-read tokens must produce a non-zero charge")
 }
 
 // TestRepro_ClaudeStreamZeroInputNotOverwrittenByEstimate 检查
@@ -137,7 +138,9 @@ func TestRepro_ZeroInputZeroOutputButCacheRead_NotZeroedByHasBillableUsage(t *te
 //	    并且只要 PromptTokens==0 就用 fallback.PromptTokens 覆盖。
 //
 // 期望行为（上游已修）：input_tokens==0 但 cache_read>0 是合法 usage，
-//   不能被估算值覆盖。
+//
+//	不能被估算值覆盖。
+//
 // 本用例通过计算 summary 复现「估算覆盖后」的记账后果，验证当前语义。
 // 该逻辑位于 relay 包内联，无法从 service 包直接调 HandleStreamFinalResponse；
 // 因此这里复制它的判据，锁定其语义（不改产品代码）。
@@ -162,12 +165,10 @@ func TestRepro_ClaudeStreamZeroInputNotOverwrittenByEstimate(t *testing.T) {
 		},
 		{
 			// 全命中缓存 + 流未正常收尾（!Done）：会进 fallback，
-			// 且因 PromptTokens==0，被估算值 3000 覆盖 → input 记账被污染。
-			// 期望行为（上游已修）：即便 !Done，input_tokens==0 且有 cache_read
-			//   时也不应以估算覆盖真实 usage。
-			// 当前行为（疑似缺陷）：覆盖为 3000。
+			// 但 input_tokens==0 且有 cache_read 时**不得**以估算覆盖真实 usage。
+			// 修复后：保持 input=0；completion 按 fallback 补 0（此处 fallbackCompletion=0）。
 			prompt: 0, completion: 0, done: false, cacheRead: 1200, estimate: 3000,
-			wantFinalP: 3000, wantFinalC: 0, overwritten: true,
+			wantFinalP: 0, wantFinalC: 0, overwritten: false,
 		},
 	}
 	for i, tc := range cases {
@@ -178,17 +179,19 @@ func TestRepro_ClaudeStreamZeroInputNotOverwrittenByEstimate(t *testing.T) {
 			if completionTokens == 0 || (!done && fallbackCompletion > completionTokens) {
 				completionTokens = fallbackCompletion
 			}
-			if promptTokens == 0 {
+			// 与 HandleStreamFinalResponse 的修复一致：有 cache 用量时，
+			// input_tokens=0 是合法的全命中缓存，不得用估算覆盖。
+			if promptTokens == 0 && tc.cacheRead == 0 {
 				promptTokens = fallbackPrompt
 			}
 		}
 		require.Equalf(t, tc.wantFinalP, promptTokens,
-			"case %d: current prompt-overwrite behavior", i)
+			"case %d: prompt token result", i)
 		require.Equalf(t, tc.wantFinalC, completionTokens,
-			"case %d: current completion-overwrite behavior", i)
-		if tc.overwritten {
-			require.NotEqual(t, tc.prompt, promptTokens,
-				"case %d: CURRENT BEHAVIOR records the estimate overwriting a legal 0 input", i)
+			"case %d: completion token result", i)
+		if !tc.overwritten && tc.cacheRead > 0 {
+			require.Equal(t, tc.prompt, promptTokens,
+				"case %d: FIXED: legal 0 input with cache_read must not be overwritten by an estimate", i)
 		}
 	}
 }

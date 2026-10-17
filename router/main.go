@@ -29,6 +29,14 @@ func SetRouter(router *gin.Engine, assets WebAssets) {
 	router.GET("/healthz", controller.Healthz)
 	router.GET("/readyz", controller.Readyz)
 
+	// G11 / MCP Gateway（Streamable HTTP）。POST/DELETE 需要 API token；
+	// GET 由 handler 返回 405（旧式 HTTP+SSE 未实现，明确拒绝而非静默降级）。
+	// 能力开关 MCP_GATEWAY_ENABLED=false 时 handler 返回 404。
+	router.POST("/mcp", middleware.TokenAuth(), middleware.TokenRateLimit(), controller.McpHandler)
+	router.DELETE("/mcp", middleware.TokenAuth(), middleware.TokenRateLimit(), controller.McpHandler)
+	router.GET("/mcp", controller.McpHandler)
+	router.OPTIONS("/mcp", controller.McpHandler)
+
 	SetApiRouter(router)
 	SetWebProtectionRouter(router)
 	SetTrainingDataRouter(router)

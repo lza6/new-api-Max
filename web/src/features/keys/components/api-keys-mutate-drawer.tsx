@@ -25,6 +25,7 @@ import {
   KeyRound,
   MessageSquare,
   Settings2,
+  Terminal,
   WalletCards,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
@@ -389,6 +390,17 @@ export function ApiKeysMutateDrawer({
   const unlimitedQuota = form.watch('unlimited_quota')
   const isShowingResult = createdKeys.length > 0
 
+  // B4-2：创建成功后立刻给出「可直接运行」的最小 curl。
+  // 模型优先用用户为这个 key 限定的第一个模型，否则给一个通用占位（用户可自行替换）。
+  const firstRequestModel = form.getValues('model_limits')?.[0] || 'gpt-4o-mini'
+  const firstRequestOrigin =
+    typeof window === 'undefined' ? '' : window.location.origin
+  const firstRequestCurl =
+    `curl ${firstRequestOrigin}/v1/chat/completions \\\n` +
+    `  -H "Authorization: Bearer ${createdKeys[0] ?? 'sk-...'}" \\\n` +
+    `  -H "Content-Type: application/json" \\\n` +
+    `  -d '{"model":"${firstRequestModel}","messages":[{"role":"user","content":"Hello"}]}'`
+
   let sheetTitle: string
   if (isShowingResult) {
     sheetTitle = t('API key created')
@@ -450,6 +462,28 @@ export function ApiKeysMutateDrawer({
                     <CopyButton value={key} aria-label={t('Copy API key')} />
                   </div>
                 ))}
+              </div>
+            </SideDrawerSection>
+            {/* B4-2：拿到 key 后立刻给出可复制的 curl，避免用户还要自己拼 base_url/模型名。 */}
+            <SideDrawerSection>
+              <SideDrawerSectionHeader
+                title={t('Send your first request')}
+                description={t(
+                  'Copy this command into a terminal to verify the key works.'
+                )}
+                icon={<Terminal className='size-4' />}
+              />
+              <div
+                className='border-border bg-muted/30 flex items-start gap-2 rounded-md border p-3'
+                data-testid='created-key-curl'
+              >
+                <pre className='min-w-0 flex-1 overflow-x-auto font-mono text-xs whitespace-pre-wrap break-all'>
+                  {firstRequestCurl}
+                </pre>
+                <CopyButton
+                  value={firstRequestCurl}
+                  aria-label={t('Copy curl command')}
+                />
               </div>
             </SideDrawerSection>
           </div>

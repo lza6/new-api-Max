@@ -81,7 +81,16 @@ type textQuotaSummary struct {
 // surcharge (e.g. /v1/alpha/search returns no usage but bills one web_search
 // call), so token count alone is not sufficient to decide.
 func (s *textQuotaSummary) hasBillableUsage() bool {
-	return s.FixedPriceBilling || s.TotalTokens > 0 || !s.ToolCallSurchargeQuota.IsZero()
+	// Claude 的 cache_read / cache_creation 是**独立于** input/output 的计费用量：
+	// 一次全命中缓存的请求可以合法地报告 input_tokens=0、output_tokens=0，
+	// 但 cache_read_input_tokens>0。只看 TotalTokens 会把这类真实用量清零。
+	return s.FixedPriceBilling ||
+		s.TotalTokens > 0 ||
+		s.CacheTokens > 0 ||
+		s.CacheCreationTokens > 0 ||
+		s.CacheCreationTokens5m > 0 ||
+		s.CacheCreationTokens1h > 0 ||
+		!s.ToolCallSurchargeQuota.IsZero()
 }
 
 func cacheWriteTokensTotal(summary textQuotaSummary) int {
@@ -650,4 +659,3 @@ func recordEmptyUpstreamResponse(ctx *gin.Context, relayInfo *relaycommon.RelayI
 	useTimeSeconds := int(summary.UseTimeSeconds)
 	model.RecordErrorLog(ctx, relayInfo.UserId, relayInfo.ChannelId, relayInfo.OriginModelName, summary.TokenName, content, relayInfo.TokenId, useTimeSeconds, relayInfo.IsStream, relayInfo.UsingGroup, other)
 }
-

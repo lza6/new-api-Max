@@ -60,6 +60,15 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 				controller.RelayNotFound(c)
 				return
 			}
+			// 默认语言（zh）不使用 URL 前缀：/zh/... 301 到无前缀地址，
+			// 避免同一内容出现两份 canonical。其它语言前缀原样服务。
+			if target, ok := controller.DefaultLocaleRedirectTarget(c.Request.URL.Path); ok {
+				if c.Request.URL.RawQuery != "" {
+					target += "?" + c.Request.URL.RawQuery
+				}
+				c.Redirect(http.StatusMovedPermanently, target)
+				return
+			}
 			c.Header("Cache-Control", "no-cache")
 			// SEO：把路由级 meta（title/description/canonical/OG）与一份**准确**的
 			// 内容块注入 SPA 壳，语言跟随访问者的 Accept-Language（默认中文）。
