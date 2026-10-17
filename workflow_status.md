@@ -62,11 +62,11 @@
 
 ## 5. 发布与部署
 
-- commit：`cdb715275484d32fbdb80b83774303bb93995f13`（已推送 `origin/main`）
-- tag / release：`v1.3.148`；https://github.com/lza6/new-api-Max/releases/tag/v1.3.148
-- 镜像：`new-api:v1.3.148`（服务器构建，源码来自 `git archive HEAD`）
-- 部署：2026-10-18 01:17 UTC+8，蓝绿 `3001 → 3000`，旧容器已停
-- 线上验收：公网 HTTPS 200、`X-New-Api-Version: v1.3.148`、`/healthz`/`/readyz` 200；
+- commit：`8ee9b16f6`（v1.3.149，已推送 `origin/main`）；v1.3.148 为 `cdb715275`
+- tag / release：`v1.3.148` 与 `v1.3.149`；https://github.com/lza6/new-api-Max/releases/tag/v1.3.149
+- 镜像：`new-api:v1.3.149`（服务器构建，源码来自 `git archive HEAD`）
+- 部署：2026-10-18，蓝绿 `3000 → 3001`（v1.3.149），旧容器已停
+- 线上验收：公网 HTTPS 200、`X-New-Api-Version: v1.3.149`、`/healthz`/`/readyz` 200；
   `/en/pricing` canonical=`https://freeapi.tingfengai.art/en/pricing` + 3 条 hreflang；
   `/sign-in` noindex；`/zh/pricing` 301→`/pricing`；sitemap 含 en 变体；
   MCP 未认证 401（默认关）；磁盘 9.7G/78G (13%)；容器内存 462MB/900MB
