@@ -105,7 +105,8 @@
   <a href="#changed">11. 改动清单</a><br>
   <a href="#verify">12. 验证证据</a><br>
   <a href="#left">13. 仍未闭环（如实）</a><br>
-  <a href="#quiz">14. 测验（必须通过）</a>
+  <a href="#review">14. 独立审查线程的复验</a><br>
+  <a href="#quiz">15. 测验（必须通过）</a>
 </div>
 
 <h2 id="why">1. 为什么要做这一轮</h2>
@@ -379,7 +380,68 @@
   </ul>
 </div>
 
-<h2 id="quiz">14. 测验（必须通过）</h2>
+<h2 id="review">14. 独立审查线程的复验（它推翻了我自己的结论）</h2>
+
+<div class="card bad">
+  <p><b>我请了一个只读审查线程，用六个维度复核本批 9 个提交。它找出了 3 个阻塞 ——
+  其中两个是我自己引入的，还有一个推翻了我此前的验证声明。</b></p>
+</div>
+
+<h3>B1（P0）「每日历史」100% 报错：默认路径返回空响应</h3>
+<pre><code>if date == "" || date == today {
+    out["stats"] = stats
+    out["known"] = true
+    return          // ← 漏了 common.ApiSuccess
+}</code></pre>
+<p>Gin 什么都不写 → <b>HTTP 200 空 body</b>。而前端「每日历史」卡<b>从不传 date</b>，
+所以它 100% 拿到空响应、解析失败、报 "Failed to load"。
+只有显式查历史日期才正常 —— 这让排查极易跑偏到前端。
+既有测试只覆盖「非法日期」与「历史日期」，恰好绕开这两条默认路径。</p>
+<p><b>为什么值得单独讲</b>：这是「只测错误路径」的又一次复现 ——
+上次它藏住了分析功能全链路不可用，这次藏住了每日历史不可用。</p>
+
+<h3>B2（P0）worker 启停的数据竞争与僵尸 worker</h3>
+<p><code>runWorker</code> 无同步地读包级 <code>workerStop</code>，而 <code>StartWorker</code>
+在锁内写它。逻辑后果比竞态报告更严重：</p>
+<pre><code>StopWorker 关闭 C1 → StartWorker 立刻把全局换成 C2
+  → 尚未调度的旧 goroutine 读到 C2（未关闭）→ 永不退出
+    → 两个 worker 同时消费同一队列
+      → 同会话水位并发读写，后写覆盖前写 → 增量重复或丢失</code></pre>
+<p>修法：stop/done 作为 <b>参数</b>传给 goroutine；<code>StopWorker</code> 等 done 真正关闭；
+<code>StartWorker</code> 先等旧 worker 退出。</p>
+
+<div class="card warn">
+  <h3>⚠️ 我此前的一条不实声明</h3>
+  <p>上一批提交信息里我写了「<code>-race</code> 同范围 PASS」。
+  实际上那次用的是<b>窄 <code>-run</code> 过滤</b>，恰好没包含 <code>TestWorkerCanRestartAfterStop</code>；
+  整包 <code>-race</code> 当时是 <b>FAIL</b>。</p>
+  <p><b>教训</b>：验证声明的<b>范围必须与结论的范围一致</b>。
+  说「全包通过」就必须跑全包；跑了 5 个用例不能说「相关范围通过」。</p>
+</div>
+
+<h3>B3 分析功能的「默认操作路径」仍然是坏的</h3>
+<p>界面标 <code>Model (optional)</code>，而后端 relay 对空 model 直接 400。
+「打开面板 → 不改模型 → 点开始」是管理员的<b>默认路径</b>，却必然失败；
+且报错来自 relay 通用校验、与「分析」无关，管理员根本不知道该改什么。</p>
+<p>修法：后端在调用模型前给出<b>点名 model</b> 的错误；前端改必填并在空值时禁用按钮。</p>
+
+<h3>另外修掉的 5 项</h3>
+<table>
+  <tr><th>项</th><th>问题</th><th>要点</th></tr>
+  <tr><td>N1</td><td>分析<b>静默丢分片</b></td><td>读/解压失败、列举截断、分片超上限都不计数 → 报告看似完整。<b>必须告诉模型「你看到的不全」</b></td></tr>
+  <tr><td>N2</td><td>导出声明 v2，两条路径不写 <code>kind</code></td><td>新增 <code>kind=message</code>。不能标 full（会重置丢历史）也不能标 suffix（消息会被粘成一句）</td></tr>
+  <tr><td>N3</td><td>目录读取失败被伪装成完整</td><td>读失败与「达到上限」语义相同（都是下界）→ 并入 truncated</td></tr>
+  <tr><td>N4</td><td><code>CountItems</code> 默认深度仍是错答案</td><td>把缺陷留作默认值 = 未来调用方再踩一次</td></tr>
+  <tr><td>N5</td><td>云盘持续故障时<b>重试风暴</b></td><td>若是 429，重试会加剧限流并拖住采集。<b>15s 负缓存</b>：既压住重试，又保证恢复后 15s 内可见</td></tr>
+</table>
+
+<div class="card info">
+  <h3>这一轮最该记住的一句</h3>
+  <p><b>「测试全绿」与「功能可用」之间，差的往往不是代码，而是测试<b>覆盖了哪条路径</b>。</b>
+  本批两轮加起来 8 个缺陷里，有 5 个是「错误路径被测、成功路径没被测」造成的。</p>
+</div>
+
+<h2 id="quiz">15. 测验（必须通过）</h2>
 <p class="note">共 10 题，需全部答对才算通过。每题作答后会显示解析。</p>
 
 <div id="quiz">
@@ -488,6 +550,39 @@ const QUIZ = [
     ],
     answer: 1,
     why: "logs 表的查询走 model.LOG_DB，它可能被配置为独立的日志库甚至 ClickHouse，无法与主库的 users 表 JOIN。"
+  },
+  {
+    stem: "「每日历史」卡为什么 100% 报错，而查历史日期却正常？",
+    opts: [
+      "历史日期走了另一个接口",
+      "默认路径（不传 date）的分支漏了写响应，返回 HTTP 200 空 body；历史日期分支才真正下发",
+      "前端没有处理日期格式",
+      "云盘只支持历史查询"
+    ],
+    answer: 1,
+    why: "分支里 return 前漏了 common.ApiSuccess。空 body 让前端解析失败，而只有历史日期分支正常 —— 于是很容易误判为前端问题。"
+  },
+  {
+    stem: "worker 启停的僵尸问题，后果为什么比「竞态报告」更严重？",
+    opts: [
+      "因为 race detector 会拖慢程序",
+      "因为旧 goroutine 读到未关闭的新 stop channel 就永不退出，两个 worker 并发消费同一队列，同会话水位后写覆盖前写，导致增量重复或丢失",
+      "因为会把进程 panic 掉",
+      "因为会让 CPU 占满"
+    ],
+    answer: 1,
+    why: "竞态只是表象；真正的后果是双消费者并发读写同一会话水位，数据会重复或丢失。修法是把 stop/done 作为参数传给 goroutine 并等待真正退出。"
+  },
+  {
+    stem: "「错误不进缓存」这条规则，忽略了什么？",
+    opts: [
+      "忽略了错误信息太长",
+      "忽略了云盘**持续故障**（尤其 429 限流）时，每个轮询都重试会持续加压，反而拖住共用同一配额的采集 worker",
+      "忽略了 Redis 不支持",
+      "忽略了大写错误"
+    ],
+    answer: 1,
+    why: "完全不缓存会让失败变成重试风暴。折中是短负缓存（15s）：既压住重试，又保证恢复后 15 秒内可见。"
   },
   {
     stem: "为什么管理端查询必须加缓存与请求合并（singleflight）？",
