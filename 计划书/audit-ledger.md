@@ -55,6 +55,8 @@
 | 每日采集聚合 | `go test ./service/training_capture/ -run TestAggregateDailyStats` | 5/5 PASS |
 | 目录计数深度语义 | `go test ./service/training_capture/ -run TestCountTree` | 6/6 PASS（含 maxDepth=1..9 穷举） |
 | 日志分片轮转 | `go test ./logger/` | 全 PASS（6.3 实际早已落地） |
+| 管理端云盘查询缓存 | `go test ./controller/ -run TestTimedCache` | 5/5 PASS（含 16 并发合并为 1 次） |
+| HTML 报告测验 | Node DOM stub 模拟作答 | 全对→pass、全错→fail、漏答→fail（判分逻辑已实证） |
 
 ---
 

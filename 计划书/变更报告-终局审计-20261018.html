@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>变更报告 — 终局审计与闭环修复（2026-10-17 ~ 10-18）</title>
+<style>
+  :root{
+    --bg:#0f1115; --surface:#171a21; --surface2:#1e222b; --line:#2a2f3a;
+    --text:#e6e9ef; --muted:#98a2b3; --accent:#6ea8fe; --ok:#3ddc97;
+    --warn:#f0b429; --bad:#ff6b6b; --code:#0b0d11;
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#f7f8fa; --surface:#fff; --surface2:#f0f2f5; --line:#dfe3e8;
+           --text:#1a1d23; --muted:#5b6472; --accent:#0b5cad; --code:#f2f4f7; }
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:16px/1.7 system-ui,-apple-system,"Segoe UI","Noto Sans SC",sans-serif;}
+  .wrap{max-width:960px;margin:0 auto;padding:32px 20px 120px}
+  h1{font-size:clamp(1.6rem,4vw,2.4rem);line-height:1.25;margin:0 0 8px}
+  h2{font-size:1.25rem;margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:1.02rem;margin:26px 0 8px;color:var(--accent)}
+  p{margin:10px 0}
+  .sub{color:var(--muted);font-size:.92rem;margin-bottom:26px}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:12px;
+        padding:18px 20px;margin:16px 0}
+  .card.bad{border-left:4px solid var(--bad)}
+  .card.warn{border-left:4px solid var(--warn)}
+  .card.ok{border-left:4px solid var(--ok)}
+  .card.info{border-left:4px solid var(--accent)}
+  code{background:var(--code);border:1px solid var(--line);border-radius:5px;
+       padding:1px 6px;font:.88em ui-monospace,SFMono-Regular,Consolas,monospace}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;
+      padding:14px 16px;overflow:auto;font:.85rem/1.55 ui-monospace,Consolas,monospace}
+  pre code{background:none;border:0;padding:0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.93rem}
+  th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.03em}
+  .tag{display:inline-block;font-size:.72rem;font-weight:700;padding:2px 8px;border-radius:999px;
+       vertical-align:middle}
+  .tag.p0{background:rgba(255,107,107,.16);color:var(--bad)}
+  .tag.p1{background:rgba(240,180,41,.16);color:var(--warn)}
+  .tag.p2{background:rgba(110,168,254,.16);color:var(--accent)}
+  .tag.ok{background:rgba(61,220,151,.16);color:var(--ok)}
+  ul{padding-left:1.3em} li{margin:6px 0}
+  .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:.92rem}
+  .kv dt{color:var(--muted)} .kv dd{margin:0}
+  /* quiz */
+  #quiz{background:var(--surface);border:1px solid var(--line);border-radius:14px;
+        padding:22px;margin-top:18px}
+  .q{margin:22px 0;padding-bottom:18px;border-bottom:1px dashed var(--line)}
+  .q:last-of-type{border-bottom:0}
+  .q p.stem{font-weight:600;margin:0 0 10px}
+  .opt{display:flex;gap:10px;align-items:flex-start;padding:8px 10px;border-radius:8px;
+       cursor:pointer;transition:background .15s}
+  .opt:hover{background:var(--surface2)}
+  .opt input{margin-top:.35em;flex:none}
+  .explain{display:none;margin:10px 0 0;padding:10px 12px;border-radius:8px;
+           font-size:.9rem;background:var(--surface2);border-left:3px solid var(--accent)}
+  .explain.show{display:block}
+  .explain.right{border-left-color:var(--ok)}
+  .explain.wrong{border-left-color:var(--bad)}
+  #result{display:none;margin-top:20px;padding:16px 18px;border-radius:12px;font-weight:600}
+  #result.pass{display:block;background:rgba(61,220,151,.12);color:var(--ok);
+               border:1px solid rgba(61,220,151,.35)}
+  #result.fail{display:block;background:rgba(255,107,107,.12);color:var(--bad);
+               border:1px solid rgba(255,107,107,.35)}
+  #submit{margin-top:16px;padding:11px 22px;border-radius:10px;border:0;cursor:pointer;
+          background:var(--accent);color:#fff;font-weight:700;font-size:.95rem}
+  #submit:hover{filter:brightness(1.08)}
+  #submit:disabled{opacity:.5;cursor:not-allowed}
+  .note{color:var(--muted);font-size:.87rem}
+  .toc{columns:2;column-gap:28px;font-size:.92rem}
+  .toc a{color:var(--accent);text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+  @media (max-width:640px){ .toc{columns:1} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>变更报告：终局审计与闭环修复</h1>
+<p class="sub">2026-10-17 → 10-18 · 7 个提交 · 本次重点不是「加功能」，而是<b>把已经写着、看起来能用的功能，变成真的能用</b></p>
+
+<div class="card info">
+  <strong>一句话结论</strong>
+  <p>这一轮通过<b>四个只读审计子代理</b>扫描了运营面板、Web 防护、训练数据管理端、用户侧开关四条链路，
+  发现并修复了 <b>4 个「单元测试全绿、实际却不可用」</b>的缺陷，外加一处我自己引入的配额风险。
+  每个修复都做了 <b>RED 验证</b>（先把旧实现还原，确认测试真的会失败），避免「假绿」。</p>
+</div>
+
+<h2 id="toc">目录</h2>
+<div class="toc">
+  <a href="#why">1. 为什么要做这一轮</a><br>
+  <a href="#intuition">2. 关键直觉：三种「假完成」</a><br>
+  <a href="#p1">3. P1：分析功能全链路不可用</a><br>
+  <a href="#count">4. 文件数恒为 0</a><br>
+  <a href="#role">5. 分析正文丢了「谁在说话」</a><br>
+  <a href="#consent">6. 同意书与真实采集面不符</a><br>
+  <a href="#ui">7. Web 防护「没有翻页」的真根因</a><br>
+  <a href="#ops">8. 排行榜口径不一致</a><br>
+  <a href="#bydate">9. 「几月几日采了多少」真正落地</a><br>
+  <a href="#quota">10. 我自己引入的配额风险</a><br>
+  <a href="#changed">11. 改动清单</a><br>
+  <a href="#verify">12. 验证证据</a><br>
+  <a href="#left">13. 仍未闭环（如实）</a><br>
+  <a href="#quiz">14. 测验（必须通过）</a>
+</div>
+
+<h2 id="why">1. 为什么要做这一轮</h2>
+<p>系统已经在生产跑。此前几轮修的都是「看得见会报错」的问题。但生产环境里更危险的是另一类：</p>
+<ul>
+  <li>按钮在、接口在、测试全绿，<b>用户点下去却永远失败</b>；</li>
+  <li>页面显示一个<b>自信但错误</b>的数字，而且没有任何标志提示它可能不对；</li>
+  <li>文案<b>承诺</b>了一件事，代码做的是另一件事。</li>
+</ul>
+<p>这类问题不会报错、不会告警，只会让运营者基于错误信息做决策。因此这一轮的做法是：
+<b>先派只读审计代理沿链路找「声明与实现不一致」</b>，再由主线程逐条复现、修复、验证。</p>
+
+<h2 id="intuition">2. 关键直觉：三种「假完成」</h2>
+
+<div class="card bad">
+  <h3>① 契约假完成：单测只测错误路径</h3>
+  <p>分析接口的测试覆盖了「缺 path」「空内容」「只传 system」等错误分支 ——
+  这些都对。但<b>成功路径从没被测过</b>（因为不能真花钱调模型）。
+  于是「成功时前端必然抛错」这个 P1 缺陷，在测试里完全隐形。</p>
+  <p class="note">教训：<b>只测错误路径的测试，会让「功能整体不可用」看起来像「功能正常」。</b></p>
+</div>
+
+<div class="card bad">
+  <h3>② 深度假完成：断言太弱，等于没断言</h3>
+  <p>云盘计数在真机测试里断言了 <code>folders &gt;= 1</code>，<b>从不断言 files</b>。
+  而缺陷恰恰是 files 恒为 0。测试通过了，错误却活着。</p>
+  <p class="note">教训：<b>断言必须覆盖「这个功能存在的理由」</b>，而不是只覆盖「它没崩」。</p>
+</div>
+
+<div class="card bad">
+  <h3>③ 口径假完成：数字对了，但读法错了</h3>
+  <p>「剩余额度」排除了管理员，「消耗排行榜」却没排除。两个数字并排显示，
+  运营者会看到「榜首消耗最多，但他的额度不计入剩余额度」这种自相矛盾的画面，
+  然后怀疑哪个数字没刷新 —— 实际上两个都是"对"的，只是口径不同。</p>
+  <p class="note">教训：<b>同一屏上的数字必须共用口径，否则它们互相拆台。</b></p>
+</div>
+
+<h2 id="p1">3. P1：分析功能全链路不可用</h2>
+
+<div class="card bad">
+  <p><span class="tag p0">P0/P1</span> 深度分析、分析报告、继续追问 —— <b>三条需求在生产中全都不可用。</b></p>
+</div>
+
+<h3>现象与根因</h3>
+<p>后端把 <code>/analyze</code> 交给 relay 栈处理。relay 成功时写出的是<b>上游的原始 chat completion</b>：</p>
+<pre><code>{ "id":"chatcmpl-x", "choices":[ {"message":{"content":"..."}} ] }   // 没有 success 字段</code></pre>
+<p>而参数错误走 <code>common.ApiErrorMsg</code>，写出的是本项目信封：</p>
+<pre><code>{ "success": false, "message": "..." }</code></pre>
+<p><b>两者都是 HTTP 200。</b>前端却按信封解包并判断：</p>
+<pre><code>if (!res.success) { throw new Error(...) }   // 成功时 res.success 是 undefined
+                                             // !undefined === true → 必然抛错</code></pre>
+
+<h3>为什么一直没被发现</h3>
+<p>既有测试只覆盖错误路径（付费红线不允许真实调用模型）。
+所以「成功路径必崩」从来没有被执行过。</p>
+
+<h3>怎么证明这不是我猜的</h3>
+<p>Playground 走的是<b>同一条 relay</b>，它一直直接读 <code>choices</code>、不判 <code>success</code>。
+同一后端、两种前端写法，Playground 能用而分析不能用 —— 反证原判据是错的。</p>
+
+<h3>修法</h3>
+<ul>
+  <li><code>api.ts</code> 原样透传原始响应，不再按 <code>{success,data}</code> 解包；</li>
+  <li>判据改为 <code>success === false</code>（<b>绝不能</b>写 <code>!success</code>），
+      并额外兜住 relay 自身的 <code>{error:{message}}</code>；</li>
+  <li>类型如实建模三种形态，并在注释里写清「为什么不能写 <code>!success</code>」。</li>
+</ul>
+<p><b>RED 验证：</b>把信封解包改回去 → 新增的 3 个契约测试立刻 2 个失败。</p>
+
+<h2 id="count">4. 文件数恒为 0（自信但错误的数字）</h2>
+
+<div class="card warn">
+  <p><span class="tag p1">HIGH</span> 管理员看到「N 个文件夹 / 0 个文件」，且 <code>truncated=false</code>。</p>
+</div>
+
+<h3>根因：遍历深度差了一层</h3>
+<p>采集布局是 <code>日期 / 用户-ID / 模型 / part-*.jsonl.gz</code>，即分片在<b>第 4 层</b>。
+而调用写死 <code>CountItems(ctx, 3)</code>：</p>
+<pre><code>列 root(0) → 日期(1)      ✅ 入队
+列 日期(1) → 用户(2)      ✅ 入队
+列 用户(2) → 模型(3)      ❌ 2+1 &lt; 3 为假 → 不展开
+                            → 模型目录只被"计数"，内部文件一个也数不到</code></pre>
+<p>后果不是报错，而是<b>一个看起来完全可信的 0</b>。管理员会以为采集根本没写数据。</p>
+
+<h3>修法</h3>
+<ul>
+  <li>新增 <code>CaptureLayoutDepth = 3</code> 常量（与布局同源），调用处传 <code>+1</code>；</li>
+  <li>把遍历抽成<b>纯函数</b> <code>countTree</code>，让深度语义可以离线穷举
+      （真机复现需要真实 OneDrive 层级）；</li>
+  <li>补上真机测试里缺失的 <code>files &gt; 0</code> 断言。</li>
+</ul>
+<p><b>新增 6 个用例</b>，其中一个<b>正面锁定缺陷本身</b>：
+用布局层数作深度时，断言 files==0 且 truncated==false。</p>
+
+<h2 id="role">5. 分析正文丢了「谁在说话」</h2>
+
+<div class="card bad">
+  <p><span class="tag p1">P1</span> 模型会把<b>自己生成的回复</b>当成「用户原话」引用进分析报告。</p>
+</div>
+
+<h3>来龙去脉</h3>
+<p>上一批上线了「模型回复也采集」，记录里现在有两类行：
+<code>role:"request"</code>（用户侧）与 <code>role:"assistant"</code>（模型回复）。
+但组装分析正文时只写了 <code>rec.Content</code>，<b>把 role 丢掉了</b>。</p>
+<p>而分析提示词明确要求「<b>逐字引用用户原话</b>」。正文里两类文本混在一起、没有任何标注，
+模型无法区分 —— 于是它摘录的「用户原话」可能整段都是它自己说过的话。
+<b>报告从根上不可信，而且管理员完全看不出来。</b></p>
+
+<h3>修法：一次扫描产出两个视图</h3>
+<dl class="kv">
+  <dt><code>Text</code></dt><dd>忠实拼接原文，不加任何标签（数据保真视图，将来用户导出自己的数据不该夹带中文标注）</dd>
+  <dt><code>AnnotatedText</code></dt><dd>逐行带角色标注，<b>专供分析提示词</b></dd>
+</dl>
+<p>标注来自记录里现成的 <code>role</code> 字段 —— 是<b>数据结构事实</b>，不是猜测。
+这与 <code>SplitHeuristicTurns</code> 那种「从拼接文本里猜角色」是两码事：那个会误判，这个不会。</p>
+<p>提示词同步改写：明确告知标注语义、<b>禁止</b>把【模型回复】当用户原话，
+并说明「请求侧那一行是拼接文本，逐轮配对不可靠」。</p>
+
+<h2 id="consent">6. 同意书与真实采集面不符</h2>
+
+<div class="card warn">
+  <p><span class="tag p1">P1（合规）</span> 免责声明只说「采集你的输入」，
+  没说<b>模型回复同样入库</b>、<b>管理员可查看并导出原始对话</b>。</p>
+</div>
+
+<p>这不是措辞问题：模型回复经常<b>复述用户贴过的密钥、报错堆栈、内部地址</b>，
+敏感面比「只采输入」大得多。不写清楚，用户的「同意」就不算知情同意。</p>
+
+<h3>两个连带动作</h3>
+<ul>
+  <li>新增声明条款（7 语言）；</li>
+  <li><b>递增 <code>CurrentPolicyVersion</code> v1 → v2</b>，使旧同意失效、重新征求。</li>
+</ul>
+
+<div class="card info">
+  <h3>顺手逮住一个「我自己引入的 UX 回归」</h3>
+  <p>版本一升，已授权用户的开关会<b>从「开」悄悄变成「关」</b>，界面不给任何解释。
+  用户会以为功能坏了、自己误触了，甚至怀疑数据在被偷偷继续采集。</p>
+  <p>修法：新增 <code>needs_reconsent</code> 下发，界面明示
+  「采集已暂停，请重新确认新说明」。而且只在<b>声明改版</b>时为 true ——
+  从未同意 / 主动撤回时不提示（否则是噪音）。</p>
+</div>
+
+<h2 id="ui">7. Web 防护「没有翻页」的真根因</h2>
+
+<div class="card ok">
+  <p><b>根因不是后端缺分页。</b>后端三张表全部支持 page/size 且返回 total。
+  也不是前端没用分页组件 —— 页面确实算了 pageCount。</p>
+</div>
+
+<p>真正的原因是一条隐藏的依赖链：</p>
+<pre><code>DataTable 默认把分页控件 portal 到"页脚容器"
+  → 该容器由 SectionPageLayout 的 PageFooterProvider 提供
+    → 页面没套 SectionPageLayout
+      → 没有 Provider
+        → PageFooterPortal 直接 return null
+          → 界面上一个页码都看不到</code></pre>
+
+<p>修法：套 <code>SectionPageLayout</code>（顺带补齐页面标题 —— 原先没有标题/面包屑，
+正是「不够高级、比较简陋」的观感来源），并把自搓的 Button 切换换成项目既有 <code>Tabs</code>。</p>
+<p class="note">排查记录：扫了全部 feature 首页，另有两处未用该布局但<b>不需要</b> ——
+<code>pricing</code> 用客户端分页且显式渲染分页组件；<code>system-settings</code> 的表格在对话框内部。故只改真正受影响的两页。</p>
+
+<h2 id="ops">8. 排行榜口径不一致</h2>
+<p>「剩余额度合计」只统计 <code>role &lt; AdminUser</code>，但消耗排行榜不排除任何人。
+管理员常拿自己账号跑分析/测试（分析费用就记在管理员账上），会<b>长期霸榜</b>，
+真正的消耗大户被挤下去。</p>
+<p>修法：SQL 侧 <code>user_id NOT IN (管理员ID)</code>。之所以不 JOIN users：
+<b>日志库可能是另一个库（ClickHouse）</b>，跨库 JOIN 不可行。</p>
+
+<div class="card warn">
+  <h3>自查时发现我自己写的回退路径是错的</h3>
+  <p>管理员数量超过内联上限时会退化为 Go 侧过滤。我第一版写的是「按 limit 取行再过滤」——
+  管理员占满前 limit 个位置时，过滤后剩 0 行，<b>真正的消耗大户完全不可见</b>。</p>
+  <p>测试当场抓住了它（<code>[] should have 1 item(s), but has 0</code>）。
+  改为<b>多取 <code>len(adminIds)</code> 行</b>再过滤，并设 2000 行兜底防巨量扫描。
+  实测日志：<code>fetched 552 rows, kept 1</code>。</p>
+</div>
+
+<h2 id="bydate">9. 「几月几日采了多少」真正落地</h2>
+<p><code>/by-date</code> 此前是<b>孤儿接口</b>（前端从不调用），且只返回当日进程内计数，
+历史日期一律 <code>known:false</code> —— 等于这条需求没做。</p>
+<p>云盘目录树的<b>一级目录就是日期</b>，是唯一持久且真实的采集记录。
+新增 <code>AggregateDailyStats</code> 从目录树聚合：每天的用户数 / 模型数 / 分片数 / 字节。</p>
+
+<h3>必须说清的口径（同一屏两个数字本就允许不一致）</h3>
+<table>
+  <tr><th>来源</th><th>含义</th><th>优点</th><th>局限</th></tr>
+  <tr><td>今日统计卡（进程内计数）</td><td>本次进程启动以来的量</td><td>实时、含未上传量</td><td>重启归零、只有今天</td></tr>
+  <tr><td>每日历史卡（云盘聚合）</td><td>已成功落盘的量</td><td>可回溯任意日期、重启不丢</td><td>只反映已上传成功</td></tr>
+</table>
+<p>卡片内写明来源，避免管理员把差异当 bug。</p>
+
+<h2 id="quota">10. 我自己引入的配额风险</h2>
+
+<div class="card bad">
+  <p><b>这不是优化，是保护。</b>管理端轮询会持续调用云盘 API，
+  而<b>采集 worker 用的是同一份速率配额</b> —— 管理端把配额打满，
+  采集上传就会 429/限流，表现为「采集莫名开始失败」，根因却在另一个页面。</p>
+</div>
+
+<p>修法：新增 <code>timedCache[T]</code>（TTL + singleflight）：</p>
+<ul>
+  <li>每日聚合缓存 <b>5 分钟</b>（这张表不需要秒级新鲜，每次刷新代价是一次全量列举）；</li>
+  <li>目录/文件计数缓存 <b>1 分钟</b>（总览 5s 轮询不再每次遍历目录；队列/在传字节走内存计数，不受影响）；</li>
+  <li><b>只缓存聚合结果，不缓存原始目录树</b>：十万条约 10MB，驻留内存与「内存有硬上限」冲突；</li>
+  <li><b>错误不进缓存</b>：云盘恢复后应立刻看到数据，不该继续吃 5 分钟旧错误；</li>
+  <li><b>Redis 未启用时也生效</b>：打满配额的风险不该取决于是否配了 Redis。</li>
+</ul>
+<p><b>RED 验证：</b>完全绕过缓存后，16 并发 → 16 次云盘调用（正是生产风险），测试立刻失败。</p>
+
+<h2 id="changed">11. 改动清单</h2>
+<table>
+  <tr><th>提交</th><th>主题</th><th>关键文件</th></tr>
+  <tr><td><code>55e392b0d</code></td><td>声明与限额一致性（版本号/解压上限/后端上限）</td>
+      <td>consent.go、compression.go、sink.go、worker.go</td></tr>
+  <tr><td><code>cf5abd39c</code></td><td>分析正文角色标注 + web 防护分页</td>
+      <td>conversation.go、training_data_analyze.go、web-protection-page.tsx</td></tr>
+  <tr><td><code>4d27bc07d</code></td><td>排行榜排除管理员 + 清理过时文案</td>
+      <td>ops_panel.go、ops_panel_test.go</td></tr>
+  <tr><td><code>f90140560</code></td><td>训练数据页套 SectionPageLayout + 复用 Tabs</td>
+      <td>training-data/index.tsx</td></tr>
+  <tr><td><code>a0f3251fa</code></td><td>台账 + 历史报告加「已过时」提示</td>
+      <td>audit-ledger.md</td></tr>
+  <tr><td><code>d229baf18</code></td><td><b>P1 分析不可用</b> + 文件数恒为 0 + 开关静默失败</td>
+      <td>training-data/api.ts、onedrive.go、naming.go、preferences-card.tsx</td></tr>
+  <tr><td><code>59e204ff5</code></td><td>每日采集历史真正落地</td>
+      <td>export.go、training_data.go、daily-history-card.tsx</td></tr>
+  <tr><td><code>5d1aa17d9</code></td><td>暴露 skipped_no_text（配置型静默失效的唯一信号）</td>
+      <td>types.ts、overview-panel.tsx</td></tr>
+  <tr><td><code>9e843c93d</code></td><td><b>管理端云盘查询缓存+请求合并</b>（保护采集配额）</td>
+      <td>training_data_cache.go、training_data.go</td></tr>
+</table>
+
+<h2 id="verify">12. 验证证据（实际运行）</h2>
+<div class="card ok">
+  <h3>RED 验证（最重要——证明测试不是假绿）</h3>
+  <ul>
+    <li>还原「信封解包」→ 分析契约测试 <b>3 个里失败 2 个</b></li>
+    <li>用布局层数作遍历深度 → <b>文件数断言失败</b></li>
+    <li>还原「不过滤管理员」→ 排行榜测试失败并打印出混入的 admin</li>
+    <li>绕过缓存 → <b>16 并发 = 16 次云盘调用</b>（预期 1 次）</li>
+    <li>还原「切压缩产物」→ 重切测试三条不变量全破</li>
+    <li>还原「16MB 硬上限」→ 20MB 合法分片报解压超限</li>
+  </ul>
+  <h3>测试与构建</h3>
+  <ul>
+    <li><code>go test ./service/training_capture/</code> 全 PASS；<code>-race</code> 同范围 PASS</li>
+    <li><code>go test ./controller/ -run 'TimedCache|TrainingData|Ops|Analyze|Aggregate|CountTree'</code> PASS</li>
+    <li><code>go test ./logger/</code> 全 PASS</li>
+    <li><code>go build ./...</code> / <code>go vet</code> / <code>gofmt -l</code> 干净</li>
+    <li>前端：<code>bun run typecheck</code>、<code>oxlint</code>、<code>i18n:check</code>（0 missing）通过</li>
+    <li>新增前端测试：分析契约 3/3、web 防护 2/2</li>
+  </ul>
+  <h3>i18n 纪律</h3>
+  <p>所有 locale 改动均为<b>纯文本行插入</b>（每文件 1~5 行、0 删除），未重新序列化 JSON；
+  混淆键 <code>footer.newapi.projectAttributionSuffix</code> 逐次核验完好。</p>
+</div>
+
+<h2 id="left">13. 仍未闭环（如实，不包装）</h2>
+<div class="card warn">
+  <ul>
+    <li><b>累计充值金额未实现</b>：<code>LogTypeTopup</code> 日志行<b>不写 Quota 字段</b>（只有文本），
+        从日志聚合的金额不可靠。要做需给审计/日志加结构化金额 —— 那是给审计表<b>加列</b>，
+        属 L3 变更，需三库验证；本机<b>无 MySQL/PostgreSQL、无 Docker</b>，无法验证，故未动。</li>
+    <li><b>浏览器 E2E 未做</b>：本会话无浏览器工具。分页修复、每日历史卡、三态 UI
+        都只有类型/lint/单元级证据。</li>
+    <li><b>多实例协调</b>未实现；<b>Claude 计费两处</b>待你拍板；<b>p95 压测</b>需真实上游渠道。</li>
+    <li><code>controller</code> 全量测试在本机约 600s 超时（jsplugin 用例耗时，<b>非本次改动引起</b>），
+        已用 <code>-run</code> 缩小范围验证相关用例。</li>
+  </ul>
+</div>
+
+<h2 id="quiz">14. 测验（必须通过）</h2>
+<p class="note">共 10 题，需全部答对才算通过。每题作答后会显示解析。</p>
+
+<div id="quiz">
+  <div id="questions"></div>
+  <button id="submit" type="button">提交答案</button>
+  <div id="result"></div>
+</div>
+
+<script>
+const QUIZ = [
+  {
+    stem: "分析接口为什么在「成功」时前端却抛错？",
+    opts: [
+      "后端返回了 HTTP 500",
+      "后端成功时返回的是上游原始 chat completion（没有 success 字段），前端判 !res.success 时 undefined 被当成假",
+      "前端网络超时",
+      "模型返回了空内容"
+    ],
+    answer: 1,
+    why: "relay 成功时直接写上游响应体，没有本项目的 {success,data} 信封。!undefined === true，所以成功路径必然抛错。正确写法是 success === false。"
+  },
+  {
+    stem: "为什么「只覆盖错误路径」的测试会让 P1 缺陷隐形？",
+    opts: [
+      "因为错误路径更重要",
+      "因为覆盖率工具不计错误路径",
+      "因为成功路径从未被执行，功能整体不可用也就无从暴露",
+      "因为错误路径的断言更严格"
+    ],
+    answer: 2,
+    why: "测试只跑错误分支时，成功分支的代码根本没执行过。功能在真实使用中 100% 走成功路径，却恰好是唯一没被测的路径。"
+  },
+  {
+    stem: "云盘文件数恒为 0 的根因是什么？",
+    opts: [
+      "云盘 API 不支持统计文件",
+      "前端没显示该字段",
+      "遍历深度等于布局层数（3），模型目录只被计数却不被展开，而分片在它内部（第 4 层）",
+      "数据库查询条件写错"
+    ],
+    answer: 2,
+    why: "CountItems(ctx,3) 时 用户目录(depth=2) 的 2+1<3 为假，模型目录不入队，其内部文件永远数不到。应传 CaptureLayoutDepth+1。"
+  },
+  {
+    stem: "为什么说「文件数恒为 0」比报错更危险？",
+    opts: [
+      "因为 0 不是合法数字",
+      "因为 truncated=false 让这个错误数字看起来完全可信，管理员会据此以为采集没在写数据",
+      "因为前端会崩溃",
+      "因为会拖慢数据库"
+    ],
+    answer: 1,
+    why: "报错会让人去查；而一个 0 加上「没有截断」的标志，看起来就是事实。运营者会基于错误信息做决策。"
+  },
+  {
+    stem: "给分析正文加角色标注时，为什么标注来自 rec.Role 而不是启发式切分？",
+    opts: [
+      "因为启发式更慢",
+      "因为 role 是记录里现成的字段（数据结构事实），不会误判；启发式是从拼接文本里猜，会误判",
+      "因为 role 字段更大",
+      "因为启发式不能处理中文"
+    ],
+    answer: 1,
+    why: "标注是读取现成字段；SplitHeuristicTurns 是从拼接文本猜角色。前者不会误判，后者会。两者不能混为一谈。"
+  },
+  {
+    stem: "免责声明为何必须递增 CurrentPolicyVersion，而不只是改文案？",
+    opts: [
+      "为了版本号好看",
+      "为了让缓存失效，提升性能",
+      "因为在旧文本下作出的同意不能覆盖新扩大的采集范围，必须重新征求",
+      "因为数据库要求唯一版本号"
+    ],
+    answer: 2,
+    why: "声明内容实质性变更（新增「回复也存」「管理员可导出」）后，旧同意即失效。递增版本会让旧同意不被认可，强制重新确认。"
+  },
+  {
+    stem: "版本递增后，为什么还必须新增 needs_reconsent 并在界面说明？",
+    opts: [
+      "因为不说明的话开关会从「开」静默变「关」，用户会以为功能坏了或自己误触，甚至怀疑数据被偷偷继续采集",
+      "因为后端需要这个字段做鉴权",
+      "因为不加会编译失败",
+      "因为国际化要求"
+    ],
+    answer: 0,
+    why: "静默的状态变化是最糟的失败方式：用户无法区分「功能坏了」「我误触了」「有人在偷偷采」。必须解释原因。"
+  },
+  {
+    stem: "Web 防护页「看不到分页」的真正根因是什么？",
+    opts: [
+      "后端不支持分页参数",
+      "前端没有分页组件",
+      "页面未套 SectionPageLayout，导致分页控件要 portal 的页脚容器不存在，PageFooterPortal 直接返回 null",
+      "数据库没有索引"
+    ],
+    answer: 2,
+    why: "后端三张表都支持 page/size 并返回 total；前端也确实算了 pageCount。缺的是页脚容器这个「挂载点」。"
+  },
+  {
+    stem: "排行榜排除管理员时，为什么用 user_id NOT IN 而不是 JOIN users 表？",
+    opts: [
+      "因为 NOT IN 更快",
+      "因为日志库可能是另一个库（ClickHouse），跨库 JOIN 不可行",
+      "因为 GORM 不支持 JOIN",
+      "因为管理员没有 user_id"
+    ],
+    answer: 1,
+    why: "logs 表的查询走 model.LOG_DB，它可能被配置为独立的日志库甚至 ClickHouse，无法与主库的 users 表 JOIN。"
+  },
+  {
+    stem: "为什么管理端查询必须加缓存与请求合并（singleflight）？",
+    opts: [
+      "纯粹为了省服务器 CPU",
+      "因为云盘配额与采集 worker 共用，管理端轮询打满配额会让采集上传 429，表现为「采集莫名开始失败」而根因在另一个页面",
+      "因为前端轮询太频繁会崩",
+      "因为 Redis 要求"
+    ],
+    answer: 1,
+    why: "这是保护而非优化：两个功能共享同一份云盘速率配额。不合并并发请求时，16 个并发会发起 16 次全量列举。"
+  }
+];
+
+const box = document.getElementById('questions');
+QUIZ.forEach((q, qi) => {
+  const d = document.createElement('div');
+  d.className = 'q';
+  const p = document.createElement('p');
+  p.className = 'stem';
+  p.textContent = (qi + 1) + '. ' + q.stem;
+  d.appendChild(p);
+  q.opts.forEach((o, oi) => {
+    const label = document.createElement('label');
+    label.className = 'opt';
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'q' + qi;
+    input.value = String(oi);
+    const span = document.createElement('span');
+    span.textContent = o;
+    label.appendChild(input);
+    label.appendChild(span);
+    d.appendChild(label);
+  });
+  const ex = document.createElement('div');
+  ex.className = 'explain';
+  ex.id = 'ex' + qi;
+  d.appendChild(ex);
+  box.appendChild(d);
+});
+
+document.getElementById('submit').addEventListener('click', () => {
+  let correct = 0;
+  const unanswered = [];
+  QUIZ.forEach((q, qi) => {
+    const picked = document.querySelector('input[name="q' + qi + '"]:checked');
+    const ex = document.getElementById('ex' + qi);
+    ex.classList.add('show');
+    if (!picked) {
+      unanswered.push(qi + 1);
+      ex.classList.add('wrong');
+      ex.textContent = '未作答。正确答案：' + q.opts[q.answer] + ' —— ' + q.why;
+      return;
+    }
+    const ok = Number(picked.value) === q.answer;
+    if (ok) correct++;
+    ex.classList.add(ok ? 'right' : 'wrong');
+    ex.textContent = (ok ? '✅ 正确。' : '❌ 错误。正确答案：' + q.opts[q.answer] + '。')
+      + ' ' + q.why;
+  });
+  const res = document.getElementById('result');
+  const total = QUIZ.length;
+  const pass = correct === total;
+  res.className = pass ? 'pass' : 'fail';
+  res.textContent = pass
+    ? '通过：' + correct + '/' + total + '。你已经理解了这次变更的关键判断。'
+    : '未通过：' + correct + '/' + total + '，需全部答对。'
+      + (unanswered.length ? '（未作答：第 ' + unanswered.join('、') + ' 题）' : '')
+      + ' 请阅读上方解析后重试。';
+  res.scrollIntoView({behavior:'smooth', block:'center'});
+});
+</script>
+
+</div>
+</body>
+</html>
