@@ -79,6 +79,12 @@ root_path() {
   echo "${r:-training-data}"
 }
 
+# names_of <json> → 逐行输出所有 "name":"..."（Graph 的字段顺序不保证，
+# 不要用「name 后面紧跟 folder/size」这种顺序敏感的 sed）。
+names_of() {
+  printf '%s' "$1" | grep -o '"name":"[^"]*"' | sed 's/^"name":"//; s/"$//'
+}
+
 # nextlink_of <json> → 取出 @odata.nextLink（处理 & 与 \/ 转义）
 nextlink_of() {
   printf '%s' "$1" |
@@ -175,10 +181,9 @@ for _ in $(seq 1 18); do
     [ -n "$TK" ] && [ -n "$DR" ] || continue
     ROOT=$(root_path "$IDX")
     body=$(list_children_all "$TK" "$DR" "$ROOT/$DAY")
-    if printf '%s' "$body" | grep -q "$U"; then
+    if names_of "$body" | grep -qF "$U"; then
       found_acct="$IDX"; found_root="$ROOT"
-      found_dir=$(printf '%s' "$body" |
-        sed -n "s/.*\"name\":\"\([^\"]*${U}[^\"]*\)\".*/\1/p" | head -1)
+      found_dir=$(names_of "$body" | grep -F "$U" | head -1 || true)
       break 2
     fi
   done
@@ -190,12 +195,12 @@ say "   ✓ 落在账号 #$found_acct 的目录：$found_root/$DAY/$found_dir"
 say "9) 下钻到模型目录并校验分片"
 TK=$(graph_token "$found_acct"); DR=$(drive_id "$found_acct")
 sub=$(list_children_all "$TK" "$DR" "$found_root/$DAY/$found_dir")
-model_dir=$(printf '%s' "$sub" | sed -n 's/.*"name":"\([^"]*\)","folder".*/\1/p' | head -1)
+model_dir=$(names_of "$sub" | grep -v '^part-' | head -1 || true)
 [ -n "$model_dir" ] || die "用户目录下没有模型子目录"
 say "   模型目录：$model_dir"
 files=$(list_children_all "$TK" "$DR" "$found_root/$DAY/$found_dir/$model_dir")
 say "   分片列表：$(printf '%s' "$files" | head -c 260)"
-part=$(printf '%s' "$files" | sed -n 's/.*"name":"\(part-[^"]*\)".*/\1/p' | head -1)
+part=$(names_of "$files" | grep '^part-' | head -1 || true)
 [ -n "$part" ] || die "模型目录下没有分片"
 
 # 下载并解压（Graph 的 /content 会 302 到下载地址，-L 跟随）
