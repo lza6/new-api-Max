@@ -1,0 +1,28 @@
+  ✅ API 登录成功（为浏览器提供会话）
+
+[1] /training-data（管理页：SectionPageLayout + Tabs）
+  ✅ 页面不是空白（SPA 已渲染）
+  ✅ 管理页有 4 个 Tab（概览/云盘文件/导出/深度分析）
+  ✅ 点击第 2 个 Tab 后内容变化（Tab 真实生效）
+
+[2] /web-protection（分页根因修复：SectionPageLayout）
+  ✅ Web 防护页渲染
+  ✅ Web 防护页有 3 个 Tab（设置/请求日志/封禁 IP）
+  ✅ 页面包含标题区（SectionPageLayout 生效）
+
+[3] /ops-panel
+  ✅ 运营面板渲染
+  ✅ 出现消耗/排行榜相关文案
+
+[4] /profile（未配置云盘 → 不渲染采集开关）
+  ✅ 个人资料页渲染
+  ✅ 未配置云盘时**不出现**采集开关卡片（中英文都不得出现）
+
+[5] 移动端 320px
+  ✅ /training-data 在 320px 下无横向溢出
+  ✅ /web-protection 在 320px 下无横向溢出
+
+[6] 控制台
+  ✅ 无未预期的运行时错误
+
+=== UI 结果：14 通过 / 0 失败 ===

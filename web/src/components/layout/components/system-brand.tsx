@@ -61,18 +61,23 @@ export function SystemBrand(props: SystemBrandProps) {
         to='/'
         aria-label={t('Go to home')}
         className={cn(
-          'text-foreground inline-flex h-7 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors outline-none select-none',
+          // `min-w-0` 是必须的：作为 flex 子项，默认 `min-width:auto` 会让它
+          // 拒绝收缩到内容宽度以下，于是窄屏上把右侧操作区挤出视口
+          // （实测 320px 下整页 `scrollWidth` 比 `clientWidth` 多 34px，
+          // 每页都出现横向滚动条）。
+          'text-foreground inline-flex h-7 min-w-0 items-center gap-1.5 rounded-md px-1.5 text-sm font-medium transition-colors outline-none select-none',
           'hover:bg-accent focus-visible:ring-ring/40 focus-visible:ring-2'
         )}
       >
-        <div className='flex size-5 items-center justify-center overflow-hidden rounded-md'>
+        <div className='flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-md'>
           <img
             src={logo}
             alt={t('Logo')}
             className='size-full rounded-md object-cover'
           />
         </div>
-        <span className='max-w-[12rem] truncate'>{name}</span>
+        {/* 窄屏上限收到 5rem：先保住右侧功能按钮不溢出，站点名按需截断。 */}
+        <span className='max-w-[5rem] truncate sm:max-w-[12rem]'>{name}</span>
       </Link>
     )
   }
