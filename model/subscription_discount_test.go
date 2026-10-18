@@ -42,4 +42,12 @@ func TestBuildSubscriptionSummarySavings(t *testing.T) {
 	sub.AmountUsed = 10_000
 	summary = BuildSubscriptionSummary(sub)
 	assert.Equal(t, 0.0, summary.SavedAmount)
+
+	// 没有价格快照（旧数据 / 周期重置后）时不得把已付套餐费算成“省下”。
+	sub.AmountUsed = 500_000
+	sub.PeriodPrice = 0
+	summary = BuildSubscriptionSummary(sub)
+	assert.Equal(t, 500.0, summary.PayAsYouGoValue)
+	assert.Equal(t, 0.0, summary.PlanPrice)
+	assert.Equal(t, 0.0, summary.SavedAmount, "无价格快照时省费必须为 0")
 }

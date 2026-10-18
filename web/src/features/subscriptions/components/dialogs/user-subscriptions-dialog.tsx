@@ -423,7 +423,9 @@ export function UserSubscriptionsDialog(props: Props) {
                     const payg = Number(record.pay_as_you_go_value || 0)
                     const saved = Number(record.saved_amount || 0)
                     const price = Number(record.plan_price || 0)
-                    if (price <= 0 && payg <= 0) {return '—'}
+                    // 没有价格快照（v1.3.152 之前的旧数据，或额度周期已重置）时
+                    // 不展示省费，避免把实际已付的套餐费显示成“省下”的金额。
+                    if (price <= 0) {return '—'}
                     return (
                       <span className='whitespace-nowrap text-xs'>
                         {t('Pay-as-you-go: {{amount}}', {

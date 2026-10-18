@@ -257,3 +257,18 @@ node e2e-local/v1388-a11y-responsive.cjs                                  # 7/7 
 
 仍不做：外部固定价支付渠道的首购折扣（需渠道侧 coupon/price 对象）；渠道冗余（需上游）；
 G8 大文件拆分（禁止大重构）。
+
+## 八、2026-10-19 v1.3.153 独立审查修复（对 v1.3.152 的复查）
+
+两名只读审查者（Go / 前端）复查 v1.3.152：
+
+| 级别 | 问题 | 修复 |
+|---|---|---|
+| P1（Go） | 并发余额购买可重复享受首购折扣：COUNT 在用户行锁之前且为快照读 | 判定移到 `lockForUpdate(users)` 之后并改用锁定读；扣款改条件更新 |
+| P1（前端） | 100% 折扣被当成“无折扣”（`discounted_price` omitempty） | 去掉 omitempty；前端用 `first_purchase_discount_on && is_first_purchase && percent>0` |
+| P1（前端） | 外部支付渠道展示余额专享折后价；`$¥` 双重符号 | “Amount Due” 只显示原价；折后价只进余额区；去掉字面 `$` |
+| P1（前端） | 非 CNY 金额缺货币符号 | `formatAmount` 补 `$`，新增 4 条单测 |
+| P1（前端） | 旧订阅/周期重置后把全部按量金额显示成“已省” | `SavedAmount` 仅在 `PeriodPrice>0` 时计算；前端无快照显示 `—` |
+
+复验：`go build ./...` PASS、定向 model 测试 PASS、`bun run typecheck` PASS、
+订阅组件测试 6/6、金额格式化 4/4。

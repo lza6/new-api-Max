@@ -70,7 +70,7 @@ export function formatTimestamp(ts: number): string {
 /** Format a money amount with its currency symbol (CNY -> ¥, otherwise $). */
 export function formatAmount(amount: number, currency?: string): string {
   const value = Number(amount || 0).toFixed(2)
-  return (currency || 'USD') === 'CNY' ? `¥${value}` : `${value}`
+  return (currency || 'USD') === 'CNY' ? `¥${value}` : `$${value}`
 }
 
 /** Format a plan price with its currency symbol (CNY -> ¥, otherwise $). */

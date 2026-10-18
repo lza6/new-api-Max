@@ -904,35 +904,49 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 			return errors.New("该套餐不允许使用余额兑换")
 		}
 
+		var user User
+		if err := lockForUpdate(tx).Where("id = ?", userId).First(&user).Error; err != nil {
+			return err
+		}
+
 		// 首购优惠：功能开关开启、用户从未购买过订阅、且套餐配置了折扣时，
 		// 对**余额支付**按折扣价扣款。外部支付渠道的固定 Price/Product ID 不受影响。
+		//
+		// 判定必须在持有用户行锁之后，且用**锁定读**：并发购买时若先读后锁，
+		// 两个事务都会看到“无历史订阅”并各自按折扣价成交（重复首购）。
+		// 锁定读同时避开 MySQL REPEATABLE READ 的一致性快照——普通 SELECT
+		// 看不到另一事务刚提交的订阅行。SQLite 没有 FOR UPDATE，由单写者
+		// 模型让后写的事务失败。
 		discountEnabled := common.FeatureFlagValue(common.FlagSubscriptionFirstPurchaseDiscount,
 			common.GetEnvOrDefaultBool(common.FlagSubscriptionFirstPurchaseDiscount, false))
 		hasPrior := false
 		if discountEnabled && plan.FirstPurchaseDiscountPercent > 0 {
-			var priorCount int64
-			if err := tx.Model(&UserSubscription{}).Where("user_id = ?", userId).Count(&priorCount).Error; err != nil {
-				return err
+			var prior UserSubscription
+			priorErr := lockForUpdate(tx).Where("user_id = ?", userId).First(&prior).Error
+			if priorErr == nil {
+				hasPrior = true
+			} else if !errors.Is(priorErr, gorm.ErrRecordNotFound) {
+				return priorErr
 			}
-			hasPrior = priorCount > 0
 		}
 		effectivePrice := EffectiveSubscriptionPrice(plan, hasPrior, discountEnabled)
 		requiredQuota, err := calcSubscriptionBalanceQuota(effectivePrice)
 		if err != nil {
 			return err
 		}
-
-		var user User
-		if err := lockForUpdate(tx).Where("id = ?", userId).First(&user).Error; err != nil {
-			return err
-		}
 		if requiredQuota > 0 && user.Quota < requiredQuota {
 			return errors.New("余额不足")
 		}
 		if requiredQuota > 0 {
-			if err := tx.Model(&User{}).Where("id = ?", userId).
-				Update("quota", gorm.Expr("quota - ?", requiredQuota)).Error; err != nil {
-				return err
+			// 条件更新兜底：前置检查即使因并发读到旧值，也不会把余额扣成负数。
+			res := tx.Model(&User{}).
+				Where("id = ? AND quota >= ?", userId, requiredQuota).
+				Update("quota", gorm.Expr("quota - ?", requiredQuota))
+			if res.Error != nil {
+				return res.Error
+			}
+			if res.RowsAffected == 0 {
+				return errors.New("余额不足")
 			}
 		}
 
@@ -1088,9 +1102,11 @@ func BuildSubscriptionSummary(sub UserSubscription) SubscriptionSummary {
 	if common.QuotaPerUnit > 0 {
 		payg = float64(sub.AmountUsed) / common.QuotaPerUnit
 	}
-	saved := payg - sub.PeriodPrice
-	if saved < 0 {
-		saved = 0
+	// 没有价格快照（旧数据 / 周期重置后 PeriodPrice=0）时不报告省费：
+	// 否则 saved = payg - 0 会把用户实际已付的套餐费显示成“省下的钱”。
+	saved := 0.0
+	if sub.PeriodPrice > 0 && payg > sub.PeriodPrice {
+		saved = payg - sub.PeriodPrice
 	}
 	return SubscriptionSummary{
 		Subscription:    &sub,

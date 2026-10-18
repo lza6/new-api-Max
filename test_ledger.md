@@ -104,3 +104,19 @@
 > 说明：`workflow_status.md` 当前工作树版本由另一并发会话维护（内容为 v1.3.151
 > 训练采集终局闭环），本轮未改动该文件，避免覆盖对方未提交内容。
 
+
+## 2026-10-19 v1.3.153 独立审查修复
+
+独立审查（Go / 前端各一名只读审查者）对 v1.3.152 提出 1 个后端 P1 + 4 个前端 P1，
+已逐条复现并修复：
+
+| 问题 | 修复 | 验证 |
+|---|---|---|
+| 并发余额购买可重复享受首购折扣（先查后锁、MySQL RR 快照） | 首购判定移到用户行锁后，改用锁定读；余额扣减改为 `quota >= cost` 条件更新 | `go build ./...` PASS；定向 model 测试 PASS |
+| 100% 折扣被前端当作无折扣（`discounted_price` 带 omitempty） | 去掉 omitempty；前端按 `first_purchase_discount_on && is_first_purchase && percent>0` 判定 | `bun run typecheck` PASS |
+| 外部支付渠道展示了余额专享折后价；`$` 与 `¥` 叠加为 `$¥` | “Amount Due” 只显示原价；折后价只出现在余额支付区 | typecheck + 订阅组件测试 6/6 |
+| 非 CNY 金额丢失货币符号 | `formatAmount` 非 CNY 分支补 `$` | 新增 `format-amount.test.ts` 4/4 PASS |
+| 无价格快照的订阅把全部按量金额显示为“已省” | 后端 `SavedAmount` 仅在 `PeriodPrice>0` 时计算；前端无快照显示 `—` | `TestBuildSubscriptionSummarySavings` 新增断言 PASS |
+
+> 环境说明：`delete-plan-dialog.test.tsx` 在本机运行超过 5 分钟未结束（与本次改动无关），
+> 已停止；相关订阅组件测试单独运行 6/6 PASS。

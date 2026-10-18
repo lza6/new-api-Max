@@ -87,21 +87,23 @@ export function SubscriptionPurchaseDialog(props: Props) {
     props.enableOnlineTopUp && (props.epayMethods || []).length > 0
   const hasAnyPayment = hasStripe || hasCreem || hasWaffoPancake || hasEpay
   const totalAmount = Number(plan.total_amount || 0)
+  const discountPercent = Number(plan.first_purchase_discount_percent || 0)
+  const hasFirstPurchaseDiscount =
+    props.plan?.first_purchase_discount_on === true &&
+    props.plan?.is_first_purchase === true &&
+    discountPercent > 0
   const discountedPrice = Number(props.plan?.discounted_price || 0)
-  const effectivePrice =
-    discountedPrice > 0 ? discountedPrice : Number(plan.price_amount || 0)
-  const price =
-    discountedPrice > 0
-      ? `${formatPlanPrice(plan)} → ${formatAmount(discountedPrice, plan.currency)}`
-      : formatPlanPrice(plan)
+  // 外部支付渠道（Stripe/Creem/Waffo/Epay）按固定 Price/Product ID 收款，
+  // 不参与余额首购折扣；只有余额支付使用折后价。
+  const balancePrice = hasFirstPurchaseDiscount
+    ? discountedPrice
+    : Number(plan.price_amount || 0)
+  const price = formatPlanPrice(plan)
   const quotaPerUnit =
     currency?.quotaPerUnit && currency.quotaPerUnit > 0
       ? currency.quotaPerUnit
       : DEFAULT_CURRENCY_CONFIG.quotaPerUnit
-  const balanceCost = Math.max(
-    0,
-    Math.ceil(effectivePrice * quotaPerUnit)
-  )
+  const balanceCost = Math.max(0, Math.ceil(balancePrice * quotaPerUnit))
   const userQuota = Math.max(0, Number(props.userQuota || 0))
   const allowBalancePay = plan.allow_balance_pay !== false
   const insufficientBalance = userQuota < balanceCost
@@ -292,7 +294,7 @@ export function SubscriptionPurchaseDialog(props: Props) {
           <Separator />
           <div className='flex items-center justify-between'>
             <span className='text-sm font-medium'>{t('Amount Due')}</span>
-            <span className='text-primary text-lg font-bold'>${price}</span>
+            <span className='text-primary text-lg font-bold'>{price}</span>
           </div>
         </div>
 
@@ -314,6 +316,16 @@ export function SubscriptionPurchaseDialog(props: Props) {
             <span className='text-muted-foreground'>{t('Available')}</span>
             <span>{formatQuota(userQuota)}</span>
           </div>
+          {hasFirstPurchaseDiscount && (
+            <div className='flex items-center justify-between gap-2 text-xs'>
+              <span className='text-muted-foreground'>
+                {t('First purchase discount')}
+              </span>
+              <span className='text-emerald-600'>
+                {formatAmount(discountedPrice, plan.currency)}
+              </span>
+            </div>
+          )}
           {!allowBalancePay ? (
             <Alert variant='destructive'>
               <AlertDescription>

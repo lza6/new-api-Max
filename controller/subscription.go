@@ -21,8 +21,9 @@ import (
 type SubscriptionPlanDTO struct {
 	Plan model.SubscriptionPlan `json:"plan"`
 	// 首购优惠展示字段：折扣仅在功能开关开启、用户从未购买过订阅时生效。
-	IsFirstPurchase         bool    `json:"is_first_purchase"`
-	DiscountedPrice         float64 `json:"discounted_price,omitempty"`
+	IsFirstPurchase bool `json:"is_first_purchase"`
+	// 不使用 omitempty：100% 折扣时折后价为 0，字段被省略会让前端误判为“没有折扣”。
+	DiscountedPrice         float64 `json:"discounted_price"`
 	FirstPurchaseDiscountOn bool    `json:"first_purchase_discount_on"`
 }
 

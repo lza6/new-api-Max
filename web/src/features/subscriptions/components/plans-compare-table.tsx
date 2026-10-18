@@ -267,13 +267,18 @@ export function PlansCompareTable(props: PlansCompareTableProps) {
                   </div>
                 </td>
                 <td className='px-3 py-3 sm:px-4'>
-                  {planRecord.discounted_price && planRecord.discounted_price > 0 ? (
+                  {planRecord.first_purchase_discount_on &&
+                  planRecord.is_first_purchase &&
+                  Number(plan.first_purchase_discount_percent || 0) > 0 ? (
                     <span className='flex flex-col'>
                       <span className='text-muted-foreground text-xs line-through'>
                         {formatPlanPrice(plan)}
                       </span>
                       <span className='text-emerald-600 font-semibold whitespace-nowrap'>
-                        {formatAmount(planRecord.discounted_price, plan.currency)}
+                        {formatAmount(
+                          Number(planRecord.discounted_price || 0),
+                          plan.currency
+                        )}
                       </span>
                       <span className='text-emerald-600 text-xs'>
                         {t('First purchase discount')}

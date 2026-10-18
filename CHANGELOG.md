@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.153] - 2026-10-19
+
+### Fixed
+- First-purchase discount could be claimed twice by concurrent balance purchases: the prior-purchase check now runs after the user row lock and uses a locking read; wallet deduction is a conditional update (`quota >= cost`).
+- 100% first-purchase discount was treated as "no discount" by the UI: `discounted_price` no longer uses `omitempty`, and the UI decides eligibility from `first_purchase_discount_on && is_first_purchase && percent > 0`.
+- External payment providers (Stripe/Creem/Waffo Pancake/Epay) no longer show the balance-only discounted price; "Amount Due" no longer prepends a literal `$` (CNY previously rendered as `$¥`).
+- Non-CNY amounts lost their currency symbol.
+- Savings no longer reports the full pay-as-you-go value as "saved" when a subscription has no price snapshot (legacy rows or after a quota-period reset).
+
+### Verification
+- `go build ./...` PASS; targeted model tests PASS.
+- `bun run typecheck` PASS; subscription component tests PASS.
+- `go test ./model/ -run 'EffectiveSubscriptionPrice|BuildSubscriptionSummary|PurchaseSubscription|TrainingCaptureLease'` PASS.
+
 ## [v1.3.152] - 2026-10-18
 
 ### Added
