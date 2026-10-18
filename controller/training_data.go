@@ -136,7 +136,7 @@ type SinkOverview struct {
 
 // GetTrainingDataAdminOverview 管理端总览。
 //
-// GET /api/training-data/admin/overview
+// GET /api/admin/training-data/overview
 func GetTrainingDataAdminOverview(c *gin.Context) {
 	overview := TrainingDataOverview{
 		Gateway: training_capture.GetGatewayStatus(),
@@ -327,7 +327,7 @@ func GetTrainingDataByDate(c *gin.Context) {
 
 // SetTrainingDataEnabled 管理端切换总开关。
 //
-// PUT /api/training-data/admin/enabled
+// PUT /api/admin/training-data/enabled
 //
 // 请求体 `{"enabled":true}`。
 func SetTrainingDataEnabled(c *gin.Context) {
@@ -385,7 +385,7 @@ type TrainingDataFileEntry struct {
 
 // ListTrainingDataFiles 列出云盘目录树。
 //
-// GET /api/training-data/admin/files?path=<可选子目录>&max=<可选条目上限>
+// GET /api/admin/training-data/files?path=<可选子目录>&max=<可选条目上限>
 //
 // `path` 为空表示从配置的根目录开始。管理端据此渲染可下钻的文件树。
 func ListTrainingDataFiles(c *gin.Context) {
@@ -475,7 +475,7 @@ func ListTrainingDataFiles(c *gin.Context) {
 
 // PreviewTrainingDataFile 读取并预览一个分片（解压后的 JSONL 文本）。
 //
-// GET /api/training-data/admin/file?path=...&max_bytes=...
+// GET /api/admin/training-data/file?path=...&max_bytes=...
 //
 // 返回**解压后**的行数组（云盘上存的是 gzip）。同时如实披露坏行数与
 // 截断事实 —— 管理端不能把残缺数据当完整展示。
@@ -560,7 +560,7 @@ func PreviewTrainingDataFile(c *gin.Context) {
 
 // DeleteTrainingDataFile 删除一个分片。
 //
-// DELETE /api/training-data/admin/file?path=...
+// DELETE /api/admin/training-data/file?path=...
 //
 // 危险操作：HTTP 层要求前端二次确认，这里额外要求显式 `confirm=1`，
 // 避免误调用（例如把查询串拼错）造成静默删数据。

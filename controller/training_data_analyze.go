@@ -95,7 +95,7 @@ const analyzeSystemPrompt = `你是一名资深的产品与运营分析师。下
 
 // AnalyzeTrainingDataConversation 管理员对某个对话记录做深度分析 / 继续追问。
 //
-// POST /api/training-data/admin/analyze
+// POST /api/admin/training-data/analyze
 func AnalyzeTrainingDataConversation(c *gin.Context) {
 	var req analyzeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

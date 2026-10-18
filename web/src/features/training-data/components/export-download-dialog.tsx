@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
 import { getTrainingDataExportDetail, issueTrainingDataExportLink } from '../api'
+import { formatBytes } from '../lib/format'
 import type {
   TrainingDataExport,
   TrainingDataExportDownload,
@@ -258,7 +259,7 @@ function renderHistory(
             {dayjs.unix(dl.started_at).format('YYYY-MM-DD HH:mm:ss')}
           </span>
           <span className='text-muted-foreground ml-auto text-xs tabular-nums'>
-            {dl.bytes_sent} B
+            {formatBytes(dl.bytes_sent)}
           </span>
         </li>
       ))}
