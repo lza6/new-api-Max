@@ -3,6 +3,7 @@ package controller
 import (
 	"context"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -523,4 +524,27 @@ func TestAnalysisDisclosesSkippedParts(t *testing.T) {
 	msg := buildAnalysisSystemMessage(assembled)
 	meta := msg[strings.Index(msg, "对话记录元信息："):]
 	assert.Contains(t, meta, "1 个分片读取或解压失败")
+}
+
+// TestListFilesRejectsPathTraversal 四个管理端入口（列举 / 预览 / 删除 / 分析）
+// 必须用**同一条**路径校验规则。
+//
+// 列举接口原先漏了 `..` 校验：路径会经 `itemPath()` 拼到 RootPath 之后交给 Graph，
+// `..` 可让列举逃出 RootPath 指向云盘其它目录 —— 与「只读训练数据目录」的
+// 边界不符。虽然仅管理员可达，但四个入口规则不一致，将来新增端点必然漏。
+func TestListFilesRejectsPathTraversal(t *testing.T) {
+	setupTrainingDataTestDB(t)
+	sink := newFakeReaderSink()
+	defer training_capture.SetSinkForTest(sink)()
+
+	for _, bad := range []string{"../secret", "2026-10-14/../../secret", "..%2Fsecret"} {
+		ctx, recorder := jsonContext(t, http.MethodGet,
+			"/api/admin/training-data/files?path="+url.QueryEscape(bad), "", 1)
+		ListTrainingDataFiles(ctx)
+
+		var env apiEnvelope
+		require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &env))
+		assert.Falsef(t, env.Success, "列举接口必须拒绝上跳路径 %q", bad)
+		assert.Contains(t, env.Message, "invalid path")
+	}
 }

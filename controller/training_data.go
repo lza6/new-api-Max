@@ -385,6 +385,15 @@ func ListTrainingDataFiles(c *gin.Context) {
 	}
 
 	root := strings.Trim(strings.TrimSpace(c.Query("path")), "/")
+	// 纵深防御：与预览/删除/分析三个端点**同一判据**。
+	// 虽然本接口仅管理员可达，但路径会经 `itemPath()` 拼到 RootPath 之后
+	// 交给 Graph —— `..` 可让列举逃出 RootPath 指向云盘其它目录，
+	// 与本功能「只读训练数据目录」的边界不符。四个入口用同一条规则，
+	// 避免将来新增端点时漏掉一个。
+	if strings.Contains(root, "..") {
+		common.ApiErrorMsg(c, "invalid path")
+		return
+	}
 	maxEntries := 0
 	if raw := c.Query("max"); raw != "" {
 		if v, err := strconv.Atoi(raw); err == nil && v > 0 {
