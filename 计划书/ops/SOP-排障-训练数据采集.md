@@ -2,7 +2,9 @@
 
 > 面向「用户说采集没生效」的场景。按**真实代码路径**从外到内逐层排查，每层给出判据与命令。
 > 证据来源全部标 `file:line`；无证据的推断标「待验证」。
-> 最后核对：2026-10-16（对照 `VERSION` = `v1.3.147`）。
+> 最后核对：2026-10-19（对照 `VERSION` = `v1.3.151`）。
+> 说明：源码行号会随迭代漂移；与行号冲突时**以符号名为准**（如 `resolve`、`maxPartSeq`、
+> `errCannotResolveAccount`），`grep -n` 现查。
 
 ---
 
@@ -103,6 +105,30 @@
 - 文本增量规则：只在「新文本以已上传前缀开头」时裁剪；否则**全量重传**（`text_increment.go:39-78`）。
   → 若看到每次都全量重传，通常是 prefix hash 不匹配（历史被编辑/截断），这是**保守正确行为**，非 bug。
 
+### 2.4 多账号归属（v1.3.150+，v1.3.151 收紧）
+
+启动日志出现 `multi-account sink active with N accounts` 才表示真的接入了多个云盘账号。
+
+归属规则（`service/training_capture/sink_multi.go` 的 `resolve`）：
+
+1. **已有数据的账号优先**（老目录永不漂移）；
+2. **任一账号 List 失败且没有任何账号证明自己有数据 → 拒绝写入**，
+   返回 `cannot resolve which account owns this directory`，信号回队重试（最多 3 次）；
+3. 只有**每个**账号都成功读到空列表，才按 `crc32(dir)%N` 分片；
+4. 同一目录出现在多个账号（手工迁移/复制）→ 取 **part 序号最大** 的账号，并打
+   `exists on multiple accounts` ERROR 日志 —— 需要人工合并/清理，不要忽略。
+
+| 日志/现象 | 含义 | 处理 |
+|---|---|---|
+| `cannot resolve ... refusing to guess` 偶发 | 某账号 List 瞬时失败（429/超时/token） | 正常自愈；持续出现查该账号 Graph 可用性 |
+| `retry queue full, dropping signal` | 失败回队时队列已满 | 说明失败持续 + 队列积压，查云盘限流 |
+| `giving up after N attempts` | 同一信号重试 3 次仍失败 | 这段增量**已丢失**；据此排查并告知影响范围 |
+| `exists on multiple accounts` | 目录被劈开 | 人工比对两边 part 序号，合并后删除多余副本；**不要直接删高序号账号** |
+| 删除接口返回成功但文件还在 | v1.3.150 及更早的 404 假成功缺陷 | 升级到 v1.3.151+；旧版删除后必须回读确认 |
+
+**读/删兜底的边界（v1.3.151）**：只有后端明确返回 not-found 才会去别的账号找；
+429/500/超时原样上抛。看到「预览失败」时先看错误类型，不要把瞬时错误当成文件不存在。
+
 ---
 
 ## 3. 切分、压缩与上传
@@ -144,3 +170,6 @@ docker logs --since 30m new-api 2>&1 | grep -i "training capture"
 | 管理端预览/分析报「解压超限」 | 分片上限是否被调过 | 解压上限与分片上限同源（`EffectiveDecompressMaxPlainBytes`）；若不一致说明版本过旧 |
 | 日志出现 `compresses poorly ... re-split` | 内容是已压缩/随机数据 | 正常自适应行为，非故障 |
 | 撤回后还上传 | worker 复查授权 | `worker.go:313-321` |
+| `cannot resolve which account owns` | 某账号 List 失败且无人有数据 | fail-closed，正常重试；持续出现查该账号凭据/限流 |
+| `exists on multiple accounts` | 同一目录被劈到两个账号 | 人工合并；写入已自动跟随最大 part 序号 |
+| 管理端删除「成功」但文件仍在 | 旧版 404 假成功 | 升级 v1.3.151+ 并回读确认 |
