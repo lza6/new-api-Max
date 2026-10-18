@@ -1,0 +1,37 @@
+生产训练数据采集 E2E — v1.3.154（2026-10-19）
+
+环境
+- 主机：154.37.208.171（freeapi.tingfengai.art）
+- 镜像：new-api:v1.3.154（蓝绿 3000→3001，healthy，外网 200）
+- 启动日志：multi-account sink active with 2 accounts + worker started (sink=onedrive)
+- 二进制确认：grep -a "cannot safely resolve" /new-api = 1 命中
+- /metrics：200，training_capture_* 系列 24 条
+
+探针：scripts/prod-capture-e2e.sh（真实用户 / 真实授权 / 真实计费请求 / 云盘回读）
+
+用例 1：capture_e2e_h1_1792359410（id=1620，路径哈希 → 账号索引 1）
+- 登录 / status available=true policy_version=v2 / grant granted=true
+- 补额度并清除 Redis user:1620
+- 一次真实补全（max_tokens=16）
+- 云盘：账号 #2，training-data/2026-10-18/capture_e2e_h1_1792359410-1620/deepseek-v4.1-flash/part-0001.jsonl.gz
+- 分片 136 B，解压 1 行：
+  role=request kind=message len=38
+- 说明：该模型本次只返回 reasoning_content，正文为空 → 没有 assistant 行（探针已明确提示，不当作故障）
+
+用例 2：capture_e2e_h4_1792359410（id=1623，路径哈希 → 账号索引 0）
+- 云盘：账号 #1，同布局
+- 分片 176 B，解压 2 行：
+  role=request kind=message len=38
+  role=assistant kind=- len=2
+- 断言：request 行 kind 合法；含 assistant 行 → 回复采集链路生效
+
+清理与回读
+- DB：watermarks/consents/tokens/logs/users 全删；剩余 capture_e2e_% 用户 = 0
+- 云盘：
+  h1 目录 account#1=404 / account#2=204（实际在 #2）
+  h4 目录 account#1=204 / account#2=404（实际在 #1）
+  两账号当日目录中剩余 capture_e2e_ 目录 = 0
+
+结论
+- 两个账号都在承载数据；分片可独立解压、逐行合法 JSON、kind 契约存在；
+- v1.3.154 的 fail-closed / 删除全账号语义未影响正常写入链路。
