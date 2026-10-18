@@ -81,4 +81,26 @@
 | 首购优惠真实浏览器 E2E | `node web/e2e-local/v13150-subscription-e2e.cjs` | **5/5 PASS**（创建套餐、折后价 80、页面展示、余额扣 80×QuotaPerUnit、清理） |
 | 前端 typecheck/build/i18n | `bun run typecheck` / `bun run build` / `bun run i18n:check` | PASS（0 missing） |
 
-证据：`evidence/three-db-conformance-20261018.json`、`计划书/e2e-evidence/v1.3.152/`。
+证据：`evidence/three-db-conformance-20261018.json`、`计划书/e2e-evidence/v1.3.150/`。
+
+## 2026-10-19 v1.3.152 发布与生产验收
+
+| 项 | 命令/证据 | 结果 |
+|---|---|---|
+| 提交 | `git commit` | `e7c77ff82`，已推送 `origin/main` |
+| 发行版 | `gh release create v1.3.152` | https://github.com/lza6/new-api-Max/releases/tag/v1.3.152 |
+| 镜像构建 | 服务器 `docker build -t new-api:v1.3.152`（源码 `git archive v1.3.152`） | PASS |
+| 蓝绿部署 | `/opt/new-api/deploy-zero-downtime.sh v1.3.152` | 3000→3001，脚本自检 200，旧容器已停 |
+| 版本 | `curl -D - https://freeapi.tingfengai.art/api/status` | HTTP 200，`X-New-Api-Version: v1.3.152` |
+| 探针 | `/healthz` `/readyz` | 200 / 200 |
+| SEO | `/en/pricing` | `lang=en`、canonical、3 条 hreflang |
+| noindex | `/sign-in` | `noindex, nofollow` |
+| MCP 默认关 | `POST /mcp` 未认证 | 401 |
+| 指标 | `/metrics` | 200，含 `training_capture_skipped_lease_total` |
+| 迁移 | PostgreSQL `\d subscription_plans` / `\d user_subscriptions` | 新列均存在 |
+| 资源 | `docker stats` / `df -h` | 149MB/900MB；11G/78G (14%) |
+| 回滚镜像 | `docker images new-api` | `v1.3.151` / `v1.3.150` / `v1.3.149` |
+
+> 说明：`workflow_status.md` 当前工作树版本由另一并发会话维护（内容为 v1.3.151
+> 训练采集终局闭环），本轮未改动该文件，避免覆盖对方未提交内容。
+
