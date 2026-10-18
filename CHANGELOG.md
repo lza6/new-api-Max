@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.154] - 2026-10-19
+
+### Fixed
+- Training capture ownership is now fail-closed whenever **any** storage account cannot be
+  listed: the unreadable account may be the real writer, so guessing would write new parts
+  into an older branch and split the directory irreversibly.
+- Read fallbacks no longer change write ownership (a single file found on another account
+  does not prove that account owns the directory).
+- Delete now runs on **every** account; a real error (429/500/timeout) on any account is
+  reported instead of claiming the file was deleted.
+- OneDrive `DeleteFile` maps 404 to `ErrFileNotFound`; idempotence is handled by the
+  controller / multi-account sink, so a delete on the wrong account can no longer report
+  success while the file remains elsewhere.
+- File listing keeps the backend's truncation flag (partial subdirectory failure/depth cap
+  is no longer displayed as a complete list); `Stat` marks `truncated` when an account fails.
+- Admin overview shows `retried`; user consent cards poll status every 30s and refresh the
+  policy version after a rejected grant; daily history no longer shows "no data" alongside
+  a read error; analyze/delete actions only appear for part files.
+
+### Documentation
+- README record format now documents the `kind` field (`full|suffix|message`); deployment and
+  troubleshooting SOPs cover ownership, delete semantics, per-user leases, the production probe,
+  and the current `NODE_TYPE` / metrics status.
+
 ## [v1.3.153] - 2026-10-19
 
 ### Fixed
