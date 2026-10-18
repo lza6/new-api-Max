@@ -94,34 +94,97 @@ const (
 	EnvOneDriveRootPath     = "TRAINING_ONEDRIVE_ROOT_PATH"
 )
 
-// LoadOneDriveConfigFromEnv 从环境变量读取配置。
+// LoadOneDriveConfigFromEnv 从环境变量读取**主账号**配置。
 // 必填项缺失时返回 `ErrSinkNotConfigured`（区别于「配了但连不上」）。
 func LoadOneDriveConfigFromEnv() (OneDriveConfig, error) {
+	return loadOneDriveConfigAt(1, "")
+}
+
+// maxOneDriveAccounts 最多支持几个账号（含主账号）。
+//
+// 取 9：用户当前 2 个；留出扩展空间但不至于让一个笔误的序号
+// 悄悄变成"第 8 个账号"。
+const maxOneDriveAccounts = 9
+
+// oneDriveEnvNamesAt 返回第 idx 个账号（1 起）的环境变量名。
+//
+// 主账号沿用历史名字（`TRAINING_ONEDRIVE_TENANT`），
+// 第 2 个起加序号前缀（`TRAINING_ONEDRIVE_2_TENANT`）—— 这样
+// **老部署的配置一行都不用改**，加账号只需追加新的变量。
+func oneDriveEnvNamesAt(idx int) (tenant, clientID, secret, driveID, rootPath string) {
+	prefix := "TRAINING_ONEDRIVE_"
+	if idx > 1 {
+		prefix = fmt.Sprintf("TRAINING_ONEDRIVE_%d_", idx)
+	}
+	return prefix + "TENANT", prefix + "CLIENT_ID", prefix + "CLIENT_SECRET", prefix + "DRIVE_ID", prefix + "ROOT_PATH"
+}
+
+// loadOneDriveConfigAt 读取第 idx 个账号。
+//
+// defaultRootPath 用于第 2+ 个账号未显式配置 RootPath 时**沿用主账号**：
+// 多账号应当共用同一套目录布局，否则管理端合并浏览会看到两套树。
+func loadOneDriveConfigAt(idx int, defaultRootPath string) (OneDriveConfig, error) {
+	tEnv, cEnv, sEnv, dEnv, rEnv := oneDriveEnvNamesAt(idx)
+	root := strings.Trim(strings.TrimSpace(os.Getenv(rEnv)), "/")
+	if root == "" {
+		root = defaultRootPath
+	}
 	cfg := OneDriveConfig{
-		Tenant:       strings.TrimSpace(os.Getenv(EnvOneDriveTenant)),
-		ClientID:     strings.TrimSpace(os.Getenv(EnvOneDriveClientID)),
-		ClientSecret: strings.TrimSpace(os.Getenv(EnvOneDriveClientSecret)),
-		DriveID:      strings.TrimSpace(os.Getenv(EnvOneDriveDriveID)),
-		RootPath:     strings.Trim(strings.TrimSpace(os.Getenv(EnvOneDriveRootPath)), "/"),
+		Tenant:       strings.TrimSpace(os.Getenv(tEnv)),
+		ClientID:     strings.TrimSpace(os.Getenv(cEnv)),
+		ClientSecret: strings.TrimSpace(os.Getenv(sEnv)),
+		DriveID:      strings.TrimSpace(os.Getenv(dEnv)),
+		RootPath:     root,
 	}
 	var missing []string
 	if cfg.Tenant == "" {
-		missing = append(missing, EnvOneDriveTenant)
+		missing = append(missing, tEnv)
 	}
 	if cfg.ClientID == "" {
-		missing = append(missing, EnvOneDriveClientID)
+		missing = append(missing, cEnv)
 	}
 	if cfg.ClientSecret == "" {
-		missing = append(missing, EnvOneDriveClientSecret)
+		missing = append(missing, sEnv)
 	}
 	if cfg.DriveID == "" {
-		missing = append(missing, EnvOneDriveDriveID)
+		missing = append(missing, dEnv)
 	}
 	if len(missing) > 0 {
 		// **不回显任何值**（secret 可能被打进日志）。
 		return OneDriveConfig{}, fmt.Errorf("%w: missing %s", ErrSinkNotConfigured, strings.Join(missing, ", "))
 	}
 	return cfg, nil
+}
+
+// LoadOneDriveConfigsFromEnv 读取**全部**账号配置（主账号 + 可选的第 2..N 个）。
+//
+// 第 2+ 个账号的规则：
+//   - **一个都没配**（连 TENANT 都空）→ 视为「没有这个账号」，跳过；
+//   - **配了一部分**→ **明确报错**。半配的账号如果被静默跳过，管理员会以为
+//     两个账号在负载均衡，实际只有一个在写 —— 与「B 也要用上」的诉求正好相反。
+func LoadOneDriveConfigsFromEnv() ([]OneDriveConfig, error) {
+	primary, err := LoadOneDriveConfigFromEnv()
+	if err != nil {
+		return nil, err
+	}
+	cfgs := []OneDriveConfig{primary}
+
+	for idx := 2; idx <= maxOneDriveAccounts; idx++ {
+		tEnv, cEnv, sEnv, dEnv, _ := oneDriveEnvNamesAt(idx)
+		anySet := strings.TrimSpace(os.Getenv(tEnv)) != "" ||
+			strings.TrimSpace(os.Getenv(cEnv)) != "" ||
+			strings.TrimSpace(os.Getenv(sEnv)) != "" ||
+			strings.TrimSpace(os.Getenv(dEnv)) != ""
+		if !anySet {
+			continue
+		}
+		c, cErr := loadOneDriveConfigAt(idx, primary.RootPath)
+		if cErr != nil {
+			return nil, fmt.Errorf("oneDrive account %d is partially configured: %w", idx, cErr)
+		}
+		cfgs = append(cfgs, c)
+	}
+	return cfgs, nil
 }
 
 // oneDriveSink OneDrive 后端实现。
@@ -136,12 +199,28 @@ type oneDriveSink struct {
 
 func init() {
 	// 注册后端。用注册表让采集核心完全不知道 OneDrive 的存在。
+	//
+	// **多账号**：主账号用 `TRAINING_ONEDRIVE_*`，第 2+ 个用
+	// `TRAINING_ONEDRIVE_<N>_*`。配了两个及以上时自动聚合成
+	// `MultiAccountSink`（目录级粘性分片），worker 完全无感。
 	RegisterSink("onedrive", func() (TrainingDataSink, error) {
-		cfg, err := LoadOneDriveConfigFromEnv()
+		cfgs, err := LoadOneDriveConfigsFromEnv()
 		if err != nil {
 			return nil, err
 		}
-		return NewOneDriveSink(cfg), nil
+		sinks := make([]TrainingDataSink, 0, len(cfgs))
+		for _, c := range cfgs {
+			sinks = append(sinks, NewOneDriveSink(c))
+		}
+		if len(sinks) == 1 {
+			return sinks[0], nil
+		}
+		m, mErr := NewMultiAccountSink(sinks)
+		if mErr != nil {
+			return nil, mErr
+		}
+		logMultiSinkStartup(m)
+		return m, nil
 	})
 }
 

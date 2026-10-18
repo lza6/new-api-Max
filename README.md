@@ -259,6 +259,7 @@ cd web && bun install --frozen-lockfile && bun run build
 | `TRAINING_ONEDRIVE_CLIENT_SECRET` | 应用 client_secret（**只从环境变量读，不落库**） |
 | `TRAINING_ONEDRIVE_DRIVE_ID` | 目标 drive id |
 | `TRAINING_ONEDRIVE_ROOT_PATH` | 可选。云盘内的根目录，便于与其它内容隔离 |
+| `TRAINING_ONEDRIVE_2_TENANT` 等 | **可选的多账号**：第 2 个账号用 `TRAINING_ONEDRIVE_2_*`（`TENANT`/`CLIENT_ID`/`CLIENT_SECRET`/`DRIVE_ID`/`ROOT_PATH`），最多到 `_9_`。规则见下 |
 | `TRAINING_CAPTURE_BUDGET_PCT` | 采集模块可用内存占机器内存的百分比，默认 `80` |
 | `TRAINING_CAPTURE_MIN_BUDGET_MB` | 预算下限（MB），默认 `128`。检测不到 cgroup 与宿主机内存时用它兜底 |
 | `TRAINING_CAPTURE_MAX_TEXT_MB` | 单条采集文本上限（MB），默认随预算自适应（最小 64KB，最大 8MB） |
@@ -285,6 +286,20 @@ worker 按声明切分。未声明上限的后端退保守默认值 4MB。这样
 **读取侧的解压上限与写入侧同源**（`EffectiveDecompressMaxPlainBytes` = 分片上限 × 8）：
 分片上限会随内存预算自适应，若解压上限写死，调大分片上限后管理端预览
 与分析会**永远解压失败**（看着像数据损坏，实为限额不匹配）。
+
+**多账号负载均衡（可选）**：配了 `TRAINING_ONEDRIVE_2_*` 就自动启用，把数据铺到多个账号上。
+
+- 分片是**按目录**（`日期/用户-模型/模型`）粘性归属的，不是每次写入轮询 ——
+  分片序号按目录递增，同一目录被劈到两个账号会让两边都从 `part-0001` 开始，
+  **同名不同内容**（不可逆）。
+- **加账号不会让老数据漂移**：解析归属时「哪个账号已有这个目录的数据就继续用它」，
+  只有全新目录才按路径哈希分片。因此增删账号、进程重启都稳定。
+- 读侧（浏览/预览/删除/分析/导出）会**合并各账号**；某账号读失败时结果标记为
+  「不完整」而不是假装成功。
+- 第 2+ 个账号的 `ROOT_PATH` 未配时**继承主账号**（多账号必须共用同一套目录布局）。
+- **只配了一半**（例如给了 tenant 没给 secret）会**明确报错**而不是静默跳过 ——
+  否则你以为两个账号在分担，实际只有一个在写。
+- 启动日志会出现 `multi-account sink active with N accounts`，可据此确认账号真的接上了。
 
 **记录格式**（每行一条 JSON）：
 
