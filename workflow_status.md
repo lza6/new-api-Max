@@ -176,3 +176,27 @@
 ### 仍未闭环
 浏览器真实 E2E（无浏览器工具）、多实例协调、Claude 计费两处（待拍板）、
 p95 压测（需真实上游）、累计充值金额（缺三库环境）。
+
+## 2026-10-18 第八轮：复验驱动的 BL-1（P0）与 5 项 NEEDS WORK
+
+### BL-1（P0，既有缺陷，非本批引入）
+`ListTree(root)` 返回**相对 root** 的短路径，而四个调用方（前端下钻 / 预览 / 删除 / 分析）
+全按**完整路径**用 → Graph 404 → 被当空目录 → **失败伪装成「数据为空」**。
+修 `toRel`：统一返回相对云盘根的完整路径（`root==""` 行为不变）。
+新增 `onedrive_path_test.go`（假 Graph + 真 sink），RED 已验证。
+
+> 关键教训：controller 的 fake sink 返回完整路径、真实 sink 返回相对路径 ——
+> **假对象与真实实现语义不一致时，端到端测试会一起撒谎**。
+> 「路径/单位/顺序」类契约必须用**真实实现 + 假传输层**测。
+
+### 其余已修
+- NW-1 结构化消息路径角色归一（`user`→`request`）+ 打 `kind=message`
+- NW-2 历史回退规则改为「按会话」而非「按分片」（否则跨分片会丢历史）
+- NW-3 两个 worker 测试改唯一 conv-id（`-count=3` 通过，此前假失败）
+- NW-4 全部分片失败时错误串带上 `SkippedParts`（不再误报「没有内容」）
+- NW-5 追问按钮也纳入 model 必填
+- S1 `countTree` 默认深度修正；S2 删死代码；S3 负缓存首次进入记日志
+
+### 验证
+`go test ./service/training_capture/ -race` 整包 PASS（109s）；
+`-count=3` 通过；controller 相关用例 PASS；前端 typecheck/i18n/oxlint 通过。

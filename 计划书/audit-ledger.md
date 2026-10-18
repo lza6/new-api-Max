@@ -47,6 +47,23 @@
 | P2 | 云盘**持续故障**时每个轮询都重试（若是 429 会加剧限流） | 「错误不缓存」没考虑持续故障 | 已修（15s 负缓存）|
 | P2 | 缓存的类型断言失败 `return zero, nil` | 把异常伪装成空数据 | 已修（返回显式错误）|
 
+### 第二轮复验：BL-1（P0，既有缺陷）
+
+**路径语义错位**：`ListTree(root)` 返回的是**相对 root** 的短路径，
+但四个调用方（前端下钻 / 预览 / 删除 / 分析）全按**完整路径**使用：
+- 前端把 `entry.path` 当下一层 `path` 参数 → 少前缀 → Graph **404**
+  → 被 `fetchEntries` 当空目录 → 界面「没有文件」；
+- 分析把 `e.Path` 直接传给 `ReadFile` → 404 → 全部计入 `SkippedParts`
+  → 报「没有内容」。
+
+最糟的是失败**伪装成「数据为空」**。修法：`ListTreeWithTruncation` 统一返回完整路径
+（`root==""` 行为不变）。新增 `onedrive_path_test.go`：**假 Graph**（伪造 RoundTripper）
+直接对真 sink 断言，RED 已验证。
+
+> 教训：controller 层的 fake sink 返回的是完整路径，与真实 sink 的
+> 「相对 root」相反 —— **假对象与真实实现的语义不一致时，端到端测试会一起撒谎**。
+> 对这类「路径/单位/顺序」契约，必须用**真实实现 + 假传输层**来测。
+
 ### ⚠️ 我此前的一条**不实声明**（记录以免重犯）
 上一批提交信息里写了「`-race` 同范围 PASS」—— 那次用的是**窄 `-run` 过滤**，
 恰好没包含 `TestWorkerCanRestartAfterStop`。整包 `-race` 当时实际是 **FAIL**。
@@ -84,6 +101,8 @@
 | kind 契约 | `go test ./service/training_capture/ -run TestMarkRequestKind|TestGlobalDedupPath|TestExportFormatNotes` | PASS |
 | by-date 默认路径 | `go test ./controller/ -run TestByDate` | PASS（含「不传 date / 查今天 必须有响应体」） |
 | 负缓存 | `go test ./controller/ -run TestTimedCache` | 6/6 PASS |
+| OneDrive 路径契约 | `go test ./service/training_capture/ -run TestListTreeAlwaysReturns` | 3/3 PASS（假 Graph，不联网） |
+| 采集包整包竞态（二轮） | `go test ./service/training_capture/ -race -count=1` | PASS（109s） |
 
 ---
 
