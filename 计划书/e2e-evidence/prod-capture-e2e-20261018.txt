@@ -1,0 +1,49 @@
+# 生产环境「训练数据采集」真实 E2E（2026-10-18）
+
+环境：freeapi.tingfengai.art / 154.37.208.171 / new-api:v1.3.150
+方式：scripts/prod-capture-e2e.sh（真实登录 → 真实授权 → 真实计费请求 → 云盘回读校验）
+请求：deepseek-v4.1-flash，max_tokens=16，非流式（一次极小请求）
+
+## 为什么必须做这一步
+单测只能证明「函数按预期返回」。这条链路真正的风险在**跨系统**：
+注册/登录契约、授权接口、计费请求、异步队列、worker 分片压缩、Graph 上传、
+多账号路由。任何一环断掉，单测都是绿的。
+
+## 运行 1 —— 用户 capture_e2e_1792321582（id=1610）
+```
+[e2e] 2) 登录                      ✓ 拿到 access_token
+[e2e] 3) 采集授权状态              available=true policy_version=v2
+[e2e] 4) 同意采集                  granted=true
+[e2e] 7) 真实补全请求              {"choices":[{"message":{"content":"收到",...}}]}
+[e2e] 8) 云盘落盘                  ✓ 落在账号 #2 的目录：capture_e2e_1792321582-1610
+[e2e] 9) 下钻校验                  模型目录：deepseek-v4.1-flash
+                                   分片：part-0001.jsonl.gz（153 字节）
+                                   解压后 2 行 JSONL
+                                     - role=request   kind=message len=15
+                                     - role=assistant kind=-       len=2
+                                   ✓ 分片可独立解压、每行都是合法 JSON、含请求侧记录
+```
+**说明**：目录落在 **账号 #2（账号 B）** —— 证明多账号负载均衡真的启用，B 不是摆设。
+
+## 运行 2 —— 用户 capture_e2e2_1792321883（id=1611）
+```
+[e2e] 8) 云盘落盘                  ✓ 落在账号 #1 的目录：capture_e2e2_1792321883-1611
+[e2e] 9) 下钻校验                  分片：part-0001.jsonl.gz（176 字节）
+                                   解压后 2 行 JSONL
+                                     - role=request   kind=message len=38
+                                     - role=assistant kind=-       len=2
+```
+**说明**：同一份代码、同一时间，另一个用户落在 **账号 #1（账号 A）** ——
+两个账号都在承载数据，「单账号不够用」的问题解决。
+
+## 过程中发现并修掉的一处**探针缺陷**（不是产品缺陷）
+运行 2 第一次失败：60s 内云盘没有该用户的目录。
+根因不是采集坏了，而是本次请求内容与运行 1 **完全相同**，而「无会话 id」时
+采集走**全局指纹去重** → 被正确判为重复、不再上传。
+→ 探针改为在请求内容里带时间戳（唯一化）。这条也写进了脚本注释，
+避免以后有人把「去重生效」误读成「采集没生效」。
+
+## 清理（已执行，均有回读确认）
+- 云盘：两个账号上 `training-data/2026-10-18/<两个测试目录>` 均 DELETE 204
+- 数据库：users / tokens / training_data_consents / training_data_watermarks
+  中 user_id ∈ {1610,1611} 全部为 **0 行**
