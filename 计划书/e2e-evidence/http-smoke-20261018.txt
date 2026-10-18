@@ -1,0 +1,35 @@
+
+=== HTTP E2E @ http://127.0.0.1:18123 ===
+
+服务已就绪
+
+[1] 初始化 root 账号
+  ✅ setup 接口可达且返回结构正确
+
+[2] 登录
+  ✅ 登录成功
+  ✅ 拿到 access_token
+
+[3] 用户侧接口
+  ✅ GET /api/user/training-data/status 返回信封
+  ✅ 未配置云盘时 available=false（不渲染无效开关）
+
+[4] 管理端训练数据接口
+  ✅ GET overview 200 且 success
+  ✅ GET by-date（不传 date）返回非空 JSON 且 success
+  ✅ by-date 下发 days 字段（每日历史卡依赖它）
+  ✅ GET by-date?date=<今天> 返回 success（曾因漏写响应体而空 body）
+  ✅ 非法日期被拒绝
+  ✅ 列举接口拒绝上跳路径
+
+[5] 运营面板接口
+  ✅ GET /api/admin/ops/overview 成功
+  ✅ GET consumption-ranking 成功且 items 为数组
+
+[6] Web 防护接口
+  ✅ GET web-protection/settings 成功
+
+[7] 鉴权边界（无会话不得访问管理端）
+  ✅ 无会话访问管理端被拒绝
+
+=== 结果：15 通过 / 0 失败 ===
