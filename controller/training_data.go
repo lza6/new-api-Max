@@ -2,6 +2,7 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -158,9 +159,10 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 
 	stat, err := sink.Stat(ctx)
 	if err != nil {
-		// 不把错误当成功：前端显示「未知」并给出原因。
+		// 不把错误当成功，但也**不丢弃已经拿到的部分数据**：
+		// 多账号下可能只有其中一个账号故障，另一个账号的用量是真实可用的。
+		// 全部丢弃会让管理端显示「未知」，掩盖另一个账号其实正常这一事实。
 		out.LastError = err.Error()
-		return out
 	}
 	out.QuotaKnown = stat.TotalBytes > 0
 	out.TotalBytes = stat.TotalBytes
@@ -168,6 +170,11 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 	out.RemainingBytes = stat.RemainingBytes
 	out.Folders = stat.FolderCount
 	out.Files = stat.FileCount
+	if err != nil {
+		// 部分数据已经填好（LastError 已说明哪部分不可靠），到此为止：
+		// 继续做更贵的 CountItems 只会放大一个已知故障账号的成本。
+		return out
+	}
 
 	// 目录/文件数在 OneDrive 后端上是可选能力（不是所有后端都能廉价统计），
 	// 用**接口断言**探测而不是把它加进 TrainingDataSink 主接口 ——
@@ -570,8 +577,13 @@ func DeleteTrainingDataFile(c *gin.Context) {
 	defer cancel()
 
 	if err := reader.DeleteFile(ctx, path); err != nil {
-		common.ApiError(c, err)
-		return
+		// 后端明确回答 not-found：目标已经不存在 → 保持「重复点击删除不报错」的幂等语义。
+		// 注意只吞 not-found；瞬时错误必须报出来（否则就是「报告已删除但文件还在」）。
+		if !errors.Is(err, training_capture.ErrFileNotFound) {
+			common.ApiError(c, err)
+			return
+		}
+		common.SysLog("training data capture: delete target already absent " + path)
 	}
 	common.SysLog("training data capture: admin deleted remote part " + path)
 	common.ApiSuccess(c, gin.H{"deleted": path})

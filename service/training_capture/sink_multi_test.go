@@ -26,6 +26,9 @@ type recSink struct {
 	files   map[string][]byte // path -> content
 	dirs    map[string]bool
 	listErr error
+	readErr error
+	delErr  error
+	statErr error
 
 	// 可选能力开关
 	supportTruncation bool
@@ -84,6 +87,9 @@ func (r *recSink) List(_ context.Context, path string) ([]string, error) {
 func (r *recSink) Stat(context.Context) (SinkStat, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.statErr != nil {
+		return SinkStat{}, r.statErr
+	}
 	return SinkStat{
 		Provider: r.name, TotalBytes: 100, UsedBytes: int64(len(r.files)),
 		RemainingBytes: 100 - int64(len(r.files)), FileCount: len(r.files),
@@ -93,9 +99,12 @@ func (r *recSink) Stat(context.Context) (SinkStat, error) {
 func (r *recSink) ReadFile(_ context.Context, path string, _ int64) ([]byte, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.readErr != nil {
+		return nil, r.readErr
+	}
 	b, ok := r.files[path]
 	if !ok {
-		return nil, ErrExportNotFound
+		return nil, ErrFileNotFound
 	}
 	return b, nil
 }
@@ -103,8 +112,11 @@ func (r *recSink) ReadFile(_ context.Context, path string, _ int64) ([]byte, err
 func (r *recSink) DeleteFile(_ context.Context, path string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
+	if r.delErr != nil {
+		return r.delErr
+	}
 	if _, ok := r.files[path]; !ok {
-		return ErrExportNotFound
+		return ErrFileNotFound
 	}
 	delete(r.files, path)
 	return nil
@@ -428,4 +440,190 @@ func TestLoadOneDriveConfigsInheritsRootPath(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, cfgs, 2)
 	assert.Equal(t, "training-data", cfgs[1].RootPath, "第二账号应继承主账号的 RootPath")
+}
+
+// TestMultiSinkRefusesToGuessWhenAllAccountsUnreadable 所有账号都列举失败时，
+// **绝不能**猜一个账号写下去。
+//
+// 若该目录其实有数据在某个账号上，猜错就会把同一目录劈到两个账号，
+// 分片序号撞车（不可逆）。宁可让本次写入失败、由 worker 下一轮重试。
+func TestMultiSinkRefusesToGuessWhenAllAccountsUnreadable(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	dir := "2026-10-18/e-5/m"
+	a.files[dir+"/part-0001.jsonl.gz"] = []byte("old")
+	a.listErr = errors.New("account A temporarily unavailable")
+	b.listErr = errors.New("account B temporarily unavailable")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	_, err = m.WritePart(ctx, dir+"/part-0002.jsonl.gz", []byte("x"))
+	require.Error(t, err, "无法判定归属时必须拒绝写入，而不是猜")
+	assert.Contains(t, err.Error(), "cannot resolve")
+	assert.False(t, a.has(dir+"/part-0002.jsonl.gz"), "不得写入任何账号")
+	assert.False(t, b.has(dir+"/part-0002.jsonl.gz"), "不得写入任何账号")
+}
+
+// TestMultiSinkReadStillWorksWhenListsFail 读侧不受此限制：
+// 逐个账号试是幂等且安全的，不该因为列举失败就拒绝读取。
+func TestMultiSinkReadStillWorksWhenListsFail(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	path := "2026-10-18/f-6/m/part-0001.jsonl.gz"
+	b.files[path] = []byte("on-B")
+	a.listErr = errors.New("down")
+	b.listErr = errors.New("down")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	got, err := m.ReadFile(ctx, path, 1<<20)
+	require.NoError(t, err, "列举失败不应妨碍逐个尝试读取")
+	assert.Equal(t, []byte("on-B"), got)
+}
+
+// TestMultiSinkRefusesToGuessWhenOwnerUnreadable 这是最危险、也最容易写错的组合：
+//
+//	归属账号 A 的 List **瞬时失败**，而 B 成功且为空（B 本来就没这个目录）。
+//
+// 想当然的做法是「只有全部账号都失败才不猜」—— 但「B 是空的」证明不了
+// 「这个目录没人写过」：真正持有它的 A 这次没读到。此时若按哈希选账号，
+// 约一半概率选中 B → 在 B 写 part-0001，而 A 早已有同名 part-0001。
+// 同一目录、同名分片、不同内容，**不可逆**。
+//
+// 正确规则：只要有任何账号读不到，就不能断定「全新目录」→ 拒绝写入。
+func TestMultiSinkRefusesToGuessWhenOwnerUnreadable(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	dir := "2026-10-18/owner-down/m"
+
+	// 目录其实属于 A（A 上有数据），但 A 这次列举失败；B 正常且为空。
+	a.files[dir+"/part-0001.jsonl.gz"] = []byte("old-on-A")
+	a.listErr = errors.New("account A: 429 too many requests")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	_, err = m.WritePart(ctx, dir+"/part-0002.jsonl.gz", []byte("new"))
+	require.Error(t, err,
+		"归属账号读不到时不得凭另一账号为空就猜哈希写下去")
+	assert.Contains(t, err.Error(), "cannot resolve")
+
+	// 关键断言：**绝不能**落到 B。
+	assert.False(t, b.has(dir+"/part-0002.jsonl.gz"),
+		"写到了 B —— 会造成 A/B 同名分片，数据集不可逆损坏")
+	assert.False(t, a.has(dir+"/part-0002.jsonl.gz"))
+
+	// 恢复 A 之后必须能正常写入 A（证明只是暂时拒绝，不是永久卡死）。
+	a.listErr = nil
+	_, err = m.WritePart(ctx, dir+"/part-0002.jsonl.gz", []byte("new"))
+	require.NoError(t, err)
+	assert.True(t, a.has(dir+"/part-0002.jsonl.gz"), "恢复后应继续写入归属账号 A")
+}
+
+// TestMultiSinkTransientReadErrorDoesNotFlipWriteOwnership 读侧瞬时错误
+// **不能**把写归属翻到另一个账号。
+//
+// 场景：目录确实归 A；B 上有一份历史遗留的同名副本。
+// A 这次读取报了 500（不是 not-found）。若此时去 B 读到旧副本并把 B
+// 记成新归属，后续 part 就全写到 B —— 而 A 上还有同名 part，目录被劈开。
+// 正确行为：把 500 原样返回；写归属保持 A 不变。
+func TestMultiSinkTransientReadErrorDoesNotFlipWriteOwnership(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	dir := "2026-10-18/g-7/m"
+	// A 持有分片序号最大的一份 → 归属是 A；B 上 part-0002 是历史遗留副本。
+	a.files[dir+"/part-0009.jsonl.gz"] = []byte("owner-A")
+	b.files[dir+"/part-0002.jsonl.gz"] = []byte("stale-copy-on-B")
+	a.readErr = errors.New("account A: 500 internal error")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	_, err = m.ReadFile(ctx, dir+"/part-0002.jsonl.gz", 1<<20)
+	require.Error(t, err, "瞬时读错误必须原样上报，不能悄悄读 B 的旧副本")
+	assert.Contains(t, err.Error(), "500")
+
+	// 关键断言：写归属没有翻转。
+	a.readErr = nil
+	_, err = m.WritePart(ctx, dir+"/part-0010.jsonl.gz", []byte("next"))
+	require.NoError(t, err)
+	assert.True(t, a.has(dir+"/part-0010.jsonl.gz"), "写归属必须仍是 A")
+	assert.False(t, b.has(dir+"/part-0010.jsonl.gz"), "绝不能因为一次读失败就漂移到 B")
+}
+
+// TestMultiSinkDeleteReachesFileOnNonOwnerAccount 删除必须真正落到持有文件的账号。
+//
+// OneDrive 曾把 404 吞成 nil：在错误的账号上删除会「返回成功但文件还在」。
+// 现在 404 变成 ErrFileNotFound，多账号 sink 才能据此去别的账号删。
+func TestMultiSinkDeleteReachesFileOnNonOwnerAccount(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	dir := "2026-10-18/h-8/m"
+	// A 因分片序号更大成为归属；part-0002 是历史遗留、其实在 B 上。
+	a.files[dir+"/part-0009.jsonl.gz"] = []byte("owner-A")
+	b.files[dir+"/part-0002.jsonl.gz"] = []byte("legacy-on-B")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	require.NoError(t, m.DeleteFile(ctx, dir+"/part-0002.jsonl.gz"))
+	assert.False(t, b.has(dir+"/part-0002.jsonl.gz"), "文件在 B 上，就必须真的从 B 删掉")
+
+	// 所有账号都没有这个文件 → 幂等成功（重复点击删除不报错）。
+	require.NoError(t, m.DeleteFile(ctx, dir+"/part-0002.jsonl.gz"))
+}
+
+// TestMultiSinkDeleteTransientErrorIsReported 删除遇到瞬时错误必须报错，
+// 不能「报告已删除」而文件仍在。
+func TestMultiSinkDeleteTransientErrorIsReported(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	dir := "2026-10-18/i-9/m"
+	a.files[dir+"/part-0009.jsonl.gz"] = []byte("owner-A")
+	b.files[dir+"/part-0002.jsonl.gz"] = []byte("legacy-on-B")
+	a.delErr = errors.New("account A: 429 too many requests")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	err = m.DeleteFile(ctx, dir+"/part-0002.jsonl.gz")
+	require.Error(t, err, "归属账号没回答清楚时不得报告删除成功")
+	assert.True(t, b.has(dir+"/part-0002.jsonl.gz"), "没删掉就不能动它")
+}
+
+// TestMultiSinkDuplicateDirectoryPicksHighestPartNumber 同一目录同时存在于
+// 两个账号（手工迁移/复制导致）时，写入必须跟着**分片序号最大**的账号走 ——
+// 那才是最近仍在写入的那个。静默挑第一个会让序号继续撞车。
+func TestMultiSinkDuplicateDirectoryPicksHighestPartNumber(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	dir := "2026-10-18/j-10/m"
+	a.files[dir+"/part-0003.jsonl.gz"] = []byte("old-A")
+	b.files[dir+"/part-0009.jsonl.gz"] = []byte("newest-B")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	_, err = m.WritePart(ctx, dir+"/part-0010.jsonl.gz", []byte("next"))
+	require.NoError(t, err)
+	assert.True(t, b.has(dir+"/part-0010.jsonl.gz"), "应写入分片序号更大的账号 B")
+	assert.False(t, a.has(dir+"/part-0010.jsonl.gz"))
+}
+
+// TestMultiSinkStatSurfacesPartialFailure 一个账号故障时：
+// 既返回部分数据，也返回错误 —— 不能让管理端误以为统计完整。
+func TestMultiSinkStatSurfacesPartialFailure(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	a.statErr = errors.New("account A: quota endpoint down")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	stat, err := m.Stat(ctx)
+	require.Error(t, err, "有账号失败就必须让调用方知道")
+	assert.Contains(t, err.Error(), "quota endpoint down")
+	assert.Positive(t, stat.TotalBytes, "另一个账号的数据仍要返回（部分数据 + 原因）")
 }

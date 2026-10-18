@@ -151,6 +151,18 @@ type TreeEntry struct {
 // **不是截断**：返回半个文件会让分析端把残缺当完整。
 var ErrFileTooLarge = errors.New("training data sink: file exceeds read limit")
 
+// ErrFileNotFound 后端明确回答「这个路径下没有这个文件」。
+//
+// [修复防御] 需要区分「不存在」与「暂时读不到」，因为多账号 sink 的兜底
+// 只能建立在**确定的 not-found** 上：
+//   - not-found → 数据可能真的在别的账号 → 可以安全地去别的账号试；
+//   - 429 / 500 / 超时 / 取 token 失败 → **什么都没证明** → 若此时去别的
+//     账号读到一份旧副本并把该账号记成新归属，后续写入就会劈到第二个账号
+//     （同名 part-NNNN 撞车，不可逆）。
+//
+// 因此后端必须把 404 映射成这个哨兵，而不是一个普通字符串错误。
+var ErrFileNotFound = errors.New("training data sink: file not found")
+
 // ---------- disabled sink ----------
 
 // disabledSink 未配置任何后端时的占位实现。

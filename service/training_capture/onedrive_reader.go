@@ -69,7 +69,9 @@ func (s *oneDriveSink) ReadFile(ctx context.Context, path string, maxBytes int64
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("onedrive read %q: not found", itemPath)
+		// 用哨兵包一层：多账号 sink 只对**确定不存在**做跨账号兜底，
+		// 瞬时错误必须原样上抛（见 ErrFileNotFound 的说明）。
+		return nil, fmt.Errorf("onedrive read %q: %w", itemPath, ErrFileNotFound)
 	}
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("onedrive read %q returned %d", itemPath, resp.StatusCode)
@@ -116,9 +118,19 @@ func (s *oneDriveSink) DeleteFile(ctx context.Context, path string) error {
 	defer func() { _ = resp.Body.Close() }()
 	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1<<20))
 
-	// 204 成功；404 视为已删除（幂等——重复点击不报错）。
-	if resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotFound {
+	// 204 成功。
+	//
+	// 404 **不能**在这里当成成功：多账号 sink 依赖「归属账号上确实没有这个文件」
+	// 这个信号去别的账号兜底。若这里把 404 吞成 nil，删除就会在错误账号上
+	// "报告成功"，而文件其实还在另一个账号上 —— 用户看到「已删除」，
+	// 数据实际没删（管理端最不能接受的一类谎言）。
+	// 幂等语义由**调用方**保留：controller 与 multi sink 都把 ErrFileNotFound
+	// 视为「目标已不存在」而返回成功。
+	if resp.StatusCode == http.StatusNoContent {
 		return nil
+	}
+	if resp.StatusCode == http.StatusNotFound {
+		return fmt.Errorf("onedrive delete %q: %w", itemPath, ErrFileNotFound)
 	}
 	return fmt.Errorf("onedrive delete %q returned %d", itemPath, resp.StatusCode)
 }

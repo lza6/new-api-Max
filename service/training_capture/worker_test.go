@@ -1291,3 +1291,48 @@ func TestExportFormatNotesDescribeEveryKind(t *testing.T) {
 		t.Error("格式说明未说明「缺 kind 的历史数据」如何处理")
 	}
 }
+
+// 回归（评审 N1）：上传失败的信号必须**回队重试**，不能直接丢。
+//
+// 这条在引入多账号 fail-closed（无法判定归属就拒绝写入）之后变得必需：
+// 「宁可不写」若没有重试，就直接等价于「永久丢数据」—— 对已经结束的会话
+// 尤其致命（没有下一次请求来重放这段增量）。
+func TestWorkerRetriesFailedSignal(t *testing.T) {
+	sink := withMemSink(t)
+	sink.failWrite = true // 注入持续失败，模拟云盘暂时不可用
+
+	restoreGateway := SetGatewayEnabledForTest(true)
+	t.Cleanup(restoreGateway)
+
+	originalQueue := captureQueue
+	captureQueue = NewCaptureQueue(64)
+	t.Cleanup(func() { captureQueue = originalQueue })
+	t.Cleanup(waitWorkerStopped)
+
+	if !StartWorker() {
+		t.Fatal("StartWorker 应返回 true")
+	}
+	defer StopWorker()
+
+	const uid = 91002
+	grantForTest(t, uid)
+	sig := BuildSignal(CaptureInput{
+		UserId: uid, Username: "retry", Model: "m", ConversationID: uniqueConvID("conv-retry"),
+		Meta:      &types.TokenCountMeta{CombineText: "失败后必须回队重试"},
+		CreatedAt: 1791937800,
+	})
+	if sig == nil {
+		t.Fatal("BuildSignal 返回 nil")
+	}
+
+	before := captureStats.TotalRetried.Load()
+	if !MaybeCapture(*sig) {
+		t.Fatal("MaybeCapture 应能入队")
+	}
+
+	if !waitFor(t, 20*time.Second, func() bool {
+		return captureStats.TotalRetried.Load() > before
+	}) {
+		t.Fatal("上传失败后信号没有被回队重试 —— 这段增量就永久丢了")
+	}
+}

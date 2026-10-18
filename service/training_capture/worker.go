@@ -2,6 +2,7 @@ package training_capture
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -57,6 +58,14 @@ const (
 	// 云盘持续不可用时，重试只是在浪费资源并刷日志
 	// （用户要的是「不影响主业务」，不是「拼命重试」）。
 	workerMaxConsecutiveErrors = 5
+
+	// workerMaxSignalRetries 单条信号最多回队重试几次。
+	//
+	// 为什么必须有上限：云盘长期不可用时，无限回队会占满队列、刷日志、
+	// 把后来的正常信号挤掉。取 3：配合已有的指数退避（1s/2s/4s…），
+	// 总等待约 7s 起步，足够扛过瞬时故障（429、token 刷新、网络抖动），
+	// 又不至于长期滞留。
+	workerMaxSignalRetries = 3
 
 	// MaxPartBytes 单个分片的目标大小。
 	//
@@ -116,6 +125,12 @@ type CaptureStats struct {
 	// 这个计数器就是那个区分信号（盲点扫描发现的可观测性缺口）。
 	TotalSkippedNoText atomic.Int64
 
+	// TotalRetried 因上传失败而**回队重试**的次数。
+	//
+	// 与 TotalUploadErrors 的区别：后者是「失败次数」，前者是「失败后成功回队」。
+	// 两者一起看才能区分「偶发抖动自愈」与「一直失败且队列在堆积」。
+	TotalRetried atomic.Int64
+
 	// usersToday 今日去重用户集合（有界，只存今日）。
 	usersTodayMu sync.Mutex
 	usersToday   map[int]struct{}
@@ -141,6 +156,8 @@ type CaptureStatsSnapshot struct {
 	TotalUploadErrors int64  `json:"total_upload_errors"`
 	SkippedNoConsent  int64  `json:"skipped_no_consent"`
 	SkippedNoText     int64  `json:"skipped_no_text"`
+	// Retried 失败后成功回队的次数（配合 upload_errors 判断是自愈还是持续故障）。
+	Retried int64 `json:"retried"`
 	QueueLen          int    `json:"queue_len"`
 	// InFlightBytes 当前正在上传的字节数（瞬时值）。
 	InFlightBytes int64 `json:"in_flight_bytes"`
@@ -165,6 +182,7 @@ func GetCaptureStats() CaptureStatsSnapshot {
 		TotalUploadErrors: captureStats.TotalUploadErrors.Load(),
 		SkippedNoConsent:  captureStats.TotalSkippedNoConsent.Load(),
 		SkippedNoText:     captureStats.TotalSkippedNoText.Load(),
+		Retried:           captureStats.TotalRetried.Load(),
 		QueueLen:          queueStats.Len,
 		InFlightBytes:     captureStats.InFlightBytes.Load(),
 		QueueCapacity:     queueStats.Capacity,
@@ -454,6 +472,28 @@ func runWorker(stop <-chan struct{}, done chan<- struct{}) {
 				backoff = workerMaxBackoff
 			}
 			logWorkerError(signal, err, consecutiveErrors)
+
+			// **回队重试**：信号已被 `ReceiveWithStop` 取走，不回队就永久丢。
+			//
+			// [修复防御] 多账号 fail-closed（无法判定目录归属就拒绝写入）
+			// 之后，这条变得**必需**：否则「宁可不写」会直接变成「数据丢了」。
+			// 对已经结束的会话尤其致命 —— 没有下一次请求来重放这段增量。
+			if signal.Attempt < workerMaxSignalRetries {
+				signal.Attempt++
+				if captureQueue != nil && captureQueue.TryEnqueue(signal) {
+					captureStats.TotalRetried.Add(1)
+				} else {
+					captureStats.TotalDropped.Add(1)
+					common.SysError(fmt.Sprintf(
+						"training capture: retry queue full, dropping signal (user=%d attempt=%d)",
+						signal.UserID, signal.Attempt))
+				}
+			} else {
+				common.SysError(fmt.Sprintf(
+					"training capture: giving up after %d attempts, this increment is lost (user=%d model=%s)",
+					signal.Attempt, signal.UserID, signal.Model))
+			}
+
 			if consecutiveErrors >= workerMaxConsecutiveErrors {
 				// 连续失败 → 长退避（云盘可能长期不可用；
 				// 拼命重试只会刷日志、占资源）。
@@ -997,6 +1037,11 @@ func cleanupOrphanParts(ctx context.Context, sink TrainingDataSink, written []st
 	}
 	for _, name := range written {
 		if err := deleter.DeleteFile(ctx, name); err != nil {
+			// 已经不存在的分片不需要清理（多账号下归属解析可能把它归到
+			// 另一个账号，见 MultiAccountSink.DeleteFile）——这不是故障。
+			if errors.Is(err, ErrFileNotFound) {
+				continue
+			}
 			common.SysError(fmt.Sprintf(
 				"training capture: failed to clean up orphan part %s: %s", name, err.Error()))
 		}

@@ -57,7 +57,15 @@ func ensureTestDB(t *testing.T) error {
 		// 只建本功能需要的两张表——**用被测试的真实模型定义**，
 		// 而不是在测试里另写一份 DDL（后者会与生产 schema 漂移，
 		// 测试通过但生产建表失败）。
-		if err := db.AutoMigrate(&model.TrainingDataConsent{}, &model.TrainingDataWatermark{}); err != nil {
+		// `SystemTaskLock` 是 worker 的多实例协调（租约）所需：worker 在消费前会
+		// `AcquireTrainingCaptureLease`，缺表会让**所有**消费路径报
+		// `no such table: system_task_locks` —— 表现为「worker 没消费队列」，
+		// 极容易被误判成采集链路坏了。测试库必须一并建这张表。
+		if err := db.AutoMigrate(
+			&model.TrainingDataConsent{},
+			&model.TrainingDataWatermark{},
+			&model.SystemTaskLock{},
+		); err != nil {
 			testDBErr = fmt.Errorf("automigrate: %w", err)
 			return
 		}
