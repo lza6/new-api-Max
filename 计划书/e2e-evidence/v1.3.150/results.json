@@ -4,17 +4,17 @@
     {
       "name": "创建 20% 首购优惠套餐",
       "ok": true,
-      "detail": "{\"data\":{\"id\":1,\"title\":\"E2E-First-1792332863775\",\"subtitle\":\"e2e\",\"price_amount\":100,\"currency\":\"CNY\",\"duration_unit\":\"month\",\"duration_value\":1,\"custom_seconds\":0,\"enabled\":true,\"sort_order\":999,\"allow_balance_pay\":true,\"allow_wallet_overflow\":true,\"stripe_price_id\":\"\",\"creem_product_id\":\"\",\"waffo_pancake_product_id\":\"\",\"max_purchase_per_user\":0,\"first_purchase_discount_percent\":20,\"concurrency_limit\":0,\"rpm_limit\":0,\"models\":\"\",\"upgrade_group\":\"\",\"downgrade_group\":\"\",\"total_amount\":1000000,\"quota_reset_period\":\"never\",\"quota_reset_custom_seconds\":0,\"created_at\":1792332863,\"updated_at\":1792332863},\"message\":\"\",\"success\":true}"
+      "detail": "{\"data\":{\"id\":1,\"title\":\"E2E-First-1792356978539\",\"subtitle\":\"e2e\",\"price_amount\":100,\"currency\":\"CNY\",\"duration_unit\":\"month\",\"duration_value\":1,\"custom_seconds\":0,\"enabled\":true,\"sort_order\":999,\"allow_balance_pay\":true,\"allow_wallet_overflow\":true,\"stripe_price_id\":\"\",\"creem_product_id\":\"\",\"waffo_pancake_product_id\":\"\",\"max_purchase_per_user\":0,\"first_purchase_discount_percent\":20,\"concurrency_limit\":0,\"rpm_limit\":0,\"models\":\"\",\"upgrade_group\":\"\",\"downgrade_group\":\"\",\"total_amount\":1000000,\"quota_reset_period\":\"never\",\"quota_reset_custom_seconds\":0,\"created_at\":1792356978,\"updated_at\":1792356978},\"message\":\"\",\"success\":true}"
     },
     {
       "name": "计划列表返回首购折后价",
       "ok": true,
-      "detail": "{\"plan\":{\"id\":1,\"title\":\"E2E-First-1792332863775\",\"subtitle\":\"e2e\",\"price_amount\":100,\"currency\":\"CNY\",\"duration_unit\":\"month\",\"duration_value\":1,\"custom_seconds\":0,\"enabled\":true,\"sort_order\":999,\"allow_balance_pay\":true,\"allow_wallet_overflow\":true,\"stripe_price_id\":\"\",\"creem_product_id\":\"\",\"waffo_pancake_product_id\":\"\",\"max_purchase_per_user\":0,\"first_purchase_discount_percent\":20,\"concurrency_limit\":0,\"rpm_limit\":0,\"models\":\"\",\"upgrade_group\":\"\",\"downgrade_group\":\"\",\"total_amount\":1000000,\"quota_reset_period\":\"never\",\"quota_reset_custom_seconds\":0,\"created_at\":1792332863,\"updated_at\":1792332863},\"is_first_purchase\":true,\"discounted_price\":80,\"first_purchase_discount_on\":true}"
+      "detail": "{\"plan\":{\"id\":1,\"title\":\"E2E-First-1792356978539\",\"subtitle\":\"e2e\",\"price_amount\":100,\"currency\":\"CNY\",\"duration_unit\":\"month\",\"duration_value\":1,\"custom_seconds\":0,\"enabled\":true,\"sort_order\":999,\"allow_balance_pay\":true,\"allow_wallet_overflow\":true,\"stripe_price_id\":\"\",\"creem_product_id\":\"\",\"waffo_pancake_product_id\":\"\",\"max_purchase_per_user\":0,\"first_purchase_discount_percent\":20,\"concurrency_limit\":0,\"rpm_limit\":0,\"models\":\"\",\"upgrade_group\":\"\",\"downgrade_group\":\"\",\"total_amount\":1000000,\"quota_reset_period\":\"never\",\"quota_reset_custom_seconds\":0,\"created_at\":1792356978,\"updated_at\":1792356978},\"is_first_purchase\":true,\"discounted_price\":80,\"first_purchase_discount_on\":true}"
     },
     {
       "name": "订阅页展示首单优惠价",
       "ok": true,
-      "detail": "跳到主内容\nnew-api-Max\n主页\n控制台\n模型广场\n排行榜\n文档\n关于\n更改语言\n切换主题\nR\n套餐对比\n\n按价格、额度、并发、RPM 与有效期对比套餐。\n\n选择适合您使用场景的套餐，购买后订阅立即生效。\n\n在售套餐 1 个\n\n返回定价页\n套餐对比表\n套餐\t价格\t有效期\t套餐额度\t并发数\tRPM\t状态\t操作\n\nE2E-First-1792332863775\n\ne2e\n\n\t\n¥100.00\n"
+      "detail": "跳到主内容\nnew-api-Max\n主页\n控制台\n模型广场\n排行榜\n文档\n关于\n更改语言\n切换主题\nR\n套餐对比\n\n按价格、额度、并发、RPM 与有效期对比套餐。\n\n选择适合您使用场景的套餐，购买后订阅立即生效。\n\n在售套餐 1 个\n\n返回定价页\n套餐对比表\n套餐\t价格\t有效期\t套餐额度\t并发数\tRPM\t状态\t操作\n\nE2E-First-1792356978539\n\ne2e\n\n\t\n¥100.00\n"
     },
     {
       "name": "余额支付按折后价扣款",

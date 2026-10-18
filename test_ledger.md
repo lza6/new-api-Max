@@ -120,3 +120,13 @@
 
 > 环境说明：`delete-plan-dialog.test.tsx` 在本机运行超过 5 分钟未结束（与本次改动无关），
 > 已停止；相关订阅组件测试单独运行 6/6 PASS。
+
+### v1.3.153 E2E 复验
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 首购优惠真实浏览器 E2E（修复后） | `E2E_BASE=http://127.0.0.1:18131 node web/e2e-local/v13150-subscription-e2e.cjs` | **5/5 PASS**（建套餐、折后价 80、页面展示、余额扣 40000000、清理） |
+| 前端金额格式 | `vitest run .../format-amount.test.ts` | 4/4 PASS |
+| 订阅组件 | `vitest run .../plans-compare-table.test.tsx` | 6/6 PASS |
+
+证据已刷新：`计划书/e2e-evidence/v1.3.150/`、`evidence/subscription-first-purchase-20261018.json`。

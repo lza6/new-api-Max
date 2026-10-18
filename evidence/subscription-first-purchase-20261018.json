@@ -1,7 +1,8 @@
 {
   "task_id": "SUBSCRIPTION-FIRST-PURCHASE-20261018",
   "status": "pass",
-  "timestamp": "2026-10-18T21:05:00Z",
+  "timestamp": "2026-10-19T04:56:00Z",
+  "code_version": "v1.3.153",
   "environment": "local SQLite + Go server 18131 + real Chromium",
   "commands_executed": [{"cmd": "node web/e2e-local/v13150-subscription-e2e.cjs", "exit_code": 0, "raw_output_tail": "E2E: 5/5 passed"}],
   "files_changed": ["model/subscription.go", "controller/subscription.go", "web/src/features/subscriptions/*"],

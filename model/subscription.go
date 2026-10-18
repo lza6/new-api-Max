@@ -915,8 +915,9 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		// 判定必须在持有用户行锁之后，且用**锁定读**：并发购买时若先读后锁，
 		// 两个事务都会看到“无历史订阅”并各自按折扣价成交（重复首购）。
 		// 锁定读同时避开 MySQL REPEATABLE READ 的一致性快照——普通 SELECT
-		// 看不到另一事务刚提交的订阅行。SQLite 没有 FOR UPDATE，由单写者
-		// 模型让后写的事务失败。
+		// 看不到另一事务刚提交的订阅行。SQLite 没有 FOR UPDATE，但连接串使用
+		// `_txlock=immediate`（common/database.go），事务在 BEGIN 时即取得写锁，
+		// 并发事务会在 BEGIN 处串行，随后读到已提交的订阅行。
 		discountEnabled := common.FeatureFlagValue(common.FlagSubscriptionFirstPurchaseDiscount,
 			common.GetEnvOrDefaultBool(common.FlagSubscriptionFirstPurchaseDiscount, false))
 		hasPrior := false
