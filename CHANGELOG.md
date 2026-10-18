@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.155] - 2026-10-19
+
+### Fixed
+- Failed capture signals are now retried **before** newer queued signals instead of being
+  appended to the queue tail. A newer signal for the same conversation could otherwise
+  advance the watermark first, forcing the older retry to re-upload the whole prefix
+  (duplicate data). Pending retries are re-queued best-effort on shutdown; the retry
+  limit (3) and `retried` counter are unchanged.
+- Admin export list is paginated (20 per page). Previously it fetched only the first 100
+  rows and discarded `total`, leaving older exports unreachable.
+
 ## [v1.3.154] - 2026-10-19
 
 ### Fixed

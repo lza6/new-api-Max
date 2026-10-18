@@ -62,10 +62,10 @@ const (
 
 	// workerMaxSignalRetries 单条信号最多回队重试几次。
 	//
-	// 为什么必须有上限：云盘长期不可用时，无限回队会占满队列、刷日志、
-	// 把后来的正常信号挤掉。取 3：配合已有的指数退避（1s/2s/4s…），
-	// 总等待约 7s 起步，足够扛过瞬时故障（429、token 刷新、网络抖动），
-	// 又不至于长期滞留。
+	// 为什么必须有上限：云盘长期不可用时，无限重试会占满资源、刷日志，
+	// 把后来的正常信号挤掉。取 3：配合指数退避（基 2s，首次 4s，
+	// 依次 8s / 16s，三次合计约 28s），足够扛过瞬时故障
+	// （429、token 刷新、网络抖动），又不至于长期滞留。
 	workerMaxSignalRetries = 3
 
 	// MaxPartBytes 单个分片的目标大小。
@@ -436,6 +436,24 @@ func runWorker(stop <-chan struct{}, done chan<- struct{}) {
 	limiter := NewByteLimiter(uploadRateLimitBytesPerSec, stop)
 	consecutiveErrors := 0
 
+	// pendingRetries 暂存**本 worker 内**待重试的信号。
+	//
+	// [修复防御] 不能把失败信号放回队列尾部：同一会话的新信号可能先被处理
+	// 并推进水位，旧信号再重试时前缀校验失败 → 整段重传（重复数据）。
+	// 放在这里并**优先于队列**处理，保证同一 worker 内的顺序：
+	//   旧信号重试 → 新信号。
+	// 单 worker 同时只有一条信号在飞，所以这里实际最多 1 条，内存有界。
+	var pendingRetries []CaptureSignal
+	defer func() {
+		// 停机时把未完成的重试尽量放回队列（尽力而为；队列满则计数丢弃）。
+		for _, sig := range pendingRetries {
+			if captureQueue != nil && captureQueue.TryEnqueue(sig) {
+				continue
+			}
+			captureStats.TotalDropped.Add(1)
+		}
+	}()
+
 	for {
 		select {
 		case <-stop:
@@ -443,9 +461,17 @@ func runWorker(stop <-chan struct{}, done chan<- struct{}) {
 		default:
 		}
 
-		// 把 stop 一并交给 Receive：否则 worker 阻塞在这里等数据时
-		// StopWorker 无法唤醒它（两个是不同的 channel，见 ReceiveWithStop）。
-		signal, ok := captureQueue.ReceiveWithStop(stop)
+		// 重试优先：它们比队列里的新信号更旧，先处理可避免顺序倒置。
+		var signal CaptureSignal
+		var ok bool
+		if len(pendingRetries) > 0 {
+			signal, pendingRetries = pendingRetries[0], pendingRetries[1:]
+			ok = true
+		} else {
+			// 把 stop 一并交给 Receive：否则 worker 阻塞在这里等数据时
+			// StopWorker 无法唤醒它（两个是不同的 channel，见 ReceiveWithStop）。
+			signal, ok = captureQueue.ReceiveWithStop(stop)
+		}
 		if !ok {
 			// 队列关闭（停机）或暂无数据。Receive 是阻塞的，
 			// 不会走到这里空转；保险起见仍睡一下。
@@ -503,25 +529,22 @@ func runWorker(stop <-chan struct{}, done chan<- struct{}) {
 			}
 			logWorkerError(signal, err, consecutiveErrors)
 
-			// **回队重试**：信号已被 `ReceiveWithStop` 取走，不回队就永久丢。
+			// **重试**：信号已被 `ReceiveWithStop` 取走，不重试就永久丢。
 			//
 			// [修复防御] 多账号 fail-closed（无法判定目录归属就拒绝写入）
 			// 之后，这条变得**必需**：否则「宁可不写」会直接变成「数据丢了」。
 			// 对已经结束的会话尤其致命 —— 没有下一次请求来重放这段增量。
+			//
+			// 放进 `pendingRetries`（下一轮**优先**处理），而不是回队列尾部：
+			// 否则更新的同会话信号可能先推进水位，旧信号重试时整段重传。
 			if signal.Attempt < workerMaxSignalRetries {
 				signal.Attempt++
-				if captureQueue != nil && captureQueue.TryEnqueue(signal) {
-					captureStats.TotalRetried.Add(1)
-				} else {
-					captureStats.TotalDropped.Add(1)
-					common.SysError(fmt.Sprintf(
-						"training capture: retry queue full, dropping signal (user=%d attempt=%d)",
-						signal.UserID, signal.Attempt))
-				}
+				pendingRetries = append(pendingRetries, signal)
+				captureStats.TotalRetried.Add(1)
 			} else {
 				common.SysError(fmt.Sprintf(
-					"training capture: giving up after %d attempts, this increment is lost (user=%d model=%s)",
-					signal.Attempt, signal.UserID, signal.Model))
+					"training capture: giving up after %d retries (%d processing attempts), this increment is lost (user=%d model=%s)",
+					signal.Attempt, signal.Attempt+1, signal.UserID, signal.Model))
 			}
 
 			if consecutiveErrors >= workerMaxConsecutiveErrors {

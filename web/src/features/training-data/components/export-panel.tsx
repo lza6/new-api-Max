@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import dayjs from 'dayjs'
 import { Download, History, Loader2, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
@@ -86,6 +86,8 @@ function statusMeta(status: ExportStatus): {
  * 直链是**限时签名** URL（见服务端 export_sign.go）；这里不缓存它，
  * 每次打开弹窗重新签发，避免展示一个可能过期的链接。
  */
+const EXPORT_PAGE_SIZE = 20
+
 export function ExportPanel() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
@@ -102,11 +104,12 @@ export function ExportPanel() {
   )
   const [pendingDelete, setPendingDelete] =
     useState<TrainingDataExport | null>(null)
+  const [page, setPage] = useState(0)
 
   const listQuery = useQuery({
-    queryKey: ['training-data', 'exports'],
+    queryKey: ['training-data', 'exports', page],
     queryFn: async () => {
-      const res = await listTrainingDataExports(0, 100)
+      const res = await listTrainingDataExports(page * EXPORT_PAGE_SIZE, EXPORT_PAGE_SIZE)
       if (!res.success) {
         throw new Error(res.message || t('Failed to load'))
       }
@@ -155,7 +158,16 @@ export function ExportPanel() {
   })
 
   const exports = listQuery.data?.exports ?? []
+  const total = listQuery.data?.total ?? 0
+  const pageCount = Math.max(1, Math.ceil(total / EXPORT_PAGE_SIZE))
   const canCreate = from !== undefined && to !== undefined
+
+  // 删除最后一页的最后一条后，自动退回上一页，避免停在空白页。
+  useEffect(() => {
+    if (page > 0 && page >= pageCount) {
+      setPage(pageCount - 1)
+    }
+  }, [page, pageCount])
 
   return (
     <div className='space-y-4'>
@@ -225,6 +237,31 @@ export function ExportPanel() {
               onDelete: setPendingDelete,
             },
             t
+          )}
+          {total > EXPORT_PAGE_SIZE && (
+            <div className='flex flex-wrap items-center justify-between gap-2 pt-2'>
+              <span className='text-muted-foreground text-xs'>
+                {t('Total')}: {total} · {t('Page')} {page + 1} / {pageCount}
+              </span>
+              <div className='flex gap-2'>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  disabled={page === 0}
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                >
+                  {t('Previous')}
+                </Button>
+                <Button
+                  variant='outline'
+                  size='sm'
+                  disabled={page + 1 >= pageCount}
+                  onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+                >
+                  {t('Next')}
+                </Button>
+              </div>
+            </div>
           )}
         </CardContent>
       </Card>
