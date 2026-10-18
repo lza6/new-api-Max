@@ -2,7 +2,6 @@ package training_capture
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -331,5 +330,4 @@ func waitWorkerStopped() {
 		time.Sleep(10 * time.Millisecond)
 	}
 	// 不 panic（cleanup 里 panic 会掩盖真实失败），但要让测试可见。
-	_ = errors.New("worker 未在 5s 内停止（StopWorker 可能失效）")
 }

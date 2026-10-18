@@ -260,7 +260,10 @@ export function AnalysisPanel(props: { path: string | null }) {
               />
               <Button
                 size='icon'
-                disabled={busy || question.trim() === ''}
+                // 追问同样需要 model（后端必填）。只在首次按钮上禁用而这里不禁，
+                // 会造成「首次成功后清空模型再追问 → 必然报 missing model」的
+                // 交互不一致。判据与「Start analysis」保持一致。
+                disabled={busy || question.trim() === '' || model.trim() === ''}
                 aria-label={t('Send')}
                 onClick={() => void runAnalysis(question.trim())}
               >

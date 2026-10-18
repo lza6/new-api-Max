@@ -2,11 +2,13 @@ package controller
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
 	"golang.org/x/sync/singleflight"
 
+	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/service/training_capture"
 )
 
@@ -138,9 +140,18 @@ func (c *timedCache[T]) get(load func() (T, error)) (T, error) {
 		v, lerr := load()
 		if lerr != nil {
 			c.mu.Lock()
+			// 只在**刚进入**负缓存时记一条：避免每次命中都刷日志。
+			enteringBackoff := c.lastErr == nil
 			c.lastErr = lerr
 			c.failedAt = time.Now()
 			c.mu.Unlock()
+			// 没有这条日志，云盘长时间故障时运维只能从"页面报错"推断，
+			// 看不到「我们正在退避、多久后重试」。
+			if enteringBackoff {
+				common.SysLog(fmt.Sprintf(
+					"training data cache: entering backoff for %s after load failure: %v",
+					c.negativeTTL, lerr))
+			}
 			return v, lerr
 		}
 		c.mu.Lock()

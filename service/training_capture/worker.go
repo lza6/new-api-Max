@@ -584,12 +584,12 @@ func processSignal(ctx context.Context, signal CaptureSignal, limiter *byteLimit
 			// 消息级路径同样必须写 `kind`：否则导出声明为 v2 的分片里
 			// 会出现「没有 kind 的 request 行」，消费方无法判断如何拼接
 			// （见 KindRequestMessage 的说明）。
-			markRequestKind(increment, KindRequestMessage)
+			prepareRequestRows(increment, KindRequestMessage)
 		}
 	} else {
 		// 退化路径：拿不到会话 id 时按内容指纹全局去重。
 		increment = GlobalDedup(messages, globalSeenFingerprints)
-		markRequestKind(increment, KindRequestMessage)
+		prepareRequestRows(increment, KindRequestMessage)
 	}
 
 	if len(increment) == 0 {
@@ -1045,8 +1045,15 @@ func requestKindFor(suffix, whole string) string {
 // 否则导出声明为 v2 的分片里会出现**没有 kind 的 request 行**。
 //
 // assistant 行不打标（回复总是完整的，见 `Message.Kind` 的说明）。
-func markRequestKind(msgs []Message, kind string) {
+func prepareRequestRows(msgs []Message, kind string) {
 	for i := range msgs {
+		// 1) 角色归一：结构化消息路径的用户侧可能标成 `user`，
+		//    而导出契约是 `role ∈ {request, assistant}` ——
+		//    `user` 会被消费方按未知角色丢弃。语义一致，统一成 `request`。
+		if msgs[i].Role == "user" {
+			msgs[i].Role = "request"
+		}
+		// 2) 形态标记：它们是「若干条完整消息」，既非对话快照也非文本后缀。
 		if msgs[i].Role == "request" && msgs[i].Kind == "" {
 			msgs[i].Kind = kind
 		}

@@ -128,13 +128,28 @@ func (s *oneDriveSink) DeleteFile(ctx context.Context, path string) error {
 // 沿用 CountItems 的防护思路：完整遍历 5TB 云盘会打爆 API 配额，
 // 管理端浏览配合「展开下钻」逐层看，单次列举有硬顶（默认 5000 条）。
 //
-// 路径语义：返回的 `Path` 相对 **root**（不含 root 前缀），
-// 这样管理端可直接按 `/` 分组渲染，也可以拼上 root 去读文件。
+// ## 路径语义：**始终返回相对云盘根目录的完整路径**
 //
-// [修复防御] 早期实现把「待访问目录」只记叶子名，下钻第二层时
+// 无论 `root` 传什么，`TreeEntry.Path` 都是**可直接回传给
+// `ReadFile` / `DeleteFile` / 再次 `ListTree` 的完整路径**。
+//
+// [修复防御] 早期实现把返回值裁成「相对 root」。看起来更"干净"，
+// 但三个调用方都把它当**完整路径**用：
+//   - 前端下钻：拿 `entry.path` 当下一层的 `path` 参数
+//     → 少一层前缀 → Graph 404 → 被当成空目录 → 界面「没有文件」；
+//   - 分析：`ListTree(会话目录)` 后直接 `ReadFile(e.Path)`
+//     → 404 → 所有分片计入 SkippedParts → 报「没有内容」；
+//   - 预览/删除：同一条路径语义。
+//
+// 也就是说「相对 root」这个契约没有任何调用方遵守，
+// 而它导致的失败会伪装成「数据为空」，极难定位。
+//
+// 现在统一成完整路径：`root==""` 时行为与旧版一致，
+// `root!=""` 时返回带前缀的完整路径，调用方无需任何拼接。
+//
+// [修复防御] 早期实现还把「待访问目录」只记叶子名，下钻第二层时
 // 前缀就丢了（`2026-10-14/alice-7` 会退化成 `gpt-4o`），
-// 导致后续目录全部列举失败、树是不完整的。改为**全程携带完整相对路径**：
-// 队列里存的就是要传给 Graph 的完整路径，避免任何拼接歧义。
+// 导致后续目录全部列举失败、树是不完整的。队列里存的始终是完整路径。
 // ListTree 列举目录树（丢弃截断标志的便捷包装）。
 //
 // 只用于**明确不在意截断**的调用方（如管理端浏览，它本来就要分页下钻）。
@@ -173,16 +188,8 @@ func (s *oneDriveSink) ListTreeWithTruncation(
 		return nil, false, err
 	}
 
-	// 归一化 root（去掉首尾斜杠），用于判断「相对 root 的路径」。
-	rootTrimmed := strings.Trim(root, "/")
-
-	// toRel 把「一次列举得到的完整路径」转成相对 root 的展示路径。
-	toRel := func(full string) string {
-		if rootTrimmed == "" {
-			return full
-		}
-		return strings.TrimPrefix(strings.TrimPrefix(full, rootTrimmed), "/")
-	}
+	// 归一化 root（去掉首尾斜杠）后只用于**发起列举**，不参与返回值裁剪。
+	// 返回值始终是完整路径，见本函数上方「路径语义」的说明。
 
 	type queueItem struct {
 		// fullPath 相对**云盘根**的完整路径（直接传给 fetchEntries）。
@@ -222,7 +229,7 @@ func (s *oneDriveSink) ListTreeWithTruncation(
 				full = strings.Trim(item.fullPath, "/") + "/" + e.name
 			}
 			out = append(out, TreeEntry{
-				Path:       toRel(full),
+				Path:       full,
 				IsDir:      e.isFolder,
 				SizeBytes:  e.size,
 				ModifiedAt: e.modified,
@@ -233,7 +240,7 @@ func (s *oneDriveSink) ListTreeWithTruncation(
 			} else if e.isFolder {
 				// 到深度上限：明确告知有子项未展开，而不是静默当成空目录。
 				out = append(out, TreeEntry{
-					Path:  toRel(full) + "/",
+					Path:  full + "/",
 					IsDir: true,
 				})
 				// 深度到顶也是「没列完」—— 导出方需要知道。

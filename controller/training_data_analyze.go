@@ -146,6 +146,23 @@ func AnalyzeTrainingDataConversation(c *gin.Context) {
 	// 下发的那份对齐**（下发的是 AnnotatedText），否则将来两者一旦分叉，
 	// 就会出现「内容非空却报了空」或「空内容却发了空正文给模型」。
 	if strings.TrimSpace(assembly.AnnotatedText) == "" {
+		// [修复防御] 内容为空时**必须区分「真的没有」与「读失败了」**。
+		//
+		// 若所有分片都因路径不匹配/读取/解压失败被跳过，直接回
+		// "no conversation content found" 会让管理员以为「这个会话没数据」，
+		// 而事实是「N 个分片读不到」—— 与 N1 的披露初衷正好相反。
+		if assembly.SkippedParts > 0 || assembly.ListTruncated {
+			common.ApiErrorMsg(c, fmt.Sprintf(
+				"no readable conversation content: %d part(s) failed to load%s",
+				assembly.SkippedParts,
+				func() string {
+					if assembly.ListTruncated {
+						return "; the listing was truncated or exceeded the part limit"
+					}
+					return ""
+				}()))
+			return
+		}
 		common.ApiErrorMsg(c, "no conversation content found at the given path")
 		return
 	}

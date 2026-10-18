@@ -196,6 +196,16 @@ func withMemSink(t *testing.T) *memSink {
 	return sink
 }
 
+// uniqueConvID 生成**每次运行都不同**的会话 id。
+//
+// [修复防御] 测试若用固定 conv-id，`go test -count>1` 时第二次运行会命中
+// 上一次留下的水位 → `SelectTextIncrement` 返回空前缀 → 不上传 →
+// 用例报「worker 没有消费队列」，把人误导到「worker 又坏了」。
+// 实际是**测试隔离**问题，与实现无关。
+func uniqueConvID(prefix string) string {
+	return fmt.Sprintf("%s-%d", prefix, time.Now().UnixNano())
+}
+
 // ---------- 目录结构（用户点名：日期/用户名/模型） ----------
 
 func TestProcessSignalCreatesDateUserModelLayout(t *testing.T) {
@@ -900,7 +910,7 @@ func TestWorkerCanRestartAfterStop(t *testing.T) {
 	grantForTest(t, uid)
 
 	sig := BuildSignal(CaptureInput{
-		UserId: uid, Username: "restart", Model: "m", ConversationID: "conv-restart",
+		UserId: uid, Username: "restart", Model: "m", ConversationID: uniqueConvID("conv-restart"),
 		Meta:      &types.TokenCountMeta{CombineText: "重启之后必须还能采集"},
 		CreatedAt: 1791937800,
 	})
@@ -944,7 +954,7 @@ func TestWorkerSurvivesPanicInOneSignal(t *testing.T) {
 	for i := range 2 {
 		sig := BuildSignal(CaptureInput{
 			UserId: uid, Username: "panic", Model: "m",
-			ConversationID: "conv-panic-" + itoaSmall(i),
+			ConversationID: uniqueConvID("conv-panic"),
 			Meta:           meta, CreatedAt: 1791937800,
 		})
 		if sig == nil || !MaybeCapture(*sig) {
@@ -1185,19 +1195,35 @@ func TestProcessSignalResplitBranchProducesValidGzip(t *testing.T) {
 
 // ---------- `kind` 契约：每一类请求行都必须带 ----------
 
-// TestMarkRequestKindTagsOnlyRequestRows 标记只作用于请求行，
+// TestPrepareRequestRowsTagsOnlyRequestRows 标记只作用于请求行，
 // 且不覆盖已有标记（消息级路径不应把已判定的 full/suffix 改掉）。
-func TestMarkRequestKindTagsOnlyRequestRows(t *testing.T) {
+func TestPrepareRequestRowsTagsOnlyRequestRows(t *testing.T) {
 	msgs := []Message{
 		{Role: "request", Content: "a"},
 		{Role: "assistant", Content: "b"},
 		{Role: "request", Content: "c", Kind: KindRequestFull},
 	}
-	markRequestKind(msgs, KindRequestMessage)
+	prepareRequestRows(msgs, KindRequestMessage)
 
 	assert.Equal(t, KindRequestMessage, msgs[0].Kind, "无标记的请求行应被打上")
 	assert.Equal(t, "", msgs[1].Kind, "assistant 行不得被打标")
 	assert.Equal(t, KindRequestFull, msgs[2].Kind, "已有标记不得被覆盖")
+}
+
+// TestPrepareRequestRowsNormalizesUserRole 结构化消息路径的用户侧角色
+// 必须归一成 `request`：导出的记录契约是 `role ∈ {request, assistant}`，
+// `user` 会让消费方按未知角色丢弃。
+func TestPrepareRequestRowsNormalizesUserRole(t *testing.T) {
+	msgs := []Message{
+		{Role: "user", Content: "用户说"},
+		{Role: "assistant", Content: "模型说"},
+	}
+	prepareRequestRows(msgs, KindRequestMessage)
+
+	assert.Equal(t, "request", msgs[0].Role, "user 必须归一为 request（导出契约）")
+	assert.Equal(t, KindRequestMessage, msgs[0].Kind)
+	assert.Equal(t, "assistant", msgs[1].Role, "assistant 不得被改")
+	assert.Equal(t, "", msgs[1].Kind, "assistant 不打形态标记")
 }
 
 // TestGlobalDedupPathWritesKind 无会话 id 的退化路径（GlobalDedup）产出的
