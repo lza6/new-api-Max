@@ -31,7 +31,7 @@ import {
 import { formatQuota } from '@/lib/format'
 import { cn } from '@/lib/utils'
 
-import { formatDuration, formatPlanPrice } from '../lib'
+import { formatAmount, formatDuration, formatPlanPrice } from '../lib'
 import type {
   PlanRecord,
   SubscriptionPlan,
@@ -267,9 +267,23 @@ export function PlansCompareTable(props: PlansCompareTableProps) {
                   </div>
                 </td>
                 <td className='px-3 py-3 sm:px-4'>
-                  <span className='font-semibold whitespace-nowrap'>
-                    {formatPlanPrice(plan)}
-                  </span>
+                  {planRecord.discounted_price && planRecord.discounted_price > 0 ? (
+                    <span className='flex flex-col'>
+                      <span className='text-muted-foreground text-xs line-through'>
+                        {formatPlanPrice(plan)}
+                      </span>
+                      <span className='text-emerald-600 font-semibold whitespace-nowrap'>
+                        {formatAmount(planRecord.discounted_price, plan.currency)}
+                      </span>
+                      <span className='text-emerald-600 text-xs'>
+                        {t('First purchase discount')}
+                      </span>
+                    </span>
+                  ) : (
+                    <span className='font-semibold whitespace-nowrap'>
+                      {formatPlanPrice(plan)}
+                    </span>
+                  )}
                 </td>
                 <td className='px-3 py-3 sm:px-4'>
                   <FormatValue value={formatDuration(plan, t)} />

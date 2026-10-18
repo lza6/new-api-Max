@@ -72,6 +72,7 @@ func RegisterMetricsGaugeProvider() {
 			// skipped_no_text > 0 且持续增长 → 很可能 CountToken 被关了
 			// （CombineText 为空），采集会一条不出。这是那个静默失效的信号。
 			common.MetricsSetGauge("training_capture_skipped_no_text_total", nil, float64(stats.SkippedNoText))
+			common.MetricsSetGauge("training_capture_skipped_lease_total", nil, float64(stats.SkippedLease))
 			common.MetricsSetGauge("training_capture_queue_len", nil, float64(stats.QueueLen))
 			common.MetricsSetGauge("training_capture_queue_capacity", nil, float64(stats.QueueCapacity))
 			common.MetricsSetGauge("training_capture_in_flight_bytes", nil, float64(stats.InFlightBytes))

@@ -27,21 +27,22 @@ import (
 // 能力开关 key —— 字面量即 env 变量名，属**稳定契约**，不得随版本改名
 // （改名会让已持久化的管理端配置失效）。
 const (
-	FlagComplexityRouting       = "COMPLEXITY_ROUTING"
-	FlagToolDrawerEnabled       = "TOOL_DRAWER_ENABLED"
-	FlagRelayAuditEnabled       = "RELAY_AUDIT_ENABLED"
-	FlagPolicyEngineMode        = "POLICY_ENGINE_MODE"
-	FlagChannelHealthWeightedLB = "CHANNEL_HEALTH_WEIGHTED_LB"
-	FlagDomainRouteEnabled      = "DOMAIN_ROUTE_ENABLED"
-	FlagMemoryInjectionEnabled  = "MEMORY_INJECTION_ENABLED"
-	FlagChannelCircuitBreaker   = "CHANNEL_CIRCUIT_BREAKER"
-	FlagChannelKeyEncryption    = "CHANNEL_KEY_ENCRYPTION"
-	FlagPasswordLoginEncryption = "PASSWORD_LOGIN_ENCRYPTION_ENABLED"
-	FlagCatalogSyncTaskEnabled  = "CATALOG_SYNC_TASK_ENABLED"
-	FlagErrorLogEnabled         = "ERROR_LOG_ENABLED"
-	FlagGetMediaTokenNotStream  = "GET_MEDIA_TOKEN_NOT_STREAM"
-	FlagResponseCacheEnabled    = "RESPONSE_CACHE_ENABLED"
-	FlagMcpGatewayEnabled       = "MCP_GATEWAY_ENABLED"
+	FlagComplexityRouting                 = "COMPLEXITY_ROUTING"
+	FlagToolDrawerEnabled                 = "TOOL_DRAWER_ENABLED"
+	FlagRelayAuditEnabled                 = "RELAY_AUDIT_ENABLED"
+	FlagPolicyEngineMode                  = "POLICY_ENGINE_MODE"
+	FlagChannelHealthWeightedLB           = "CHANNEL_HEALTH_WEIGHTED_LB"
+	FlagDomainRouteEnabled                = "DOMAIN_ROUTE_ENABLED"
+	FlagMemoryInjectionEnabled            = "MEMORY_INJECTION_ENABLED"
+	FlagChannelCircuitBreaker             = "CHANNEL_CIRCUIT_BREAKER"
+	FlagChannelKeyEncryption              = "CHANNEL_KEY_ENCRYPTION"
+	FlagPasswordLoginEncryption           = "PASSWORD_LOGIN_ENCRYPTION_ENABLED"
+	FlagCatalogSyncTaskEnabled            = "CATALOG_SYNC_TASK_ENABLED"
+	FlagErrorLogEnabled                   = "ERROR_LOG_ENABLED"
+	FlagGetMediaTokenNotStream            = "GET_MEDIA_TOKEN_NOT_STREAM"
+	FlagResponseCacheEnabled              = "RESPONSE_CACHE_ENABLED"
+	FlagMcpGatewayEnabled                 = "MCP_GATEWAY_ENABLED"
+	FlagSubscriptionFirstPurchaseDiscount = "SUBSCRIPTION_FIRST_PURCHASE_DISCOUNT"
 )
 
 // FeatureFlagKeys 返回全部受治理开关的 key（顺序不保证，调用方按需排序）。
@@ -62,6 +63,7 @@ func FeatureFlagKeys() []string {
 		FlagGetMediaTokenNotStream,
 		FlagResponseCacheEnabled,
 		FlagMcpGatewayEnabled,
+		FlagSubscriptionFirstPurchaseDiscount,
 	}
 }
 

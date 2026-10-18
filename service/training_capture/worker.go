@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -125,6 +126,9 @@ type CaptureStats struct {
 	// 这个计数器就是那个区分信号（盲点扫描发现的可观测性缺口）。
 	TotalSkippedNoText atomic.Int64
 
+	// TotalSkippedLease 因其他实例持有该用户采集租约而跳过的次数（多实例协调）。
+	TotalSkippedLease atomic.Int64
+
 	// TotalRetried 因上传失败而**回队重试**的次数。
 	//
 	// 与 TotalUploadErrors 的区别：后者是「失败次数」，前者是「失败后成功回队」。
@@ -137,6 +141,15 @@ type CaptureStats struct {
 }
 
 var captureStats = &CaptureStats{}
+
+// captureLeaseOwner 标识本进程，用于多实例采集租约（host:pid）。
+var captureLeaseOwner = func() string {
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		host = "unknown"
+	}
+	return fmt.Sprintf("%s:%d", host, os.Getpid())
+}()
 
 func init() {
 	today := timeUTCDate(time.Now().Unix())
@@ -156,9 +169,10 @@ type CaptureStatsSnapshot struct {
 	TotalUploadErrors int64  `json:"total_upload_errors"`
 	SkippedNoConsent  int64  `json:"skipped_no_consent"`
 	SkippedNoText     int64  `json:"skipped_no_text"`
+	SkippedLease      int64  `json:"skipped_lease"`
 	// Retried 失败后成功回队的次数（配合 upload_errors 判断是自愈还是持续故障）。
-	Retried int64 `json:"retried"`
-	QueueLen          int    `json:"queue_len"`
+	Retried  int64 `json:"retried"`
+	QueueLen int   `json:"queue_len"`
 	// InFlightBytes 当前正在上传的字节数（瞬时值）。
 	InFlightBytes int64 `json:"in_flight_bytes"`
 	QueueCapacity int   `json:"queue_capacity"`
@@ -182,6 +196,7 @@ func GetCaptureStats() CaptureStatsSnapshot {
 		TotalUploadErrors: captureStats.TotalUploadErrors.Load(),
 		SkippedNoConsent:  captureStats.TotalSkippedNoConsent.Load(),
 		SkippedNoText:     captureStats.TotalSkippedNoText.Load(),
+		SkippedLease:      captureStats.TotalSkippedLease.Load(),
 		Retried:           captureStats.TotalRetried.Load(),
 		QueueLen:          queueStats.Len,
 		InFlightBytes:     captureStats.InFlightBytes.Load(),
@@ -463,7 +478,22 @@ func runWorker(stop <-chan struct{}, done chan<- struct{}) {
 			continue
 		}
 
+		// 多实例协调：同一用户同一时刻只允许一个实例上传，避免水位互相覆盖。
+		leaseOK, leaseErr := model.AcquireTrainingCaptureLease(signal.UserID, captureLeaseOwner, 5*time.Minute)
+		if leaseErr != nil {
+			captureStats.TotalSkippedLease.Add(1)
+			common.SysError("training capture: acquire lease failed for user " + fmt.Sprint(signal.UserID) + ": " + leaseErr.Error())
+			continue
+		}
+		if !leaseOK {
+			captureStats.TotalSkippedLease.Add(1)
+			continue
+		}
+
 		uploaded, uploadedBytes, err := processSignalSafely(context.Background(), signal, limiter)
+		if releaseErr := model.ReleaseTrainingCaptureLease(signal.UserID, captureLeaseOwner); releaseErr != nil {
+			common.SysError("training capture: release lease failed for user " + fmt.Sprint(signal.UserID) + ": " + releaseErr.Error())
+		}
 		if err != nil {
 			captureStats.TotalUploadErrors.Add(1)
 			consecutiveErrors++

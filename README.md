@@ -220,6 +220,15 @@ cd web && bun install --frozen-lockfile && bun run build
 - 关闭开关后 `/mcp` 立即返回 404，现有会话失效。
 - `MCP_INTERNAL_BASE_URL` 可覆盖内部回环地址（默认 `http://127.0.0.1:$PORT`），仅在反向代理/特殊部署时需要。
 
+### 订阅首购优惠与省费可视化
+
+- **首购优惠**：套餐可配置 `first_purchase_discount_percent`（0-100）。只有开启
+  `SUBSCRIPTION_FIRST_PURCHASE_DISCOUNT` 功能开关、用户从未购买过订阅、且使用**余额支付**时生效；
+  使用固定 `Price/Product ID` 的外部支付渠道不参与折扣。扣款、订单金额与订阅价格快照均按折后价记录。
+- **省费可视化**：用户订阅详情展示本周期 `已用额度 / 剩余额度 / 按量等价金额 / 已省金额`。
+  口径与 `calcSubscriptionBalanceQuota` 一致：`按量等价 = 已用额度 / QuotaPerUnit`，
+  `已省 = max(0, 按量等价 - 本周期实付)`。不使用未经验证的模型价格推算。
+
 ### 渠道密钥加密启用步骤（`CHANNEL_KEY_ENCRYPTION`）
 
 > **默认关闭**。启用后渠道 `key` 列写入 `enc:v1:` 前缀的 AES-256-GCM 密文，读取时自动解密；

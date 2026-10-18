@@ -12,6 +12,7 @@ import (
 	"github.com/lza6/new-api-Max/service"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/lza6/new-api-Max/setting/ratio_setting"
+	"github.com/shopspring/decimal"
 	"gorm.io/gorm"
 )
 
@@ -19,6 +20,10 @@ import (
 
 type SubscriptionPlanDTO struct {
 	Plan model.SubscriptionPlan `json:"plan"`
+	// 首购优惠展示字段：折扣仅在功能开关开启、用户从未购买过订阅时生效。
+	IsFirstPurchase         bool    `json:"is_first_purchase"`
+	DiscountedPrice         float64 `json:"discounted_price,omitempty"`
+	FirstPurchaseDiscountOn bool    `json:"first_purchase_discount_on"`
 }
 
 type BillingPreferenceRequest struct {
@@ -42,12 +47,25 @@ func GetSubscriptionPlans(c *gin.Context) {
 		common.ApiError(c, err)
 		return
 	}
+	userId := c.GetInt("id")
+	firstPurchase := false
+	if userId > 0 {
+		if first, err := model.IsFirstSubscriptionPurchase(userId); err == nil {
+			firstPurchase = first
+		}
+	}
+	discountOn := common.FeatureFlagValue(common.FlagSubscriptionFirstPurchaseDiscount,
+		common.GetEnvOrDefaultBool(common.FlagSubscriptionFirstPurchaseDiscount, false))
 	result := make([]SubscriptionPlanDTO, 0, len(plans))
 	for _, p := range plans {
 		p.NormalizeDefaults()
-		result = append(result, SubscriptionPlanDTO{
-			Plan: p,
-		})
+		dto := SubscriptionPlanDTO{Plan: p, IsFirstPurchase: firstPurchase, FirstPurchaseDiscountOn: discountOn}
+		if discountOn && firstPurchase && p.FirstPurchaseDiscountPercent > 0 {
+			pct := min(max(p.FirstPurchaseDiscountPercent, 0), 100)
+			dto.DiscountedPrice = decimal.NewFromFloat(p.PriceAmount).
+				Mul(decimal.NewFromFloat(1 - pct/100)).Round(6).InexactFloat64()
+		}
+		result = append(result, dto)
 	}
 	common.ApiSuccess(c, result)
 }
@@ -165,6 +183,10 @@ func AdminCreateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "价格不能超过9999")
 		return
 	}
+	if req.Plan.FirstPurchaseDiscountPercent < 0 || req.Plan.FirstPurchaseDiscountPercent > 100 {
+		common.ApiErrorMsg(c, "首购优惠百分比必须在 0-100 之间")
+		return
+	}
 	if req.Plan.Currency == "" {
 		req.Plan.Currency = "CNY"
 	}
@@ -252,6 +274,10 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 		common.ApiErrorMsg(c, "价格不能超过9999")
 		return
 	}
+	if req.Plan.FirstPurchaseDiscountPercent < 0 || req.Plan.FirstPurchaseDiscountPercent > 100 {
+		common.ApiErrorMsg(c, "首购优惠百分比必须在 0-100 之间")
+		return
+	}
 	req.Plan.Id = id
 	if req.Plan.Currency == "" {
 		req.Plan.Currency = "CNY"
@@ -302,28 +328,29 @@ func AdminUpdateSubscriptionPlan(c *gin.Context) {
 	err := model.DB.Transaction(func(tx *gorm.DB) error {
 		// update plan (allow zero values updates with map)
 		updateMap := map[string]any{
-			"title":                      req.Plan.Title,
-			"subtitle":                   req.Plan.Subtitle,
-			"price_amount":               req.Plan.PriceAmount,
-			"currency":                   req.Plan.Currency,
-			"duration_unit":              req.Plan.DurationUnit,
-			"duration_value":             req.Plan.DurationValue,
-			"custom_seconds":             req.Plan.CustomSeconds,
-			"enabled":                    req.Plan.Enabled,
-			"sort_order":                 req.Plan.SortOrder,
-			"stripe_price_id":            req.Plan.StripePriceId,
-			"creem_product_id":           req.Plan.CreemProductId,
-			"waffo_pancake_product_id":   req.Plan.WaffoPancakeProductId,
-			"max_purchase_per_user":      req.Plan.MaxPurchasePerUser,
-			"total_amount":               req.Plan.TotalAmount,
-			"upgrade_group":              req.Plan.UpgradeGroup,
-			"downgrade_group":            req.Plan.DowngradeGroup,
-			"quota_reset_period":         req.Plan.QuotaResetPeriod,
-			"quota_reset_custom_seconds": req.Plan.QuotaResetCustomSeconds,
-			"concurrency_limit":          req.Plan.ConcurrencyLimit,
-			"rpm_limit":                  req.Plan.RpmLimit,
-			"models":                     req.Plan.Models,
-			"updated_at":                 common.GetTimestamp(),
+			"title":                           req.Plan.Title,
+			"subtitle":                        req.Plan.Subtitle,
+			"price_amount":                    req.Plan.PriceAmount,
+			"currency":                        req.Plan.Currency,
+			"duration_unit":                   req.Plan.DurationUnit,
+			"duration_value":                  req.Plan.DurationValue,
+			"custom_seconds":                  req.Plan.CustomSeconds,
+			"enabled":                         req.Plan.Enabled,
+			"sort_order":                      req.Plan.SortOrder,
+			"stripe_price_id":                 req.Plan.StripePriceId,
+			"creem_product_id":                req.Plan.CreemProductId,
+			"waffo_pancake_product_id":        req.Plan.WaffoPancakeProductId,
+			"max_purchase_per_user":           req.Plan.MaxPurchasePerUser,
+			"first_purchase_discount_percent": req.Plan.FirstPurchaseDiscountPercent,
+			"total_amount":                    req.Plan.TotalAmount,
+			"upgrade_group":                   req.Plan.UpgradeGroup,
+			"downgrade_group":                 req.Plan.DowngradeGroup,
+			"quota_reset_period":              req.Plan.QuotaResetPeriod,
+			"quota_reset_custom_seconds":      req.Plan.QuotaResetCustomSeconds,
+			"concurrency_limit":               req.Plan.ConcurrencyLimit,
+			"rpm_limit":                       req.Plan.RpmLimit,
+			"models":                          req.Plan.Models,
+			"updated_at":                      common.GetTimestamp(),
 		}
 		if req.Plan.AllowBalancePay != nil {
 			updateMap["allow_balance_pay"] = *req.Plan.AllowBalancePay

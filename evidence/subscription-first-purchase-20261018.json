@@ -1,0 +1,19 @@
+{
+  "task_id": "SUBSCRIPTION-FIRST-PURCHASE-20261018",
+  "status": "pass",
+  "timestamp": "2026-10-18T21:05:00Z",
+  "environment": "local SQLite + Go server 18131 + real Chromium",
+  "commands_executed": [{"cmd": "node web/e2e-local/v13150-subscription-e2e.cjs", "exit_code": 0, "raw_output_tail": "E2E: 5/5 passed"}],
+  "files_changed": ["model/subscription.go", "controller/subscription.go", "web/src/features/subscriptions/*"],
+  "tests": [
+    {"name": "create plan with 20% first-purchase discount", "type": "browser-e2e", "status": "pass", "evidence": "plan id returned"},
+    {"name": "plan list discounted_price=80", "type": "browser-e2e", "status": "pass", "evidence": "is_first_purchase=true, discounted_price=80"},
+    {"name": "pricing/plans shows discounted price", "type": "browser-e2e", "status": "pass", "evidence": "¥80.00 + badge"},
+    {"name": "balance charge uses discounted price", "type": "browser-e2e", "status": "pass", "evidence": "deducted=40000000 = 80*QuotaPerUnit"}
+  ],
+  "coverage_summary": null,
+  "seams_touched": ["subscription plan DTO", "balance payment", "subscription price snapshot", "savings summary"],
+  "mock_scenarios_covered": [],
+  "browser_validation": {"tool": "playwright", "result": "5/5", "screenshots": ["first-purchase-discount.png"]},
+  "limitations": ["external fixed-price providers do not receive the discount by design"]
+}

@@ -174,6 +174,11 @@ type SubscriptionPlan struct {
 	// Max purchases per user (0 = unlimited)
 	MaxPurchasePerUser int `json:"max_purchase_per_user" gorm:"type:int;default:0"`
 
+	// FirstPurchaseDiscountPercent 首单优惠百分比（0-100，0 = 不优惠）。
+	// 仅在功能开关 SUBSCRIPTION_FIRST_PURCHASE_DISCOUNT 开启且用户从未购买过订阅时
+	// 对**余额支付**生效；外部支付渠道的固定 Price/Product ID 不在此列。
+	FirstPurchaseDiscountPercent float64 `json:"first_purchase_discount_percent" gorm:"type:decimal(5,2);not null;default:0"`
+
 	// 订阅档位：并发上限（进程内计数，超限 429）与 RPM 上限（60s 滑动窗口）。
 	// 0 = 不限制（沿用既有 token/分组/全局限流，不绕过既有防线）。
 	ConcurrencyLimit int `json:"concurrency_limit" gorm:"type:int;default:0"`
@@ -273,6 +278,12 @@ type UserSubscription struct {
 	AmountTotal int64 `json:"amount_total" gorm:"type:bigint;not null;default:0"`
 	AmountUsed  int64 `json:"amount_used" gorm:"type:bigint;not null;default:0"`
 
+	// 价格快照（用于省费可视化，不参与计费）。PriceAmount 为累计实付；
+	// PeriodPrice 为当前额度周期实付，随 AmountUsed 一起重置。
+	PriceAmount float64 `json:"price_amount" gorm:"type:decimal(10,6);not null;default:0"`
+	PeriodPrice float64 `json:"period_price" gorm:"type:decimal(10,6);not null;default:0"`
+	Currency    string  `json:"currency" gorm:"type:varchar(8);not null;default:'USD'"`
+
 	StartTime int64  `json:"start_time" gorm:"bigint"`
 	EndTime   int64  `json:"end_time" gorm:"bigint;index;index:idx_user_sub_active,priority:3"`
 	Status    string `json:"status" gorm:"type:varchar(32);index;index:idx_user_sub_active,priority:2"` // active/expired/cancelled
@@ -342,6 +353,16 @@ func (s *UserSubscription) EffectiveTier(planConcurrency, planRpm int) (concurre
 
 type SubscriptionSummary struct {
 	Subscription *UserSubscription `json:"subscription"`
+
+	// 省费可视化：只使用本订阅自己的额度/价格快照，不猜测模型价格。
+	// PayAsYouGoValue = AmountUsed / QuotaPerUnit（与本项目 calcSubscriptionBalanceQuota
+	// 同一换算口径）；SavedAmount = max(0, PayAsYouGoValue - PeriodPrice)。
+	ConsumedQuota   int64   `json:"consumed_quota"`
+	RemainingQuota  int64   `json:"remaining_quota"`
+	PlanPrice       float64 `json:"plan_price"`
+	PayAsYouGoValue float64 `json:"pay_as_you_go_value"`
+	SavedAmount     float64 `json:"saved_amount"`
+	Currency        string  `json:"currency"`
 }
 
 type SubscriptionResetResult struct {
@@ -533,6 +554,12 @@ func downgradeUserGroupForSubscriptionTx(tx *gorm.DB, sub *UserSubscription, now
 }
 
 func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, source string) (*UserSubscription, error) {
+	return CreateUserSubscriptionFromPlanWithPriceTx(tx, userId, plan, source, plan.PriceAmount)
+}
+
+// CreateUserSubscriptionFromPlanWithPriceTx 与 CreateUserSubscriptionFromPlanTx 相同，
+// 但允许调用方传入**实际支付价格**（首购折扣、优惠券等）。价格只做快照，不参与额度计算。
+func CreateUserSubscriptionFromPlanWithPriceTx(tx *gorm.DB, userId int, plan *SubscriptionPlan, source string, priceAmount float64) (*UserSubscription, error) {
 	if tx == nil {
 		return nil, errors.New("tx is nil")
 	}
@@ -541,6 +568,9 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 	}
 	if userId <= 0 {
 		return nil, errors.New("invalid user id")
+	}
+	if priceAmount < 0 {
+		priceAmount = 0
 	}
 	InvalidateActiveSubscriptionCache(userId)
 	nowUnix := getDBTimestampTx(tx)
@@ -572,6 +602,9 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		if plan.TotalAmount > 0 {
 			updates["amount_total"] = gorm.Expr("amount_total + ?", plan.TotalAmount)
 		}
+		updates["price_amount"] = gorm.Expr("price_amount + ?", priceAmount)
+		updates["period_price"] = gorm.Expr("period_price + ?", priceAmount)
+		updates["currency"] = plan.Currency
 		if updateErr := tx.Model(&UserSubscription{}).Where("id = ?", activeSub.Id).Updates(updates).Error; updateErr != nil {
 			return nil, updateErr
 		}
@@ -627,6 +660,9 @@ func CreateUserSubscriptionFromPlanTx(tx *gorm.DB, userId int, plan *Subscriptio
 		PlanId:              plan.Id,
 		AmountTotal:         plan.TotalAmount,
 		AmountUsed:          0,
+		PriceAmount:         priceAmount,
+		PeriodPrice:         priceAmount,
+		Currency:            plan.Currency,
 		StartTime:           now.Unix(),
 		EndTime:             endUnix,
 		Status:              "active",
@@ -868,7 +904,20 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 			return errors.New("该套餐不允许使用余额兑换")
 		}
 
-		requiredQuota, err := calcSubscriptionBalanceQuota(plan.PriceAmount)
+		// 首购优惠：功能开关开启、用户从未购买过订阅、且套餐配置了折扣时，
+		// 对**余额支付**按折扣价扣款。外部支付渠道的固定 Price/Product ID 不受影响。
+		discountEnabled := common.FeatureFlagValue(common.FlagSubscriptionFirstPurchaseDiscount,
+			common.GetEnvOrDefaultBool(common.FlagSubscriptionFirstPurchaseDiscount, false))
+		hasPrior := false
+		if discountEnabled && plan.FirstPurchaseDiscountPercent > 0 {
+			var priorCount int64
+			if err := tx.Model(&UserSubscription{}).Where("user_id = ?", userId).Count(&priorCount).Error; err != nil {
+				return err
+			}
+			hasPrior = priorCount > 0
+		}
+		effectivePrice := EffectiveSubscriptionPrice(plan, hasPrior, discountEnabled)
+		requiredQuota, err := calcSubscriptionBalanceQuota(effectivePrice)
 		if err != nil {
 			return err
 		}
@@ -887,7 +936,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 			}
 		}
 
-		subscription, err := CreateUserSubscriptionFromPlanTx(tx, userId, plan, PaymentMethodBalance)
+		subscription, err := CreateUserSubscriptionFromPlanWithPriceTx(tx, userId, plan, PaymentMethodBalance, effectivePrice)
 		if err != nil {
 			return err
 		}
@@ -897,7 +946,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		order := &SubscriptionOrder{
 			UserId:          userId,
 			PlanId:          plan.Id,
-			Money:           plan.PriceAmount,
+			Money:           effectivePrice,
 			TradeNo:         tradeNo,
 			PaymentMethod:   PaymentMethodBalance,
 			PaymentProvider: PaymentProviderBalance,
@@ -911,7 +960,7 @@ func PurchaseSubscriptionWithBalance(userId int, planId int) error {
 		}
 
 		logPlanTitle = plan.Title
-		logMoney = plan.PriceAmount
+		logMoney = effectivePrice
 		chargedQuota = requiredQuota
 		if subscription.PrevUserGroup != "" {
 			upgradeGroup = strings.TrimSpace(subscription.UpgradeGroup)
@@ -1007,11 +1056,51 @@ func buildSubscriptionSummaries(subs []UserSubscription) []SubscriptionSummary {
 	result := make([]SubscriptionSummary, 0, len(subs))
 	for _, sub := range subs {
 		subCopy := sub
-		result = append(result, SubscriptionSummary{
-			Subscription: &subCopy,
-		})
+		result = append(result, BuildSubscriptionSummary(subCopy))
 	}
 	return result
+}
+
+// EffectiveSubscriptionPrice 计算首购优惠后的实付价格。
+// 仅当开关开启、用户没有历史订阅、套餐折扣在 (0,100] 时生效；否则返回原价。
+func EffectiveSubscriptionPrice(plan *SubscriptionPlan, hasPriorPurchase, discountEnabled bool) float64 {
+	if plan == nil {
+		return 0
+	}
+	if !discountEnabled || hasPriorPurchase || plan.FirstPurchaseDiscountPercent <= 0 {
+		return plan.PriceAmount
+	}
+	pct := min(max(plan.FirstPurchaseDiscountPercent, 0), 100)
+	return decimal.NewFromFloat(plan.PriceAmount).
+		Mul(decimal.NewFromFloat(1 - pct/100)).
+		Round(6).InexactFloat64()
+}
+
+// BuildSubscriptionSummary 生成省费可视化数据（纯函数，便于测试）。
+// 口径：PayAsYouGoValue = AmountUsed / QuotaPerUnit，与 calcSubscriptionBalanceQuota 一致；
+// SavedAmount = max(0, PayAsYouGoValue - PeriodPrice)。
+func BuildSubscriptionSummary(sub UserSubscription) SubscriptionSummary {
+	remaining := int64(0)
+	if sub.AmountTotal > 0 {
+		remaining = max(sub.AmountTotal-sub.AmountUsed, 0)
+	}
+	payg := 0.0
+	if common.QuotaPerUnit > 0 {
+		payg = float64(sub.AmountUsed) / common.QuotaPerUnit
+	}
+	saved := payg - sub.PeriodPrice
+	if saved < 0 {
+		saved = 0
+	}
+	return SubscriptionSummary{
+		Subscription:    &sub,
+		ConsumedQuota:   sub.AmountUsed,
+		RemainingQuota:  remaining,
+		PlanPrice:       sub.PeriodPrice,
+		PayAsYouGoValue: decimal.NewFromFloat(payg).Round(6).InexactFloat64(),
+		SavedAmount:     decimal.NewFromFloat(saved).Round(6).InexactFloat64(),
+		Currency:        sub.Currency,
+	}
 }
 
 // AdminInvalidateUserSubscription marks a user subscription as cancelled and ends it immediately.
@@ -1172,6 +1261,7 @@ func resetUserSubscriptionTx(tx *gorm.DB, sub *UserSubscription, plan *Subscript
 	}
 	InvalidateActiveSubscriptionCache(sub.UserId)
 	sub.AmountUsed = 0
+	sub.PeriodPrice = 0
 	if advanceResetTime {
 		nextReset := calcNextResetTime(time.Unix(now, 0), plan, sub.EndTime)
 		sub.NextResetTime = nextReset
@@ -1509,6 +1599,7 @@ func maybeResetUserSubscriptionWithPlanTx(tx *gorm.DB, sub *UserSubscription, pl
 		return nil
 	}
 	sub.AmountUsed = 0
+	sub.PeriodPrice = 0
 	sub.LastResetTime = base.Unix()
 	sub.NextResetTime = next
 	return tx.Save(sub).Error
@@ -1788,4 +1879,17 @@ func PostConsumeUserSubscriptionDelta(userSubscriptionId int, delta int64) error
 		sub.AmountUsed = newUsed
 		return tx.Save(&sub).Error
 	})
+}
+
+// IsFirstSubscriptionPurchase 报告用户是否从未拥有过任何订阅（含已过期/取消）。
+// 用于首购优惠展示与余额支付折扣判定。
+func IsFirstSubscriptionPurchase(userId int) (bool, error) {
+	if userId <= 0 {
+		return false, errors.New("invalid userId")
+	}
+	var count int64
+	if err := DB.Model(&UserSubscription{}).Where("user_id = ?", userId).Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count == 0, nil
 }

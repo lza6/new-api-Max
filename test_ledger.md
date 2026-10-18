@@ -68,3 +68,17 @@
 | MCP 默认关 | `POST /mcp` 未认证 | 401（认证后由默认 false 返回 404） |
 | 新表 | PostgreSQL pg_tables | action_approvals / mcp_sessions / open_ai_ops_objects |
 | 资源 | `docker stats` / `df -h` | 内存 462MB/900MB；磁盘 9.7G/78G(13%) |
+
+## 2026-10-18 v1.3.152 补位验证
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 首购优惠纯函数 | `go test ./model/ -run TestEffectiveSubscriptionPrice` | PASS |
+| 省费汇总纯函数 | `go test ./model/ -run TestBuildSubscriptionSummarySavings` | PASS |
+| 多实例采集租约 | `go test ./model/ -run TestTrainingCaptureLeaseExclusiveAndExpires` | PASS |
+| 采集包回归 | `go test ./service/training_capture/` | PASS（78.8s） |
+| 三库 conformance | 生产服务器临时 MySQL 5.7 + PostgreSQL 15 + SQLite | **PASS**（1.07s / 1.42s / 8.49s） |
+| 首购优惠真实浏览器 E2E | `node web/e2e-local/v13150-subscription-e2e.cjs` | **5/5 PASS**（创建套餐、折后价 80、页面展示、余额扣 80×QuotaPerUnit、清理） |
+| 前端 typecheck/build/i18n | `bun run typecheck` / `bun run build` / `bun run i18n:check` | PASS（0 missing） |
+
+证据：`evidence/three-db-conformance-20261018.json`、`计划书/e2e-evidence/v1.3.152/`。

@@ -245,3 +245,15 @@ node e2e-local/v1388-a11y-responsive.cjs                                  # 7/7 
 - ops 列表响应 JSON 解析失败时 fail-closed（返回空 data），不再原样透传。
 - list/create 响应超过 8MB 时明确 502，不返回被截断的 JSON。
 - 三位独立审查员复验结论：Go **Approve**、前端 **Approve**、安全 **Approve**。
+
+## 七、2026-10-18 v1.3.152 补位（上轮标记的业务/环境项）
+
+| 项 | 实现 | 验证 |
+|---|---|---|
+| 首购优惠 | 套餐 `first_purchase_discount_percent`；开关 `SUBSCRIPTION_FIRST_PURCHASE_DISCOUNT`；仅余额支付、仅首购；折后价写入订单/订阅价格快照 | 纯函数测试 + 真实浏览器 E2E 5/5（扣款 80×QuotaPerUnit） |
+| 省费可视化 | `SubscriptionSummary` 新增 `consumed/remaining/plan_price/pay_as_you_go/saved`；订阅详情新增省费列 | 纯函数测试（含负数不为负） |
+| 多实例采集协调 | `system_task_locks` 按用户租约；worker 获取/释放；`training_capture_skipped_lease_total` | 互斥/过期抢占测试 + 采集包回归 |
+| 三库 conformance | SQLite / MySQL 5.7 / PostgreSQL 15（生产临时库） | **PASS** 10.98s，证据 `evidence/three-db-conformance-20261018.json` |
+
+仍不做：外部固定价支付渠道的首购折扣（需渠道侧 coupon/price 对象）；渠道冗余（需上游）；
+G8 大文件拆分（禁止大重构）。

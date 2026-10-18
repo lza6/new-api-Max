@@ -189,6 +189,14 @@ var registry = []FeatureSwitch{
 		RollbackHint: "Turn off to return to streaming responses.",
 	},
 	{
+		Key: common.FlagSubscriptionFirstPurchaseDiscount, Kind: KindBool, Default: "false",
+		TitleKey:       "Subscription First-Purchase Discount",
+		DescriptionKey: "Applies each plan's first_purchase_discount_percent to balance-paid subscriptions when the user has never purchased a subscription. External payment providers with fixed price/product IDs are not affected.",
+		Risk:           RiskMedium, AdminEditable: true,
+		MetricKeys:   []string{},
+		RollbackHint: "Turn off to charge the full plan price again; already-created orders keep their charged amount.",
+	},
+	{
 		Key: common.FlagMcpGatewayEnabled, Kind: KindBool, Default: "false",
 		TitleKey:       "MCP Gateway",
 		DescriptionKey: "Exposes the gateway as a Model Context Protocol server (Streamable HTTP). Read-only tools/resources are available to the caller; paid tools (image generation) require an administrator approval for every call. Turning this off makes /mcp unreachable.",

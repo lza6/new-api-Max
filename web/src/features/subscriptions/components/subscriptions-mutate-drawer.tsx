@@ -487,6 +487,35 @@ export function SubscriptionsMutateDrawer({
                     </FormItem>
                   )}
                 />
+
+                <FormField
+                  control={form.control}
+                  name='first_purchase_discount_percent'
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('First purchase discount (%)')}</FormLabel>
+                      <FormControl>
+                        <Input
+                          {...field}
+                          type='number'
+                          min={0}
+                          max={100}
+                          onChange={(e) =>
+                            field.onChange(
+                              Number.parseFloat(e.target.value) || 0
+                            )
+                          }
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        {t(
+                          'Applies to balance-paid subscriptions for users who never purchased before. Requires the subscription first-purchase discount feature switch. External payment providers with fixed price IDs are not affected.'
+                        )}
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <FormField

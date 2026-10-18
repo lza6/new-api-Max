@@ -47,12 +47,16 @@ export const subscriptionPlanSchema = z.object({
   concurrency_limit: z.number().optional().default(0),
   rpm_limit: z.number().optional().default(0),
   models: z.string().optional().default(''),
+  first_purchase_discount_percent: z.number().optional(),
 })
 
 export type SubscriptionPlan = z.infer<typeof subscriptionPlanSchema>
 
 export interface PlanRecord {
   plan: SubscriptionPlan
+  is_first_purchase?: boolean
+  discounted_price?: number
+  first_purchase_discount_on?: boolean
 }
 
 // ============================================================================
@@ -69,6 +73,9 @@ export const userSubscriptionSchema = z.object({
   end_time: z.number(),
   amount_total: z.number(),
   amount_used: z.number(),
+  price_amount: z.number().optional(),
+  period_price: z.number().optional(),
+  currency: z.string().optional(),
   next_reset_time: z.number().optional(),
   rpm_override: z.number().optional().default(0),
   concurrency_override: z.number().optional().default(0),
@@ -78,6 +85,12 @@ export type UserSubscription = z.infer<typeof userSubscriptionSchema>
 
 export interface UserSubscriptionRecord {
   subscription: UserSubscription
+  consumed_quota?: number
+  remaining_quota?: number
+  plan_price?: number
+  pay_as_you_go_value?: number
+  saved_amount?: number
+  currency?: string
 }
 
 // ============================================================================

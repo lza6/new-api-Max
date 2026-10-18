@@ -1,0 +1,29 @@
+{
+  "task_id": "DB-CONFORMANCE-20261018",
+  "status": "pass",
+  "timestamp": "2026-10-18T11:16:10Z",
+  "environment": "production server 154.37.208.171; sqlite in-test; MySQL 5.7 container; PostgreSQL 15 production container (separate conformance DB)",
+  "commands_executed": [
+    {
+      "cmd": "GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go test -c ./model -o /tmp/model.test",
+      "exit_code": 0,
+      "raw_output_tail": "binary built"
+    },
+    {
+      "cmd": "docker run --rm --network new-api_new-api-network -v /opt:/opt:ro -e TEST_POSTGRES_DSN=... -e TEST_MYSQL_DSN=... debian:bookworm-slim /opt/model-conformance.test -test.run TestDBConformanceAutoMigrateIdempotent -test.v",
+      "exit_code": 0,
+      "raw_output_tail": "PASS: sqlite 1.07s / mysql 1.42s / postgres 8.49s"
+    }
+  ],
+  "files_changed": [],
+  "tests": [
+    {"name": "TestDBConformanceAutoMigrateIdempotent/sqlite", "type": "db-conformance", "status": "pass", "evidence": "PASS"},
+    {"name": "TestDBConformanceAutoMigrateIdempotent/mysql", "type": "db-conformance", "status": "pass", "evidence": "MySQL 5.7 PASS"},
+    {"name": "TestDBConformanceAutoMigrateIdempotent/postgres", "type": "db-conformance", "status": "pass", "evidence": "PostgreSQL 15 PASS"}
+  ],
+  "coverage_summary": null,
+  "seams_touched": ["ActionApproval", "McpSession", "OpenAIOpsObject", "UserSubscription price snapshot fields", "SystemTaskLock lease"],
+  "mock_scenarios_covered": [],
+  "browser_validation": null,
+  "limitations": ["conformance DB was temporary; dropped after test", "idempotency only, not a full production upgrade rehearsal"]
+}

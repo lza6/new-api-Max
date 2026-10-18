@@ -61,7 +61,7 @@ import {
   resetUserSubscriptionsByPlan,
   setUserSubscriptionTier,
 } from '../../api'
-import { formatPlanPrice, formatTimestamp } from '../../lib'
+import { formatAmount, formatPlanPrice, formatTimestamp } from '../../lib'
 import type { PlanRecord, UserSubscriptionRecord } from '../../types'
 
 interface Props {
@@ -414,6 +414,29 @@ export function UserSubscriptionsDialog(props: Props) {
                     return total > 0
                       ? `${formatQuota(used)}/${formatQuota(total)}`
                       : t('Unlimited')
+                  },
+                },
+                {
+                  id: 'savings',
+                  header: t('Savings'),
+                  cell: (record) => {
+                    const payg = Number(record.pay_as_you_go_value || 0)
+                    const saved = Number(record.saved_amount || 0)
+                    const price = Number(record.plan_price || 0)
+                    if (price <= 0 && payg <= 0) {return '—'}
+                    return (
+                      <span className='whitespace-nowrap text-xs'>
+                        {t('Pay-as-you-go: {{amount}}', {
+                          amount: formatAmount(payg, record.currency),
+                        })}
+                        <br />
+                        <span className='text-emerald-600'>
+                          {t('Saved: {{amount}}', {
+                            amount: formatAmount(saved, record.currency),
+                          })}
+                        </span>
+                      </span>
+                    )
                   },
                 },
                 {

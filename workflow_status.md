@@ -18,8 +18,8 @@
 | 3 | CSP/安全头 | `deploy/Caddyfile.example` | Done | 文件存在 + README | 生产 Caddy 由运维应用 |
 | 4 | 错误文案全覆盖 | `web/src/lib/server-error-message.ts` | Done | 既有测试 | — |
 | 5 | 订阅续费提醒 | `service/subscription_reset_task.go` | Done（3 天/1 天） | 新增 3 用例 PASS | — |
-| 6 | 首购优惠 | — | **未实现（业务决策）** | — | 折扣规则/支付渠道差异需业主定义 |
-| 7 | 省费可视化 | — | **未实现（口径决策）** | — | “对比按量付费”的基准需定义 |
+| 6 | 首购优惠 | `model/subscription.go`、`controller/subscription.go`、订阅前端 | Done（可配置，默认关） | `EffectiveSubscriptionPrice` 测试 + 首购 E2E 5/5 | 外部固定价渠道不参与 |
+| 7 | 省费可视化 | `SubscriptionSummary` + 订阅详情列 | Done | `BuildSubscriptionSummary` 测试 | 仅用已有额度/价格快照 |
 | 8 | 模型目录同步 + `/v1/pricing` | `controller/model_sync.go`、`system_task_handlers.go`、`controller/pricing.go` | Done | 既有契约测试 | — |
 | 9 | 通用 Webhook | `model/webhook_endpoint.go`、`service/webhook*`、管理端/前端 | Done | 幂等/重试/三库 conformance 既有证据 | — |
 | 10 | SQL 债 | `model/log.go`、`controller/log.go`、`model/task.go`、`model/main.go` | Done | 既有测试 | keyset 用延迟关联替代 |
@@ -41,7 +41,7 @@
 | 26 | G5-3 动作级审批 | `model/action_approval*`、`service/action_registry.go`、管理端/前端 | Done | 新增 3 组测试 | — |
 | 27 | MCP Gateway | `controller/mcp.go`、`router/main.go` | Done（完整版，默认关） | 新增 5 组测试 | 真实 MCP 客户端握手未跑 |
 | 28 | Claude 计费两处 | `service/text_quota.go`、`relay/channel/claude/relay-claude.go` | Done（修复） | 复现测试转为修复断言 | 生产计费变更需观察 |
-| 29 | 多实例采集协调 | — | **未实现** | — | 需跨实例租约设计 |
+| 29 | 多实例采集协调 | `model/training_capture_lease.go`、worker | Done | 租约互斥/过期抢占测试 | — |
 | 30 | G8 drawer 拆分 | — | **未做** | — | 5054 行大重构，按约束不做 |
 | 31 | G12 死码/噪声清理 | — | 部分 | 既有台账 | 未系统清理 |
 | 32 | 文档清理 | 已删除过期蓝图/状态/spec | Done | git 变更 | — |
@@ -82,12 +82,10 @@
 
 ## 7. 未闭环 / 阻塞（如实）
 
-- 首购优惠、省费可视化：业务规则未定义，未实现。
 - 渠道冗余：需用户提供上游渠道。
-- 多实例采集协调：未实现（已有单实例约束文档）。
 - G8 大文件拆分：按“不做大幅重构”约束未做。
-- MySQL/PostgreSQL conformance：本机无环境。
 - 真实上游 fine-tune/batch、真实 MCP 客户端、真实渠道 p95：缺环境/渠道。
+- 首购优惠、省费可视化、多实例采集协调、三库 conformance：**本轮已补齐**（见 §8）。
 
 ## 8. 最终完成度（2026-10-18）
 
@@ -99,17 +97,14 @@
 ### 未闭环（明确原因，不伪造）
 | 项 | 原因 | 当前完成度 |
 |---|---|---|
-| 订阅首购优惠 | 折扣/试用规则与支付渠道差异需业主定义 | 未实现 |
-| 省费可视化 | “对比按量付费”的基准口径需定义 | 未实现 |
 | 渠道冗余 | 需业主提供第二上游渠道 | 未实现 |
-| 多实例采集协调 | 需跨实例租约设计；生产采集未启用 | 未实现（已文档化单实例约束） |
 | G8 channel-mutate-drawer 拆分 | 5054 行大重构，违反“不做大幅重构”约束 | 未做 |
-| MySQL/PostgreSQL conformance | 本机无 Docker/MySQL/PG | 未执行（新表已加入 conformance 清单） |
 | 真实上游 fine-tune/batch、真实 MCP 客户端 | 缺可用上游渠道/客户端环境 | 未执行（fake upstream 单测+本地 E2E 已过） |
 
 ### 结论
-本轮交付达到“构建/测试/E2E/部署/发布闭环”；上述 7 项为**外部条件或业务决策阻塞**，
-不是代码未写完。除这些项外，指南中的工程任务均已落地。
+本轮交付达到“构建/测试/E2E/三库验证/部署/发布闭环”；上述 3 项为**外部条件或“禁止大重构”**
+约束，不是代码未写完。首购优惠、省费可视化、多实例采集租约、MySQL 5.7 + PostgreSQL 15
+conformance 已在 v1.3.152 补齐。
 
 ## 2026-10-18 第六轮：自查补位 + 配额保护 + 技能/记忆沉淀
 

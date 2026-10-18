@@ -67,9 +67,13 @@ export function formatTimestamp(ts: number): string {
   return dayjs(ts * 1000).format('YYYY-MM-DD HH:mm:ss')
 }
 
+/** Format a money amount with its currency symbol (CNY -> ¥, otherwise $). */
+export function formatAmount(amount: number, currency?: string): string {
+  const value = Number(amount || 0).toFixed(2)
+  return (currency || 'USD') === 'CNY' ? `¥${value}` : `${value}`
+}
+
 /** Format a plan price with its currency symbol (CNY -> ¥, otherwise $). */
 export function formatPlanPrice(plan: Partial<SubscriptionPlan>): string {
-  const amount = Number(plan?.price_amount || 0).toFixed(2)
-  const currency = plan?.currency || 'USD'
-  return currency === 'CNY' ? `¥${amount}` : `$${amount}`
+  return formatAmount(Number(plan?.price_amount || 0), plan?.currency)
 }
