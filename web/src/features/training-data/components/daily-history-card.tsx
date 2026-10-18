@@ -150,9 +150,17 @@ export function DailyHistoryCard() {
           data={ordered}
           getRowKey={(row) => row.date}
           emptyContent={
-            <p className='text-muted-foreground py-6 text-center text-sm'>
-              {t('No captured data yet')}
-            </p>
+            // 云盘读取失败时**不能**同时说「还没有数据」：那会把
+            // 「读失败」误读成「没数据」，管理员会据此以为采集停了。
+            err ? (
+              <p className='text-destructive py-6 text-center text-sm'>
+                {t('Cloud drive read failed')}
+              </p>
+            ) : (
+              <p className='text-muted-foreground py-6 text-center text-sm'>
+                {t('No captured data yet')}
+              </p>
+            )
           }
         />
         {err && (

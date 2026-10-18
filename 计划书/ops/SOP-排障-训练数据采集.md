@@ -105,22 +105,28 @@
 - 文本增量规则：只在「新文本以已上传前缀开头」时裁剪；否则**全量重传**（`text_increment.go:39-78`）。
   → 若看到每次都全量重传，通常是 prefix hash 不匹配（历史被编辑/截断），这是**保守正确行为**，非 bug。
 
-### 2.4 多账号归属（v1.3.150+，v1.3.151 收紧）
+### 2.4 多账号归属（当前实现）
 
 启动日志出现 `multi-account sink active with N accounts` 才表示真的接入了多个云盘账号。
 
 归属规则（`service/training_capture/sink_multi.go` 的 `resolve`）：
 
 1. **已有数据的账号优先**（老目录永不漂移）；
-2. **任一账号 List 失败且没有任何账号证明自己有数据 → 拒绝写入**，
-   返回 `cannot resolve which account owns this directory`，信号回队重试（最多 3 次）；
+2. **只有每个账号都能成功列举，才允许选定归属**：只要有**任一账号** List 失败，
+   即使另一个账号能看到数据，也会拒绝写入并返回
+   `cannot safely resolve which account owns this directory`，信号回队重试（最多 3 次）。
+   读不到的那个账号可能才是真正的写入者（它的 part 序号更大）——猜错会劈裂目录；
 3. 只有**每个**账号都成功读到空列表，才按 `crc32(dir)%N` 分片；
 4. 同一目录出现在多个账号（手工迁移/复制）→ 取 **part 序号最大** 的账号，并打
    `exists on multiple accounts` ERROR 日志 —— 需要人工合并/清理，不要忽略。
 
+**删除语义（v1.3.153+）**：删除会在**所有账号**上逐份执行，任一账号返回真实错误
+（429/500/超时）时不会报告整体成功。底层 404 映射为 `ErrFileNotFound`，
+幂等由 controller / multi-sink 提供。
+
 | 日志/现象 | 含义 | 处理 |
 |---|---|---|
-| `cannot resolve ... refusing to guess` 偶发 | 某账号 List 瞬时失败（429/超时/token） | 正常自愈；持续出现查该账号 Graph 可用性 |
+| `cannot safely resolve ... refusing to guess` 偶发 | 某账号 List 瞬时失败（429/超时/token） | 正常自愈；持续出现查该账号 Graph 可用性 |
 | `retry queue full, dropping signal` | 失败回队时队列已满 | 说明失败持续 + 队列积压，查云盘限流 |
 | `giving up after N attempts` | 同一信号重试 3 次仍失败 | 这段增量**已丢失**；据此排查并告知影响范围 |
 | `exists on multiple accounts` | 目录被劈开 | 人工比对两边 part 序号，合并后删除多余副本；**不要直接删高序号账号** |
@@ -128,6 +134,25 @@
 
 **读/删兜底的边界（v1.3.151）**：只有后端明确返回 not-found 才会去别的账号找；
 429/500/超时原样上抛。看到「预览失败」时先看错误类型，不要把瞬时错误当成文件不存在。
+
+### 2.5 多实例租约（v1.3.152+）
+
+- worker 消费前会按**用户**获取 DB 租约（`system_task_locks`，5 分钟、不续期）。
+- 拿不到租约 → 该信号**直接跳过**并计入 `skipped_lease`（不回队）。
+- 指标：`training_capture_skipped_lease_total`（/metrics）与管理端 overview。
+- 已知限制：总开关/授权缓存仍是进程内 30s；租约过期后可能被另一实例接管；
+  `skipped_lease` 持续增长说明同一用户在多个实例间频繁争抢，需检查实例数或上游耗时。
+
+### 2.6 生产探针
+
+`scripts/prod-capture-e2e.sh` 用真实用户走完整链路并回读云盘分片：
+
+```bash
+E2E_USER=xxx E2E_PASS='...' E2E_SET_QUOTA=1 bash scripts/prod-capture-e2e.sh http://127.0.0.1:3000
+```
+
+前置条件：生产禁用密码注册 → 先用 SQL 预建账号；新用户 quota=0，
+补额度后必须 `DEL user:<id>`（Redis 缓存 TTL 60s）；请求模型需在线（可用 `E2E_MODEL` 覆盖）。
 
 ---
 
@@ -170,6 +195,6 @@ docker logs --since 30m new-api 2>&1 | grep -i "training capture"
 | 管理端预览/分析报「解压超限」 | 分片上限是否被调过 | 解压上限与分片上限同源（`EffectiveDecompressMaxPlainBytes`）；若不一致说明版本过旧 |
 | 日志出现 `compresses poorly ... re-split` | 内容是已压缩/随机数据 | 正常自适应行为，非故障 |
 | 撤回后还上传 | worker 复查授权 | `worker.go:313-321` |
-| `cannot resolve which account owns` | 某账号 List 失败且无人有数据 | fail-closed，正常重试；持续出现查该账号凭据/限流 |
+| `cannot safely resolve which account owns` | 某账号 List 失败 | fail-closed，正常重试；持续出现查该账号凭据/限流 |
 | `exists on multiple accounts` | 同一目录被劈到两个账号 | 人工合并；写入已自动跟随最大 part 序号 |
 | 管理端删除「成功」但文件仍在 | 旧版 404 假成功 | 升级 v1.3.151+ 并回读确认 |

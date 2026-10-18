@@ -46,6 +46,8 @@
     "Dropped": "已丢弃",
     "queue full, best-effort": "队列满时尽力而为",
     "Upload errors": "上传失败",
+    "Retried": "重试",
+    "failures re-queued for retry": "失败后回队重试",
     "These counters live in memory and reset when the service restarts; they cover the current day only.": "这些计数保存在内存中，服务重启后归零；只统计当天。",
     "Settings updated": "设置已更新",
     "Analyze": "分析",

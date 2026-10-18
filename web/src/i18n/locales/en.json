@@ -46,6 +46,8 @@
     "Dropped": "Dropped",
     "queue full, best-effort": "queue full, best-effort",
     "Upload errors": "Upload errors",
+    "Retried": "Retried",
+    "failures re-queued for retry": "failures re-queued for retry",
     "These counters live in memory and reset when the service restarts; they cover the current day only.": "These counters live in memory and reset when the service restarts; they cover the current day only.",
     "Settings updated": "Settings updated",
     "Analyze": "Analyze",

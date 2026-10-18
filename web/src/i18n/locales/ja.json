@@ -16,6 +16,8 @@
     "Dropped": "破棄",
     "queue full, best-effort": "キュー満杯時はベストエフォート",
     "Upload errors": "アップロードエラー",
+    "Retried": "再試行",
+    "failures re-queued for retry": "失敗後に再キュー",
     "These counters live in memory and reset when the service restarts; they cover the current day only.": "これらのカウンタはメモリ上にあり、サービス再起動でリセットされます。当日分のみを集計します。",
     "Settings updated": "設定を更新しました",
     "Analyze": "分析",

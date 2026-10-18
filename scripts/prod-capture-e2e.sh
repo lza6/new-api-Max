@@ -13,18 +13,39 @@
 #   - 临时文件用 trap 清理。
 #
 # 用法（在生产服务器上）：
-#   bash prod-capture-e2e.sh [baseURL]
+#   bash prod-capture-e2e.sh [baseURL]   # 不传则自动探测 3000/3001（蓝绿会交替）
 #   E2E_USER=xxx E2E_PASS=yyy bash prod-capture-e2e.sh          # 预建账号，不改额度
 #   E2E_USER=xxx E2E_PASS=yyy E2E_SET_QUOTA=1 bash ...          # 预建账号并补足额度
-#   E2E_DAY=2026-10-17 bash ...                                 # 指定日期目录
+#   E2E_DAY=2026-10-17 bash ...                                 # 指定日期目录（**UTC** 日期）
+#   E2E_MODEL=xxx bash ...                                      # 指定在线模型
+#
+# 前置条件：
+#   - 生产通常禁用密码注册 → 必须先用 SQL 预建 E2E_USER；
+#   - 新用户 quota=0，补额度后需删除 Redis `user:<id>`（脚本会做）；
+#   - 依赖容器名 `postgres` / `redis` 与库名 `new-api`（与生产 compose 一致）；
+#   - 服务器有 python3（校验 gzip/JSONL）。
 set -euo pipefail
 
-BASE="${1:-http://127.0.0.1:3001}"
+BASE="${1:-}"
+if [ -z "$BASE" ]; then
+  for p in 3000 3001; do
+    if curl -s -o /dev/null --max-time 2 "http://127.0.0.1:$p/api/status"; then
+      BASE="http://127.0.0.1:$p"; break
+    fi
+  done
+fi
+[ -n "$BASE" ] || { echo "[e2e] ✗ 无法探测本地端口（试过 3000/3001），请显式传入 baseURL" >&2; exit 1; }
 ENVF="${ENVF:-/opt/new-api/.env}"
 TS=$(date +%s)
 DAY="${E2E_DAY:-$(date -u +%F)}"
 U="${E2E_USER:-capture_e2e_$TS}"
 P="${E2E_PASS:-CaptureE2E!2026}"
+MODEL="${E2E_MODEL:-deepseek-v4.1-flash}"
+
+# 用户名会拼进 SQL（预建账号查找）与云盘目录名；限制字符集，避免引号破坏语句。
+case "$U" in
+  *[!A-Za-z0-9_.-]*) echo "[e2e] ✗ E2E_USER 只允许字母/数字/_.-：$U" >&2; exit 1 ;;
+esac
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
@@ -71,12 +92,22 @@ drive_id() {
   env_get "${pre}DRIVE_ID"
 }
 
-# RootPath 每个账号可以不同（默认 training-data）。**不能写死**。
+# RootPath：主账号未配置 → drive 根目录（空）；第 2+ 账号未配置 → 继承主账号。
+# 与 service/training_capture/onedrive.go 的实现一致，**不能**硬编码 training-data，
+# 否则生产改了根目录就会误报「没找到」。
 root_path() {
   local idx="$1" pre r
   pre="$(acct_prefix "$idx")"
   r=$(env_get "${pre}ROOT_PATH")
-  echo "${r:-training-data}"
+  if [ -z "$r" ] && [ "$idx" != "1" ]; then
+    r=$(env_get "TRAINING_ONEDRIVE_ROOT_PATH")
+  fi
+  printf '%s' "$r" | sed 's|^/*||; s|/*$||'
+}
+
+# join_path <root> <child>：root 为空时不要产生前导斜杠。
+join_path() {
+  if [ -z "$1" ]; then printf '%s' "$2"; else printf '%s/%s' "$1" "$2"; fi
 }
 
 # names_of <json> → 逐行输出所有 "name":"..."（Graph 的字段顺序不保证，
@@ -98,11 +129,20 @@ list_children_all() {
   local tok="$1" d="$2" p="$3" url body n=0
   url="https://graph.microsoft.com/v1.0/drives/$d/root:/${p}:/children?\$select=name,size,folder&top=200"
   while [ -n "$url" ] && [ "$n" -lt 20 ]; do
-    body=$(curl -sS --max-time 25 -H "Authorization: Bearer $tok" "$url")
+    # 单次网络抖动不应中止整个探针：轮询循环会在下一轮重试。
+    body=$(curl -sS --max-time 25 -H "Authorization: Bearer $tok" "$url" || true)
+    if [ -z "$body" ] || printf '%s' "$body" | grep -q '"error"'; then
+      # 把错误体打出来（不含凭据），让「读失败」与「目录为空」可区分。
+      printf '%s\n' "$body"
+      return 0
+    fi
     printf '%s\n' "$body"
     url=$(nextlink_of "$body")
     n=$((n + 1))
   done
+  if [ "$n" -ge 20 ]; then
+    echo "WARN: 分页超过 20 页，结果可能不完整" >&2
+  fi
 }
 
 if [ -n "${E2E_USER:-}" ]; then
@@ -177,9 +217,9 @@ say "7) 发一次真实补全请求（max_tokens=16）"
 PROBE="CAPTURE-E2E-$TS 请只回复两个字：收到"
 resp=$(curl -sS --max-time 120 -X POST "$BASE/v1/chat/completions" \
   -H "Authorization: Bearer sk-$KEY" -H 'Content-Type: application/json' \
-  -d "{\"model\":\"deepseek-v4.1-flash\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROBE\"}],\"max_tokens\":16,\"stream\":false}")
+  -d "{\"model\":\"$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"$PROBE\"}],\"max_tokens\":16,\"stream\":false}")
 say "   relay: $(printf '%s' "$resp" | head -c 220)"
-printf '%s' "$resp" | grep -q '"choices"' || die "补全请求失败（额度/模型/渠道？）"
+printf '%s' "$resp" | grep -q '"choices"' || die "补全请求失败（额度/模型/渠道？可用 E2E_MODEL 指定在线模型）"
 
 say "8) 等待后台 worker 上传（最多 90s，逐账号查找）"
 found_acct=""; found_root=""; found_dir=""
@@ -188,33 +228,41 @@ for _ in $(seq 1 18); do
     TK=$(graph_token "$IDX" || true); DR=$(drive_id "$IDX")
     [ -n "$TK" ] && [ -n "$DR" ] || continue
     ROOT=$(root_path "$IDX")
-    body=$(list_children_all "$TK" "$DR" "$ROOT/$DAY")
-    if names_of "$body" | grep -qF "$U"; then
+    DAY_PATH=$(join_path "$ROOT" "$DAY")
+    body=$(list_children_all "$TK" "$DR" "$DAY_PATH")
+    names=$(names_of "$body" || true)
+    # 用 here-string 而不是 `names_of | grep -q`：后者在匹配后提前退出会让
+    # 上游 sed 收到 SIGPIPE（141），pipefail 下整个条件变成假 → 误判「没找到」。
+    if grep -qF -- "$U" <<<"$names" || grep -qF -- "-$UID_" <<<"$names"; then
       found_acct="$IDX"; found_root="$ROOT"
-      found_dir=$(names_of "$body" | grep -F "$U" | head -1 || true)
+      found_dir=$(grep -F -- "$U" <<<"$names" | head -1 || true)
+      [ -n "$found_dir" ] || found_dir=$(grep -F -- "-$UID_" <<<"$names" | head -1 || true)
       break 2
     fi
   done
   sleep 5
 done
-[ -n "$found_acct" ] || die "90s 内云盘上没找到 $U 的目录（docker logs new-api | grep -i 'training capture'）"
-say "   ✓ 落在账号 #$found_acct 的目录：$found_root/$DAY/$found_dir"
+[ -n "$found_acct" ] || die "90s 内云盘上没找到用户 $U 的目录（docker logs new-api | grep -i 'training capture'）"
+FOUND_DAY_PATH=$(join_path "$found_root" "$DAY")
+say "   ✓ 落在账号 #$found_acct 的目录：$FOUND_DAY_PATH/$found_dir"
 
 say "9) 下钻到模型目录并校验分片"
-TK=$(graph_token "$found_acct"); DR=$(drive_id "$found_acct")
-sub=$(list_children_all "$TK" "$DR" "$found_root/$DAY/$found_dir")
+TK=$(graph_token "$found_acct" || true)
+[ -n "$TK" ] || die "账号 #$found_acct 取 token 失败"
+DR=$(drive_id "$found_acct")
+sub=$(list_children_all "$TK" "$DR" "$FOUND_DAY_PATH/$found_dir")
 model_dir=$(names_of "$sub" | grep -v '^part-' | head -1 || true)
 [ -n "$model_dir" ] || die "用户目录下没有模型子目录"
 say "   模型目录：$model_dir"
-files=$(list_children_all "$TK" "$DR" "$found_root/$DAY/$found_dir/$model_dir")
+files=$(list_children_all "$TK" "$DR" "$FOUND_DAY_PATH/$found_dir/$model_dir")
 say "   分片列表：$(printf '%s' "$files" | head -c 260)"
 part=$(names_of "$files" | grep '^part-' | head -1 || true)
 [ -n "$part" ] || die "模型目录下没有分片"
 
 # 下载并解压（Graph 的 /content 会 302 到下载地址，-L 跟随）
-curl -sSL --max-time 60 -H "Authorization: Bearer $TK" \
-  "https://graph.microsoft.com/v1.0/drives/$DR/root:/$found_root/$DAY/$found_dir/$model_dir/$part:/content" \
-  -o "$TMP/part.gz"
+curl -fsSL --max-time 60 -H "Authorization: Bearer $TK" \
+  "https://graph.microsoft.com/v1.0/drives/$DR/root:/$FOUND_DAY_PATH/$found_dir/$model_dir/$part:/content" \
+  -o "$TMP/part.gz" || die "下载分片失败（HTTP 错误或网络中断）"
 say "   分片大小：$(wc -c <"$TMP/part.gz") 字节"
 
 # 校验失败必须让整个探针失败（早期版本没有检查退出码，
@@ -230,12 +278,23 @@ except Exception as e:
 lines = [l for l in plain.decode('utf-8').splitlines() if l.strip()]
 print(f"   解压后 {len(lines)} 行 JSONL")
 roles = []
+kinds = []
 for l in lines:
     rec = json.loads(l)
     roles.append(rec.get("role"))
+    if rec.get("role") == "request":
+        kinds.append(rec.get("kind"))
     print(f"     - role={rec.get('role')} kind={rec.get('kind','-')} len={len(rec.get('content',''))}")
 assert any(r == "request" for r in roles), "缺少请求侧记录"
-print("   ✓ 分片可独立解压、每行都是合法 JSON、含请求侧记录")
+# `kind` 是消费方契约（full/suffix/message），缺失会让清洗脚本静默污染数据。
+assert kinds and all(k in ("full", "suffix", "message") for k in kinds), \
+    f"request 行缺少合法 kind（实际 {kinds}）"
+if "assistant" in roles:
+    print("   ✓ 含 assistant 行：回复采集链路已生效")
+else:
+    print("   ⚠ 本次没有 assistant 行：可能是模型只回了 reasoning/工具调用（正文为空），"
+          "不一定是采集失败 —— 需要用有正文的模型再测")
+print("   ✓ 分片可独立解压、每行都是合法 JSON、request 行含合法 kind")
 PY
 
 say "完成。一次性用户：$U (id=$UID_)"
@@ -244,4 +303,4 @@ echo "  docker exec postgres psql -U newapi -d new-api -c \"delete from tokens w
 echo "  docker exec postgres psql -U newapi -d new-api -c \"delete from training_data_consents where user_id=$UID_\""
 echo "  docker exec postgres psql -U newapi -d new-api -c \"delete from training_data_watermarks where user_id=$UID_\""
 echo "  docker exec postgres psql -U newapi -d new-api -c \"delete from users where id=$UID_\""
-echo "  # 云盘目录（用上面的账号 token）：DELETE .../root:/$found_root/$DAY/$found_dir:/"
+echo "  # 云盘目录（该账号 token）：DELETE .../root:/$FOUND_DAY_PATH/$found_dir:/   # 注意 ROOT_PATH 为空时没有前导目录"

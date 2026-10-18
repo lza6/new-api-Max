@@ -2,6 +2,7 @@ package training_capture
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -124,14 +125,18 @@ func TestOneDriveReaderLive(t *testing.T) {
 		}
 	})
 
-	t.Run("DeleteFileIsIdempotent", func(t *testing.T) {
-		// 第一次删除成功；第二次（已不存在）也必须返回 nil ——
-		// 管理端重复点击不该报错。
+	t.Run("DeleteFileReportsNotFound", func(t *testing.T) {
+		// 第一次删除成功；第二次（已不存在）**底层 sink** 必须返回
+		// ErrFileNotFound —— 幂等由 controller / MultiAccountSink 提供。
+		//
+		// 为什么底层不能吞 404：多账号下「在错误账号上删除」会被当成成功，
+		// 而文件还在另一个账号（v1.3.150 的真实缺陷）。
 		if err := sink.DeleteFile(ctx, probeDir+"/"+partName); err != nil {
 			t.Fatalf("首次删除失败：%v", err)
 		}
-		if err := sink.DeleteFile(ctx, probeDir+"/"+partName); err != nil {
-			t.Fatalf("重复删除应幂等（返回 nil），实际 %v", err)
+		err := sink.DeleteFile(ctx, probeDir+"/"+partName)
+		if !errors.Is(err, ErrFileNotFound) {
+			t.Fatalf("重复删除应返回 ErrFileNotFound（由上层做幂等），实际 %v", err)
 		}
 		// 确认真的没了。
 		if _, err := sink.ReadFile(ctx, probeDir+"/"+partName, 1<<20); err == nil {

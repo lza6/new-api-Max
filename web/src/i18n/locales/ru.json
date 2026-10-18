@@ -16,6 +16,8 @@
     "Dropped": "Отброшено",
     "queue full, best-effort": "очередь заполнена, по возможности",
     "Upload errors": "Ошибки загрузки",
+    "Retried": "Повторные попытки",
+    "failures re-queued for retry": "Повторы после ошибки",
     "These counters live in memory and reset when the service restarts; they cover the current day only.": "Эти счётчики хранятся в памяти и сбрасываются при перезапуске службы; они охватывают только текущий день.",
     "Settings updated": "Настройки обновлены",
     "Analyze": "Анализ",

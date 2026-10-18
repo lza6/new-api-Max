@@ -90,10 +90,12 @@ export function ExportDownloadDialog(props: {
       {link && (
         <div className='space-y-4'>
           <div className='flex flex-wrap items-center gap-2 text-xs'>
-            <Badge variant='secondary' className='font-normal'>
-              <CheckCircle2 className='size-3' />
-              {t('This export supports HTTP range requests (resumable).')}
-            </Badge>
+            {link.resumable && (
+              <Badge variant='secondary' className='font-normal'>
+                <CheckCircle2 className='size-3' />
+                {t('This export supports HTTP range requests (resumable).')}
+              </Badge>
+            )}
             <span className='text-muted-foreground'>
               {t('Link expires')}:{' '}
               {dayjs.unix(link.expires_at).format('YYYY-MM-DD HH:mm:ss')}

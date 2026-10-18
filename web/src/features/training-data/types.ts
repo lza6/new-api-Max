@@ -50,6 +50,13 @@ export interface CaptureStats {
   total_enqueued: number
   total_dropped: number
   total_upload_errors: number
+  /**
+   * 上传失败后**成功回队重试**的次数。
+   *
+   * 与 `total_upload_errors` 一起看：失败数上升但 retried 也上升 = 偶发抖动自愈；
+   * 失败数持续上升而 retried 不涨 = 队列/水位/归属判定有持续故障。
+   */
+  retried: number
   skipped_no_consent: number
   /**
    * 因**取不到任何文本**而跳过的次数。

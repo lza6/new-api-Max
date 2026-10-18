@@ -16,6 +16,8 @@
     "Dropped": "Abandonnés",
     "queue full, best-effort": "file pleine, au mieux",
     "Upload errors": "Erreurs de téléversement",
+    "Retried": "Nouvelle tentative",
+    "failures re-queued for retry": "Remis en file après échec",
     "These counters live in memory and reset when the service restarts; they cover the current day only.": "Ces compteurs résident en mémoire et sont remis à zéro au redémarrage du service ; ils ne couvrent que la journée en cours.",
     "Settings updated": "Paramètres mis à jour",
     "Analyze": "Analyser",

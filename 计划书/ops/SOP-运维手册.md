@@ -39,7 +39,7 @@
 | 看**磁盘** | `df -h /` 和 `docker system df` | `计划书/ops/disk-guard.example.sh:26,51`、`计划书/ops/deploy-zero-downtime.example.sh:111` |
 | 看**内存 / 重启** | `docker stats --no-stream new-api` | 部署脚本给容器设 `--memory 900m`（`计划书/ops/deploy-zero-downtime.example.sh:44`） |
 | 看**渠道健康分与熔断态** | `GET /api/system-info/channel-health`（需 root 会话） | `router/api-router.go:367` |
-| 看**内部指标**（需先开 `METRICS_ENABLED`） | `curl -s http://127.0.0.1:3000/metrics` | `middleware/metrics_auth.go:36-38`；**生产当前未开启**，见 §5.6 |
+| 看**内部指标**（需先开 `METRICS_ENABLED`） | `curl -s http://127.0.0.1:3000/metrics` | `middleware/metrics_auth.go:36-38`；**生产已开启**（2026-10-19 实测 200，含 `training_capture_*`） |
 
 > ⚠️ 容器内监听端口是 **3000**（`Dockerfile:44`），但**宿主端口是 3000/3001 交替的**
 > ——蓝绿部署会改 Caddy 上游。命令里出现的宿主端口请以当前 Caddyfile 为准（§3.1）。
@@ -77,6 +77,13 @@ EOF
 
 ### 2.1 流程（每一步的判定条件都来自脚本原文）
 
+0. **先构建镜像（脚本不会自动 build/pull）**：
+   ```bash
+   cd /opt && git clone --depth 1 --branch <tag> <repo> new-api-src-<tag>
+   cd new-api-src-<tag> && docker build -t new-api:<tag> .
+   ```
+   在 4C4G 上约 8–20 分钟；构建期间旧容器继续服务。
+   确认镜像存在：`docker images new-api | grep <tag>`。
 1. **探测当前上游端口，选另一个**：读 Caddyfile 里的 `127.0.0.1:300x`，
    在 `3000`/`3001` 之间交替（`计划书/ops/deploy-zero-downtime.example.sh:23-27`）。
 2. **起新容器**（旧容器全程不停）：
@@ -97,12 +104,15 @@ EOF
 7. **自动清理**：清构建缓存、保留最近 `KEEP_IMAGES`（默认 4）个镜像、删 `/root` 源码残留
    （`计划书/ops/deploy-zero-downtime.example.sh:91-111`）。
 
-> ⚠️ **已知约束（来自既有事故记录，不要破）**：新容器必须带 `NODE_TYPE=slave`，
-> 否则后台任务（订阅重置 / 认证清理 / `authz.Init`）会由 `common.IsMasterNode` 门控的
-> master 分支**与旧容器重复执行**。
-> 来源：生产部署记忆 `freeapi-production-deploy.md`（2026-09-29 零停机发布章节）。
-> **待确认**：脱敏模板中未包含 `NODE_TYPE`（模板可能已过时于真实脚本），以服务器上的
-> 真实脚本为准。
+> ⚠️ **`NODE_TYPE` 现状（务必理解，不要照抄旧结论）**：
+> `common.IsMasterNode` 的判据是 `NODE_TYPE != "slave"`，即**不设置就是 master**。
+> 当前生产脚本**没有**设置 `NODE_TYPE` → 蓝绿重叠期间新旧两个容器都是 master，
+> 后台任务（订阅重置 / 认证清理 / `authz.Init`）会**重复执行**。
+> 旧文档要求“新容器必须 slave”，但那样在切流并删除旧容器后**没有任何 master**。
+> 两种方案二选一，变更前需评估：
+> (a) 接受重叠期短暂双 master（当前生产做法）；
+> (b) 新容器 `NODE_TYPE=slave`，切流删旧容器后再重启新容器为 master。
+> **不要只做一半**（只加 slave 不补 master 会让后台任务永久停摆）。
 
 ### 2.2 部署后自检（脚本已内建，人工再复核一次）
 
@@ -300,8 +310,8 @@ curl -s http://127.0.0.1:3000/metrics | grep -E '^process_(goroutines|memory_hea
 `process_memory_heap_objects` 与 alloc 同步上涨 → 大概率有「只加不减」的 map/slice。
 （指标清单来源：`计划书/workflow_status.md` Batch-10 章节。）
 
-> ⚠️ **生产当前 `METRICS_ENABLED` 未开启** → `/metrics` 返回的是前端 SPA HTML，
-> 上述指标**在生产看不到**（见 §5.6）。
+> ✅ **生产已开启 `METRICS_ENABLED`**（2026-10-19 实测 `/metrics` 返回 200，
+> 含 `training_capture_*` 系列）。若某实例返回 SPA HTML，按 §5.6 检查该实例的 env。
 
 已修复的 4 处**真实**无界点（曾经的内存增长源）：`web_protection_tracker` 的 `banCache`
 （8192 硬上界）、`url_guard` 的 `ssrfCache`（4096）、`tokenizer` 的 `tokenEncoderMap`
@@ -414,6 +424,8 @@ docker logs new-api 2>&1 | grep -i 'SESSION_SECRET'
 `METRICS_ENABLED` 未设为 `true`（大小写不敏感，只有 `true` 才开）
 → 路由根本没注册 → 落到 SPA fallback 返回前端 HTML
 （`middleware/metrics_auth.go:36-38`）。
+排除：`curl -s http://127.0.0.1:<端口>/metrics | head -1` 应以 `# TYPE` 开头；
+若返回 `<!doctype html>`，说明**当前实例**没开（注意蓝绿两个端口可能配置不同）。
 端点本身受保护：可信来源 IP 放行，否则要求 root 会话（`middleware/metrics_auth.go`）。
 **是否在生产开启需运维/产品决策**（开启后即可观察内存/goroutine 趋势与 loop 心跳）。
 
@@ -491,7 +503,7 @@ GROUP BY 1 ORDER BY 3 DESC;
 ## 8. 本文刻意没写的内容（原因）
 
 - **SLA / 可用性百分比 / 平均恢复时间**：仓库内**没有**真实的历史可用性度量数据
-  （`METRICS_ENABLED` 未开启、无外部监控接入），编造数字只会误导。
+  （`METRICS_ENABLED` 虽已开启，但未接入外部时序存储，无长期历史），编造数字只会误导。
 - **生产 `.env` 的具体内容与凭据**：安全边界，本文只给用法。
 - **Caddyfile 的完整生产原文**：仓库内只有示例副本（`deploy/Caddyfile.example`），
   生产文件在宿主机；引用示例会与线上不一致。

@@ -171,7 +171,10 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 	out.Folders = stat.FolderCount
 	out.Files = stat.FileCount
 	if err != nil {
-		// 部分数据已经填好（LastError 已说明哪部分不可靠），到此为止：
+		// 部分数据已经填好（LastError 已说明哪部分不可靠）。
+		// 同时标记 Truncated：这里的 Folders/Files 只是**部分账号之和**，
+		// 不标记就等于把它当完整值展示（与字段契约相反）。
+		out.Truncated = true
 		// 继续做更贵的 CountItems 只会放大一个已知故障账号的成本。
 		return out
 	}
@@ -204,6 +207,7 @@ func collectSinkOverview(parent context.Context) SinkOverview {
 		})
 		if cerr != nil {
 			out.LastError = cerr.Error()
+			out.Truncated = true
 			return out
 		}
 		out.Folders, out.Files, out.Truncated = counts.Folders, counts.Files, counts.Truncated
@@ -416,7 +420,20 @@ func ListTrainingDataFiles(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), 30*time.Second)
 	defer cancel()
 
-	entries, err := reader.ListTree(ctx, root, maxEntries)
+	// **必须保留截断标志**：`ListTree` 是丢弃标志的便捷包装，用它再按
+	// 「条目数 >= max」反推会漏掉「某个子目录读失败」「深度到顶」这两种
+	// 条目数不足上限的不完整情况 —— 界面会把残缺列表当成完整列表。
+	var entries []training_capture.TreeEntry
+	var truncated bool
+	if t, ok := reader.(interface {
+		ListTreeWithTruncation(ctx context.Context, root string, maxEntries int) ([]training_capture.TreeEntry, bool, error)
+	}); ok {
+		entries, truncated, err = t.ListTreeWithTruncation(ctx, root, maxEntries)
+	} else {
+		// 后端不支持报告完整性 → 无法证明列举完整，保守标记为截断。
+		entries, err = reader.ListTree(ctx, root, maxEntries)
+		truncated = true
+	}
 	if err != nil {
 		common.ApiError(c, err)
 		return
@@ -452,7 +469,7 @@ func ListTrainingDataFiles(c *gin.Context) {
 		"count":       len(out),
 		"total_bytes": totalBytes,
 		// 达到上限说明列表**不完整**，前端须提示（不能当成全部）。
-		"truncated": maxEntries > 0 && len(out) >= maxEntries,
+		"truncated": truncated || (maxEntries > 0 && len(out) >= maxEntries),
 	})
 }
 

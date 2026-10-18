@@ -16,6 +16,8 @@
     "Dropped": "已丟棄",
     "queue full, best-effort": "佇列滿時盡力而為",
     "Upload errors": "上傳失敗",
+    "Retried": "重試",
+    "failures re-queued for retry": "失敗後回佇列重試",
     "These counters live in memory and reset when the service restarts; they cover the current day only.": "這些計數保存在記憶體中，服務重啟後歸零；只統計當天。",
     "Settings updated": "設定已更新",
     "Analyze": "分析",

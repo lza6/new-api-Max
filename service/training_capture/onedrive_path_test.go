@@ -160,3 +160,33 @@ func TestListTreeAlwaysReturnsDriveRelativePaths(t *testing.T) {
 		}
 	})
 }
+
+// TestOneDriveDeleteMaps404ToErrFileNotFound 底层 sink 必须把 404 明确映射成
+// `ErrFileNotFound`，不能吞成 nil。
+//
+// 这是多账号删除正确性的前提：若底层把 404 当成功，multi-sink 在**错误的账号**
+// 上删除就会「报告成功但文件还在另一个账号」。幂等语义由上层的
+// controller / MultiAccountSink 负责，而不是这里。
+func TestOneDriveDeleteMaps404ToErrFileNotFound(t *testing.T) {
+	sink := NewOneDriveSink(OneDriveConfig{
+		Tenant: "t", ClientID: "c", ClientSecret: "s", DriveID: "drive",
+	})
+	sink.client.Transport = roundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if strings.Contains(r.URL.Host, "login.microsoftonline.com") {
+			return jsonResponse(`{"access_token":"tok","expires_in":3600}`, http.StatusOK), nil
+		}
+		require.Equal(t, http.MethodDelete, r.Method, "DeleteFile 只能用 DELETE")
+		if strings.Contains(r.URL.EscapedPath(), "missing") {
+			return jsonResponse(`{"error":{"code":"itemNotFound"}}`, http.StatusNotFound), nil
+		}
+		return jsonResponse("", http.StatusNoContent), nil
+	})
+
+	ctx := context.Background()
+	require.NoError(t, sink.DeleteFile(ctx, "2026-10-18/u-1/m/part-0001.jsonl.gz"),
+		"204 应返回 nil")
+
+	err := sink.DeleteFile(ctx, "2026-10-18/u-1/m/missing.jsonl.gz")
+	require.Error(t, err, "404 不能吞成成功")
+	assert.ErrorIs(t, err, ErrFileNotFound)
+}

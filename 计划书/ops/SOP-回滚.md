@@ -78,8 +78,11 @@
 
 ## 5. 镜像 / 部署回滚
 
-- 零停机栈：`rollback.sh <上一 tag>`，或用 `deploy-zero-downtime.sh <上一 tag>` 指定旧镜像
-  （见 `.claude/skills/new-api-add-feature/SKILL.md` §7；服务器脚本 `/opt/new-api/rollback.sh`）。
+- 当前零停机栈的回滚路径：**`deploy-zero-downtime.sh <上一 tag>`**（用旧镜像重新走一遍蓝绿），
+  或手工把 Caddy 上游指回仍在运行的旧容器。
+- `rollback.sh` 是**历史 compose 方案**：当前生产服务器（154.37.208.171）的
+  `/opt/new-api/` 下**没有这个脚本**（2026-10-19 核对），不要把它当成可用路径；
+  若未来恢复，需先确认其镜像引用与 `NODE_TYPE` 语义。
 - 注意部署脚本 `docker run` 必须含 `--memory 900m --memory-swap 900m`，否则回滚脚本本身可能触发
   全局 OOM（2026-10-07 事故记录）。
 

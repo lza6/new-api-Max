@@ -75,6 +75,10 @@ export function TrainingDataPreferencesCard() {
       }
       return response.data
     },
+    // **必须轮询**：管理员关闭总开关或免责声明升版后，已打开页面的用户
+    // 不能一直看到旧状态（全局默认关闭了窗口聚焦刷新）。
+    // 30s 与后端授权缓存 TTL 一致，避免「后端已变、界面还说可用」。
+    refetchInterval: 30_000,
   })
 
   const grantMutation = useMutation({
@@ -91,6 +95,12 @@ export function TrainingDataPreferencesCard() {
       setDisclaimerOpen(false)
     },
     onError: (error) => {
+      // 失败最常见的原因是**声明已升版**（后端拒绝旧 policy_version）。
+      // 只弹 toast 会让弹窗继续用缓存里的旧版本重试，形成「怎么点都失败」。
+      // 主动重新拉状态，让用户看到新声明版本并重新确认。
+      void queryClient.invalidateQueries({
+        queryKey: trainingDataStatusQueryKey,
+      })
       handleServerError(error, t('Failed to update settings'))
     },
   })
@@ -109,6 +119,9 @@ export function TrainingDataPreferencesCard() {
       setRevokeOpen(false)
     },
     onError: (error) => {
+      void queryClient.invalidateQueries({
+        queryKey: trainingDataStatusQueryKey,
+      })
       handleServerError(error, t('Failed to update settings'))
     },
   })

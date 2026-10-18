@@ -16,6 +16,8 @@
     "Dropped": "Đã bỏ",
     "queue full, best-effort": "hàng đợi đầy, nỗ lực tối đa",
     "Upload errors": "Lỗi tải lên",
+    "Retried": "Đã thử lại",
+    "failures re-queued for retry": "Đưa lại vào hàng đợi sau lỗi",
     "These counters live in memory and reset when the service restarts; they cover the current day only.": "Các bộ đếm này nằm trong bộ nhớ và sẽ đặt lại khi dịch vụ khởi động lại; chúng chỉ tính cho ngày hiện tại.",
     "Settings updated": "Đã cập nhật cài đặt",
     "Analyze": "Phân tích",

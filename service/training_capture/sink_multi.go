@@ -92,18 +92,24 @@ func dirOf(path string) string {
 	return ""
 }
 
-// errCannotResolveAccount 无法判定目录归属（有账号列举失败，且没有任何账号
-// 能证明自己拥有这个目录）。
+// errCannotResolveAccount 无法安全判定目录归属（有账号列举失败，
+// 或无法排除「另一个账号才是真正写入者」）。
 //
 // 这时**绝不能**猜一个账号写下去：如果该目录其实有数据在某个账号上，
 // 猜错就会把同一目录劈到两个账号，分片序号撞车（不可逆）。
 // 宁可让这次写入失败、由 worker 重试（有次数上限，见 workerMaxSignalRetries）。
 var errCannotResolveAccount = errors.New(
-	"multi sink: cannot resolve which account owns this directory (an account failed to list it and no account has data); refusing to guess")
+	"multi sink: cannot safely resolve which account owns this directory (an account could not be listed); refusing to guess")
 
 // accountFor 返回某个**目录**应使用的账号下标（带缓存）。
-// ok=false 表示所有账号都读不到、无法安全判定。
+// ok=false 表示无法安全判定归属（有账号读不到，见 resolve）。
 func (m *MultiAccountSink) accountFor(ctx context.Context, dir string) (int, bool) {
+	// 单账号没有「劈裂」风险：无论列举是否成功都只能用这个账号。
+	// 这里仍走 fail-closed 只会白丢数据（重试 3 次后放弃），没有任何收益。
+	if len(m.accounts) == 1 {
+		return 0, true
+	}
+
 	m.mu.RLock()
 	if i, ok := m.dirIdx[dir]; ok {
 		m.mu.RUnlock()
@@ -130,7 +136,7 @@ func (m *MultiAccountSink) accountFor(ctx context.Context, dir string) (int, boo
 
 // resolve 决定目录归属：已有数据者优先，其次按路径哈希。
 //
-// 返回值 decided=false 表示**有账号的列举失败、且没有任何账号能证明自己有数据**，
+// 返回值 decided=false 表示**有账号的列举失败**（无论其它账号是否有数据），
 // 此时不猜（见下方「为什么不能猜」）。
 //
 // ## 同一目录出现在多个账号上怎么办（修复 N4）
@@ -148,8 +154,8 @@ func (m *MultiAccountSink) resolve(ctx context.Context, dir string) (int, bool) 
 	for i, a := range m.accounts {
 		names, err := a.List(ctx, dir)
 		if err != nil {
-			// 单个账号查询失败不改变归属判断（可能只是瞬时故障）；
-			// 继续看下一个，避免把有数据的目录误判成"全新"而分到别的账号。
+			// 记下失败；最终由下方统一 fail-closed。
+			// 不能在这里「跳过它、按其它账号判定」：读不到的账号可能才是写入者。
 			failed++
 			continue
 		}
@@ -173,13 +179,18 @@ func (m *MultiAccountSink) resolve(ctx context.Context, dir string) (int, bool) 
 	}
 
 	// 1) 有账号已存在该目录的分片 → 沿用（老目录永不漂移）。
+	//
+	// **但只要有账号读不到，就仍然不能写**：读不到的那个账号可能才是
+	// 真正的写入者（它上面的 part 序号更大）。此时选可读账号会让新分片
+	// 落到旧分支上，与不可读账号的同名 part 撞车 —— 目录被永久劈开。
+	// 宁可等这次故障恢复（worker 会重试），也不要在证据不全时下结论。
 	if owner >= 0 {
 		if failed > 0 {
-			// 有账号读不到、却已经有人证明自己有数据：沿用有数据的账号。
-			// 不在这里 fail-closed，否则任意一个账号的瞬时故障都会让所有目录停止写入。
 			common.SysError(fmt.Sprintf(
-				"training capture: %d account(s) failed to list directory %q while resolving ownership; "+
-					"using account #%d which already has data", failed, dir, owner+1))
+				"training capture: %d account(s) failed to list directory %q; refusing to choose an owner "+
+					"even though account #%d has data — another account may hold newer parts",
+				failed, dir, owner+1))
+			return 0, false
 		}
 		return owner, true
 	}
@@ -203,25 +214,31 @@ func (m *MultiAccountSink) resolve(ctx context.Context, dir string) (int, bool) 
 	return int(crc32.ChecksumIEEE([]byte(dir)) % uint32(len(m.accounts))), true
 }
 
-// maxPartSeq 返回分片名里的最大序号（解析不出时返回 -1）。
+// maxPartSeq 返回分片名里的最大序号（没有合法分片时返回 -1）。
 //
-// 分片名形如 `part-0007.jsonl.gz`；序号是**目录级**递增的，
-// 因此「序号最大的账号」就是最近仍在写入的那个账号。
+// 只接受 `part-<digits>.jsonl` / `part-<digits>.jsonl.gz` 这种**完整**分片名。
+// 早期实现「前缀匹配 + 截到第一个非数字」，会把 `part-123abc` 误解析成 123，
+// 也看不出名字其实不是分片 —— 而这里的返回值决定「重复目录时信谁」，
+// 解析错了就会把写入导到错误的账号上。
 func maxPartSeq(names []string) int {
 	maxSeq := -1
 	for _, name := range names {
-		if !strings.HasPrefix(name, "part-") {
+		rest, ok := strings.CutPrefix(name, "part-")
+		if !ok {
 			continue
 		}
-		rest := strings.TrimPrefix(name, "part-")
-		end := strings.IndexFunc(rest, func(r rune) bool { return r < '0' || r > '9' })
-		if end == 0 {
+		dot := strings.IndexByte(rest, '.')
+		if dot <= 0 {
 			continue
 		}
-		if end < 0 {
-			end = len(rest)
+		digits := rest[:dot]
+		if strings.Trim(digits, "0123456789") != "" {
+			continue // part-123abc.jsonl：不是合法分片名。
 		}
-		if n, err := strconv.Atoi(rest[:end]); err == nil && n > maxSeq {
+		if !strings.HasPrefix(rest[dot:], ".jsonl") {
+			continue
+		}
+		if n, err := strconv.Atoi(digits); err == nil && n > maxSeq {
 			maxSeq = n
 		}
 	}
@@ -323,20 +340,24 @@ func (m *MultiAccountSink) ReadFile(ctx context.Context, path string, maxBytes i
 		if !isNotFound(err) {
 			return nil, err
 		}
-		return m.readFromOthers(ctx, dir, path, maxBytes, first)
+		return m.readFromOthers(ctx, path, maxBytes, first)
 	}
 
-	// 归属判定不出来（有账号的 List 失败且无人有数据）：读是幂等的，
-	// 逐个账号试。读到即证明数据在这个账号上，可以纠正归属缓存。
-	return m.readFromOthers(ctx, dir, path, maxBytes, -1)
+	// 归属判定不出来（有账号的 List 失败）：读是幂等的，逐个账号试。
+	return m.readFromOthers(ctx, path, maxBytes, -1)
 }
 
 // readFromOthers 在除 exclude 之外的账号上找文件。
 //
 // 全部候选都 not-found → 返回 ErrExportNotFound（保持管理端既有语义）；
 // 任何候选报真实错误 → 返回该错误（不能把「读不到」伪装成「不存在」）。
+//
+// **这里绝不能改 `dirIdx`**：读是幂等操作，而「某个单文件在 B 上」不能证明
+// 「这个目录归 B」—— 目录里可能同时存在 A 的更新分片。一旦把写归属改成 B，
+// 后续写入就会与 A 上的同名 part 撞车（不可逆）。归属只由 resolve 依据
+// 「目录内的分片集合」判定。
 func (m *MultiAccountSink) readFromOthers(
-	ctx context.Context, dir, path string, maxBytes int64, exclude int,
+	ctx context.Context, path string, maxBytes int64, exclude int,
 ) ([]byte, error) {
 	var firstRealErr error
 	for i := range m.accounts {
@@ -345,8 +366,6 @@ func (m *MultiAccountSink) readFromOthers(
 		}
 		b, err := m.readerAt(i).ReadFile(ctx, path, maxBytes)
 		if err == nil {
-			// 文件确实在这里：纠正归属，后续写入跟着数据走。
-			m.remember(dir, i)
 			return b, nil
 		}
 		if !isNotFound(err) && firstRealErr == nil {
@@ -359,59 +378,43 @@ func (m *MultiAccountSink) readFromOthers(
 	return nil, ErrExportNotFound
 }
 
-// DeleteFile 同 ReadFile：先归属，再兜底；兜底也只在**确定 not-found** 时进行。
+// DeleteFile 在**所有**账号上删除该路径。
 //
-// 为什么不能「失败就换账号删」：OneDrive 的 404 曾经被吞成 nil，
-// 于是在错误账号上删除会**返回成功但文件仍在另一个账号**（见 onedrive_reader.go）。
-// 现在 404 映射成 ErrFileNotFound，这里据此区分：
-//   - not-found → 目标不在这个账号 → 去别的账号找；
-//   - 其他错误 → 原样返回（删除是最不该"猜"的操作）。
+// 语义：调用方说「删这个文件」，那它就不该在任何账号上继续存在。
+// 只删归属账号是不够的：同一路径可能因手工迁移/历史缺陷同时存在于多个账号，
+// 只删一份却返回成功，就是「报告已删除但文件还在」（这正是 v1.3.150 的缺陷）。
+// 逐账号删除同时消除了对归属判定的依赖 —— 删除不需要知道谁"拥有"目录。
 //
-// 所有账号都明确回答 not-found 时返回 nil：重复点击删除不应报错（幂等）。
+// 返回规则：
+//   - 每个账号都明确成功或 not-found → nil（幂等：重复点击不报错）；
+//   - 任一账号报真实错误（429/500/超时）→ 返回该错误，**不报告"已删除"**。
+//     即使已在别的账号删掉一份，也会带上"部分完成"的上下文。
 func (m *MultiAccountSink) DeleteFile(ctx context.Context, path string) error {
-	dir := dirOf(path)
-	if first, ok := m.accountFor(ctx, dir); ok {
-		err := m.readerAt(first).DeleteFile(ctx, path)
-		if err == nil {
-			return nil
-		}
-		if !isNotFound(err) {
-			return err
-		}
-		return m.deleteFromOthers(ctx, dir, path, first)
-	}
-	return m.deleteFromOthers(ctx, dir, path, -1)
-}
-
-// deleteFromOthers 在除 exclude 之外的账号上删除文件。
-func (m *MultiAccountSink) deleteFromOthers(ctx context.Context, dir, path string, exclude int) error {
 	var firstRealErr error
+	deletedAny := false
 	for i := range m.accounts {
-		if i == exclude {
-			continue
-		}
 		err := m.readerAt(i).DeleteFile(ctx, path)
-		if err == nil {
-			m.remember(dir, i)
-			return nil
-		}
-		if !isNotFound(err) && firstRealErr == nil {
-			firstRealErr = err
+		switch {
+		case err == nil:
+			deletedAny = true
+		case isNotFound(err):
+			// 这个账号上没有，继续看下一个。
+		default:
+			if firstRealErr == nil {
+				firstRealErr = err
+			}
 		}
 	}
 	if firstRealErr != nil {
-		// 有账号没回答清楚（可能文件就在那里）：不能报告"已删除"。
+		if deletedAny {
+			return fmt.Errorf(
+				"multi sink: deleted at least one copy of %q but could not verify every account: %w",
+				path, firstRealErr)
+		}
 		return firstRealErr
 	}
-	// 每个账号都明确说没有这个文件 → 目标已经不存在，幂等成功。
+	// 全部账号都明确「已删除」或「本来就没有」→ 幂等成功。
 	return nil
-}
-
-// remember 记录目录的真实归属（读侧发现"数据其实在别的账号"时纠正缓存）。
-func (m *MultiAccountSink) remember(dir string, idx int) {
-	m.mu.Lock()
-	m.dirIdx[dir] = idx
-	m.mu.Unlock()
 }
 
 // ListTreeWithTruncation 合并各账号的目录树。
@@ -450,6 +453,11 @@ func (m *MultiAccountSink) ListTreeWithTruncation(
 		truncated = truncated || trunc
 		for _, e := range entries {
 			if _, dup := seen[e.Path]; dup {
+				// 重复路径说明目录被劈到了多个账号（正常不应发生）。
+				// 管理端必须知道「你看到的这份可能不是正在写入的那份」。
+				common.SysError(fmt.Sprintf(
+					"training capture: path %q exists on multiple accounts; "+
+						"showing the first listed copy — merge/clean the duplicates manually", e.Path))
 				continue
 			}
 			seen[e.Path] = struct{}{}

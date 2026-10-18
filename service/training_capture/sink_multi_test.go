@@ -359,14 +359,18 @@ func TestMultiSinkRejectsNonReaderBackend(t *testing.T) {
 	assert.Contains(t, err.Error(), "SinkReader")
 }
 
-// TestMultiSinkToleratesListErrorsWhenResolving 解析归属时某账号 List 失败，
-// 不能把"有数据的老目录"误判成全新目录（那会漂移到别的账号）。
-func TestMultiSinkToleratesListErrorsWhenResolving(t *testing.T) {
+// TestMultiSinkRefusesToGuessWhenAnyAccountUnreadable 只要**任何一个**账号
+// 读不到目录，就不能选定归属 —— 哪怕另一个账号确实有数据。
+//
+// 为什么：读不到的那个账号可能才是真正的写入者（它的 part 序号更大）。
+// 选可读账号会让新分片落到旧分支上，与不可读账号的同名 part 撞车。
+// 恢复可读后必须能继续写入。
+func TestMultiSinkRefusesToGuessWhenAnyAccountUnreadable(t *testing.T) {
 	ctx := context.Background()
 	a := newRecSink("A")
 	b := newRecSink("B")
 	dir := "2026-10-18/d-4/m"
-	// 老数据在 B 上；A 的 List 报错。
+	// 老数据在 B 上；A 的 List 报错（A 可能也有更新的分片，只是这次读不到）。
 	b.files[dir+"/part-0001.jsonl.gz"] = []byte("old")
 	a.listErr = errors.New("transient")
 
@@ -374,9 +378,15 @@ func TestMultiSinkToleratesListErrorsWhenResolving(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = m.WritePart(ctx, dir+"/part-0002.jsonl.gz", []byte("new"))
+	require.Error(t, err, "有账号读不到时不得猜测归属")
+	assert.Contains(t, err.Error(), "cannot safely resolve")
+	assert.False(t, b.has(dir+"/part-0002.jsonl.gz"), "不得写入任何账号")
+
+	// 恢复后必须能继续写入（证明只是暂时拒绝，不是永久卡死）。
+	a.listErr = nil
+	_, err = m.WritePart(ctx, dir+"/part-0002.jsonl.gz", []byte("new"))
 	require.NoError(t, err)
-	assert.True(t, b.has(dir+"/part-0002.jsonl.gz"),
-		"A 读失败时仍应发现数据在 B，从而继续用 B（不能漂移）")
+	assert.True(t, b.has(dir+"/part-0002.jsonl.gz"), "恢复后应写入有数据的账号 B")
 }
 
 // writeOnlySink 只实现写入接口，用于验证构造期校验。
@@ -460,7 +470,7 @@ func TestMultiSinkRefusesToGuessWhenAllAccountsUnreadable(t *testing.T) {
 
 	_, err = m.WritePart(ctx, dir+"/part-0002.jsonl.gz", []byte("x"))
 	require.Error(t, err, "无法判定归属时必须拒绝写入，而不是猜")
-	assert.Contains(t, err.Error(), "cannot resolve")
+	assert.Contains(t, err.Error(), "cannot safely resolve")
 	assert.False(t, a.has(dir+"/part-0002.jsonl.gz"), "不得写入任何账号")
 	assert.False(t, b.has(dir+"/part-0002.jsonl.gz"), "不得写入任何账号")
 }
@@ -508,7 +518,7 @@ func TestMultiSinkRefusesToGuessWhenOwnerUnreadable(t *testing.T) {
 	_, err = m.WritePart(ctx, dir+"/part-0002.jsonl.gz", []byte("new"))
 	require.Error(t, err,
 		"归属账号读不到时不得凭另一账号为空就猜哈希写下去")
-	assert.Contains(t, err.Error(), "cannot resolve")
+	assert.Contains(t, err.Error(), "cannot safely resolve")
 
 	// 关键断言：**绝不能**落到 B。
 	assert.False(t, b.has(dir+"/part-0002.jsonl.gz"),
@@ -575,8 +585,11 @@ func TestMultiSinkDeleteReachesFileOnNonOwnerAccount(t *testing.T) {
 	require.NoError(t, m.DeleteFile(ctx, dir+"/part-0002.jsonl.gz"))
 }
 
-// TestMultiSinkDeleteTransientErrorIsReported 删除遇到瞬时错误必须报错，
-// 不能「报告已删除」而文件仍在。
+// TestMultiSinkDeleteTransientErrorIsReported 删除遇到瞬时错误必须报错。
+//
+// 新语义会逐账号删除（消除重复副本），因此 B 上的那份会被删掉；
+// 但 A 的 429 说明"无法确认已全部删除"，必须把错误报出来，
+// 不能因为删掉了一份就报告整体成功。
 func TestMultiSinkDeleteTransientErrorIsReported(t *testing.T) {
 	ctx := context.Background()
 	a, b := newRecSink("A"), newRecSink("B")
@@ -589,8 +602,9 @@ func TestMultiSinkDeleteTransientErrorIsReported(t *testing.T) {
 	require.NoError(t, err)
 
 	err = m.DeleteFile(ctx, dir+"/part-0002.jsonl.gz")
-	require.Error(t, err, "归属账号没回答清楚时不得报告删除成功")
-	assert.True(t, b.has(dir+"/part-0002.jsonl.gz"), "没删掉就不能动它")
+	require.Error(t, err, "有账号没回答清楚时不得报告整体删除成功")
+	assert.Contains(t, err.Error(), "429")
+	assert.False(t, b.has(dir+"/part-0002.jsonl.gz"), "能删掉的副本仍要删掉")
 }
 
 // TestMultiSinkDuplicateDirectoryPicksHighestPartNumber 同一目录同时存在于
@@ -626,4 +640,88 @@ func TestMultiSinkStatSurfacesPartialFailure(t *testing.T) {
 	require.Error(t, err, "有账号失败就必须让调用方知道")
 	assert.Contains(t, err.Error(), "quota endpoint down")
 	assert.Positive(t, stat.TotalBytes, "另一个账号的数据仍要返回（部分数据 + 原因）")
+}
+
+// TestMultiSinkReadFallbackDoesNotChangeWriteOwnership 读侧兜底成功
+// **不得**改变写归属。
+//
+// 场景：目录归 A（A 有 part-0009），B 上有一份历史遗留的 part-0002。
+// 管理员预览 part-0002：A 返回 not-found → 去 B 读到。
+// 但「单个文件在 B 上」不能证明「目录归 B」—— 若因此把归属改成 B，
+// 后续 part 就会写到 B 的旧分支，与 A 上的同名分片撞车。
+func TestMultiSinkReadFallbackDoesNotChangeWriteOwnership(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	dir := "2026-10-18/k-11/m"
+	a.files[dir+"/part-0009.jsonl.gz"] = []byte("owner-A")
+	b.files[dir+"/part-0002.jsonl.gz"] = []byte("legacy-on-B")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	got, err := m.ReadFile(ctx, dir+"/part-0002.jsonl.gz", 1<<20)
+	require.NoError(t, err, "归属账号没有时应兜底读到 B 的副本")
+	assert.Equal(t, []byte("legacy-on-B"), got)
+
+	_, err = m.WritePart(ctx, dir+"/part-0010.jsonl.gz", []byte("next"))
+	require.NoError(t, err)
+	assert.True(t, a.has(dir+"/part-0010.jsonl.gz"), "写归属必须仍是有最高序号的 A")
+	assert.False(t, b.has(dir+"/part-0010.jsonl.gz"), "一次读兜底不得把写归属翻到 B")
+}
+
+// TestMultiSinkDeleteRemovesDuplicateCopies 同一路径同时存在于多个账号时，
+// 删除必须把每一份都删掉 —— 只删一份却返回成功就是「报告已删除但文件还在」。
+func TestMultiSinkDeleteRemovesDuplicateCopies(t *testing.T) {
+	ctx := context.Background()
+	a, b := newRecSink("A"), newRecSink("B")
+	path := "2026-10-18/l-12/m/part-0007.jsonl.gz"
+	a.files[path] = []byte("copy-on-A")
+	b.files[path] = []byte("copy-on-B")
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a, b})
+	require.NoError(t, err)
+
+	require.NoError(t, m.DeleteFile(ctx, path))
+	assert.False(t, a.has(path), "A 上的副本必须删掉")
+	assert.False(t, b.has(path), "B 上的副本也必须删掉")
+}
+
+// TestMultiSinkSingleAccountDoesNotFailClosed 只有一个后端时没有「劈裂」风险，
+// 不能因为一次 List 失败就拒绝写入（那只会白丢数据）。
+func TestMultiSinkSingleAccountDoesNotFailClosed(t *testing.T) {
+	ctx := context.Background()
+	a := newRecSink("A")
+	a.listErr = errors.New("temporarily unavailable")
+	dir := "2026-10-18/m-13/m"
+
+	m, err := NewMultiAccountSink([]TrainingDataSink{a})
+	require.NoError(t, err)
+
+	_, err = m.WritePart(ctx, dir+"/part-0001.jsonl.gz", []byte("x"))
+	require.NoError(t, err, "单账号必须直接写入")
+	assert.True(t, a.has(dir+"/part-0001.jsonl.gz"))
+}
+
+// TestMaxPartSeqOnlyAcceptsRealPartNames 序号解析决定「重复目录时信谁」，
+// 必须严格识别合法分片名；误解析会把写入导到错误账号。
+func TestMaxPartSeqOnlyAcceptsRealPartNames(t *testing.T) {
+	cases := []struct {
+		name  string
+		names []string
+		want  int
+	}{
+		{"前导零", []string{"part-0001.jsonl.gz", "part-0012.jsonl.gz"}, 12},
+		{"未压缩后缀", []string{"part-0007.jsonl"}, 7},
+		{"非数字尾巴", []string{"part-123abc.jsonl.gz"}, -1},
+		{"空序号", []string{"part-.jsonl.gz"}, -1},
+		{"非分片文件", []string{"other.jsonl.gz"}, -1},
+		{"空列表", nil, -1},
+		{"溢出", []string{"part-999999999999999999999.jsonl.gz"}, -1},
+		{"混合", []string{"part-0003.jsonl.gz", "part-0001.jsonl.gz.bak", "x"}, 3},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, maxPartSeq(tc.names))
+		})
+	}
 }

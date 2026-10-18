@@ -240,8 +240,10 @@ export function FileBrowserPanel(props: { onAnalyze?: (path: string) => void }) 
                   >
                     {entry.path.split('/').pop()}
                   </button>
-                  {!entry.is_dir && (
-                    <>
+                  {!entry.is_dir &&
+                    (entry.path.endsWith('.jsonl.gz') ||
+                      entry.path.endsWith('.jsonl')) && (
+                      <>
                       <span className='text-muted-foreground shrink-0 font-mono text-xs tabular-nums'>
                         {formatBytes(entry.size_bytes)}
                       </span>

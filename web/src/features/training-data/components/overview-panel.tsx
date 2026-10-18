@@ -123,6 +123,16 @@ function SinkCard(props: { sink: SinkOverview }) {
           })}
           {sink.truncated && ` · ${t('(at least, list was truncated)')}`}
         </p>
+        {/*
+          配额已知 ≠ 统计完整：多账号里可能只有一个账号的 CountItems 失败，
+          此时 folders/files 是部分之和。后端会带 last_error 并把 truncated
+          置 true；这里必须显示，否则管理员看到的是一个偏小却"看起来完整"的数字。
+        */}
+        {sink.last_error && (
+          <p className='text-destructive text-xs break-all'>
+            {sink.last_error}
+          </p>
+        )}
       </CardContent>
     </Card>
   )
@@ -178,6 +188,11 @@ function StatsCard(props: { stats: CaptureStats }) {
           <StatCard
             label={t('Upload errors')}
             value={String(s.total_upload_errors)}
+          />
+          <StatCard
+            label={t('Retried')}
+            value={String(s.retried)}
+            hint={t('failures re-queued for retry')}
           />
         </div>
 
