@@ -150,7 +150,15 @@ else
   docker exec postgres psql -U newapi -d new-api \
     -c "update users set quota=2000000 where id=$UID_ and quota < 2000000" >/dev/null 2>&1 ||
     die "补额度失败"
-  say "   额度已补足到 2000000（仅当原值更低）"
+  # **直接改库后必须清用户缓存**：用户信息有 Redis 缓存（user:<id>，TTL 60s），
+  # 不清就会继续读到旧额度 —— 请求仍报「额度不足」，很容易被误判成「充值没生效」。
+  # Redis 连接串只在容器 env 里（.env 没有），从容器读，且不回显密码。
+  REDIS_URL=$(docker exec new-api printenv REDIS_CONN_STRING 2>/dev/null | head -1 || true)
+  if [ -n "$REDIS_URL" ]; then
+    RPASS=$(printf '%s' "$REDIS_URL" | sed -n 's|redis://:\([^@]*\)@.*|\1|p')
+    docker exec redis redis-cli -a "$RPASS" DEL "user:$UID_" >/dev/null 2>&1 || true
+  fi
+  say "   额度已补足到 2000000（仅当原值更低），并已清除用户缓存"
 fi
 
 say "6) 创建短期、限额度 API 密钥（1 小时 / 100000 额度）"
