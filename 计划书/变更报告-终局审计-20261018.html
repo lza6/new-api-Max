@@ -105,7 +105,7 @@
   <a href="#changed">11. 改动清单</a><br>
   <a href="#verify">12. 验证证据</a><br>
   <a href="#left">13. 仍未闭环（如实）</a><br>
-  <a href="#review">14. 独立审查线程的复验</a><br>
+  <a href="#review">14. 独立审查线程的复验</a>（含 <a href="#bl1">二轮 P0：路径语义</a>）<br>
   <a href="#quiz">15. 测验（必须通过）</a>
 </div>
 
@@ -425,6 +425,33 @@
 且报错来自 relay 通用校验、与「分析」无关，管理员根本不知道该改什么。</p>
 <p>修法：后端在调用模型前给出<b>点名 model</b> 的错误；前端改必填并在空值时禁用按钮。</p>
 
+<h3 id="bl1">二轮复验又抓到一个 P0（既有缺陷）：路径语义错位</h3>
+
+<div class="card bad">
+  <p><code>ListTree(root)</code> 返回的是<b>相对 root</b> 的短路径，
+  但四个调用方——前端下钻、预览、删除、分析——<b>全都按完整路径使用</b>。</p>
+</div>
+
+<pre><code>浏览 2026-10-14 → 后端返回 "alice-1"
+  → 前端拿它当下一层的 path → 请求 RootPath/alice-1（缺日期前缀）
+    → Graph 404 → 被 fetchEntries 当成「空目录」
+      → 界面显示「No files yet」   ← 失败伪装成"数据为空"
+分析：ReadFile("part-0001.jsonl.gz") → 404 → 全部计入 SkippedParts
+      → 报「没有内容」              ← 同样是"空"而不是"错"</code></pre>
+
+<p>修法：统一返回完整路径（<code>root==""</code> 时行为不变）。前端本来就有
+<code>startsWith(prefix)</code> 的显示裁剪，无需改动。</p>
+
+<div class="card warn">
+  <h3>⚠️ 为什么我自己的端到端测试没抓到它</h3>
+  <p>controller 层的 <code>fakeReaderSink</code> 返回的是<b>完整路径</b>，
+  而真实 OneDrive sink 返回的是<b>相对路径</b>。两者语义相反，
+  于是「端到端测试」只验证了计数逻辑，<b>和真实后端一起撒谎</b>。</p>
+  <p><b>教训</b>：对「路径 / 单位 / 顺序 / 编码」这类契约，
+  必须用<b>真实实现 + 假传输层</b>来测，不能用「假对象 + 假传输层」——
+  后者测的是假对象的行为，不是产品行为。</p>
+</div>
+
 <h3>另外修掉的 5 项</h3>
 <table>
   <tr><th>项</th><th>问题</th><th>要点</th></tr>
@@ -572,6 +599,17 @@ const QUIZ = [
     ],
     answer: 1,
     why: "竞态只是表象；真正的后果是双消费者并发读写同一会话水位，数据会重复或丢失。修法是把 stop/done 作为参数传给 goroutine 并等待真正退出。"
+  },
+  {
+    stem: "为什么 controller 的 fake sink 端到端测试没能发现「路径语义错位」？",
+    opts: [
+      "因为测试没跑",
+      "因为 fake sink 返回完整路径、真实 sink 返回相对 root——两者语义相反，假对象让端到端测试与真实后端一起撒谎",
+      "因为路径太长",
+      "因为没有断言错误码"
+    ],
+    answer: 1,
+    why: "假对象与真实实现的语义不一致时，端到端测试测的是假对象的行为。路径/单位/顺序/编码这类契约，必须用真实实现 + 假传输层来测。"
   },
   {
     stem: "「错误不进缓存」这条规则，忽略了什么？",
