@@ -83,8 +83,8 @@ func TestOneDriveReaderLive(t *testing.T) {
 		}
 	})
 
-	t.Run("ListTreeReturnsFullRelativePaths", func(t *testing.T) {
-		entries, err := sink.ListTree(ctx, cfg.RootPath, 500)
+	t.Run("ListTreeReturnsDriveRelativePaths", func(t *testing.T) {
+		entries, err := sink.ListTree(ctx, "", 500)
 		if err != nil {
 			t.Fatalf("ListTree：%v", err)
 		}
@@ -115,7 +115,7 @@ func TestOneDriveReaderLive(t *testing.T) {
 	})
 
 	t.Run("ListTreeHonorsMaxEntries", func(t *testing.T) {
-		entries, err := sink.ListTree(ctx, cfg.RootPath, 3)
+		entries, err := sink.ListTree(ctx, "", 3)
 		if err != nil {
 			t.Fatalf("ListTree：%v", err)
 		}
@@ -155,7 +155,7 @@ func TestOneDriveListTreeTruncationReportingLive(t *testing.T) {
 	defer cancel()
 
 	t.Run("上限充足时不报截断", func(t *testing.T) {
-		_, truncated, err := sink.ListTreeWithTruncation(ctx, cfg.RootPath, 5000)
+		_, truncated, err := sink.ListTreeWithTruncation(ctx, "", 5000)
 		if err != nil {
 			t.Fatalf("列举失败：%v", err)
 		}
@@ -168,7 +168,7 @@ func TestOneDriveListTreeTruncationReportingLive(t *testing.T) {
 		// 取 1 条：真实云盘根目录下必然不止一个条目，
 		// 因此**必须**报告截断。若不报，说明判定失效 ——
 		// 导出会拿这份残缺当全量。
-		entries, truncated, err := sink.ListTreeWithTruncation(ctx, cfg.RootPath, 1)
+		entries, truncated, err := sink.ListTreeWithTruncation(ctx, "", 1)
 		if err != nil {
 			t.Fatalf("列举失败：%v", err)
 		}

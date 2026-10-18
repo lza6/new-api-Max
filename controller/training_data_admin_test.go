@@ -548,3 +548,35 @@ func TestListFilesRejectsPathTraversal(t *testing.T) {
 		assert.Contains(t, env.Message, "invalid path")
 	}
 }
+
+// TestAnalyzeAllPartsUnreadableReportsFailureNotEmptiness 全部分片读不到时，
+// 错误必须是「N 个分片读取失败」，而不是误导性的「没有内容」。
+//
+// 这两种说法对管理员意味着完全不同的下一步：
+// 「没有内容」→ 这个会话本来就没数据；「读取失败」→ 去查云盘/配置。
+// 把前者当后者会让真正的故障被当成正常空数据。
+func TestAnalyzeAllPartsUnreadableReportsFailureNotEmptiness(t *testing.T) {
+	setupTrainingDataTestDB(t)
+	sink := newFakeReaderSink()
+	plain := []byte("{\"role\":\"request\",\"content\":\"内容\"}\n")
+	compressed, err := training_capture.CompressPartForTest(plain)
+	require.NoError(t, err)
+	const p1 = "2026-10-14/a-1/m/part-0001.jsonl.gz"
+	const p2 = "2026-10-14/a-1/m/part-0002.jsonl.gz"
+	sink.files[p1] = compressed
+	sink.files[p2] = compressed
+	sink.failPaths = map[string]bool{p1: true, p2: true}
+	defer training_capture.SetSinkForTest(sink)()
+
+	ctx, recorder := jsonContext(t, http.MethodPost, "/api/training-data/admin/analyze",
+		`{"path":"2026-10-14/a-1/m","model":"gpt-4o"}`, 1)
+	AnalyzeTrainingDataConversation(ctx)
+
+	var env apiEnvelope
+	require.NoError(t, common.Unmarshal(recorder.Body.Bytes(), &env))
+	assert.False(t, env.Success)
+	assert.Contains(t, env.Message, "failed to load",
+		"必须说明是读取失败，而不是「没有内容」")
+	assert.Contains(t, env.Message, "2 part(s)",
+		"必须给出失败分片数，便于判断缺了多少")
+}

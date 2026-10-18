@@ -577,7 +577,9 @@ func (s *oneDriveSink) Stat(ctx context.Context) (SinkStat, error) {
 //   - visitedLimit > 0 时最多访问这么多个目录；**队列未排空**即表示数字是下界。
 func countTree(list func(path string) ([]dirEntry, error), maxDepth, visitedLimit int) (folders, files int, truncated bool) {
 	if maxDepth <= 0 {
-		maxDepth = CaptureLayoutDepth
+		// 与 CountItems 的默认值保持一致：布局层数 + 1 才能数到
+		// 模型目录**内部**的分片文件（见 CaptureLayoutDepth 的说明）。
+		maxDepth = CaptureLayoutDepth + 1
 	}
 	type queueItem struct {
 		path  string

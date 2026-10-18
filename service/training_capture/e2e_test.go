@@ -316,10 +316,11 @@ func waitFor(t *testing.T, timeout time.Duration, cond func() bool) bool {
 
 var _ = context.Background
 
-// waitWorkerStopped 停止 worker 并等待它真正退出（供 t.Cleanup 使用）。
+// waitWorkerStopped 停止 worker 并确认它已退出（供 t.Cleanup 使用）。
 //
-// 用 `WorkerRunning()` 轮询而不是「自己起的 done channel」：
-// 那样只有在测试自己起 goroutine 时才拿得到，而我们现在走真实 API。
+// 实际等待已由 `StopWorker` 完成（它关闭 stop 后会等 `done` 真正关闭，
+// 有界 5s）。这里再做一次轮询只是**兜底断言**：若 `StopWorker` 将来退化成
+// 「只置标志就返回」，测试仍能在清理阶段发现「标志说停了但 goroutine 还在」。
 func waitWorkerStopped() {
 	StopWorker()
 	deadline := time.Now().Add(5 * time.Second)
@@ -329,5 +330,4 @@ func waitWorkerStopped() {
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	// 不 panic（cleanup 里 panic 会掩盖真实失败），但要让测试可见。
 }

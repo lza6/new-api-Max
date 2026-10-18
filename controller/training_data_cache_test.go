@@ -60,9 +60,17 @@ func TestTimedCacheReloadsAfterTTL(t *testing.T) {
 // 等于持续加压，让限流更难解除；而采集 worker 共用同一份配额，会被一起拖住。
 // 永久缓存 → 云盘恢复后管理员继续看到旧错误。
 // 折中：负缓存 negativeTTL，到点自动重试。
+//
+// ## 为什么用「手动推 failedAt」而不是 sleep
+//
+// 最初的写法是「20ms 窗口 + sleep 30ms」。它**不稳定**：进入负缓存时会记一条
+// `common.SysLog`，而本机首次 SysLog 经 cgo 写控制台约 60~120ms ——
+// 直接吃掉了 20ms 窗口，第二次 get 时窗口已过期 → 断言失败。
+// 也就是说测试在验证「时钟」而不是「逻辑」。
+// 改为把时间戳直接推到过去，让用例**只依赖逻辑**、不依赖真实耗时。
 func TestTimedCacheNegativeCachesErrorsBriefly(t *testing.T) {
 	c := newTimedCache[int](time.Minute)
-	c.negativeTTL = 20 * time.Millisecond
+	c.negativeTTL = time.Hour // 足够大，确保不会被任何真实耗时穿透
 	var calls atomic.Int32
 	shouldFail := true
 	load := func() (int, error) {
@@ -82,8 +90,12 @@ func TestTimedCacheNegativeCachesErrorsBriefly(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, int32(1), calls.Load(), "负缓存窗口内不得重试（防重试风暴）")
 
-	// 窗口过期后自动重试；此时云盘已恢复 → 必须拿到数据。
-	time.Sleep(30 * time.Millisecond)
+	// 把失败时间推到窗口之外 —— 等价于「等待到期」，但不依赖真实时间。
+	c.mu.Lock()
+	c.failedAt = time.Now().Add(-2 * time.Hour)
+	c.mu.Unlock()
+
+	// 到期后自动重试；此时云盘已恢复 → 必须拿到数据。
 	shouldFail = false
 	v, err := c.get(load)
 	require.NoError(t, err, "负缓存过期后必须重试并恢复")
