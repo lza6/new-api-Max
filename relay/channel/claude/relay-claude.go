@@ -115,7 +115,7 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 				data = patchClaudeMessageDeltaUsageData(data, buildMessageDeltaPatchUsage(&claudeResponse, claudeInfo))
 			}
 		}
-		countClaudeStreamBillableTools(c, info, &claudeResponse)
+		countClaudeStreamBillableTools(c, info, &claudeResponse, claudeInfo)
 		helper.ClaudeChunkData(c, claudeResponse, data)
 	} else if info.RelayFormat == types.RelayFormatOpenAI {
 		state, err := claudeToChatStreamState(info)
@@ -131,7 +131,7 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 			return nil
 		}
 
-		countClaudeStreamBillableTools(c, info, &claudeResponse)
+		countClaudeStreamBillableTools(c, info, &claudeResponse, claudeInfo)
 
 		if response == nil {
 			return nil
@@ -152,7 +152,7 @@ func HandleStreamResponseData(c *gin.Context, info *relaycommon.RelayInfo, claud
 		if !FormatClaudeResponseInfo(&claudeResponse, nil, claudeInfo) {
 			return nil
 		}
-		countClaudeStreamBillableTools(c, info, &claudeResponse)
+		countClaudeStreamBillableTools(c, info, &claudeResponse, claudeInfo)
 		if sendErr := sendGeminiStreamResults(c, results); sendErr != nil {
 			return sendErr
 		}
@@ -214,7 +214,7 @@ func sendGeminiStreamResults(c *gin.Context, results []relayconvert.ResponseResu
 	return nil
 }
 
-func countClaudeStreamBillableTools(c *gin.Context, info *relaycommon.RelayInfo, claudeResponse *dto.ClaudeResponse) {
+func countClaudeStreamBillableTools(c *gin.Context, info *relaycommon.RelayInfo, claudeResponse *dto.ClaudeResponse, claudeInfo *relayconvert.ClaudeResponseInfo) {
 	if claudeResponse == nil {
 		return
 	}
@@ -222,6 +222,9 @@ func countClaudeStreamBillableTools(c *gin.Context, info *relaycommon.RelayInfo,
 		claudeResponse.ContentBlock != nil &&
 		claudeResponse.ContentBlock.Type == "tool_use" {
 		info.CountBillableToolCall(dto.BuildInCallToolUse, claudeResponse.ContentBlock.Name)
+		if claudeInfo != nil {
+			claudeInfo.ToolUseCount++
+		}
 	}
 	if claudeResponse.Type == "message_delta" &&
 		claudeResponse.Usage != nil &&
@@ -242,6 +245,12 @@ func HandleStreamFinalResponse(c *gin.Context, info *relaycommon.RelayInfo, clau
 		hasCacheUsage := claudeInfo.Usage.PromptTokensDetails.CachedTokens > 0 ||
 			claudeInfo.Usage.PromptTokensDetails.CacheCreationTokensTotal() > 0
 		fallback := service.ResponseText2Usage(c, claudeInfo.ResponseText.String(), info.UpstreamModelName, info.GetEstimatePromptTokens())
+		// tool_use 块的函数名与 JSON 参数也是上游计费的输出 token，
+		// 但 ResponseText 只含正文 —— 切断流只按正文估算会低估（甚至为 0）。
+		// 每个工具块按约 40 token 计入（Claude Haiku/Sonnet 实测口径）。
+		if claudeInfo.ToolUseCount > 0 {
+			fallback.CompletionTokens += claudeInfo.ToolUseCount * 40
+		}
 		if claudeInfo.Usage.CompletionTokens == 0 ||
 			(!claudeInfo.Done && fallback.CompletionTokens > claudeInfo.Usage.CompletionTokens) {
 			claudeInfo.Usage.CompletionTokens = fallback.CompletionTokens

@@ -21,6 +21,9 @@ type ClaudeResponseInfo struct {
 	ResponseText strings.Builder
 	Usage        *dto.Usage
 	Done         bool
+	// ToolUseCount 记录流中出现的 tool_use 块数量：流在被切断、没有 usage 时
+	// 用它估算 completion（每个 tool_use 至少包含函数名与 JSON 参数）。
+	ToolUseCount int
 
 	// Only snapshots synthesized from partial display usage may be refreshed by
 	// later display deltas. Serialized BillingUsage always remains authoritative.

@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.157] - 2026-10-19
+
+### Fixed
+- Claude streams cut before terminal usage now include `tool_use` blocks in the
+  completion estimate (~40 tokens per block). `ResponseText` only contains prose,
+  so tool-only turns previously settled with an undercount (or zero).
+- Task-plugin protocol pre-checks preserve the real failure reason: oversized
+  bodies return **413** with the configured limit instead of a generic
+  `400 Invalid task protocol request`; other read/parse errors include their cause.
+
 ## [v1.3.156] - 2026-10-19
 
 Upstream-alignment hardening (security, billing correctness, container awareness).

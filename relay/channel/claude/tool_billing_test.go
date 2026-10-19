@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/relaykit/relayconvert"
 	"github.com/lza6/new-api-Max/relaykit/types"
 	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/stretchr/testify/assert"
@@ -57,20 +58,22 @@ func TestCountClaudeStreamBillableToolsSetsWebSearchRequests(t *testing.T) {
 		Usage: &dto.ClaudeUsage{
 			ServerToolUse: &dto.ClaudeServerToolUse{WebSearchRequests: 3},
 		},
-	})
+	}, nil)
 	assert.Equal(t, 3, c.GetInt("claude_web_search_requests"))
 
 	operation_setting.SetToolPriceForTest("stream_fn", 2.0)
 	t.Cleanup(func() {
 		operation_setting.DeleteToolPriceForTest("stream_fn")
 	})
+	claudeInfo := &relayconvert.ClaudeResponseInfo{}
 	countClaudeStreamBillableTools(c, info, &dto.ClaudeResponse{
 		Type: "content_block_start",
 		ContentBlock: &dto.ClaudeMediaMessage{
 			Type: "tool_use",
 			Name: "stream_fn",
 		},
-	})
+	}, claudeInfo)
 	require.Contains(t, info.ResponsesUsageInfo.BuiltInTools, "stream_fn")
 	assert.Equal(t, 1, info.ResponsesUsageInfo.BuiltInTools["stream_fn"].CallCount)
+	assert.Equal(t, 1, claudeInfo.ToolUseCount, "tool_use 块数量用于切断流的 completion 估算")
 }

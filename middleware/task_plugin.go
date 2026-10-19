@@ -326,7 +326,16 @@ func PinTaskPluginEndpoint() gin.HandlerFunc {
 		modelRequest, err := getModelFromRequest(c)
 		if err != nil {
 			if _, _, protocolPath := pluginruntime.LookupHostProtocolOperation(c.Request.Method, c.Request.URL.Path); protocolPath {
-				abortWithOpenAiMessage(c, http.StatusBadRequest, "Invalid task protocol request")
+				// 不要把「请求体超限 / 读失败」统一压成 400 Invalid request：
+				// 超限必须是 413，其它错误带上真实原因，否则调用方无法区分
+				// 「我的 JSON 写错了」与「我的请求太大了」。
+				if common.IsRequestBodyTooLargeError(err) {
+					abortWithOpenAiMessage(c, http.StatusRequestEntityTooLarge,
+						fmt.Sprintf("Request body exceeds the %d MB limit", constant.MaxRequestBodyMB))
+					return
+				}
+				abortWithOpenAiMessage(c, http.StatusBadRequest,
+					"Invalid task protocol request: "+err.Error())
 				return
 			}
 			c.Next()
