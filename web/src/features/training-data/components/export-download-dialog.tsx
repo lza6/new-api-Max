@@ -245,24 +245,35 @@ function renderHistory(
     )
   }
   return (
-    <ul className='divide-border divide-y text-sm'>
-      {downloads.map((dl) => (
-        <li key={dl.id} className='flex flex-wrap items-center gap-3 py-2'>
-          <span className='font-mono'>
-            #{dl.downloader_id > 0 ? dl.downloader_id : t('Unknown')}
-          </span>
-          <Badge variant={dl.completed ? 'secondary' : 'outline'}>
-            {dl.completed ? t('Completed') : t('Incomplete')}
-          </Badge>
-          <span className='text-muted-foreground text-xs'>
-            {t('Started')}:{' '}
-            {dayjs.unix(dl.started_at).format('YYYY-MM-DD HH:mm:ss')}
-          </span>
-          <span className='text-muted-foreground ml-auto text-xs tabular-nums'>
-            {formatBytes(dl.bytes_sent)}
-          </span>
-        </li>
-      ))}
-    </ul>
+    <>
+      <ul className='divide-border divide-y text-sm'>
+        {downloads.map((dl) => (
+          <li key={dl.id} className='flex flex-wrap items-center gap-3 py-2'>
+            <span className='font-mono'>
+              #{dl.downloader_id > 0 ? dl.downloader_id : t('Unknown')}
+            </span>
+            <Badge variant={dl.completed ? 'secondary' : 'outline'}>
+              {dl.completed ? t('Completed') : t('Incomplete')}
+            </Badge>
+            <span className='text-muted-foreground text-xs'>
+              {t('Started')}:{' '}
+              {dayjs.unix(dl.started_at).format('YYYY-MM-DD HH:mm:ss')}
+            </span>
+            <span className='text-muted-foreground ml-auto text-xs tabular-nums'>
+              {formatBytes(dl.bytes_sent)}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {/*
+        后端最多返回 100 条下载记录；正好 100 条时可能还有更早的记录。
+        不提示的话，管理员会以为这就是全部。
+      */}
+      {downloads.length >= 100 && (
+        <p className='text-muted-foreground pt-2 text-xs'>
+          {t('Showing only the latest 100 downloads.')}
+        </p>
+      )}
+    </>
   )
 }
