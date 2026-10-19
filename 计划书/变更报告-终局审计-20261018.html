@@ -108,7 +108,7 @@
   <a href="#review">14. 独立审查线程的复验</a>（含 <a href="#bl1">二轮 P0：路径语义</a>）<br>
   <a href="#multi">15. 多账号云盘 + 生产真实 E2E</a><br>
   <a href="#owner">16. 归属判定的四个致命缺陷（v1.3.151）</a><br>
-  <a href="#upstream">17. 上游对标加固（v1.3.156）</a><br>
+  <a href="#upstream">17. 上游对标加固（v1.3.156–157）</a><br>
   <a href="#quiz">18. 测验（必须通过）</a>
 </div>
 
@@ -608,7 +608,7 @@ B 成功且为空（B 本来就没这个目录）
   这也说明：<b>任何直接改库的运维操作，都要考虑缓存</b>。</p>
 </div>
 
-<h2 id="upstream">17. 上游对标加固（v1.3.156）</h2>
+<h2 id="upstream">17. 上游对标加固（v1.3.156–157）</h2>
 
 <div class="card info">
   <p><b>背景：</b>本 fork 的上游基线停在 2026-09-09，上游到 2026-10-18 已有 242 个提交。
@@ -635,6 +635,10 @@ B 成功且为空（B 本来就没这个目录）
       <td>产生过上游事件即估算 prompt；工参/推理/拒答增量计入 completion</td></tr>
   <tr><td>计费</td><td>Ollama 最后一帧 <code>done</code> 里的 tool_calls 丢失</td>
       <td>done 帧也转发 tool_calls 并置 finish_reason</td></tr>
+  <tr><td>计费</td><td>Claude 切断流的 completion 只按正文估算，tool_use 块漏计</td>
+      <td>按每个 tool_use 块约 40 token 计入（v1.3.157）</td></tr>
+  <tr><td>体验</td><td>任务协议预检把「请求体超限」压成 400 Invalid request</td>
+      <td>超限返回 <b>413</b> 并带上限制值；其它错误带真实原因（v1.3.157）</td></tr>
   <tr><td>可靠性</td><td>通知限流 key 带小时后缀：窗口每小时重置、&gt;60 分钟配置失效</td>
       <td>固定窗口 + Lua 原子自增补 TTL；非法时长回退 10 分钟</td></tr>
   <tr><td>可靠性</td><td>审计日志按 <code>(created_at, event_id)</code> 排序但无复合索引</td>
@@ -670,7 +674,7 @@ B 成功且为空（B 本来就没这个目录）
 </ul>
 
 <h2 id="quiz">18. 测验（必须通过）</h2>
-<p class="note">共 29 题，需全部答对才算通过。每题作答后会显示解析。</p>
+<p class="note">共 31 题，需全部答对才算通过。每题作答后会显示解析。</p>
 
 <div id="quiz">
   <div id="questions"></div>
@@ -998,6 +1002,28 @@ const QUIZ = [
     ],
     answer: 1,
     why: "静态资源来自 embed、无 DB/上游调用。把它们与页面请求共用一个限额，误伤成本远大于防护收益。"
+  },
+  {
+    stem: "Claude 流在终止事件前被切断、且只产生了 tool_use 块时，为什么 completion 不能只按正文估算？",
+    opts: [
+      "因为 tool_use 不消耗 token",
+      "因为 tool_use 的函数名与 JSON 参数也是上游计费的输出 token，而正文（ResponseText）里没有这部分，只按正文会低估甚至为 0",
+      "因为正文一定是空的",
+      "因为 tool_use 计在 prompt 里"
+    ],
+    answer: 1,
+    why: "流中记录 tool_use 块数量，每个按约 40 token 计入 completion 估算；否则工具型会话在切断时会少计费。"
+  },
+  {
+    stem: "任务协议预检为什么不能把「请求体超限」统一返回 400 Invalid request？",
+    opts: [
+      "因为 400 不能带 JSON",
+      "因为调用方无法区分「JSON 写错了」与「请求太大了」；超限应返回 413 并带上限制值，其它错误应带真实原因",
+      "因为 413 更安全",
+      "因为 400 会被限流"
+    ],
+    answer: 1,
+    why: "错误码是调用契约的一部分。把所有失败压成 400，会让接入方按错误方向排查（改 JSON 而不是减小请求体）。"
   }
 ];
 
