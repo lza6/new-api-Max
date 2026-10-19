@@ -77,3 +77,30 @@ func TestCountClaudeStreamBillableToolsSetsWebSearchRequests(t *testing.T) {
 	assert.Equal(t, 1, info.ResponsesUsageInfo.BuiltInTools["stream_fn"].CallCount)
 	assert.Equal(t, 1, claudeInfo.ToolUseCount, "tool_use 块数量用于切断流的 completion 估算")
 }
+
+// 切断流没有 usage 时，每个 tool_use 块必须计入 completion 估算；
+// 否则工具型会话（正文为空）会按 0 结算（v1.3.157 的核心行为）。
+func TestHandleStreamFinalResponseEstimatesToolUseCompletion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "test-model",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "test-model",
+		},
+	}
+	info.SetEstimatePromptTokens(9)
+
+	claudeInfo := &relayconvert.ClaudeResponseInfo{
+		Usage:        &dto.Usage{},
+		Done:         false,
+		ToolUseCount: 2,
+	}
+	HandleStreamFinalResponse(c, info, claudeInfo)
+
+	require.Equal(t, 80, claudeInfo.Usage.CompletionTokens, "2 个 tool_use 块 × 40 token")
+	require.Equal(t, 9, claudeInfo.Usage.PromptTokens)
+}

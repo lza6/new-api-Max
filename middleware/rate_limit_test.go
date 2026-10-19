@@ -357,13 +357,15 @@ func TestIsStaticAssetRequest(t *testing.T) {
 		{"/static/js/index.abc123.js", true},
 		{"/static/css/index.css", true},
 		{"/assets/logo.webp", true},
-		{"/fonts/Inter.woff2", true},
+		{"/fonts/Inter.woff2", false},
 		{"/favicon.ico", true},
 		{"/logo.png", true},
 		{"/pricing", false},
 		{"/api/status", false},
 		{"/v1/chat/completions", false},
 		{"/static", false},
+		{"/pricing.js", false},
+		{"/anything.css", false},
 	}
 	for _, tc := range cases {
 		if got := isStaticAssetRequest(tc.path); got != tc.want {

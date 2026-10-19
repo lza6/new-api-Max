@@ -315,7 +315,9 @@ func getModelFromRequest(c *gin.Context) (*ModelRequest, error) {
 	if strings.HasPrefix(c.Request.Header.Get("Content-Type"), "application/json") {
 		modelRequest, err := getModelFromJSONBody(c)
 		if err != nil {
-			return nil, errors.New(i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
+			// 保留原始错误链：上层需要区分「请求体超限」(413) 与「JSON 写错」(400)。
+			// 用 errors.New 会丢失 Unwrap，common.IsRequestBodyTooLargeError 永远为 false。
+			return nil, fmt.Errorf("%s: %w", i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}), err)
 		}
 		return modelRequest, nil
 	}
@@ -323,7 +325,7 @@ func getModelFromRequest(c *gin.Context) (*ModelRequest, error) {
 	var modelRequest ModelRequest
 	err := common.UnmarshalBodyReusable(c, &modelRequest)
 	if err != nil {
-		return nil, errors.New(i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}))
+		return nil, fmt.Errorf("%s: %w", i18n.T(c, i18n.MsgDistributorInvalidRequest, map[string]any{"Error": err.Error()}), err)
 	}
 	return &modelRequest, nil
 }

@@ -299,6 +299,22 @@ func TestOaiResponsesStreamHandlerBillsCutStream(t *testing.T) {
 			wantCompletionNonZero: true,
 		},
 		{
+			name: "上游 error 事件不得估算 prompt",
+			events: []string{
+				`{"type":"error","code":"server_error","message":"upstream exploded"}`,
+			},
+			wantPrompt:            0,
+			wantCompletionNonZero: false,
+		},
+		{
+			name: "incomplete 携带的权威 usage 必须保留",
+			events: []string{
+				`{"type":"response.incomplete","response":{"status":"incomplete","usage":{"input_tokens":11,"output_tokens":5,"total_tokens":16}}}`,
+			},
+			wantPrompt:            11,
+			wantCompletionNonZero: true,
+		},
+		{
 			name: "明确失败不计 prompt",
 			events: []string{
 				`{"type":"response.failed","response":{"status":"failed"}}`,

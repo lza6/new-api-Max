@@ -13,7 +13,10 @@ import (
 // notifyLimitStore is used for in-memory rate limiting when Redis is disabled
 var (
 	notifyLimitStore sync.Map
-	cleanupOnce      sync.Once
+	// notifyLimitMu 保护内存路径的「读-改-写」：sync.Map 的单次操作原子
+	// 不代表复合操作原子，并发通知会丢失自增（实际发送数超过上限）。
+	notifyLimitMu sync.Mutex
+	cleanupOnce   sync.Once
 )
 
 type limitCount struct {
@@ -81,6 +84,10 @@ func checkMemoryLimit(userId int, notifyType string) (bool, error) {
 	key := fmt.Sprintf("%d:%s", userId, notifyType)
 	now := time.Now()
 
+	// 复合读-改-写必须互斥：sync.Map 的单次操作原子不代表整体原子。
+	notifyLimitMu.Lock()
+	defer notifyLimitMu.Unlock()
+
 	// Get current limit count or initialize new one
 	var currentLimit limitCount
 	if value, ok := notifyLimitStore.Load(key); ok {
@@ -97,6 +104,8 @@ func checkMemoryLimit(userId int, notifyType string) (bool, error) {
 	currentLimit.Count++
 
 	// Check against limits
+	// limit <= 0 视为「不允许发送」（fail-closed）：默认值由 env 提供，
+	// 误配为 0 时宁可静默少发，也不要在无上限的情况下放大通知。
 	limit := constant.NotifyLimitCount
 
 	// Store updated count

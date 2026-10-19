@@ -68,6 +68,12 @@ func init() {
 func StartSystemMonitor() {
 	go func() {
 		usage := newContainerUsage()
+		// 容器口径只在设置了 cgroup 内存/CPU 配额时可用；不可用时回退宿主机口径。
+		// 这条日志让运维能确认当前实例到底用的是哪套口径（否则误 503 很难定位）。
+		if _, ok := usage.memoryUsage(); !ok {
+			SysLog("system monitor: cgroup memory limit unavailable (no quota or no cgroup namespace); " +
+				"falling back to host memory metrics — overload detection may include other workloads on the node")
+		}
 		var detector overloadDetector
 		for {
 			config := GetPerformanceMonitorConfig()

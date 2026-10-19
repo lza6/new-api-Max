@@ -1,0 +1,161 @@
+{
+  "task_id": "v13156-v13157-upstream-hardening",
+  "status": "done",
+  "timestamp": "2026-10-19T16:30:00+08:00",
+  "scope": [
+    "v1.3.156 upstream alignment: Waffo StoreID, image billing, Responses cut-stream billing, Ollama done frame, notification window, audit index, task plugin source, container overload, static assets rate limit, group rate limit, TLS clone, websocket bump, role whitelist, Gemini countTokens",
+    "v1.3.157: Claude tool_use completion estimate; task body 413"
+  ],
+  "commands_executed": [
+    {
+      "cmd": "go build ./...",
+      "exit_code": 0,
+      "raw_output_tail": "BUILD=0"
+    },
+    {
+      "cmd": "cd relaykit && GOWORK=off go build ./...",
+      "exit_code": 0,
+      "raw_output_tail": "RELAYKIT=0"
+    },
+    {
+      "cmd": "TEST_MYSQL_DSN=... TEST_POSTGRES_DSN=... go test ./model/ -run 'TestDBConformance' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/model 128.891s (sqlite/mysql/postgres: AutoMigrate idempotent + audit index PASS)"
+    },
+    {
+      "cmd": "go test ./common/ -run 'TestCountOverload|TestCheckSystemOverload|TestContainer|TestOutboundTransportHonorsTLSEnv' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/common"
+    },
+    {
+      "cmd": "go test ./service/ -run 'TestNotifyLimit|TestWaffoPancake' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/service 37.286s"
+    },
+    {
+      "cmd": "go test ./middleware/ -run 'TestModelRateLimit|TestIsStaticAssetRequest|TestTaskPlugin' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/middleware"
+    },
+    {
+      "cmd": "go test ./relay/channel/openai/ -run 'TestOpenaiImage|TestNormalizeOpenAIUsageMapsOutputDetails|TestOaiResponses' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/relay/channel/openai"
+    },
+    {
+      "cmd": "go test ./relay/channel/ollama/ -run 'TestOllama' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/relay/channel/ollama"
+    },
+    {
+      "cmd": "go test ./relay/channel/claude/ -run 'TestCountClaudeStreamBillableTools|TestHandleClaudeResponseDataCountsToolUse' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/relay/channel/claude"
+    },
+    {
+      "cmd": "cd web && bun run typecheck && bunx oxlint -c .oxlintrc.json src/features/training-data && bun run vitest run src/features/training-data/api.test.ts src/features/profile/__tests__/settings.test.tsx && bun run i18n:check && bun run build",
+      "exit_code": 0,
+      "raw_output_tail": "tsgo -b OK; vitest 2 files / 10 tests passed; i18n missing-key check OK (0 missing); build succeeded"
+    },
+    {
+      "cmd": "go test ./service/training_capture/ -run '^$' -bench 'BenchmarkBuildSignal|BenchmarkHotPath' -benchtime=300ms",
+      "exit_code": 0,
+      "raw_output_tail": "Disabled 96.62 ns/op 0 B/op 0 allocs/op; Enabled 3400 ns/op 224 B/op 2 allocs/op; FullCapture 2072 ns/op 224 B/op 2 allocs/op"
+    },
+    {
+      "cmd": "deploy-zero-downtime.sh v1.3.154 / v1.3.155 / v1.3.156 / v1.3.157",
+      "exit_code": 0,
+      "raw_output_tail": "healthy; external 200; version header matches each tag; 0 HTTP 500s in the observation windows"
+    }
+  ],
+  "files_changed": [
+    "common/container_usage.go",
+    "common/container_usage_test.go",
+    "common/system_monitor.go",
+    "common/redis.go",
+    "common/outbound.go",
+    "common/init.go",
+    "common/outbound_test.go",
+    "middleware/performance.go",
+    "middleware/rate-limit.go",
+    "middleware/rate_limit_test.go",
+    "middleware/model-rate-limit.go",
+    "middleware/task_plugin.go",
+    "service/notify-limit.go",
+    "service/notify_limit_test.go",
+    "service/waffo_pancake.go",
+    "service/waffo_pancake_test.go",
+    "service/http_client.go",
+    "service/protected_fetch_client.go",
+    "relay/channel/openai/relay_image.go",
+    "relay/channel/openai/image_stream_test.go",
+    "relay/channel/openai/relay_responses.go",
+    "relay/channel/openai/relay_responses_billing_test.go",
+    "relay/channel/ollama/stream.go",
+    "relay/channel/ollama/stream_test.go",
+    "relay/channel/claude/relay-claude.go",
+    "relay/channel/claude/relay_responses.go",
+    "relay/channel/claude/tool_billing_test.go",
+    "relaykit/relayconvert/internal/claude_messages/to_oai_chat_resp.go",
+    "relaykit/dto/openai_response.go",
+    "relay/relay_task.go",
+    "router/relay-router.go",
+    "controller/user.go",
+    "controller/model_sync.go",
+    "controller/ratio_sync.go",
+    "model/task_plugin.go",
+    "model/audit_log.go",
+    "model/db_conformance_test.go",
+    "go.mod",
+    "go.sum",
+    "CHANGELOG.md",
+    "README.md",
+    "policy.md",
+    "workflow_status.md",
+    "test_ledger.md"
+  ],
+  "tests": [
+    {"name": "TestDBConformanceAutoMigrateIdempotent", "type": "integration", "status": "pass", "evidence": "sqlite+mariadb/postgres subtests PASS"},
+    {"name": "TestDBConformanceLogsIndexes", "type": "integration", "status": "pass", "evidence": "idx_audit_created_event present on all three dialects"},
+    {"name": "TestWaffoPancakeStoreMatches", "type": "unit", "status": "pass"},
+    {"name": "TestNotifyLimitFixedWindowMemory", "type": "unit", "status": "pass"},
+    {"name": "TestContainerMemoryUsageExcludesInactiveFileCache", "type": "unit", "status": "pass"},
+    {"name": "TestContainerCPUSaturation", "type": "unit", "status": "pass"},
+    {"name": "TestCheckSystemOverload", "type": "unit", "status": "pass"},
+    {"name": "TestOutboundTransportHonorsTLSEnv", "type": "unit", "status": "pass", "evidence": "asserts cloned TLS config"},
+    {"name": "TestOpenaiImageResponseCount", "type": "unit", "status": "pass"},
+    {"name": "TestNormalizeOpenAIUsageMapsOutputDetails", "type": "unit", "status": "pass"},
+    {"name": "TestOaiResponsesStreamHandlerBillsCutStream", "type": "unit", "status": "pass"},
+    {"name": "TestOllamaStreamDoneFrameToolCalls", "type": "unit", "status": "pass"},
+    {"name": "TestCountClaudeStreamBillableToolsSetsWebSearchRequests", "type": "unit", "status": "pass", "evidence": "also asserts ToolUseCount==1"},
+    {"name": "TestIsStaticAssetRequest", "type": "unit", "status": "pass"}
+  ],
+  "coverage_summary": null,
+  "seams_touched": [
+    "relay -> usage normalization -> billing",
+    "middleware rate limit -> web NoRoute static assets",
+    "worker -> course of relay stream finalization (Responses/Ollama/Claude)",
+    "GORM AutoMigrate -> SQLite/MySQL/PostgreSQL",
+    "cgroup -> SystemStatus -> overload middleware"
+  ],
+  "mock_scenarios_covered": [
+    "upstream image response object-shaped data",
+    "split url/b64_json entries",
+    "revised_prompt-only entries",
+    "Responses stream cut before terminal event",
+    "Ollama done-frame tool_calls",
+    "fake cgroup v2 files for CPU/memory",
+    "fake sse/JSON responses for billing tests"
+  ],
+  "browser_validation": {
+    "performed": false,
+    "reason": "No UI code changed in v1.3.156/157; frontend typecheck/lint/build and prior Playwright suites were used. v1.3.155 UI changes (export pagination, download notice) verified by typecheck/lint/build + i18n check, not a new browser run."
+  },
+  "limitations": [
+    "No real paid API calls (image/video/audio/payment) were made.",
+    "No production load test was run; the latest recorded local mock-upstream stress is evidence/stress-relay-20261017-c50-final.json (0 errors, QPS 19.9, P95 5.80s).",
+    "Admin user-management step-up was intentionally not implemented: backend-only enforcement would break the existing admin UI until a frontend proof flow ships.",
+    "relaykit cross-protocol conversion batch and Responses WebSocket were not ported.",
+    "Coverage was not recomputed for the whole repository; targeted package tests and three-DB conformance were used instead."
+  ]
+}

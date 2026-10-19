@@ -15,6 +15,7 @@ import (
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	relayconstant "github.com/lza6/new-api-Max/relay/constant"
 	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/relaykit/relayconvert"
 	"github.com/stretchr/testify/require"
 )
 
@@ -497,4 +498,23 @@ func TestNormalizeOpenAIUsageMapsOutputDetails(t *testing.T) {
 	require.Equal(t, 2000, usage.CompletionTokenDetails.ImageTokens)
 	require.Equal(t, 3, usage.CompletionTokenDetails.AudioTokens)
 	require.Equal(t, 4, usage.CompletionTokenDetails.ReasoningTokens)
+}
+
+// Responses 路径也必须把 output_tokens_details 映射到 completion_tokens_details；
+// 否则 /v1/responses 的 img_o/audio_o/reasoning 会按 0 计费（P2-1）。
+func TestNormalizeResponsesUsageMapsOutputDetails(t *testing.T) {
+	normalized := relayconvert.NormalizeResponsesUsage(&dto.Usage{
+		OutputTokens: 20,
+		OutputTokensDetails: &dto.OutputTokenDetails{
+			TextTokens:      1,
+			ImageTokens:     2000,
+			AudioTokens:     3,
+			ReasoningTokens: 4,
+		},
+	})
+	require.NotNil(t, normalized)
+	require.Equal(t, 2000, normalized.CompletionTokenDetails.ImageTokens)
+	require.Equal(t, 3, normalized.CompletionTokenDetails.AudioTokens)
+	require.Equal(t, 4, normalized.CompletionTokenDetails.ReasoningTokens)
+	require.Equal(t, 1, normalized.CompletionTokenDetails.TextTokens)
 }

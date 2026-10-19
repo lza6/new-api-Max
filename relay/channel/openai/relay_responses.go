@@ -119,6 +119,13 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				imageCommitted = true
 			}
 		case "response.failed", "response.incomplete", "response.cancelled", "response.canceled":
+			// incomplete/cancelled 与 completed 一样可能携带**权威 usage**
+			// （例如 max_output_tokens 触发的 incomplete）。只重置图片计数、
+			// 丢掉 usage 会让 prompt/cache 统计全部失真。
+			if streamResponse.Response != nil && streamResponse.Response.Usage != nil {
+				incomingUsage := relayconvert.NormalizeResponsesUsage(streamResponse.Response.Usage)
+				usage = dto.MergeUsageNonZero(usage, incomingUsage)
+			}
 			if streamResponse.Type == "response.failed" {
 				explicitFailure = true
 			}
@@ -127,6 +134,10 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
+		case "error":
+			// 上游明确报错（官方 Responses 事件 type=error）：不得按「产生过事件」
+			// 估算 prompt，否则用户会为一个没生成的请求付费。
+			explicitFailure = true
 		case "response.output_text.delta",
 			// 工具参数、推理、拒答同样是上游计费的输出 token：
 			// 流被切断时只统计 output_text 会低估 completion（甚至为 0）。

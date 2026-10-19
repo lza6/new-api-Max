@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"path"
 	"strconv"
 	"strings"
 
@@ -209,17 +208,27 @@ func GlobalWebRateLimit() func(c *gin.Context) {
 	return defNext
 }
 
+// staticAssetExactPaths 是构建产物中位于**根目录**的固定文件。
+// 必须用精确匹配：按扩展名豁免会让 `/pricing.js` 这类不存在的路径也绕过限流，
+// 落到 SPA 渲染（BuildSPAIndexHTML），反而成为低成本请求洪水的入口。
+var staticAssetExactPaths = map[string]struct{}{
+	"/favicon.ico":           {},
+	"/logo.png":              {},
+	"/pay-apple.png":         {},
+	"/pay-card.png":          {},
+	"/pay-google.png":        {},
+	"/sw.js":                 {},
+	"/waffo-logo-dark.svg":   {},
+	"/waffo-logo-light.svg":  {},
+}
+
 // isStaticAssetRequest 判断是否为前端静态构建产物。
 func isStaticAssetRequest(urlPath string) bool {
 	if strings.HasPrefix(urlPath, "/static/") || strings.HasPrefix(urlPath, "/assets/") {
 		return true
 	}
-	switch strings.ToLower(path.Ext(urlPath)) {
-	case ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
-		".woff", ".woff2", ".ttf", ".map":
-		return true
-	}
-	return false
+	_, ok := staticAssetExactPaths[urlPath]
+	return ok
 }
 
 func GlobalAPIRateLimit() func(c *gin.Context) {

@@ -85,6 +85,11 @@ func PrepareTaskPluginRoute() gin.HandlerFunc {
 			if errors.Is(err, errTaskPluginUnsupportedMediaType) {
 				status = http.StatusUnsupportedMediaType
 			}
+			// 请求体超限必须是 413，且发生在 route request 构建阶段
+			// （getBodyStorage 返回的错误仍保留 ErrRequestBodyTooLarge 链）。
+			if common.IsRequestBodyTooLargeError(err) {
+				status = http.StatusRequestEntityTooLarge
+			}
 			abortTaskPluginRouteErrorDetail(c, status, err.Error())
 			return
 		}
@@ -553,6 +558,9 @@ func PrepareTaskPluginEndpoint() gin.HandlerFunc {
 			status := http.StatusBadRequest
 			if errors.Is(err, errTaskPluginUnsupportedMediaType) {
 				status = http.StatusUnsupportedMediaType
+			}
+			if common.IsRequestBodyTooLargeError(err) {
+				status = http.StatusRequestEntityTooLarge
 			}
 			abortWithOpenAiMessage(c, status, err.Error())
 			return

@@ -15,6 +15,10 @@ import (
 // 工作负载的占用也算成本进程过载，导致正常的 relay 流量被 503 熔断。这里
 // 改为优先读取当前容器的 cgroup 配额与用量，只有在拿不到 cgroup 数据时才由
 // 调用方回退到宿主机口径。
+//
+// **边界**：只有设置了 CPU/内存 cgroup 配额时容器口径才可用；未设置配额
+// （cpu.max=max / memory.max=max）或未开启 cgroup namespace 时仍回退宿主机口径。
+// 启动日志会明确打印当前走的是哪套口径。
 
 const (
 	defaultCgroupRoot = "/sys/fs/cgroup"

@@ -234,6 +234,23 @@ func usageFromResponsesUsage(src *dto.Usage, createBillingSnapshot bool) *dto.Us
 		usage.CompletionTokenDetails.AudioTokens = src.CompletionTokenDetails.AudioTokens
 		usage.CompletionTokenDetails.ImageTokens = src.CompletionTokenDetails.ImageTokens
 	}
+	// Responses/图片上游常用 output_tokens_details 报输出拆分；计费表达式读的是
+	// completion_tokens_details（img_o / audio_o / reasoning）。只补零值，
+	// 不覆盖上面已经拿到的权威 CompletionTokenDetails。
+	if src.OutputTokensDetails != nil {
+		if usage.CompletionTokenDetails.ReasoningTokens == 0 {
+			usage.CompletionTokenDetails.ReasoningTokens = src.OutputTokensDetails.ReasoningTokens
+		}
+		if usage.CompletionTokenDetails.TextTokens == 0 {
+			usage.CompletionTokenDetails.TextTokens = src.OutputTokensDetails.TextTokens
+		}
+		if usage.CompletionTokenDetails.AudioTokens == 0 {
+			usage.CompletionTokenDetails.AudioTokens = src.OutputTokensDetails.AudioTokens
+		}
+		if usage.CompletionTokenDetails.ImageTokens == 0 {
+			usage.CompletionTokenDetails.ImageTokens = src.OutputTokensDetails.ImageTokens
+		}
+	}
 	usage.ClaudeCacheCreation5mTokens = src.ClaudeCacheCreation5mTokens
 	usage.ClaudeCacheCreation1hTokens = src.ClaudeCacheCreation1hTokens
 	return usage

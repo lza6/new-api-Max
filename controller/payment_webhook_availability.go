@@ -91,9 +91,12 @@ func isWaffoPancakeTopUpEnabled() bool {
 	}
 	// Presence-of-credentials = enabled. Webhook public keys ship inside
 	// the SDK; mode (test/prod) is read from each event.
+	// **StoreID 也是必需项**：webhook 会强制校验它；只配另外三项会让
+	// 下单成功但回调被拒（用户已付款却不到账）。缺少 StoreID 时视为未启用。
 	return strings.TrimSpace(setting.WaffoPancakeMerchantID) != "" &&
 		strings.TrimSpace(setting.WaffoPancakePrivateKey) != "" &&
-		strings.TrimSpace(setting.WaffoPancakeProductID) != ""
+		strings.TrimSpace(setting.WaffoPancakeProductID) != "" &&
+		strings.TrimSpace(setting.WaffoPancakeStoreID) != ""
 }
 
 func isWaffoPancakeWebhookConfigured() bool {
@@ -104,7 +107,8 @@ func isWaffoPancakeWebhookEnabled() bool {
 	return operation_setting.IsPaymentComplianceConfirmed() &&
 		strings.TrimSpace(setting.WaffoPancakeMerchantID) != "" &&
 		strings.TrimSpace(setting.WaffoPancakePrivateKey) != "" &&
-		strings.TrimSpace(setting.WaffoPancakeProductID) != ""
+		strings.TrimSpace(setting.WaffoPancakeProductID) != "" &&
+		strings.TrimSpace(setting.WaffoPancakeStoreID) != ""
 }
 
 func isEpayTopUpEnabled() bool {
