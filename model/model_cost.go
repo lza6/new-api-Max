@@ -204,6 +204,24 @@ func activeModelCost(channelId int, modelName string, at time.Time) (*ModelCost,
 	return &row, true
 }
 
+// tokenCostMicros 计算 tokens 对应的成本（微元），对乘法溢出做饱和保护。
+//
+// prompt/completion tokens 来自上游 usage（不可信），而 rate 允许到 1e11 微元/百万。
+// 直接 `rate * tokens` 在 tokens >= 9.2e7 时会溢出 int64 并回绕成负数/小数，
+// 写出一个错误的 cost_quota（不会扣用户钱，但会污染财务报表）。
+func tokenCostMicros(rate int64, tokens int) int64 {
+	if rate <= 0 || tokens <= 0 {
+		return 0
+	}
+	t := int64(tokens)
+	if rate > math.MaxInt64/t {
+		common.SysError(fmt.Sprintf(
+			"model cost: token cost overflow (rate=%d tokens=%d); saturating", rate, tokens))
+		return math.MaxInt64 / 2
+	}
+	return rate * t / 1_000_000
+}
+
 // RequestCostQuota 计算一次请求的上游成本（额度单位），并返回所用配置的 ID。
 //
 // ok=false 表示该渠道/模型没有配置成本 —— 此时成本按 0 计，运营报表必须
@@ -216,12 +234,8 @@ func RequestCostQuota(channelId int, modelName string, promptTokens, completionT
 	var micros int64
 	switch cfg.BillingMode {
 	case ModelCostModePerToken:
-		if promptTokens > 0 {
-			micros += cfg.CostInputPerMillionMicros * int64(promptTokens) / 1_000_000
-		}
-		if completionTokens > 0 {
-			micros += cfg.CostOutputPerMillionMicros * int64(completionTokens) / 1_000_000
-		}
+		micros = tokenCostMicros(cfg.CostInputPerMillionMicros, promptTokens) +
+			tokenCostMicros(cfg.CostOutputPerMillionMicros, completionTokens)
 	default: // per call
 		micros = cfg.CostPerCallMicros
 	}

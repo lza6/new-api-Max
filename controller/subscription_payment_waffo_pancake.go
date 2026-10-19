@@ -52,8 +52,11 @@ func SubscriptionRequestWaffoPancakePay(c *gin.Context) {
 	}
 	// Plan targets its own Pancake product, so we only require credentials
 	// here — not the gateway-level WaffoPancakeProductID.
+	// **StoreID 同样是必需项**：webhook 会强制校验它；缺 StoreID 时下单成功、
+	// 回调被拒，用户付款后订阅永远不激活。
 	if strings.TrimSpace(setting.WaffoPancakeMerchantID) == "" ||
-		strings.TrimSpace(setting.WaffoPancakePrivateKey) == "" {
+		strings.TrimSpace(setting.WaffoPancakePrivateKey) == "" ||
+		strings.TrimSpace(setting.WaffoPancakeStoreID) == "" {
 		common.ApiErrorMsg(c, "Waffo Pancake 未配置或密钥无效")
 		return
 	}

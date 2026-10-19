@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.160] - 2026-10-20
+
+### Fixed (second independent review)
+- **ClickHouse log backend**: `cost_quota` was missing from the CREATE TABLE and the
+  idempotent ADD COLUMN migration. GORM would have inserted an unknown column and every
+  consume log write would fail. Added the column to both paths.
+- Responses error events: `response.error` (used by the conversion layer) now counts as
+  an explicit failure like `error`, so a failed stream is never billed estimated prompt.
+- Subscription Waffo checkout now requires `StoreID`, matching the top-up guard and the
+  webhook fail-closed rule (otherwise payment succeeds but the subscription never activates).
+- Token cost multiplication now saturates on int64 overflow instead of wrapping to a
+  bogus (possibly negative) cost snapshot.
+- Unknown `/static/*` paths now return 404 instead of falling through to unlimited SPA
+  rendering; real static assets are served before this guard.
+- System monitor logs the metric source per resource (`cpu=host|cgroup memory=host|cgroup`)
+  instead of only warning about memory.
+- The IP-recording setting text now matches behavior: usage logs always record the caller
+  IP; the switch only controls error logs.
+- Added a status-code regression test: oversized task-protocol body → 413, malformed
+  small JSON → 400.
+- Notification-limit memory test cleans its key so `-count=2` is stable.
+
 ## [v1.3.159] - 2026-10-20
 
 ### Performance

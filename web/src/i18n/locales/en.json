@@ -7393,6 +7393,7 @@
     "Input cost per 1M tokens (CNY)": "Input cost per 1M tokens (CNY)",
     "Output cost per 1M tokens (CNY)": "Output cost per 1M tokens (CNY)",
     "Note (optional)": "Note (optional)",
-    "Price adjustment": "Price adjustment"
+    "Price adjustment": "Price adjustment",
+    "Usage logs always record the caller IP; this switch only controls error logs.": "Usage logs always record the caller IP; this switch only controls error logs."
   }
 }

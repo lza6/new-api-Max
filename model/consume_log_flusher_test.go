@@ -240,4 +240,12 @@ func TestConsumeLogRecordsCostSnapshotAndIP(t *testing.T) {
 	// 0.0007 元 / 7.3 * 500000 ≈ 47.95 → 48
 	require.Equal(t, int64(48), got.CostQuota)
 	require.Equal(t, "203.0.113.9", got.Ip)
+
+	// 合成日志（如违规罚金）显式 SkipCost：不能给一笔没有上游调用的记录计成本。
+	RecordConsumeLog(c, 2, RecordConsumeLogParams{
+		ChannelId: 49, ModelName: "m", Quota: 100, SkipCost: true,
+	})
+	var skipped Log
+	require.NoError(t, LOG_DB.Where("user_id = ?", 2).First(&skipped).Error)
+	require.Zero(t, skipped.CostQuota)
 }

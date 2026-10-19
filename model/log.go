@@ -59,23 +59,23 @@ func sanitizeClickHouseLikePattern(input string) (string, error) {
 }
 
 type Log struct {
-	Id               int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2;index:idx_log_type_created_id,priority:3"`
-	UserId           int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1;index:idx_log_user_type_created,priority:1"`
-	CreatedAt        int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_log_type_created_id,priority:2;index:idx_log_user_type_created,priority:3"`
-	Type             int    `json:"type" gorm:"index:idx_log_type_created_id,priority:1;index:idx_log_user_type_created,priority:2"`
-	Content          string `json:"content"`
-	Username         string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
-	TokenName        string `json:"token_name" gorm:"index;default:''"`
-	ModelName        string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
-	Quota            int    `json:"quota" gorm:"default:0"`
+	Id        int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2;index:idx_log_type_created_id,priority:3"`
+	UserId    int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1;index:idx_log_user_type_created,priority:1"`
+	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_log_type_created_id,priority:2;index:idx_log_user_type_created,priority:3"`
+	Type      int    `json:"type" gorm:"index:idx_log_type_created_id,priority:1;index:idx_log_user_type_created,priority:2"`
+	Content   string `json:"content"`
+	Username  string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
+	TokenName string `json:"token_name" gorm:"index;default:''"`
+	ModelName string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
+	Quota     int    `json:"quota" gorm:"default:0"`
 	// CostQuota 上游成本（额度单位），由 model_cost 在结算时**快照**写入。
 	// json:"-"：这是管理员财务口径，绝不能随用户日志返回。
 	// 聚合只 SUM 本列，因此调价不会重写历史利润。
-	CostQuota        int64  `json:"-" gorm:"bigint;default:0"`
-	PromptTokens     int    `json:"prompt_tokens" gorm:"default:0"`
-	CompletionTokens int    `json:"completion_tokens" gorm:"default:0"`
-	UseTime          int    `json:"use_time" gorm:"default:0"`
-	IsStream         bool   `json:"is_stream"`
+	CostQuota        int64 `json:"-" gorm:"bigint;default:0"`
+	PromptTokens     int   `json:"prompt_tokens" gorm:"default:0"`
+	CompletionTokens int   `json:"completion_tokens" gorm:"default:0"`
+	UseTime          int   `json:"use_time" gorm:"default:0"`
+	IsStream         bool  `json:"is_stream"`
 	// RequestBytes/ResponseBytes 每请求流量字节（供站点权威统计/带宽排行直接 SUM，
 	// 避免全表扫 other JSON；旧行无值按 0 计入，不影响既有 other 口径）。
 	// 注：不再挂 idx_logs_traffic——该复合索引（request_bytes,response_bytes）缺
@@ -386,20 +386,24 @@ func RecordErrorLog(c *gin.Context, userId int, channelId int, modelName string,
 }
 
 type RecordConsumeLogParams struct {
-	ChannelId        int       `json:"channel_id"`
-	PromptTokens     int       `json:"prompt_tokens"`
-	CompletionTokens int       `json:"completion_tokens"`
-	ModelName        string    `json:"model_name"`
-	TokenName        string    `json:"token_name"`
-	Quota            int       `json:"quota"`
-	Content          string    `json:"content"`
-	TokenId          int       `json:"token_id"`
-	UseTimeSeconds   int       `json:"use_time_seconds"`
-	IsStream         bool      `json:"is_stream"`
-	Group            string    `json:"group"`
-	RequestBytes     int64     `json:"request_bytes"`
-	ResponseBytes    int64     `json:"response_bytes"`
-	Other            *LogOther `json:"other"`
+	ChannelId        int    `json:"channel_id"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	ModelName        string `json:"model_name"`
+	TokenName        string `json:"token_name"`
+	Quota            int    `json:"quota"`
+	Content          string `json:"content"`
+	TokenId          int    `json:"token_id"`
+	UseTimeSeconds   int    `json:"use_time_seconds"`
+	IsStream         bool   `json:"is_stream"`
+	Group            string `json:"group"`
+	RequestBytes     int64  `json:"request_bytes"`
+	ResponseBytes    int64  `json:"response_bytes"`
+	// SkipCost 为 true 时不为这条日志计算上游成本。
+	// 仅用于**非上游调用**的合成 consume 日志（例如违规扣费）：
+	// 给它们按次计成本会把罚款当成一次真实调用，虚增成本。
+	SkipCost bool      `json:"skip_cost,omitempty"`
+	Other    *LogOther `json:"other"`
 }
 
 func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams) {
@@ -415,13 +419,15 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	// 写入 logs.cost_quota。之后调价只追加新规则，不会改写这条历史记录，
 	// 因此日报/月报/年报的利润始终可复现。
 	costQuota := int64(0)
-	if ruleQuota, ruleId, ok := RequestCostQuota(params.ChannelId, params.ModelName, params.PromptTokens, params.CompletionTokens, time.Unix(createdAt, 0)); ok {
-		costQuota = ruleQuota
-		if params.Other == nil {
-			params.Other = NewLogOther()
+	if !params.SkipCost {
+		if ruleQuota, ruleId, ok := RequestCostQuota(params.ChannelId, params.ModelName, params.PromptTokens, params.CompletionTokens, time.Unix(createdAt, 0)); ok {
+			costQuota = ruleQuota
+			if params.Other == nil {
+				params.Other = NewLogOther()
+			}
+			params.Other.SetAdmin("upstream_cost_quota", ruleQuota)
+			params.Other.SetAdmin("upstream_cost_rule_id", ruleId)
 		}
-		params.Other.SetAdmin("upstream_cost_quota", ruleQuota)
-		params.Other.SetAdmin("upstream_cost_rule_id", ruleId)
 	}
 	// B5-2: 微美元影子价（仅统计口径，不改变 quota 计费；未收录定价的模型不写字段）。
 	if params.Other != nil {
@@ -495,6 +501,10 @@ type RecordTaskBillingLogParams struct {
 	RequestId string
 }
 
+// RecordTaskBillingLog 记录任务结算差异（consume 差额 / refund）。
+// **不在这里计算上游成本**：任务的上游成本在提交时已由 RecordConsumeLog 按
+// 渠道×模型记录（按次规则）；结算差额是同一次上游调用的调整，再计一次会重复。
+// 任务没有 usage token，因此 token 规则不适用于任务类。
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	if params.LogType == LogTypeConsume && !common.LogConsumeEnabled {
 		return

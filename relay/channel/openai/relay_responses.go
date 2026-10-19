@@ -134,9 +134,14 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
-		case "error":
-			// 上游明确报错（官方 Responses 事件 type=error）：不得按「产生过事件」
-			// 估算 prompt，否则用户会为一个没生成的请求付费。
+		case "error", "response.error":
+			// 上游明确报错（官方 `error`，以及本仓库转换层使用的 `response.error`）：
+			// 不得按「产生过事件」估算 prompt，否则用户会为一个没生成的请求付费。
+			// 若此前已观察到图像工具调用，按其它终止事件一致处理：提交已完成的计数。
+			if !imageCommitted {
+				imageCounter.Commit(info)
+				imageCommitted = true
+			}
 			explicitFailure = true
 		case "response.output_text.delta",
 			// 工具参数、推理、拒答同样是上游计费的输出 token：

@@ -738,8 +738,30 @@ B 成功且为空（B 本来就没这个目录）
       毛利率是**毛**利，不是净利。</li>
 </ul>
 
+<h3>第二轮独立复验后的补充修复</h3>
+<table>
+  <tr><th>级别</th><th>问题</th><th>修复</th></tr>
+  <tr><td>P0</td><td>ClickHouse 日志表缺 <code>cost_quota</code> 列：GORM INSERT 含未知列 →
+      所有消费日志写入失败，运营面板 500</td>
+      <td>建表 SQL + <code>ensureClickHouseLogColumns</code> 补列；补单测</td></tr>
+  <tr><td>P1</td><td>转换层错误事件名是 <code>response.error</code>，只匹配 <code>error</code>
+      时仍会估 prompt</td><td>两种事件名都视为失败，并补计费用例</td></tr>
+  <tr><td>P1</td><td>订阅下单入口未校验 StoreID，可绕过 webhook fail-closed</td>
+      <td>订阅 Waffo 下单同样要求 StoreID</td></tr>
+  <tr><td>P2</td><td>token 成本乘法可能溢出 int64 并回绕</td>
+      <td>饱和乘法 + 日志；补溢出单测</td></tr>
+  <tr><td>P2</td><td><code>/static/</code> 不存在路径仍可跳过限流并触发 SSR</td>
+      <td>不存在的 <code>/static/*</code> 直接 404</td></tr>
+  <tr><td>P2</td><td>cgroup CPU 回退没有日志，容易误以为整套指标都是容器口径</td>
+      <td>启动时分别打印 <code>cpu=host|cgroup memory=host|cgroup</code></td></tr>
+  <tr><td>P2</td><td>IP 开关文案与「使用日志始终记录 IP」不一致</td>
+      <td>文案明确：开关只控制错误日志</td></tr>
+  <tr><td>P3</td><td>413 修复缺状态码级测试</td>
+      <td>新增：超限 → 413；小 JSON 语法错误仍 400</td></tr>
+</table>
+
 <h2 id="quiz">19. 测验（必须通过）</h2>
-<p class="note">共 36 题，需全部答对才算通过。每题作答后会显示解析。</p>
+<p class="note">共 38 题，需全部答对才算通过。每题作答后会显示解析。</p>
 
 <div id="quiz">
   <div id="questions"></div>
@@ -1144,6 +1166,28 @@ const QUIZ = [
     ],
     answer: 1,
     why: "成本是管理员财务口径。字段不参与用户日志序列化，利润/成本只在 AdminAuth 下的运营面板可见。"
+  },
+  {
+    stem: "为什么给 logs 加 cost_quota 列时，必须同时改 ClickHouse 建表 SQL？",
+    opts: [
+      "因为 ClickHouse 不支持 Int64",
+      "因为 ClickHouse 的 CREATE TABLE IF NOT EXISTS 不会给已有表加列；GORM INSERT 含未知列会让所有消费日志写入失败，运营报表也会报错",
+      "因为 ClickHouse 只支持 UTF-8",
+      "因为 ClickHouse 不需要日志"
+    ],
+    answer: 1,
+    why: "ClickHouse 是受支持的独立日志库；新增列必须同时更新建表 SQL 与幂等补列逻辑（ADD COLUMN IF NOT EXISTS）。"
+  },
+  {
+    stem: "上游返回的 prompt/completion tokens 为什么在计算成本前要做溢出保护？",
+    opts: [
+      "因为 tokens 一定是负数",
+      "因为 tokens 来自上游 usage（不可信），大数乘以每百万单价会溢出 int64 并回绕，写出错误的 cost_quota 污染报表",
+      "因为 int64 装不下任何 token",
+      "因为成本只能用 float"
+    ],
+    answer: 1,
+    why: "成本不扣用户钱，但会破坏财务口径；用饱和乘法 + 日志，保证任何输入都不会得到负成本或回绕值。"
   }
 ];
 

@@ -28,6 +28,9 @@ func TestNotifyLimitFixedWindowMemory(t *testing.T) {
 
 	const userID = 880001
 	const notifyType = "unit-test"
+	// 同一进程重复运行（-count=2）会复用 sync.Map；先清掉上次遗留的计数。
+	notifyLimitStore.Delete("880001:unit-test")
+	t.Cleanup(func() { notifyLimitStore.Delete("880001:unit-test") })
 	for i := range 2 {
 		ok, err := CheckNotificationLimit(userID, notifyType)
 		require.NoError(t, err)

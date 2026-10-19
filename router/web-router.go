@@ -56,7 +56,13 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 		},
 		static.Serve("/", frontendFS),
 		func(c *gin.Context) {
-			if strings.HasPrefix(c.Request.RequestURI, "/v1") || strings.HasPrefix(c.Request.RequestURI, "/api") || strings.HasPrefix(c.Request.RequestURI, "/assets") {
+			// 不存在的构建产物路径直接 404：static.Serve 对缺失文件不会 Abort，
+			// 若继续落到下面的 SPA 注入，会变成「无需限流的 SSR 渲染入口」。
+			if strings.HasPrefix(c.Request.RequestURI, "/v1") ||
+				strings.HasPrefix(c.Request.RequestURI, "/api") ||
+				strings.HasPrefix(c.Request.RequestURI, "/assets") ||
+				strings.HasPrefix(c.Request.RequestURI, "/static/") ||
+				c.Request.RequestURI == "/static" {
 				controller.RelayNotFound(c)
 				return
 			}

@@ -1698,3 +1698,44 @@ func insertTaskPluginRouteTask(t *testing.T, task *model.Task) {
 	t.Helper()
 	require.NoError(t, model.DB.Create(task).Error)
 }
+
+// 任务协议端点的请求体超限必须返回 413，而不是被压成 400 Invalid request。
+// 同时验证普通小 JSON 语法错误仍是 400（413 不能吃掉所有解析错误）。
+func TestPinTaskPluginEndpointStatusCodesForBodyErrors(t *testing.T) {
+	const key = "oversize-413-test"
+	_, err := jsplugin.DefaultRegistry.Register(taskProtocolPluginSource(
+		key,
+		"1.0.0",
+		`["claimed-model"]`,
+		"/v1/responses",
+		`return {model: ctx.model, action: "ok"};`,
+	), jsplugin.Options{})
+	require.NoError(t, err)
+	t.Cleanup(func() { require.NoError(t, jsplugin.DefaultRegistry.Unregister(key)) })
+
+	previous := constant.MaxRequestBodyMB
+	constant.MaxRequestBodyMB = 1
+	t.Cleanup(func() { constant.MaxRequestBodyMB = previous })
+
+	router := gin.New()
+	router.POST("/v1/responses", PinTaskPluginEndpoint(), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	t.Run("oversized body returns 413", func(t *testing.T) {
+		body := bytes.Repeat([]byte{'x'}, (1<<20)+1)
+		req := httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+	})
+
+	t.Run("small malformed body returns 400", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodPost, "/v1/responses", strings.NewReader(`{"model":`))
+		req.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		require.Equal(t, http.StatusBadRequest, w.Code)
+	})
+}

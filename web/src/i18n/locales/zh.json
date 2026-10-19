@@ -7393,6 +7393,7 @@
     "Input cost per 1M tokens (CNY)": "输入成本 / 百万 token（元）",
     "Output cost per 1M tokens (CNY)": "输出成本 / 百万 token（元）",
     "Note (optional)": "备注（可选）",
-    "Price adjustment": "调价"
+    "Price adjustment": "调价",
+    "Usage logs always record the caller IP; this switch only controls error logs.": "使用日志始终记录调用者 IP；此开关仅控制错误日志。"
   }
 }

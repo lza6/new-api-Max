@@ -487,19 +487,23 @@ func migrateClickHouseLogDB() error {
 	if err := LOG_DB.Exec(clickHouseLogCreateTableSQL(ttlDays)).Error; err != nil {
 		return err
 	}
-	if err := ensureClickHouseLogTrafficColumns(); err != nil {
+	if err := ensureClickHouseLogColumns(); err != nil {
 		return err
 	}
 	return syncClickHouseLogTTL(ttlDays)
 }
 
-// ensureClickHouseLogTrafficColumns 为既有 ClickHouse logs 表补 request_bytes/
-// response_bytes 两列（B2-4）。ClickHouse 的 CREATE TABLE IF NOT EXISTS 不会给
-// 已存在的表加列，而站点流量统计（GetLogsTraffic / SiteOverview / 带宽排行）在
-// SQL 侧直接 SUM 这两列——缺列会导致这些端点报 "Unknown identifier"。ALTER 用
-// ADD COLUMN IF NOT EXISTS，幂等；CH 支持该语法。
-func ensureClickHouseLogTrafficColumns() error {
-	for _, col := range []string{"request_bytes Int64 DEFAULT 0", "response_bytes Int64 DEFAULT 0"} {
+// ensureClickHouseLogColumns 为既有 ClickHouse logs 表补新增列（B2-4 / 财务）。
+// ClickHouse 的 CREATE TABLE IF NOT EXISTS 不会给已存在的表加列，而站点流量统计
+// 与运营财务在 SQL 侧直接 SUM 这些列——缺列会导致端点报 "Unknown identifier"，
+// 更严重的是 GORM INSERT 会包含未知列，**所有消费日志写入失败**。
+// ALTER 用 ADD COLUMN IF NOT EXISTS，幂等；CH 支持该语法。
+func ensureClickHouseLogColumns() error {
+	for _, col := range []string{
+		"request_bytes Int64 DEFAULT 0",
+		"response_bytes Int64 DEFAULT 0",
+		"cost_quota Int64 DEFAULT 0",
+	} {
 		if err := LOG_DB.Exec("ALTER TABLE logs ADD COLUMN IF NOT EXISTS " + col).Error; err != nil {
 			return err
 		}
@@ -542,6 +546,7 @@ CREATE TABLE IF NOT EXISTS logs (
 	token_name String DEFAULT '',
 	model_name String DEFAULT '',
 	quota Int32 DEFAULT 0,
+	cost_quota Int64 DEFAULT 0,
 	prompt_tokens Int32 DEFAULT 0,
 	completion_tokens Int32 DEFAULT 0,
 	use_time Int32 DEFAULT 0,

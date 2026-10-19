@@ -87,6 +87,8 @@ func TestClickHouseLogCreateTableSQL(t *testing.T) {
 	// B2-4：CH 日志表必须含流量字节列，否则站点流量统计（SQL 侧 SUM 这两列）报 Unknown identifier。
 	assert.Contains(t, withoutTTL, "request_bytes Int64 DEFAULT 0")
 	assert.Contains(t, withoutTTL, "response_bytes Int64 DEFAULT 0")
+	// 财务：缺列不仅让运营报表报错，GORM INSERT 含未知列会让**所有消费日志写入失败**。
+	assert.Contains(t, withoutTTL, "cost_quota Int64 DEFAULT 0")
 
 	withTTL := clickHouseLogCreateTableSQL(30)
 	assert.Contains(t, withTTL, "ORDER BY (created_at, request_id)")

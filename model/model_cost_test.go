@@ -112,3 +112,12 @@ func TestValidateModelCostInput(t *testing.T) {
 	good := ModelCostInput{ChannelId: 1, Model: "m", BillingMode: ModelCostModePerCall, CostPerCallCNY: 0.0007}
 	require.NoError(t, ValidateModelCostInput(&good, now))
 }
+
+func TestTokenCostMicrosSaturatesOnOverflow(t *testing.T) {
+	// rate=1e11 微元/百万, tokens=2e8 → 乘积 2e19 远超 int64。
+	got := tokenCostMicros(100_000_000_000, 200_000_000)
+	assert.Greater(t, got, int64(0), "溢出必须饱和为正数，不能回绕成负成本")
+	assert.GreaterOrEqual(t, got, int64(1))
+	// 正常值不受影响：1 元/百万 × 500k = 0.5 元 = 500000 微元
+	assert.Equal(t, int64(500_000), tokenCostMicros(1_000_000, 500_000))
+}

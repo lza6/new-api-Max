@@ -160,7 +160,9 @@ func ChargeViolationFeeIfNeeded(ctx *gin.Context, relayInfo *relaycommon.RelayIn
 		UseTimeSeconds: int(useTimeSeconds),
 		IsStream:       relayInfo.IsStream,
 		Group:          relayInfo.UsingGroup,
-		Other:          other,
+		// 罚款不是一次上游调用：不要为它计上游成本。
+		SkipCost: true,
+		Other:    other,
 	})
 
 	return true

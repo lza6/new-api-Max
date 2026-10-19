@@ -66,7 +66,9 @@ export function PrivacyCard(props: PrivacyCardProps) {
   return (
     <TitledCard
       title={t('Record IP Address')}
-      description={t('Log IP address for usage and error logs')}
+      description={t(
+        'Usage logs always record the caller IP; this switch only controls error logs.'
+      )}
       disableHoverEffect
     >
       <div className='flex items-center justify-between gap-4'>
