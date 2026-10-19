@@ -19,7 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-import type { OpsOverview, OpsRankingResult } from './types'
+import type {
+  ModelCostRule,
+  OpsDaySeriesItem,
+  OpsOverview,
+  OpsRankingResult,
+} from './types'
 
 /** GET /api/ops/overview —— 当日/累计消耗、用户剩余额度合计、日均消耗与运营天数估算。 */
 export async function getOpsOverview(days?: number): Promise<OpsOverview> {
@@ -46,5 +51,43 @@ export async function grantUserQuota(payload: {
   quota: number
 }): Promise<void> {
   const res = await api.post('/api/admin/ops/grant-quota', payload)
+  requireServerSuccess(res.data)
+}
+
+/** GET /api/admin/ops/daily —— 逐日营收/成本/利润（本地时区）。 */
+export async function getOpsDailySeries(
+  days = 30
+): Promise<{ days: number; items: OpsDaySeriesItem[] }> {
+  const res = await api.get('/api/admin/ops/daily', { params: { days } })
+  return requireServerSuccess(res.data)?.data as {
+    days: number
+    items: OpsDaySeriesItem[]
+  }
+}
+
+/** GET /api/admin/ops/model-costs —— 成本配置历史（append-only）。 */
+export async function getModelCosts(params?: {
+  channel_id?: number
+  model?: string
+  limit?: number
+}): Promise<{ items: ModelCostRule[] }> {
+  const res = await api.get('/api/admin/ops/model-costs', { params })
+  return requireServerSuccess(res.data)?.data as {
+    items: ModelCostRule[]
+  }
+}
+
+/** POST /api/admin/ops/model-costs —— 追加一条成本规则（不修改历史）。 */
+export async function createModelCost(payload: {
+  channel_id: number
+  model: string
+  billing_mode: 'call' | 'token'
+  cost_per_call_cny: number
+  cost_input_per_million_cny: number
+  cost_output_per_million_cny: number
+  effective_from?: number
+  note?: string
+}): Promise<void> {
+  const res = await api.post('/api/admin/ops/model-costs', payload)
   requireServerSuccess(res.data)
 }

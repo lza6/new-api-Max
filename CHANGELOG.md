@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.158] - 2026-10-20
+
+### Added — 运营财务（营收/成本/利润）
+- **上游成本配置（管理员专属）**：按「渠道 × 模型」录入人民币成本，支持
+  **按次**与**按 token（输入/输出每百万）**两种模式；模型留空表示渠道默认。
+- **成本历史 append-only**：每次保存追加一条带 `effective_from` 的规则，
+  旧规则永不修改；每个请求结算时把当时生效的成本**快照**写入 `logs.cost_quota`，
+  因此调价不会改写历史利润，日报/月报/年报可复现。
+- **运营面板财务卡**：今日/本月/本年的营收、上游成本、毛利、毛利率；
+  预计本月/本年利润（按已过天数外推）；建议每日上游充值（日均成本 × 1.5 缓冲）；
+  未配置成本规则时显式提示「利润按成本 0 计算」。
+- **逐日财务序列** `GET /api/admin/ops/daily`：便于观察调价前后的波动。
+- **成本规则接口** `GET/POST /api/admin/ops/model-costs`：只追加，不提供修改/删除。
+- 成本金额以微元（1e-6 元）存整数；额度换算与前端展示营收使用同一口径。
+- **使用日志始终记录调用者 IP**（不再受个人设置开关影响），便于排查滥用。
+
+### Fixed (independent review of v1.3.156/157)
+- 任务请求体超限现在真正返回 **413**：`getModelFromRequest` 保留错误链，
+  route request 构建阶段也识别 `ErrRequestBodyTooLarge`。
+- Responses 流的上游 `type:error` 事件不再估算 prompt（避免为失败请求计费）；
+  `response.incomplete/cancelled` 携带的权威 usage 会被保留。
+- Responses 路径也映射 `output_tokens_details`（img_o/audio_o/reasoning）。
+- Waffo Pancake：`StoreID` 纳入支付/webhook 启用条件，避免「下单成功但回调被拒」。
+- 静态资源限流豁免改为**精确白名单**（`/static/`、`/assets/` 与已知根文件），
+  不再按扩展名放行任意路径。
+- 内存通知限流加互斥（复合读-改-写原子）；cgroup 不可用时打印一次明确日志。
+- 补充 Claude tool_use 计费、Responses 截断流、成本快照与 IP 的回归测试。
+
 ## [v1.3.157] - 2026-10-19
 
 ### Fixed

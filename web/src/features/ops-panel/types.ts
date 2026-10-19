@@ -37,6 +37,52 @@ export interface OpsOverview {
   average_over_days: number
   /** = total_remaining_quota / daily_average_quota；日均消耗为 0 时为 null。 */
   estimated_remaining_days: number | null
+
+  // ---- 财务（营收 / 成本 / 利润）----
+  // 全部为**额度单位**；前端用 formatQuota 换算为人民币展示。
+  today_revenue_quota: number
+  today_cost_quota: number
+  today_profit_quota: number
+  today_margin_percent: number | null
+  month_revenue_quota: number
+  month_cost_quota: number
+  month_profit_quota: number
+  month_margin_percent: number | null
+  year_revenue_quota: number
+  year_cost_quota: number
+  year_profit_quota: number
+  year_margin_percent: number | null
+  projected_month_profit_quota: number
+  projected_year_profit_quota: number
+  daily_average_cost_quota: number
+  recommended_daily_topup_quota: number
+  cost_configured: boolean
+  /** 最早的成本生效时间（unix 秒）；早于它的日志没有成本快照。 */
+  cost_tracking_since: number
+}
+
+/** 一条上游成本配置（金额为**微元**，1 元 = 1e6）。 */
+export interface ModelCostRule {
+  id: number
+  channel_id: number
+  /** 空字符串表示渠道级默认成本。 */
+  model: string
+  billing_mode: 'call' | 'token'
+  cost_per_call_micros: number
+  cost_input_per_million_micros: number
+  cost_output_per_million_micros: number
+  effective_from: number
+  created_by: number
+  note: string
+  created_at: string
+}
+
+export interface OpsDaySeriesItem {
+  date: string
+  revenue_quota: number
+  cost_quota: number
+  profit_quota: number
+  requests: number
 }
 
 export interface OpsRankingItem {

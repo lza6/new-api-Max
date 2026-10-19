@@ -24,7 +24,9 @@ import { SectionPageLayout } from '@/components/layout'
 import { Button } from '@/components/ui/button'
 
 import { ConsumptionRanking } from './components/consumption-ranking'
+import { ModelCostSettings } from './components/model-cost-settings'
 import { OpsOverviewCards } from './components/ops-overview-cards'
+import { ProfitOverview } from './components/profit-overview'
 import { OPS_QUERY_KEY } from './constants'
 
 /**
@@ -53,6 +55,8 @@ export function OpsPanel() {
       <SectionPageLayout.Content>
         <div className='space-y-3 sm:space-y-4'>
           <OpsOverviewCards />
+          <ProfitOverview />
+          <ModelCostSettings />
           <ConsumptionRanking />
         </div>
       </SectionPageLayout.Content>

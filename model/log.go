@@ -68,6 +68,10 @@ type Log struct {
 	TokenName        string `json:"token_name" gorm:"index;default:''"`
 	ModelName        string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
 	Quota            int    `json:"quota" gorm:"default:0"`
+	// CostQuota 上游成本（额度单位），由 model_cost 在结算时**快照**写入。
+	// json:"-"：这是管理员财务口径，绝不能随用户日志返回。
+	// 聚合只 SUM 本列，因此调价不会重写历史利润。
+	CostQuota        int64  `json:"-" gorm:"bigint;default:0"`
 	PromptTokens     int    `json:"prompt_tokens" gorm:"default:0"`
 	CompletionTokens int    `json:"completion_tokens" gorm:"default:0"`
 	UseTime          int    `json:"use_time" gorm:"default:0"`
@@ -407,6 +411,18 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	requestId := c.GetString(common.RequestIdKey)
 	upstreamRequestId := c.GetString(common.UpstreamRequestIdKey)
 	createdAt := common.GetTimestamp()
+	// 上游成本**快照**：按该渠道×模型在结算时刻生效的成本规则计算，
+	// 写入 logs.cost_quota。之后调价只追加新规则，不会改写这条历史记录，
+	// 因此日报/月报/年报的利润始终可复现。
+	costQuota := int64(0)
+	if ruleQuota, ruleId, ok := RequestCostQuota(params.ChannelId, params.ModelName, params.PromptTokens, params.CompletionTokens, time.Unix(createdAt, 0)); ok {
+		costQuota = ruleQuota
+		if params.Other == nil {
+			params.Other = NewLogOther()
+		}
+		params.Other.SetAdmin("upstream_cost_quota", ruleQuota)
+		params.Other.SetAdmin("upstream_cost_rule_id", ruleId)
+	}
 	// B5-2: 微美元影子价（仅统计口径，不改变 quota 计费；未收录定价的模型不写字段）。
 	if params.Other != nil {
 		if usd, known := ComputeApiEquivalentUsd(params.ModelName, params.PromptTokens, params.CompletionTokens); known {
@@ -414,8 +430,6 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		}
 	}
 	otherStr := params.Other.JSONString()
-	// 判断是否需要记录 IP
-	needRecordIp := userSettingRecordIp(c, userId)
 	log := &Log{
 		UserId:           userId,
 		Username:         username,
@@ -427,6 +441,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		TokenName:        params.TokenName,
 		ModelName:        params.ModelName,
 		Quota:            params.Quota,
+		CostQuota:        costQuota,
 		ChannelId:        params.ChannelId,
 		TokenId:          params.TokenId,
 		UseTime:          params.UseTimeSeconds,
@@ -434,12 +449,9 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		RequestBytes:     params.RequestBytes,
 		ResponseBytes:    params.ResponseBytes,
 		Group:            params.Group,
-		Ip: func() string {
-			if needRecordIp {
-				return c.ClientIP()
-			}
-			return ""
-		}(),
+		// 运营要求：使用日志必须记录调用者 IP，**不再**受个人设置开关影响。
+		// （此前默认关闭，导致管理员排查滥用时拿不到来源。）
+		Ip:                c.ClientIP(),
 		RequestId:         requestId,
 		UpstreamRequestId: upstreamRequestId,
 		Other:             otherStr,

@@ -48,6 +48,10 @@ func SetTrainingDataRouter(router *gin.Engine) {
 	admin.GET("/ops/overview", middleware.DisableCache(), controller.GetOpsOverview)
 	admin.GET("/ops/consumption-ranking", middleware.DisableCache(), controller.GetOpsConsumptionRanking)
 	admin.POST("/ops/grant-quota", middleware.DisableCache(), controller.GrantUserQuota)
+	// 财务：逐日营收/成本/利润 + 成本配置（只追加历史，不修改旧行）。
+	admin.GET("/ops/daily", middleware.DisableCache(), controller.GetOpsDailySeries)
+	admin.GET("/ops/model-costs", middleware.DisableCache(), controller.GetModelCosts)
+	admin.POST("/ops/model-costs", middleware.DisableCache(), controller.CreateModelCost)
 
 	// ---- 一键导出 + 下载记录 ----
 	admin.POST("/training-data/export", middleware.DisableCache(), controller.CreateTrainingDataExport)
@@ -90,6 +94,9 @@ var trainingDataAdminRoutes = []struct {
 	{"GET", "/api/admin/ops/overview"},
 	{"GET", "/api/admin/ops/consumption-ranking"},
 	{"POST", "/api/admin/ops/grant-quota"},
+	{"GET", "/api/admin/ops/daily"},
+	{"GET", "/api/admin/ops/model-costs"},
+	{"POST", "/api/admin/ops/model-costs"},
 	// 导出（管理端）
 	{"POST", "/api/admin/training-data/export"},
 	{"GET", "/api/admin/training-data/export"},

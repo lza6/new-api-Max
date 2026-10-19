@@ -56,6 +56,13 @@ const (
 	// opsMaxRankingOverscan Go 侧过滤时的取行上限（防止一次巨量扫描）。
 	// 超限时榜单可能少于 limit 条 —— 那时记日志说明，比拖垮日志库好。
 	opsMaxRankingOverscan = 2000
+
+	// opsTopUpBufferRatio 上游备货缓冲倍数：建议每日充值 = 日均成本 × 该倍数。
+	// 1.5 表示留出 50% 余量，覆盖上游涨价、流量波动与结算延迟。
+	opsTopUpBufferRatio = 1.5
+
+	// opsMaxDailySeriesDays 日报序列的最大天数（避免一次拉太多聚合）。
+	opsMaxDailySeriesDays = 90
 )
 
 // opsOverviewData 是 /api/ops/overview 的响应体（字段名即口径，见文件头注释）。
@@ -70,6 +77,43 @@ type opsOverviewData struct {
 	DailyAverageQuota      float64  `json:"daily_average_quota"`
 	AverageOverDays        int      `json:"average_over_days"`
 	EstimatedRemainingDays *float64 `json:"estimated_remaining_days"`
+
+	// ---- 财务口径（营收 / 成本 / 利润）----
+	// 营收 = consume 日志 quota；成本 = 结算时快照写入的 logs.cost_quota。
+	// 两者都是**额度单位**，前端用统一的 formatQuota 换算为人民币展示。
+	// 调价只追加成本历史行，不会改写旧日志 → 历史利润可复现。
+	TodayRevenueQuota  int64    `json:"today_revenue_quota"`
+	TodayCostQuota     int64    `json:"today_cost_quota"`
+	TodayProfitQuota   int64    `json:"today_profit_quota"`
+	TodayMarginPercent *float64 `json:"today_margin_percent"`
+	// 本月（服务器本地时区，1 号 00:00 起）与本年（1 月 1 日 00:00 起）。
+	MonthRevenueQuota  int64    `json:"month_revenue_quota"`
+	MonthCostQuota     int64    `json:"month_cost_quota"`
+	MonthProfitQuota   int64    `json:"month_profit_quota"`
+	MonthMarginPercent *float64 `json:"month_margin_percent"`
+	YearRevenueQuota   int64    `json:"year_revenue_quota"`
+	YearCostQuota      int64    `json:"year_cost_quota"`
+	YearProfitQuota    int64    `json:"year_profit_quota"`
+	YearMarginPercent  *float64 `json:"year_margin_percent"`
+	// 按当前速度外推（本月已过天数 / 本年已过天数），不是承诺值。
+	ProjectedMonthProfitQuota float64 `json:"projected_month_profit_quota"`
+	ProjectedYearProfitQuota  float64 `json:"projected_year_profit_quota"`
+	// 近 average_over_days 天的日均成本 × 1.5，作为「上游每天大概充多少钱」的建议。
+	DailyAverageCostQuota      float64 `json:"daily_average_cost_quota"`
+	RecommendedDailyTopupQuota float64 `json:"recommended_daily_topup_quota"`
+	// 是否配置过任何成本规则；未配置时成本=0，利润数字会偏高，前端必须提示。
+	CostConfigured bool `json:"cost_configured"`
+	// 最早的成本生效时间（unix 秒）。早于它的日志没有成本快照。
+	CostTrackingSince int64 `json:"cost_tracking_since"`
+}
+
+// opsDaySeriesItem 运营日报的一行。
+type opsDaySeriesItem struct {
+	Date         string `json:"date"`
+	RevenueQuota int64  `json:"revenue_quota"`
+	CostQuota    int64  `json:"cost_quota"`
+	ProfitQuota  int64  `json:"profit_quota"`
+	Requests     int64  `json:"requests"`
 }
 
 // opsRankingItem 是消耗排行榜的一行。
@@ -92,6 +136,57 @@ func parseOpsIntParam(c *gin.Context, name string, fallback, maxValue int) int {
 		return fallback
 	}
 	return min(n, maxValue)
+}
+
+// opsAggregate 一段时间内的营收/成本/请求数。
+type opsAggregate struct {
+	Revenue  int64
+	Cost     int64
+	Requests int64
+}
+
+// opsAggregateSince 汇总 since（Unix 秒；<=0 表示不限起点）之后的 consume 日志。
+// 营收与成本都在 SQL 侧整数 SUM，避免 float 累加误差。
+func opsAggregateSince(since int64) (opsAggregate, error) {
+	var agg struct {
+		Revenue  int64 `gorm:"column:revenue"`
+		Cost     int64 `gorm:"column:cost"`
+		Requests int64 `gorm:"column:requests"`
+	}
+	tx := model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeConsume)
+	if since > 0 {
+		tx = tx.Where("created_at >= ?", since)
+	}
+	if err := tx.Select(
+		"COALESCE(SUM(quota), 0) AS revenue, COALESCE(SUM(cost_quota), 0) AS cost, COUNT(*) AS requests",
+	).Scan(&agg).Error; err != nil {
+		return opsAggregate{}, err
+	}
+	return opsAggregate{Revenue: agg.Revenue, Cost: agg.Cost, Requests: agg.Requests}, nil
+}
+
+// opsAggregateRange 汇总 [from, to) 区间内的 consume 日志。
+func opsAggregateRange(from, to int64) (opsAggregate, error) {
+	var agg struct {
+		Revenue  int64 `gorm:"column:revenue"`
+		Cost     int64 `gorm:"column:cost"`
+		Requests int64 `gorm:"column:requests"`
+	}
+	err := model.LOG_DB.Model(&model.Log{}).
+		Where("type = ? AND created_at >= ? AND created_at < ?", model.LogTypeConsume, from, to).
+		Select("COALESCE(SUM(quota), 0) AS revenue, COALESCE(SUM(cost_quota), 0) AS cost, COUNT(*) AS requests").
+		Scan(&agg).Error
+	return opsAggregate{Revenue: agg.Revenue, Cost: agg.Cost, Requests: agg.Requests}, err
+}
+
+// marginPercent 利润率（0~100）。营收为 0 时返回 nil（JSON null），
+// 而不是 0% 或 +Inf——没有营收就没有「利润率」这个概念。
+func marginPercent(revenue, profit int64) *float64 {
+	if revenue <= 0 {
+		return nil
+	}
+	v := float64(profit) / float64(revenue) * 100
+	return &v
 }
 
 // opsConsumeQuotaSince 返回 since（Unix 秒；<=0 表示不限起点）之后 consume 日志的额度整数之和。
@@ -130,6 +225,8 @@ func GetOpsOverview(c *gin.Context) {
 
 	now := time.Now()
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location()).Unix()
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location()).Unix()
+	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Unix()
 	windowStart := now.Add(-time.Duration(days) * 24 * time.Hour).Unix()
 
 	totalQuota, err := opsConsumeQuotaSince(0)
@@ -137,14 +234,25 @@ func GetOpsOverview(c *gin.Context) {
 		common.ApiErrorMsg(c, "failed to query total consumption: "+err.Error())
 		return
 	}
-	todayQuota, err := opsConsumeQuotaSince(todayStart)
+	// 今日/本月/本年/窗口：营收 + 成本 + 请求数一次查完。
+	today, err := opsAggregateSince(todayStart)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query today consumption: "+err.Error())
+		common.ApiErrorMsg(c, "failed to query today aggregates: "+err.Error())
 		return
 	}
-	windowQuota, err := opsConsumeQuotaSince(windowStart)
+	month, err := opsAggregateSince(monthStart)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query window consumption: "+err.Error())
+		common.ApiErrorMsg(c, "failed to query month aggregates: "+err.Error())
+		return
+	}
+	year, err := opsAggregateSince(yearStart)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to query year aggregates: "+err.Error())
+		return
+	}
+	window, err := opsAggregateSince(windowStart)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to query window aggregates: "+err.Error())
 		return
 	}
 
@@ -161,9 +269,20 @@ func GetOpsOverview(c *gin.Context) {
 		return
 	}
 
-	dailyAverage := float64(windowQuota) / float64(days)
+	dailyAverage := float64(window.Revenue) / float64(days)
+	dailyAverageCost := float64(window.Cost) / float64(days)
+	monthDays := time.Date(now.Year(), now.Month()+1, 0, 0, 0, 0, 0, now.Location()).Day()
+	monthElapsed := max(now.Day(), 1)
+	yearDays := 365
+	if time.Date(now.Year(), 12, 31, 0, 0, 0, 0, now.Location()).YearDay() == 366 {
+		yearDays = 366
+	}
+	yearElapsed := max(now.YearDay(), 1)
+
+	costSince, costCount := model.ModelCostTrackingSince()
+
 	data := opsOverviewData{
-		TodayQuota: todayQuota,
+		TodayQuota: today.Revenue,
 		// 明确标注口径：前端并排展示两个「今日」时不会误导（盲点 B15）。
 		TodayQuotaTimezone:  now.Location().String(),
 		TotalQuota:          totalQuota,
@@ -171,6 +290,28 @@ func GetOpsOverview(c *gin.Context) {
 		UserCount:           remaining.UserCount,
 		DailyAverageQuota:   dailyAverage,
 		AverageOverDays:     days,
+
+		TodayRevenueQuota:  today.Revenue,
+		TodayCostQuota:     today.Cost,
+		TodayProfitQuota:   today.Revenue - today.Cost,
+		TodayMarginPercent: marginPercent(today.Revenue, today.Revenue-today.Cost),
+
+		MonthRevenueQuota:  month.Revenue,
+		MonthCostQuota:     month.Cost,
+		MonthProfitQuota:   month.Revenue - month.Cost,
+		MonthMarginPercent: marginPercent(month.Revenue, month.Revenue-month.Cost),
+
+		YearRevenueQuota:  year.Revenue,
+		YearCostQuota:     year.Cost,
+		YearProfitQuota:   year.Revenue - year.Cost,
+		YearMarginPercent: marginPercent(year.Revenue, year.Revenue-year.Cost),
+
+		ProjectedMonthProfitQuota:  float64(month.Revenue-month.Cost) / float64(monthElapsed) * float64(monthDays),
+		ProjectedYearProfitQuota:   float64(year.Revenue-year.Cost) / float64(yearElapsed) * float64(yearDays),
+		DailyAverageCostQuota:      dailyAverageCost,
+		RecommendedDailyTopupQuota: dailyAverageCost * opsTopUpBufferRatio,
+		CostConfigured:             costCount > 0,
+		CostTrackingSince:          costSince,
 	}
 	// 日均消耗为 0 时不给「还能运营几天」（返回 null），避免除零得到 +Inf。
 	if dailyAverage > 0 {
@@ -339,4 +480,93 @@ func GrantUserQuota(c *gin.Context) {
 		Mode:   "add",
 		Value:  req.Quota,
 	})
+}
+
+// GetOpsDailySeries GET /api/admin/ops/daily?days=30
+//
+// 逐日营收/成本/利润（服务器本地时区）。用于观察调价前后的波动：
+// 每一天只 SUM 当天日志里的 quota / cost_quota 快照，历史不会被新价格改写。
+func GetOpsDailySeries(c *gin.Context) {
+	days := parseOpsIntParam(c, "days", 30, opsMaxDailySeriesDays)
+	cacheKey := "ops:daily:" + strconv.Itoa(days)
+	if common.RedisEnabled {
+		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
+			var hit []opsDaySeriesItem
+			if common.Unmarshal([]byte(cached), &hit) == nil {
+				common.ApiSuccess(c, gin.H{"days": days, "items": hit})
+				return
+			}
+		}
+	}
+
+	now := time.Now()
+	startOfToday := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
+	items := make([]opsDaySeriesItem, 0, days)
+	for i := days - 1; i >= 0; i-- {
+		dayStart := startOfToday.AddDate(0, 0, -i)
+		dayEnd := dayStart.AddDate(0, 0, 1)
+		agg, err := opsAggregateRange(dayStart.Unix(), dayEnd.Unix())
+		if err != nil {
+			common.ApiErrorMsg(c, "failed to query daily aggregates: "+err.Error())
+			return
+		}
+		items = append(items, opsDaySeriesItem{
+			Date:         dayStart.Format("2006-01-02"),
+			RevenueQuota: agg.Revenue,
+			CostQuota:    agg.Cost,
+			ProfitQuota:  agg.Revenue - agg.Cost,
+			Requests:     agg.Requests,
+		})
+	}
+
+	if common.RedisEnabled {
+		if raw, err := common.Marshal(items); err == nil {
+			_ = common.RedisSet(cacheKey, string(raw), opsOverviewCacheTTL)
+		}
+	}
+	common.ApiSuccess(c, gin.H{"days": days, "items": items})
+}
+
+// GetModelCosts GET /api/admin/ops/model-costs?channel_id=&model=&limit=
+// 返回成本配置历史（append-only；调价只新增，不修改旧行）。
+func GetModelCosts(c *gin.Context) {
+	channelId, _ := strconv.Atoi(c.Query("channel_id"))
+	limit, _ := strconv.Atoi(c.Query("limit"))
+	rows, err := model.ListModelCosts(channelId, c.Query("model"), limit)
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to list model costs: "+err.Error())
+		return
+	}
+	common.ApiSuccess(c, gin.H{"items": rows})
+}
+
+// CreateModelCost POST /api/admin/ops/model-costs
+// body: {channel_id, model, billing_mode, cost_per_call_cny, cost_input_per_million_cny,
+//
+//	cost_output_per_million_cny, effective_from?, note?}
+//
+// **只追加**：同一渠道/模型再次提交会生成新的历史行，旧行保持不变。
+func CreateModelCost(c *gin.Context) {
+	var in model.ModelCostInput
+	if err := common.DecodeJson(c.Request.Body, &in); err != nil {
+		common.ApiErrorI18n(c, i18n.MsgInvalidParams)
+		return
+	}
+	if err := model.ValidateModelCostInput(&in, time.Now()); err != nil {
+		common.ApiErrorMsg(c, err.Error())
+		return
+	}
+	row, err := model.CreateModelCost(in, c.GetInt("id"))
+	if err != nil {
+		common.ApiErrorMsg(c, "failed to create model cost: "+err.Error())
+		return
+	}
+	recordUserSecurityAudit(c, c.GetInt("id"), "admin.model_cost.create", map[string]any{
+		"channel_id":     row.ChannelId,
+		"model":          row.Model,
+		"billing_mode":   row.BillingMode,
+		"effective_from": row.EffectiveFrom,
+		"rule_id":        row.Id,
+	})
+	common.ApiSuccess(c, row)
 }

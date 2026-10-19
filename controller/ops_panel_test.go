@@ -30,7 +30,7 @@ func setupOpsPanelTest(t *testing.T) *gorm.DB {
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}))
+	require.NoError(t, db.AutoMigrate(&model.User{}, &model.Log{}, &model.ModelCost{}))
 	model.DB, model.LOG_DB = db, db
 	common.SetDatabaseTypes(common.DatabaseTypeSQLite, common.DatabaseTypeSQLite)
 	// 关掉缓存：同一用例内要多次查询并看到最新数据。
@@ -163,4 +163,48 @@ func TestOpsRankingSurvivesManyAdmins(t *testing.T) {
 	}
 	require.Len(t, body.Data.Items, 1, "应只剩普通用户：%+v", body.Data.Items)
 	assert.Equal(t, normal.Id, body.Data.Items[0].UserID)
+}
+
+// 运营面板的财务口径：营收 - 成本 = 利润，利润率只在有营收时给出；
+// 成本来自日志里的快照（cost_quota），而不是按当前配置重算历史。
+func TestOpsOverviewProfitAndMargin(t *testing.T) {
+	db := setupOpsPanelTest(t)
+	now := common.GetTimestamp()
+
+	for _, row := range []model.Log{
+		{UserId: 1, Type: model.LogTypeConsume, Quota: 1_000_000, CostQuota: 400_000, CreatedAt: now},
+		{UserId: 1, Type: model.LogTypeConsume, Quota: 500_000, CostQuota: 100_000, CreatedAt: now},
+		// 非 consume 日志不得计入营收/成本。
+		{UserId: 1, Type: model.LogTypeTopup, Quota: 9_999_999, CostQuota: 9_999_999, CreatedAt: now},
+	} {
+		require.NoError(t, db.Create(&row).Error)
+	}
+	// 一条成本规则 → cost_configured=true。
+	require.NoError(t, db.Create(&model.ModelCost{
+		ChannelId: 49, Model: "deepseek-v4.1-flash", BillingMode: model.ModelCostModePerCall,
+		CostPerCallMicros: 700, EffectiveFrom: now - 10,
+	}).Error)
+
+	w := httptest.NewRecorder()
+	opsTestRouter().ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/ops/overview?days=14", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var envelope struct {
+		Success bool            `json:"success"`
+		Data    opsOverviewData `json:"data"`
+	}
+	require.NoError(t, common.Unmarshal(w.Body.Bytes(), &envelope))
+	require.True(t, envelope.Success)
+	d := envelope.Data
+
+	assert.Equal(t, int64(1_500_000), d.TodayRevenueQuota)
+	assert.Equal(t, int64(500_000), d.TodayCostQuota)
+	assert.Equal(t, int64(1_000_000), d.TodayProfitQuota)
+	require.NotNil(t, d.TodayMarginPercent)
+	assert.InDelta(t, 66.6667, *d.TodayMarginPercent, 0.01)
+	assert.Equal(t, d.TodayRevenueQuota, d.MonthRevenueQuota, "本月应包含今天")
+	assert.Equal(t, d.TodayProfitQuota, d.YearProfitQuota, "本年应包含今天")
+	assert.True(t, d.CostConfigured)
+	assert.Greater(t, d.ProjectedMonthProfitQuota, float64(0))
+	assert.Greater(t, d.RecommendedDailyTopupQuota, float64(0))
 }

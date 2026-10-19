@@ -388,6 +388,8 @@ func migrateDB() error {
 		&ActionApproval{},
 		&McpSession{},
 		&OpenAIOpsObject{},
+		// 上游成本历史（按渠道×模型，append-only；管理员财务口径）。
+		&ModelCost{},
 	}
 	if os.Getenv("LOG_SQL_DSN") == "" {
 		mainTables = append(mainTables, &Log{})
@@ -438,6 +440,8 @@ func BackupTables() []any {
 		&AuthzRole{}, &BannedIP{}, &WebRequestLog{}, &SiteDailyVisitor{},
 		&TrainingDataConsent{}, &TrainingDataWatermark{}, &EventDelivery{},
 		&WebhookEndpoint{}, &ActionApproval{}, &McpSession{}, &OpenAIOpsObject{},
+		// 成本历史必须进备份：它是财务对账的唯一依据。
+		&ModelCost{},
 	}
 }
 

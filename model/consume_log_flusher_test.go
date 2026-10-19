@@ -11,6 +11,7 @@ import (
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/relaykit/dto"
+	"github.com/lza6/new-api-Max/setting/operation_setting"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 )
@@ -196,4 +197,47 @@ func TestUserSettingRecordIpReusesRequestContext(t *testing.T) {
 		c.Set(string(constant.ContextKeyUserSetting), dto.UserSetting{})
 		require.False(t, userSettingRecordIp(c, 1))
 	})
+}
+
+// 使用日志必须记录成本快照与调用者 IP：
+//   - 成本按结算时生效的规则写入 logs.cost_quota，后续调价不重写历史；
+//   - IP 不再受个人设置开关影响（运营排查滥用的必需信息）。
+func TestConsumeLogRecordsCostSnapshotAndIP(t *testing.T) {
+	origDB, origLogDB := DB, LOG_DB
+	origFlush, origConsume, origExport := common.LogFlushEnabled, common.LogConsumeEnabled, common.DataExportEnabled
+	origRate := operation_setting.USDExchangeRate
+	defer func() {
+		DB, LOG_DB = origDB, origLogDB
+		common.LogFlushEnabled, common.LogConsumeEnabled, common.DataExportEnabled = origFlush, origConsume, origExport
+		operation_setting.USDExchangeRate = origRate
+		modelCostCache.Range(func(k, _ any) bool { modelCostCache.Delete(k); return true })
+	}()
+
+	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(&Log{}, &ModelCost{}))
+	DB, LOG_DB = db, db
+	common.LogFlushEnabled = false // 同步落库，便于直接断言
+	common.LogConsumeEnabled = true
+	common.DataExportEnabled = false
+	operation_setting.USDExchangeRate = 7.3
+	modelCostCache.Range(func(k, _ any) bool { modelCostCache.Delete(k); return true })
+
+	_, err = CreateModelCost(ModelCostInput{
+		ChannelId: 49, Model: "m", BillingMode: ModelCostModePerCall,
+		CostPerCallCNY: 0.0007, EffectiveFrom: common.GetTimestamp() - 60,
+	}, 1)
+	require.NoError(t, err)
+
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest(http.MethodPost, "/", nil)
+	c.Request.RemoteAddr = "203.0.113.9:54321"
+	c.Set("username", "u")
+	RecordConsumeLog(c, 1, RecordConsumeLogParams{ChannelId: 49, ModelName: "m", Quota: 100})
+
+	var got Log
+	require.NoError(t, LOG_DB.Where("type = ?", LogTypeConsume).First(&got).Error)
+	// 0.0007 元 / 7.3 * 500000 ≈ 47.95 → 48
+	require.Equal(t, int64(48), got.CostQuota)
+	require.Equal(t, "203.0.113.9", got.Ip)
 }

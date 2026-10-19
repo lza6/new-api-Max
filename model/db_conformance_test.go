@@ -134,6 +134,8 @@ func conformanceModels() []any {
 		// G5-3 动作审批 + G11 MCP 会话。两者都只用标准列类型、无数据库特有特性，
 		// 但仍必须证明二次迁移不改 schema。
 		&ActionApproval{}, &McpSession{}, &OpenAIOpsObject{},
+		// 上游成本历史（append-only）+ logs.cost_quota 快照列。
+		&ModelCost{},
 	}
 }
 
