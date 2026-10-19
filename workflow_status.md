@@ -103,3 +103,46 @@
 - 无（本轮范围内）。
 - 范围外/下一轮：Claude 计费两处决策待用户；累计充值金额（需三库验证）；p95 压测；
   下载记录 100 条上限提示等 P3 UI 项；`/readyz` 健康检查。
+
+---
+
+## 6. v1.3.156 上游对标加固（2026-10-19）
+
+上游 `upstream/main` = `058c8231b`（2026-10-18），merge-base 2026-09-09，上游领先 242 个非 merge 提交。
+逐条核对「已独立修复 / 仍存在 / 不适用」后，移植与本项目真实风险相关项。
+
+### 已移植
+| 类别 | 修复 | 验证 |
+|---|---|---|
+| 安全 | Waffo 回调校验 StoreID（未配置 fail-closed） | 表驱动单测 |
+| 安全 | CreateUser 角色白名单 | `go build` + 静态确认（无现成 handler 测试） |
+| 安全 | TLS 配置每处 `Clone()` | `TestOutboundTransportHonorsTLSEnv` |
+| 安全 | Gemini `:countTokens` 拒绝转发 | `go build`（路由层静态确认） |
+| 安全 | gorilla/websocket 1.5.3 | `go build` |
+| 计费 | 图片按负载计数 | `TestOpenaiImageResponseCount` |
+| 计费 | `output_tokens_details` → completion details | `TestNormalizeOpenAIUsageMapsOutputDetails` |
+| 计费 | Responses 截断流估算 prompt | `TestOaiResponsesStreamHandlerBillsCutStream` |
+| 计费 | Ollama done 帧 tool_calls | `TestOllamaStreamDoneFrameToolCalls` |
+| 可靠性 | 任务提交接受任意 2xx | 代码核对（无现成 platform 测试） |
+| 可靠性 | 通知固定窗口 + 原子计数 | `TestNotifyLimitFixedWindowMemory` |
+| 可靠性 | 审计复合索引 | 三库 conformance |
+| 可靠性 | task plugin source 1MiB | 三库 conformance（二次迁移幂等） |
+| 可靠性 | 过载哨兵 cgroup + 3 次 + 新鲜度 | `TestContainer*` / `TestCheckSystemOverload` |
+| 体验 | 静态资源不计页面限流 | `TestIsStaticAssetRequest` |
+| 体验 | 模型限流按分组隔离 | `go test ./middleware/ -run TestModelRateLimit` |
+
+### 明确不移植
+- scoped access tokens（认证体系 6k+ 行重写）
+- Responses WebSocket 中继（未实现的协议栈）
+- 插件/jsplugin 引擎重构（实现路径不同）
+- relaykit 跨协议转换批次（面广，需逐项测试；本轮记录）
+- 管理端用户管理 step-up（后端单方面加校验会让现有 UI 全部 403，必须前后端配套）
+- Claude tool_use 的 completion 估算（缺 `ToolUseCount` 字段；prompt 估算已由现有逻辑覆盖）
+
+### 验证
+- 三库 conformance（真实 SQLite/MySQL/PostgreSQL）：
+  `TestDBConformanceAutoMigrateIdempotent` + `TestDBConformanceLogsIndexes` **PASS**
+- 定向单测：common / service / middleware / openai / ollama 全部 PASS
+- `cd relaykit && GOWORK=off go build ./...` PASS
+- `go build ./...` PASS
+- 生产部署与 E2E：见下方追加

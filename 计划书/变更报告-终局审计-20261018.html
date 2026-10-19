@@ -108,7 +108,8 @@
   <a href="#review">14. 独立审查线程的复验</a>（含 <a href="#bl1">二轮 P0：路径语义</a>）<br>
   <a href="#multi">15. 多账号云盘 + 生产真实 E2E</a><br>
   <a href="#owner">16. 归属判定的四个致命缺陷（v1.3.151）</a><br>
-  <a href="#quiz">17. 测验（必须通过）</a>
+  <a href="#upstream">17. 上游对标加固（v1.3.156）</a><br>
+  <a href="#quiz">18. 测验（必须通过）</a>
 </div>
 
 <h2 id="why">1. 为什么要做这一轮</h2>
@@ -607,8 +608,69 @@ B 成功且为空（B 本来就没这个目录）
   这也说明：<b>任何直接改库的运维操作，都要考虑缓存</b>。</p>
 </div>
 
-<h2 id="quiz">17. 测验（必须通过）</h2>
-<p class="note">共 25 题，需全部答对才算通过。每题作答后会显示解析。</p>
+<h2 id="upstream">17. 上游对标加固（v1.3.156）</h2>
+
+<div class="card info">
+  <p><b>背景：</b>本 fork 的上游基线停在 2026-09-09，上游到 2026-10-18 已有 242 个提交。
+  本轮不是「全量合并」，而是逐条核对「本地是否已独立修复 / 是否仍存在 / 是否适用」，
+  只移植与本项目真实风险相关的修复。</p>
+</div>
+
+<h3>本轮移植（按风险排序）</h3>
+<table>
+  <tr><th>类别</th><th>问题</th><th>修法</th></tr>
+  <tr><td>安全</td><td>Waffo Pancake 回调只验签 + mode，不校验店铺</td>
+      <td>强制比对配置的 <code>StoreID</code>；未配置则 fail-closed（跨店铺伪造）</td></tr>
+  <tr><td>安全</td><td>创建用户接受任意小于操作者的整数角色</td>
+      <td>改为角色白名单（<code>IsValidateRole</code>）</td></tr>
+  <tr><td>安全</td><td>多个 Transport 共享同一个 <code>*tls.Config</code></td>
+      <td>每处 <code>Clone()</code>，并加断言防止共享模板被污染</td></tr>
+  <tr><td>安全</td><td>Gemini <code>:countTokens</code> 被通配路由当 generateContent 转发</td>
+      <td>路由层拒绝（未知路由，不计费）</td></tr>
+  <tr><td>计费</td><td>图片按 <code>data.#</code> 计数：对象形态计 0、一图拆 url+b64 计 2</td>
+      <td>按真实图片负载计数：对象 1 张；数组取 url/b64 条目数的较大值</td></tr>
+  <tr><td>计费</td><td><code>output_tokens_details</code> 未映射，<code>img_o/audio_o</code> 读到 0</td>
+      <td>映射到 <code>completion_tokens_details</code></td></tr>
+  <tr><td>计费</td><td>Responses 流在终止事件前被切断 → 按 0 结算并退还预扣</td>
+      <td>产生过上游事件即估算 prompt；工参/推理/拒答增量计入 completion</td></tr>
+  <tr><td>计费</td><td>Ollama 最后一帧 <code>done</code> 里的 tool_calls 丢失</td>
+      <td>done 帧也转发 tool_calls 并置 finish_reason</td></tr>
+  <tr><td>可靠性</td><td>通知限流 key 带小时后缀：窗口每小时重置、&gt;60 分钟配置失效</td>
+      <td>固定窗口 + Lua 原子自增补 TTL；非法时长回退 10 分钟</td></tr>
+  <tr><td>可靠性</td><td>审计日志按 <code>(created_at, event_id)</code> 排序但无复合索引</td>
+      <td>新增复合索引（三库 conformance 验证）</td></tr>
+  <tr><td>可靠性</td><td>任务插件源码列在 MySQL 只有 64KB</td>
+      <td>1MiB 容量（MySQL mediumtext / PG varchar / SQLite text）</td></tr>
+  <tr><td>可靠性</td><td>过载哨兵用宿主机指标、单次采样即熔断</td>
+      <td>cgroup 口径 + 连续 3 次（约 15 秒）+ 采样新鲜度（30 秒）</td></tr>
+  <tr><td>体验</td><td>冷启动的静态资源计入每 IP 页面限流，第二个用户直接 429</td>
+      <td>静态构建产物不计页面限流</td></tr>
+  <tr><td>体验</td><td>模型限流计数不分组：A 组消耗挤占 B 组额度</td>
+      <td>按分组隔离计数 key</td></tr>
+  <tr><td>依赖</td><td>gorilla/websocket 1.5.0</td><td>升级到 1.5.3</td></tr>
+</table>
+
+<h3>明确不移植（附原因）</h3>
+<ul>
+  <li><b>scoped access tokens（6k+ 行）：</b>属于认证体系重写，会大范围破坏现有 session/JWT/step-up 中间件。</li>
+  <li><b>Responses WebSocket 中继：</b>新协议栈，本 fork 未实现，收益与风险不匹配。</li>
+  <li><b>任务插件/jsplugin 体系重构：</b>两边插件引擎实现不同，整包移植会破坏本地运行时。</li>
+  <li><b>relaykit 跨协议转换批次：</b>涉及面广，需要逐项单测，本轮只记录、未批量移植。</li>
+  <li><b>管理端用户管理 step-up：</b>后端加校验会让现有管理 UI 全部 403；
+      必须前后端配套上线，本轮不做「只做一半」的改动。</li>
+</ul>
+
+<h3>验证</h3>
+<ul>
+  <li><b>三库 conformance（真实 SQLite / MySQL / PostgreSQL）：</b>
+      AutoMigrate 二次幂等 + 审计复合索引存在性，全部 PASS。</li>
+  <li><b>定向单测：</b>Waffo StoreID、图片计数、output_tokens_details、Responses 截断流、
+      Ollama done 帧、容器口径、限流分组、静态资源判定，全部 PASS。</li>
+  <li><b>relaykit 独立构建：</b><code>GOWORK=off go build ./...</code> PASS。</li>
+</ul>
+
+<h2 id="quiz">18. 测验（必须通过）</h2>
+<p class="note">共 29 题，需全部答对才算通过。每题作答后会显示解析。</p>
 
 <div id="quiz">
   <div id="questions"></div>
@@ -892,6 +954,50 @@ const QUIZ = [
     ],
     answer: 1,
     why: "顺序倒置会让旧文本在新水位之后重放。把重试信号暂存在 worker 内、下一轮优先取用，保证「旧信号重试 → 新信号」。"
+  },
+  {
+    stem: "Waffo Pancake 回调已经验签通过，为什么还必须校验 StoreID？",
+    opts: [
+      "因为验签会过期",
+      "因为签名只证明「某个 Pancake 店铺发来的事件」，不证明「是我们的店铺」；另一店铺的合法签名事件可携带我们的 trade_no 触发订单完成",
+      "因为 StoreID 影响税率",
+      "因为 SDK 要求"
+    ],
+    answer: 1,
+    why: "验签 + mode 只解决「事件未被篡改」，不解决「事件属于本商户」。必须比对配置的 StoreID，未配置时 fail-closed。"
+  },
+  {
+    stem: "图片计费为什么不能直接用 data 数组长度？",
+    opts: [
+      "因为数组长度一定是错的",
+      "因为对象形态的 data 会计 0、同一张图拆成 url 和 b64_json 两条会计 2、只有 revised_prompt 的条目也会被计成图片",
+      "因为 gjson 不支持数组",
+      "因为数组长度没有上限"
+    ],
+    answer: 1,
+    why: "按真实图片负载计数：对象含 url/b64_json 计 1；数组取 url 条目数与 b64_json 条目数的较大值；无图片负载计 0。"
+  },
+  {
+    stem: "容器化部署时，为什么过载哨兵不能直接用 /proc/meminfo 与单次采样？",
+    opts: [
+      "因为 /proc 不可读",
+      "因为那度量的是宿主机而非容器配额，同节点其它负载会把正常流量误判为过载；单次尖峰也会立即熔断",
+      "因为容器里没有 CPU",
+      "因为 gopsutil 有 bug"
+    ],
+    answer: 1,
+    why: "改为 cgroup 口径 + 连续 3 次采样（约 15 秒）+ 采样新鲜度（30 秒）；任一采样回落即恢复。"
+  },
+  {
+    stem: "前端静态构建产物为什么不应计入每 IP 的页面限流？",
+    opts: [
+      "因为静态资源不需要鉴权",
+      "因为一次冷启动会并发拉取几十~上百个文件，算进页面限额会让同一 IP 的第二个用户直接 429（正常首屏加载被当成攻击）",
+      "因为静态资源不占带宽",
+      "因为 CDN 会处理"
+    ],
+    answer: 1,
+    why: "静态资源来自 embed、无 DB/上游调用。把它们与页面请求共用一个限额，误伤成本远大于防护收益。"
   }
 ];
 

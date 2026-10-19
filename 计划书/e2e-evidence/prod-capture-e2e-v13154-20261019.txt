@@ -44,3 +44,12 @@ v1.3.155 复测（2026-10-19，镜像 new-api:v1.3.155，上游 3000）
 - 分片 1 行：role=request kind=message len=38（本次模型只回 reasoning，无 assistant）
 - 清理：DB 各表删除 1 行；云盘目录 account#1=204 / account#2=404
 结论：v1.3.155 的重试顺序与导出分页改动未影响采集主链路。
+
+==========================================================================
+v1.3.156 复测（2026-10-19，镜像 new-api:v1.3.156，上游 3001）
+- 生产：healthy，版本头 v1.3.156，10 分钟 0 个 500
+- DB：audit_logs.idx_audit_created_event 存在；task_plugins.source = varchar(1048576)
+- 探针用户 capture_e2e_v156_1792398651（id=1630）
+- 云盘：账号 #1，training-data/2026-10-19/...，2 行（request kind=message + assistant）
+- 清理：DB 各表删除 1 行；云盘 account#1=204 / account#2=404
+结论：v1.3.156 的上游对标改动未影响采集与对话主链路。
