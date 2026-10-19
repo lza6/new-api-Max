@@ -98,22 +98,17 @@ func StartTrainingDataCapture() {
 
 	common.SysLog("training data capture: worker started (sink=" + sinkName + ")")
 
-	// ⚠️ 多实例约束：**必须显式告知运维**（盲点扫描发现的真实缺陷）。
+	// 多实例约束（v1.3.152 起已部分闭环，必须如实告知运维）：
 	//
-	// 采集模块目前**没有跨实例协调**，多实例同时开启会造成两类真实问题：
-	//
-	//	1. 分片互相覆盖：两实例对同一 (用户,会话) 各自 List→取序号→WritePart，
-	//	   得到同一个 partSeq，而 OneDrive 的 PUT .../content 是**替换**语义
-	//	   → 先写的被后写的覆盖（静默丢数据）。
-	//	2. 开关/撤回不跨实例传播：总开关与授权缓存都是**进程内**状态
-	//	   （`gatewayEnabled` + 内存 map），A 实例关掉后 B 实例最长 30s 仍在采集；
-	//	   管理员关开关时看到的「已关闭」只对当前实例成立。
-	//
-	// 这不是理论风险，是代码路径可直接推出的结论。在实现跨实例协调
-	// （云盘侧条件写 / DB 租约 / Redis 锁）之前，必须让运维知道。
-	common.SysLog("training data capture: WARNING - capture does NOT coordinate across instances; " +
-		"run it on a SINGLE instance only, otherwise shards may overwrite each other " +
-		"and the gateway switch will not propagate between instances")
+	//	1. **同一用户**的上传已由 DB 租约（`system_task_locks`）串行化，
+	//	   不会出现两个实例抢同一 part 序号。不同用户可由不同实例并行处理。
+	//	2. 总开关与授权缓存仍是**进程内**状态（`gatewayEnabled` + 内存 map），
+	//	   A 实例关闭后 B 实例最长 30s 仍在采集 —— 这是剩余的真实窗口。
+	//	3. 租约固定 5 分钟且不续期；超长上传可能在租约过期后被另一实例接管。
+	//	4. 拿不到租约的信号会计入 `skipped_lease` 并跳过（不回队）。
+	common.SysLog("training data capture: multi-instance uploads are serialized per user by DB leases; " +
+		"gateway/consent caches remain process-local (up to 30s propagation), " +
+		"leases last 5 minutes and are not renewed")
 }
 
 // trainingDataCleanupInterval 水位清理周期。

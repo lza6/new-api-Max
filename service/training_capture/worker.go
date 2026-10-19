@@ -1072,7 +1072,8 @@ func CleanupStaleWatermarks() (int64, error) {
 //   - 这是**补偿**（best-effort），不是事务。删除失败只记录日志，
 //     不改变「本次上传失败」这个结论 —— 返回错误给上层，水位照样不推进。
 //   - 单实例前提下安全：只删**本批自己刚写**的那几个名字，不会碰历史分片。
-//     多实例会重新引入竞态（见启动日志里的多实例告警）。
+//     多实例下，同一用户的上传由 DB 租约串行化；但租约过期后另一实例接管时
+//     仍可能与本补偿删除交叉（已知限制，见启动日志）。
 func cleanupOrphanParts(ctx context.Context, sink TrainingDataSink, written []string) {
 	if len(written) == 0 {
 		return
