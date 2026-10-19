@@ -196,7 +196,8 @@ else
   REDIS_URL=$(docker exec new-api printenv REDIS_CONN_STRING 2>/dev/null | head -1 || true)
   if [ -n "$REDIS_URL" ]; then
     RPASS=$(printf '%s' "$REDIS_URL" | sed -n 's|redis://:\([^@]*\)@.*|\1|p')
-    docker exec redis redis-cli -a "$RPASS" DEL "user:$UID_" >/dev/null 2>&1 || true
+    # 用 REDISCLI_AUTH 传密码，避免 `-a` 把口令暴露在进程参数里。
+    docker exec -e REDISCLI_AUTH="$RPASS" redis redis-cli DEL "user:$UID_" >/dev/null 2>&1 || true
   fi
   say "   额度已补足到 2000000（仅当原值更低），并已清除用户缓存"
 fi
