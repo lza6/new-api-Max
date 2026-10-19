@@ -176,3 +176,16 @@
 - 前端 typecheck/oxlint/i18n/build PASS；浏览器 E2E `ui-e2e-ops-profit.cjs` 11/11
 - 生产真实请求：glm-5.3-flash → `quota=3000, cost_quota=1000`，IP 已记录；用户日志无 cost_quota
 - 今日总览：10,470,400 / 2,801,460 / 7,668,940（margin 73.24%）
+
+### v1.3.160 二轮独立复验修复（已部署）
+- ClickHouse 建表/补列补 `cost_quota`（缺列会让所有消费日志写入失败）。
+- Responses `response.error` 与 `error` 一样视为失败。
+- 订阅 Waffo 下单要求 StoreID。
+- token 成本饱和乘法（防 int64 回绕）。
+- 不存在 `/static/*` 直接 404；生产实测 404，真实资源 200。
+- 启动日志分别报告 `cpu=host|cgroup memory=host|cgroup`；
+  本实例实测 `cpu=host memory=cgroup`（无 CPU 配额，内存有 900m 限制）。
+- IP 开关文案改为「使用日志始终记录 IP，开关仅控制错误日志」。
+- 413 状态码测试（超限 413 / 小 JSON 400）；通知测试清理 key。
+- 生产 v1.3.160（上游 3001）：healthy、0 个 500、4 条成本规则保留、
+  财务 totalview 冷 9.8s / 缓存 0.0s。
