@@ -39,7 +39,16 @@ type TaskPlugin struct {
 	Key        string `json:"key" gorm:"size:128;not null;uniqueIndex:uk_task_plugin_key_version,priority:1"`
 	APIVersion int    `json:"api_version" gorm:"not null"`
 	Version    string `json:"version" gorm:"size:64;not null;uniqueIndex:uk_task_plugin_key_version,priority:2"`
-	Source     string `json:"source" gorm:"type:text;not null"`
+	// Source cap is 1 MiB (controller enforces it). A bare `type:text` is only
+	// 64 KiB on MySQL, so larger plugins would fail to insert (or truncate).
+	// size=1 MiB makes GORM emit mediumtext on MySQL (16 MiB capacity),
+	// varchar(1048576) on PostgreSQL, and text on SQLite.
+	//
+	// **不要在这里加 `not null`**：GORM 的 MySQL migrator 在「type + size +
+	// NOT NULL」组合下无法把 mediumtext 的长度（16777215）与 size 对齐，
+	// 每次 AutoMigrate 都会重复 `MODIFY COLUMN`（三库幂等测试会红）。
+	// 非空由应用层保证（controller 校验 Source 非空）。
+	Source     string `json:"source" gorm:"size:1048576"`
 	SourceHash string `json:"source_hash" gorm:"size:64;not null"`
 	// Icon is the plugin logo shipped as a sidecar icon.svg / icon.png next to
 	// plugin.js, stored as a data URI so one column carries both the media

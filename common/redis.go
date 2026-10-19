@@ -249,6 +249,35 @@ func RedisHGetObj(key string, obj any) error {
 	return nil
 }
 
+// RedisIncrWithTTL 原子地自增计数器，并在键**没有 TTL**时设置过期时间。
+//
+// 为什么需要专用实现：`RedisIncr` 在 TTL<=0（键不存在或无过期）时**什么都不做**，
+// 于是「先 GET 再 SET/INCR」的限流写法存在两个真实缺陷：
+//   - 竞态：两个请求同时看到空键，各自 SET 1（少计数）；
+//   - 历史/异常键没有 TTL 时永远不增长（限流永久失效）。
+//
+// Lua 保证「自增 + 补 TTL」原子执行；已有 TTL 的键保持原窗口（固定窗口语义）。
+func RedisIncrWithTTL(key string, delta int64, expiration time.Duration) (int64, error) {
+	if RDB == nil {
+		return 0, fmt.Errorf("redis is not initialized")
+	}
+	ctx := context.Background()
+	script := redis.NewScript(`
+local v = redis.call('INCRBY', KEYS[1], ARGV[1])
+local ttl = redis.call('PTTL', KEYS[1])
+if ttl < 0 and tonumber(ARGV[2]) > 0 then
+  redis.call('PEXPIRE', KEYS[1], ARGV[2])
+end
+return v
+`)
+	millis := expiration.Milliseconds()
+	res, err := script.Run(ctx, RDB, []string{key}, delta, millis).Int64()
+	if err != nil {
+		return 0, fmt.Errorf("redis incr with ttl: %w", err)
+	}
+	return res, nil
+}
+
 // RedisIncr Add this function to handle atomic increments
 func RedisIncr(key string, delta int64) error {
 	if DebugEnabled {

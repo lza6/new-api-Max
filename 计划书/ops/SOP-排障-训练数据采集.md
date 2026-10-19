@@ -114,8 +114,10 @@
 1. **已有数据的账号优先**（老目录永不漂移）；
 2. **只有每个账号都能成功列举，才允许选定归属**：只要有**任一账号** List 失败，
    即使另一个账号能看到数据，也会拒绝写入并返回
-   `cannot safely resolve which account owns this directory`，信号回队重试（最多 3 次）。
-   读不到的那个账号可能才是真正的写入者（它的 part 序号更大）——猜错会劈裂目录；
+   `cannot safely resolve which account owns this directory`，信号优先重试（最多 3 次，
+   退避约 4/8/16 秒）。读不到的那个账号可能才是真正的写入者（它的 part 序号更大）——猜错会劈裂目录。
+   **可用性代价**：故障持续超过约 28 秒时该增量会被放弃（日志 `giving up after 3 retries`），
+   这是有意的「用可用性换数据完整性」；
 3. 只有**每个**账号都成功读到空列表，才按 `crc32(dir)%N` 分片；
 4. 同一目录出现在多个账号（手工迁移/复制）→ 取 **part 序号最大** 的账号，并打
    `exists on multiple accounts` ERROR 日志 —— 需要人工合并/清理，不要忽略。

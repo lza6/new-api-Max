@@ -265,3 +265,83 @@ func TestOaiResponsesStreamHandlerDoesNotCountPartialImageEvent(t *testing.T) {
 
 	assert.Equal(t, 0, info.ResponsesUsageInfo.BuiltInTools[dto.BuildInToolImageGeneration].CallCount)
 }
+
+// 流在 response.completed 前被切断时，只要产生过上游事件且不是 response.failed，
+// 就必须估算 prompt 并计入工参/推理/拒答的 completion；
+// 否则会按 0 结算并退还整笔预扣（收入泄漏）。
+func TestOaiResponsesStreamHandlerBillsCutStream(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	// StreamScannerHandler 用 StreamingTimeout 构造 ticker；未初始化时为 0 会 panic。
+	oldTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
+
+	cases := []struct {
+		name                  string
+		events                []string
+		wantPrompt            int
+		wantCompletionNonZero bool
+	}{
+		{
+			name: "工具参数增量被切断",
+			events: []string{
+				`{"type":"response.function_call_arguments.delta","delta":"{\"city\":\"Paris\"}"}`,
+			},
+			wantPrompt:            7,
+			wantCompletionNonZero: true,
+		},
+		{
+			name: "推理增量被切断",
+			events: []string{
+				`{"type":"response.reasoning_text.delta","delta":"thinking about the answer"}`,
+			},
+			wantPrompt:            7,
+			wantCompletionNonZero: true,
+		},
+		{
+			name: "明确失败不计 prompt",
+			events: []string{
+				`{"type":"response.failed","response":{"status":"failed"}}`,
+			},
+			wantPrompt:            0,
+			wantCompletionNonZero: false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var body bytes.Buffer
+			for _, e := range tc.events {
+				body.WriteString("data: " + e + "\n\n")
+			}
+			w := httptest.NewRecorder()
+			c, _ := gin.CreateTestContext(w)
+			c.Request = httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
+			c.Set(common.RequestIdKey, "responses-cut-stream-test")
+
+			info := &relaycommon.RelayInfo{
+				OriginModelName: "test-model",
+				DisablePing:     true,
+				ChannelMeta: &relaycommon.ChannelMeta{
+					UpstreamModelName: "test-model",
+				},
+			}
+			info.SetEstimatePromptTokens(7)
+			resp := &http.Response{
+				StatusCode: http.StatusOK,
+				Body:       io.NopCloser(strings.NewReader(body.String())),
+				Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+			}
+
+			usage, apiErr := OaiResponsesStreamHandler(c, info, resp)
+			require.Nil(t, apiErr)
+			require.NotNil(t, usage)
+			assert.Equal(t, tc.wantPrompt, usage.PromptTokens)
+			if tc.wantCompletionNonZero {
+				assert.Greater(t, usage.CompletionTokens, 0)
+			} else {
+				assert.Zero(t, usage.CompletionTokens)
+			}
+		})
+	}
+}

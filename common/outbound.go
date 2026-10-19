@@ -60,7 +60,7 @@ func buildOutboundTransport() *http.Transport {
 	}
 	// 直读 env：无论何时构建（首个外呼，晚于 .env/进程 env 就绪），均正确反映开关。
 	if GetEnvOrDefaultBool("TLS_INSECURE_SKIP_VERIFY", false) {
-		transport.TLSClientConfig = InsecureTLSConfig
+		transport.TLSClientConfig = InsecureTLSConfig.Clone()
 	}
 	return transport
 }

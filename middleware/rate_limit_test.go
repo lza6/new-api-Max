@@ -346,3 +346,28 @@ func TestGlobalAPIRateLimitSkipsHealthProbe(t *testing.T) {
 	assert.Equal(t, http.StatusTooManyRequests,
 		performRateLimitRequest(router, "/api/limited", "10.0.0.2:1234").Code)
 }
+
+// 前端静态构建产物不能计入页面限流：一次冷启动会拉取几十~上百个文件，
+// 算进去会让同一 IP 的第二个用户直接 429（不是攻击流量）。
+func TestIsStaticAssetRequest(t *testing.T) {
+	cases := []struct {
+		path string
+		want bool
+	}{
+		{"/static/js/index.abc123.js", true},
+		{"/static/css/index.css", true},
+		{"/assets/logo.webp", true},
+		{"/fonts/Inter.woff2", true},
+		{"/favicon.ico", true},
+		{"/logo.png", true},
+		{"/pricing", false},
+		{"/api/status", false},
+		{"/v1/chat/completions", false},
+		{"/static", false},
+	}
+	for _, tc := range cases {
+		if got := isStaticAssetRequest(tc.path); got != tc.want {
+			t.Errorf("isStaticAssetRequest(%q) = %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}

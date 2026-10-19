@@ -239,6 +239,10 @@ type Usage struct {
 	InputTokens            int                `json:"input_tokens"`
 	OutputTokens           int                `json:"output_tokens"`
 	InputTokensDetails     *InputTokenDetails `json:"input_tokens_details"`
+	// OutputTokensDetails is the Images/Responses native output breakdown
+	// (text / audio / image / reasoning). It must be mapped onto
+	// CompletionTokenDetails before billing expressions read `img_o`/`audio_o`.
+	OutputTokensDetails *OutputTokenDetails `json:"output_tokens_details,omitempty"`
 
 	// claude cache 1h
 	ClaudeCacheCreation5mTokens int `json:"claude_cache_creation_5_m_tokens"`

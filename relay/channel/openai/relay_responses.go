@@ -76,6 +76,11 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 	var responseTextBuilder strings.Builder
 	imageCounter := &relaycommon.ImageGenerationCallCounter{}
 	imageCommitted := false
+	// started：至少成功解析过一个上游事件。
+	// explicitFailure：上游明确报告了失败（response.failed）。
+	// 两者用于「流在终止事件前被切断」时的 prompt 计费判定（见函数末尾）。
+	started := false
+	explicitFailure := false
 
 	helper.StreamScannerHandler(c, resp, info, func(data string, sr *helper.StreamResult) {
 
@@ -86,6 +91,7 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 			sr.Error(err)
 			return
 		}
+		started = true
 		sendResponsesStreamData(c, streamResponse, data)
 		switch streamResponse.Type {
 		case "response.completed", "response.done":
@@ -113,12 +119,21 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 				imageCommitted = true
 			}
 		case "response.failed", "response.incomplete", "response.cancelled", "response.canceled":
+			if streamResponse.Type == "response.failed" {
+				explicitFailure = true
+			}
 			if !imageCommitted {
 				imageCounter.Reset()
 				imageCounter.Commit(info)
 				imageCommitted = true
 			}
-		case "response.output_text.delta":
+		case "response.output_text.delta",
+			// 工具参数、推理、拒答同样是上游计费的输出 token：
+			// 流被切断时只统计 output_text 会低估 completion（甚至为 0）。
+			"response.function_call_arguments.delta",
+			"response.reasoning_summary_text.delta",
+			"response.reasoning_text.delta",
+			"response.refusal.delta":
 			// 处理输出文本
 			responseTextBuilder.WriteString(streamResponse.Delta)
 		case dto.ResponsesOutputTypeItemDone:
@@ -149,7 +164,11 @@ func OaiResponsesStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp
 		}
 	}
 
-	if usage.PromptTokens == 0 && usage.CompletionTokens != 0 {
+	// 上游一旦开始生成就会计 prompt。流在 response.completed 前被切断时，
+	// 只要产生过上游事件且没有被明确报告失败，就必须估算 prompt；
+	// 否则结算为 0 会把整笔预扣费退掉（收入泄漏）。
+	billsPrompt := usage.CompletionTokens != 0 || (started && !explicitFailure)
+	if usage.PromptTokens == 0 && billsPrompt {
 		usage.PromptTokens = info.GetEstimatePromptTokens()
 	}
 

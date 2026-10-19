@@ -97,3 +97,39 @@ func TestOllamaChatHandlerNonStreamToolCalls(t *testing.T) {
 		})
 	}
 }
+
+// 有些 Ollama 版本把 tool_calls 放在最后的 done 帧；只处理非 done 帧会丢掉
+// 最后一次工具调用（客户端只收到 stop）。这里锁定 done 帧也要转发。
+func TestOllamaStreamDoneFrameToolCalls(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	oldTimeout := constant.StreamingTimeout
+	constant.StreamingTimeout = 30
+	t.Cleanup(func() { constant.StreamingTimeout = oldTimeout })
+
+	body := `{"model":"llama3.1","created_at":"2026-05-27T12:00:00Z","message":{"role":"assistant","content":"","tool_calls":[{"id":"call_done","function":{"name":"get_weather","arguments":{"city":"Paris"}}}]},"done":true,"done_reason":"stop","prompt_eval_count":5,"eval_count":7}` + "\n"
+
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/chat", nil)
+
+	info := &relaycommon.RelayInfo{
+		OriginModelName: "llama3.1",
+		ChannelMeta: &relaycommon.ChannelMeta{
+			UpstreamModelName: "llama3.1",
+		},
+	}
+	resp := &http.Response{
+		StatusCode: http.StatusOK,
+		Body:       io.NopCloser(strings.NewReader(body)),
+		Header:     http.Header{"Content-Type": []string{"application/x-ndjson"}},
+	}
+
+	usage, apiErr := ollamaStreamHandler(c, info, resp)
+	require.Nil(t, apiErr)
+	require.NotNil(t, usage)
+
+	out := w.Body.String()
+	assert.Contains(t, out, `"tool_calls"`)
+	assert.Contains(t, out, `"call_done"`)
+	assert.Contains(t, out, `"finish_reason":"tool_calls"`)
+}

@@ -177,6 +177,29 @@ func ollamaStreamHandler(c *gin.Context, info *relaycommon.RelayInfo, resp *http
 		usage.PromptTokens = chunk.PromptEvalCount
 		usage.CompletionTokens = chunk.EvalCount
 		usage.TotalTokens = usage.PromptTokens + usage.CompletionTokens
+		// 有些 Ollama 版本把 tool_calls 放在**最后一个 done 帧**里而不是
+		// 普通 delta 帧。只处理 !Done 分支会丢掉最后一次工具调用
+		// （客户端收到 stop 但没有 tool_calls）。
+		if chunk.Message != nil && len(chunk.Message.ToolCalls) > 0 {
+			toolCalls, nextIndex := ollamaToolCallsToOpenAI(chunk.Message.ToolCalls, toolCallIndex, true)
+			toolCallIndex = nextIndex
+			toolDelta := dto.ChatCompletionsStreamResponse{
+				Id:      responseId,
+				Object:  "chat.completion.chunk",
+				Created: created,
+				Model:   model,
+				Choices: []dto.ChatCompletionsStreamResponseChoice{{
+					Index: 0,
+					Delta: dto.ChatCompletionsStreamResponseChoiceDelta{
+						Role:      "assistant",
+						ToolCalls: toolCalls,
+					},
+				}},
+			}
+			if data, err := common.Marshal(toolDelta); err == nil {
+				_ = helper.StringData(c, string(data))
+			}
+		}
 		finishReason := chunk.DoneReason
 		if finishReason == "" {
 			finishReason = "stop"

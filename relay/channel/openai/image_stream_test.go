@@ -10,9 +10,11 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
+	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/constant"
 	relaycommon "github.com/lza6/new-api-Max/relay/common"
 	relayconstant "github.com/lza6/new-api-Max/relay/constant"
+	"github.com/lza6/new-api-Max/relaykit/dto"
 	"github.com/stretchr/testify/require"
 )
 
@@ -446,4 +448,53 @@ func TestOpenaiImageStreamHandlerRecordsUpstreamErrorEvent(t *testing.T) {
 	// is still forwarded in the data: payload (stream ID 77).
 	require.Contains(t, recorder.Body.String(), `event: upstream_error`)
 	require.Contains(t, recorder.Body.String(), `stream ID 77`)
+}
+
+// openaiImageResponseCount 必须按**真实图片负载**计数：
+// 对象形态、url/b64 拆分、无图片条目都不能算错（直接影响图片计费）。
+func TestOpenaiImageResponseCount(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want int64
+	}{
+		{"标准数组", `{"data":[{"url":"a"},{"url":"b"}]}`, 2},
+		{"b64 数组", `{"data":[{"b64_json":"x"},{"b64_json":"y"}]}`, 2},
+		{"对象形态", `{"data":{"url":"a","b64_json":"x"}}`, 1},
+		{"一图拆成 url+b64", `{"data":[{"url":"a"},{"b64_json":"x"}]}`, 1},
+		{"只有 revised_prompt", `{"data":[{"revised_prompt":"draw a cat"}]}`, 0},
+		{"空数组", `{"data":[]}`, 0},
+		{"没有 data", `{}`, 0},
+		{"空字符串字段不算", `{"data":[{"url":""},{"b64_json":"x"}]}`, 1},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			require.Equal(t, tc.want, openaiImageResponseCount([]byte(tc.body)))
+		})
+	}
+}
+
+// 图片/Responses 上游的 output_tokens_details 必须映射到 completion_tokens_details，
+// 否则计费表达式里的 img_o / audio_o / reasoning 读到 0（少计费）。
+func TestNormalizeOpenAIUsageMapsOutputDetails(t *testing.T) {
+	var usage dto.Usage
+	require.NoError(t, common.Unmarshal([]byte(`{
+		"input_tokens": 10,
+		"output_tokens": 20,
+		"output_tokens_details": {
+			"text_tokens": 1,
+			"image_tokens": 2000,
+			"audio_tokens": 3,
+			"reasoning_tokens": 4
+		}
+	}`), &usage))
+
+	normalizeOpenAIUsage(&usage)
+	require.Equal(t, 10, usage.PromptTokens)
+	require.Equal(t, 20, usage.CompletionTokens)
+	require.Equal(t, 30, usage.TotalTokens)
+	require.Equal(t, 1, usage.CompletionTokenDetails.TextTokens)
+	require.Equal(t, 2000, usage.CompletionTokenDetails.ImageTokens)
+	require.Equal(t, 3, usage.CompletionTokenDetails.AudioTokens)
+	require.Equal(t, 4, usage.CompletionTokenDetails.ReasoningTokens)
 }

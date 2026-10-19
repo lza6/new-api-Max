@@ -37,7 +37,13 @@ func TestOutboundTransportHonorsTLSEnv(t *testing.T) {
 	t.Setenv("TLS_INSECURE_SKIP_VERIFY", "true")
 	tr := buildOutboundTransport()
 	require.NotNil(t, tr.TLSClientConfig)
-	assert.Same(t, InsecureTLSConfig, tr.TLSClientConfig)
+	assert.True(t, tr.TLSClientConfig.InsecureSkipVerify)
+	// **必须是克隆，不能共享同一个 *tls.Config**：tls.Config 文档要求
+	// 「首次使用后不得修改」；共享指针会让任意一个 transport 的后续改动
+	// 波及所有 transport（上游 feefe09f2 的修复点）。
+	assert.NotSame(t, InsecureTLSConfig, tr.TLSClientConfig)
+	tr.TLSClientConfig.ServerName = "only-this-transport.example"
+	assert.Empty(t, InsecureTLSConfig.ServerName, "改动一个 transport 的 TLS 配置不得污染共享模板")
 
 	t.Setenv("TLS_INSECURE_SKIP_VERIFY", "false")
 	tr2 := buildOutboundTransport()

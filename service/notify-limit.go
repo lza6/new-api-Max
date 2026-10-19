@@ -2,7 +2,6 @@ package service
 
 import (
 	"fmt"
-	"strconv"
 	"sync"
 	"time"
 
@@ -22,8 +21,15 @@ type limitCount struct {
 	Timestamp time.Time
 }
 
+// getDuration 返回限流窗口长度。
+//
+// 非法/未初始化（<=0）时回退到 10 分钟：否则「窗口长度 0」会让内存实现
+// 每次都判定过期（计数永远回到 0，限流永久失效）。
 func getDuration() time.Duration {
 	minute := constant.NotificationLimitDurationMinute
+	if minute <= 0 {
+		minute = 10
+	}
 	return time.Duration(minute) * time.Minute
 }
 
@@ -55,42 +61,24 @@ func CheckNotificationLimit(userId int, notifyType string) (bool, error) {
 }
 
 func checkRedisLimit(userId int, notifyType string) (bool, error) {
-	key := fmt.Sprintf("notify_limit:%d:%s:%s", userId, notifyType, time.Now().Format("2006010215"))
+	// **键不能带小时后缀**：带 `2006010215` 会让窗口每小时重置一次，
+	// 配置 >60 分钟的时长完全失效；且跨小时的两个请求落在不同键上，
+	// 统计口径被切成两段。固定窗口由 TTL 表达（见 RedisIncrWithTTL）。
+	key := fmt.Sprintf("notify_limit:%d:%s", userId, notifyType)
 
-	// Get current count
-	count, err := common.RedisGet(key)
-	if err != nil && err.Error() != "redis: nil" {
-		return false, fmt.Errorf("failed to get notification count: %w", err)
-	}
-
-	// If key doesn't exist, initialize it
-	if count == "" {
-		err = common.RedisSet(key, "1", getDuration())
-		return true, err
-	}
-
-	currentCount, _ := strconv.Atoi(count)
-	limit := constant.NotifyLimitCount
-
-	// Check if limit is already reached
-	if currentCount >= limit {
-		return false, nil
-	}
-
-	// Only increment if under limit
-	err = common.RedisIncr(key, 1)
+	count, err := common.RedisIncrWithTTL(key, 1, getDuration())
 	if err != nil {
-		return false, fmt.Errorf("failed to increment notification count: %w", err)
+		return false, fmt.Errorf("failed to count notification: %w", err)
 	}
-
-	return true, nil
+	return count <= int64(constant.NotifyLimitCount), nil
 }
 
 func checkMemoryLimit(userId int, notifyType string) (bool, error) {
 	// Ensure cleanup task is started
 	cleanupOnce.Do(startCleanupTask)
 
-	key := fmt.Sprintf("%d:%s:%s", userId, notifyType, time.Now().Format("2006010215"))
+	// 与 Redis 版一致：不带小时后缀，窗口长度由 getDuration 决定。
+	key := fmt.Sprintf("%d:%s", userId, notifyType)
 	now := time.Now()
 
 	// Get current limit count or initialize new one

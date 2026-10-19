@@ -2,6 +2,48 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.156] - 2026-10-19
+
+Upstream-alignment hardening (security, billing correctness, container awareness).
+
+### Security
+- Waffo Pancake webhooks now verify the event's `StoreID` against the configured
+  store and fail closed when it is unset. Signatures only prove *a* store sent the
+  event, not that it was ours.
+- `CreateUser` rejects non-standard role integers (for example `5`, `-1`, `99`)
+  instead of only comparing against the operator's role.
+- All outbound `http.Transport`s now use `InsecureTLSConfig.Clone()`; sharing one
+  `*tls.Config` pointer across transports is unsafe after first use.
+- Gemini `:countTokens` is rejected as an unknown route instead of being forwarded
+  upstream as `generateContent` (unnecessary calls and billing).
+- Bumped `gorilla/websocket` 1.5.0 → 1.5.3.
+
+### Billing correctness
+- OpenAI image responses are billed by **image payload**: object-shaped `data`
+  counts once when it has `url`/`b64_json`, arrays bill `max(url entries,
+  b64_json entries)`, and entries with only `revised_prompt` bill nothing.
+- `output_tokens_details` is mapped onto `completion_tokens_details`, so `img_o`,
+  `audio_o` and reasoning fields are no longer billed as zero.
+- Responses streams cut before `response.completed` now estimate prompt tokens
+  when any event was observed (unless upstream reported `response.failed`), and
+  tool-argument/reasoning/refusal deltas feed the completion estimate.
+- Ollama streams forward `tool_calls` carried by the final `done` frame.
+- Task submission accepts any 2xx (201/202 are valid "accepted" responses).
+
+### Reliability
+- Notification limits use a fixed window (no hour suffix in the key), count
+  atomically with TTL repair, and fall back to a 10-minute window when
+  misconfigured.
+- Added a `(created_at, event_id)` composite index on `audit_logs`.
+- Task plugin `source` uses a 1 MiB-capable column (MySQL `mediumtext`); the old
+  bare `text` capped at 64 KiB.
+- Overload detection now uses cgroup CPU/memory figures, requires 3 consecutive
+  samples (~15 s), and ignores stale samples (>30 s).
+- Frontend build assets no longer consume the per-IP page rate limit (cold starts
+  fetch dozens of files and were producing false 429s for the next user).
+- Model request rate-limit counters are isolated per group, so one group's usage
+  no longer consumes another group's quota.
+
 ## [v1.3.155] - 2026-10-19
 
 ### Fixed

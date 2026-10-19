@@ -1,6 +1,8 @@
 package router
 
 import (
+	"strings"
+
 	"github.com/lza6/new-api-Max/constant"
 	"github.com/lza6/new-api-Max/controller"
 	"github.com/lza6/new-api-Max/middleware"
@@ -233,6 +235,13 @@ func SetRelayRouter(router *gin.Engine) {
 	{
 		// Gemini API 路径格式: /v1beta/models/{model_name}:{action}
 		relayGeminiRouter.POST("/models/*path", func(c *gin.Context) {
+			// `:countTokens` 是本地可计算的元数据接口，本网关**不转发**它。
+			// 若交给通配路由，会被当作 generateContent 发给上游 ——
+			// 产生无意义的上游调用与计费。按未知路由立即拒绝（不计费）。
+			if strings.HasSuffix(c.Param("path"), ":countTokens") {
+				controller.RelayNotFound(c)
+				return
+			}
 			controller.Relay(c, types.RelayFormatGemini)
 		})
 	}

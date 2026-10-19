@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 
@@ -191,9 +192,34 @@ func PublicReadRateLimit() func(c *gin.Context) {
 
 func GlobalWebRateLimit() func(c *gin.Context) {
 	if common.GlobalWebRateLimitEnable {
-		return rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+		limiter := rateLimitFactory(common.GlobalWebRateLimitNum, common.GlobalWebRateLimitDuration, "GW")
+		return func(c *gin.Context) {
+			// 前端构建产物（/static/js/*.js、*.css、字体、图标）不计入页面限流。
+			// 一次冷启动页面会并发拉取几十~上百个静态文件；把它们算进
+			// 120/180s/IP 的页面限额，会让同一 IP 的第二个用户直接 429 ——
+			// 这不是攻击流量，而是正常的首屏加载。
+			// 静态资源来自 embed、无 DB/上游调用，单独限流的收益低于误伤成本。
+			if isStaticAssetRequest(c.Request.URL.Path) {
+				c.Next()
+				return
+			}
+			limiter(c)
+		}
 	}
 	return defNext
+}
+
+// isStaticAssetRequest 判断是否为前端静态构建产物。
+func isStaticAssetRequest(urlPath string) bool {
+	if strings.HasPrefix(urlPath, "/static/") || strings.HasPrefix(urlPath, "/assets/") {
+		return true
+	}
+	switch strings.ToLower(path.Ext(urlPath)) {
+	case ".js", ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico",
+		".woff", ".woff2", ".ttf", ".map":
+		return true
+	}
+	return false
 }
 
 func GlobalAPIRateLimit() func(c *gin.Context) {

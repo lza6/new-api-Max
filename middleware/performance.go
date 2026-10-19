@@ -1,9 +1,10 @@
 package middleware
 
 import (
-	"fmt"
+	"errors"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/lza6/new-api-Max/common"
@@ -37,35 +38,18 @@ func SystemPerformanceCheck() gin.HandlerFunc {
 	}
 }
 
-// checkSystemPerformance 检查系统性能是否超过阈值
+// checkSystemPerformance 检查系统性能是否超过阈值。
+//
+// 过载标记来自**连续采样**（约 15 秒）且要求采样新鲜（<=30 秒），
+// 单一瞬时尖峰或采样停滞都不会熔断流量；阈值仍按当前配置实时复核。
 func checkSystemPerformance() *types.NewAPIError {
 	config := common.GetPerformanceMonitorConfig()
-	if !config.Enabled {
+	overload := common.CheckSystemOverload(common.GetSystemStatus(), config, time.Now())
+	if overload == nil {
 		return nil
 	}
-
-	status := common.GetSystemStatus()
-
-	// 检查 CPU
-	if config.CPUThreshold > 0 && int(status.CPUUsage) > config.CPUThreshold {
-		return types.NewErrorWithStatusCode(
-			fmt.Errorf("system cpu overloaded (current: %.1f%%, threshold: %d%%)", status.CPUUsage, config.CPUThreshold),
-			"system_cpu_overloaded", http.StatusServiceUnavailable)
-	}
-
-	// 检查内存
-	if config.MemoryThreshold > 0 && int(status.MemoryUsage) > config.MemoryThreshold {
-		return types.NewErrorWithStatusCode(
-			fmt.Errorf("system memory overloaded (current: %.1f%%, threshold: %d%%)", status.MemoryUsage, config.MemoryThreshold),
-			"system_memory_overloaded", http.StatusServiceUnavailable)
-	}
-
-	// 检查磁盘
-	if config.DiskThreshold > 0 && int(status.DiskUsage) > config.DiskThreshold {
-		return types.NewErrorWithStatusCode(
-			fmt.Errorf("system disk overloaded (current: %.1f%%, threshold: %d%%)", status.DiskUsage, config.DiskThreshold),
-			"system_disk_overloaded", http.StatusServiceUnavailable)
-	}
-
-	return nil
+	return types.NewErrorWithStatusCode(
+		errors.New(overload.Error()),
+		types.ErrorCode(overload.Code),
+		http.StatusServiceUnavailable)
 }

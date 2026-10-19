@@ -161,10 +161,24 @@ func WaffoPancakeBuyerIdentityFromUserID(userID int) string {
 
 // VerifyConfiguredWaffoPancakeWebhook verifies the signature header. The SDK
 // picks the matching test / prod public key from the payload's `mode` field.
+//
+// **必须同时校验 StoreID**：签名只证明「某个 Pancake 店铺发来的事件」，
+// 不证明「是我们的店铺」。若只验签 + mode，另一店铺的合法签名事件只要携带
+// 我们的 trade_no / buyer identity，就能触发 order.completed（跨店铺伪造）。
+// 因此这里在验签之后**强制**比对配置的 StoreID；未配置则 fail-closed。
 func VerifyConfiguredWaffoPancakeWebhook(payload string, signatureHeader string) (*WaffoPancakeWebhookEvent, error) {
 	evt, err := pancake.VerifyWebhookTyped[pancake.WebhookEventData](payload, signatureHeader, nil)
 	if err != nil {
 		return nil, err
+	}
+	configuredStoreID := strings.TrimSpace(setting.WaffoPancakeStoreID)
+	if configuredStoreID == "" {
+		return nil, fmt.Errorf("waffo pancake webhook rejected: store ID is not configured")
+	}
+	if !waffoPancakeStoreMatches(evt.StoreID, configuredStoreID) {
+		return nil, fmt.Errorf(
+			"waffo pancake webhook rejected: store ID mismatch (event %q, configured %q)",
+			evt.StoreID, configuredStoreID)
 	}
 	identity := ""
 	if evt.Data.MerchantProvidedBuyerIdentity != nil {
@@ -192,6 +206,13 @@ func VerifyConfiguredWaffoPancakeWebhook(payload string, signatureHeader string)
 			MerchantProvidedBuyerIdentity: identity,
 		},
 	}, nil
+}
+
+// waffoPancakeStoreMatches 判定回调是否来自我们配置的店铺（大小写/空白不敏感）。
+func waffoPancakeStoreMatches(eventStoreID, configuredStoreID string) bool {
+	eventStoreID = strings.TrimSpace(eventStoreID)
+	configuredStoreID = strings.TrimSpace(configuredStoreID)
+	return configuredStoreID != "" && strings.EqualFold(eventStoreID, configuredStoreID)
 }
 
 // ResolveWaffoPancakeTradeNo maps a verified webhook event to a local TopUp

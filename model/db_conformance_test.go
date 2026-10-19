@@ -176,7 +176,7 @@ func TestDBConformanceLogsIndexes(t *testing.T) {
 	for _, dialect := range conformanceDialects(t) {
 		t.Run(dialect.name, func(t *testing.T) {
 			db, _ := dialect.openDB(t)
-			require.NoError(t, db.AutoMigrate(&Log{}, &TaskEvent{}, &Task{}))
+			require.NoError(t, db.AutoMigrate(&Log{}, &TaskEvent{}, &Task{}, &AuditLog{}))
 
 			tableName := "logs"
 			for _, idx := range []string{"idx_created_at_id", "idx_user_id_id"} {
@@ -188,6 +188,9 @@ func TestDBConformanceLogsIndexes(t *testing.T) {
 			// B2-4：任务轮询正向活跃态复合索引 (status, progress, submit_time)。
 			assert.True(t, db.Migrator().HasIndex("tasks", "idx_task_active_poll"),
 				"expected active-poll composite index on tasks (%s)", dialect.name)
+			// 审计日志按 (created_at DESC, event_id DESC) 排序；没有复合索引会 filesort。
+			assert.True(t, db.Migrator().HasIndex("audit_logs", "idx_audit_created_event"),
+				"expected composite ordering index on audit_logs (%s)", dialect.name)
 		})
 	}
 }

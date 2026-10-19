@@ -361,7 +361,9 @@ func RelayTaskSubmit(c *gin.Context, info *relaycommon.RelayInfo) (*TaskSubmitRe
 		return nil, service.TaskErrorWrapperLocal(errors.New("upstream returned an empty response"), "fail_to_fetch_task", http.StatusBadGateway)
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
+	// 任何 2xx 都算受理：部分上游用 201/202 表示「任务已创建/已排队」。
+	// 只接受 200 会把成功的提交误判为失败（并触发退款/重试）。
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		// 非 2xx 的错误体只用于分类与日志：加上限，超限时按「无 body」继续分类
 		// （下游 ClassifySubmitFailure 支持空 body），不因为读不下而丢弃整个判定。
 		responseBody, _ := common.ReadAllLimited(resp.Body, common.MaxUpstreamErrorResponseBytes)
