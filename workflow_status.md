@@ -84,6 +84,7 @@
 | 2026-10-19 | `bunx oxlint` + `bun run build`（导出分页） | 干净 / 成功 |
 | 2026-10-19 | `deploy-zero-downtime.sh v1.3.155` | healthy；外网 200；版本头 v1.3.155 |
 | 2026-10-19 | 生产 E2E v1.3.155（id=1626） | 账号 #1；`kind=message`；清理 204/404 |
+| 2026-10-19 | 热路径基准（本机） | 关闭 96.6ns/0 allocs；开启 3.4µs/224B/2；完整入队 2.1µs |
 
 证据：`计划书/e2e-evidence/prod-capture-e2e-v13154-20261019.txt`
 

@@ -589,6 +589,17 @@ B 成功且为空（B 本来就没这个目录）
 </table>
 <p>两个账号都在承载数据。测试用户、token、授权、日志、云盘目录均已清理，回读确认剩余 0。</p>
 
+<h3>热路径开销（本机基准，Go benchmark）</h3>
+<table>
+  <tr><th>场景</th><th>耗时</th><th>分配</th></tr>
+  <tr><td>采集关闭（短路）</td><td>96.6 ns/op</td><td>0 B / 0 allocs</td></tr>
+  <tr><td>采集开启（构造信号）</td><td>3.4 µs/op</td><td>224 B / 2 allocs</td></tr>
+  <tr><td>完整热路径（含入队）</td><td>2.1 µs/op</td><td>224 B / 2 allocs</td></tr>
+</table>
+<p class="note">这是本机微基准，不代表生产端到端延迟；它只证明**请求路径上没有重活**：
+一次入队是微秒级、固定两次分配，真正的切分/压缩/上传都在异步 worker。
+关闭时约 100ns，说明「功能开着」不会成为可感知的延迟来源。</p>
+
 <div class="card info">
   <h3>部署后踩到的一个真实坑</h3>
   <p>直接 SQL 把新用户 quota 改大后，请求仍报「额度不足」。原因是用户信息有 Redis 缓存
