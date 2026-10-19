@@ -44,7 +44,7 @@ const (
 	opsDefaultRankLimit   = 20
 	opsMaxRankDays        = 365
 	opsMaxRankLimit       = 100
-	opsOverviewCacheTTL   = time.Minute
+	opsOverviewCacheTTL   = 5 * time.Minute
 
 	// opsMaxInlineAdminIds 排行榜排除管理员时允许内联的最大 ID 数。
 	// 超过则退化为 Go 侧过滤（结果仍正确，但可能少于 limit 条并记日志）。
@@ -138,31 +138,61 @@ func parseOpsIntParam(c *gin.Context, name string, fallback, maxValue int) int {
 	return min(n, maxValue)
 }
 
+// opsFinancialAggregates 一次扫描算出总营收与今日/本月/本年/窗口的营收+成本。
+//
+// 为什么不用多条独立查询：日志表 1.4M 行时单条全表 SUM 约 9s，五条并发会把
+// 连接池打满且总耗时仍受最长那条限制；一条带 CASE 的聚合只扫一遍。
+// 结果由 GetOpsOverview 整体缓存（5 分钟），不会每分钟重复扫描。
+type opsFinancialAggregates struct {
+	TotalRevenue int64
+	Today        opsAggregate
+	Month        opsAggregate
+	Year         opsAggregate
+	Window       opsAggregate
+}
+
+func queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart int64) (opsFinancialAggregates, error) {
+	var row struct {
+		TotalRevenue  int64 `gorm:"column:total_revenue"`
+		TodayRevenue  int64 `gorm:"column:today_revenue"`
+		TodayCost     int64 `gorm:"column:today_cost"`
+		MonthRevenue  int64 `gorm:"column:month_revenue"`
+		MonthCost     int64 `gorm:"column:month_cost"`
+		YearRevenue   int64 `gorm:"column:year_revenue"`
+		YearCost      int64 `gorm:"column:year_cost"`
+		WindowRevenue int64 `gorm:"column:window_revenue"`
+		WindowCost    int64 `gorm:"column:window_cost"`
+	}
+	err := model.LOG_DB.Model(&model.Log{}).
+		Where("type = ?", model.LogTypeConsume).
+		Select(`COALESCE(SUM(quota), 0) AS total_revenue,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN quota ELSE 0 END), 0) AS today_revenue,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN cost_quota ELSE 0 END), 0) AS today_cost,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN quota ELSE 0 END), 0) AS month_revenue,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN cost_quota ELSE 0 END), 0) AS month_cost,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN quota ELSE 0 END), 0) AS year_revenue,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN cost_quota ELSE 0 END), 0) AS year_cost,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN quota ELSE 0 END), 0) AS window_revenue,
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN cost_quota ELSE 0 END), 0) AS window_cost`,
+			todayStart, todayStart, monthStart, monthStart, yearStart, yearStart, windowStart, windowStart).
+		Scan(&row).Error
+	if err != nil {
+		return opsFinancialAggregates{}, err
+	}
+	return opsFinancialAggregates{
+		TotalRevenue: row.TotalRevenue,
+		Today:        opsAggregate{Revenue: row.TodayRevenue, Cost: row.TodayCost},
+		Month:        opsAggregate{Revenue: row.MonthRevenue, Cost: row.MonthCost},
+		Year:         opsAggregate{Revenue: row.YearRevenue, Cost: row.YearCost},
+		Window:       opsAggregate{Revenue: row.WindowRevenue, Cost: row.WindowCost},
+	}, nil
+}
+
 // opsAggregate 一段时间内的营收/成本/请求数。
 type opsAggregate struct {
 	Revenue  int64
 	Cost     int64
 	Requests int64
-}
-
-// opsAggregateSince 汇总 since（Unix 秒；<=0 表示不限起点）之后的 consume 日志。
-// 营收与成本都在 SQL 侧整数 SUM，避免 float 累加误差。
-func opsAggregateSince(since int64) (opsAggregate, error) {
-	var agg struct {
-		Revenue  int64 `gorm:"column:revenue"`
-		Cost     int64 `gorm:"column:cost"`
-		Requests int64 `gorm:"column:requests"`
-	}
-	tx := model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeConsume)
-	if since > 0 {
-		tx = tx.Where("created_at >= ?", since)
-	}
-	if err := tx.Select(
-		"COALESCE(SUM(quota), 0) AS revenue, COALESCE(SUM(cost_quota), 0) AS cost, COUNT(*) AS requests",
-	).Scan(&agg).Error; err != nil {
-		return opsAggregate{}, err
-	}
-	return opsAggregate{Revenue: agg.Revenue, Cost: agg.Cost, Requests: agg.Requests}, nil
 }
 
 // opsAggregateRange 汇总 [from, to) 区间内的 consume 日志。
@@ -189,22 +219,6 @@ func marginPercent(revenue, profit int64) *float64 {
 	return &v
 }
 
-// opsConsumeQuotaSince 返回 since（Unix 秒；<=0 表示不限起点）之后 consume 日志的额度整数之和。
-// SQL 侧 SUM，不在 Go 侧用 float 累加 quota。
-func opsConsumeQuotaSince(since int64) (int64, error) {
-	var agg struct {
-		Quota int64 `gorm:"column:quota"`
-	}
-	tx := model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeConsume)
-	if since > 0 {
-		tx = tx.Where("created_at >= ?", since)
-	}
-	if err := tx.Select("COALESCE(SUM(quota), 0) AS quota").Scan(&agg).Error; err != nil {
-		return 0, err
-	}
-	return agg.Quota, nil
-}
-
 // GetOpsOverview GET /api/ops/overview?days=14
 // 当日/累计消耗、非管理员用户剩余额度合计、日均消耗与「还能运营多少天」。
 func GetOpsOverview(c *gin.Context) {
@@ -229,32 +243,14 @@ func GetOpsOverview(c *gin.Context) {
 	yearStart := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Unix()
 	windowStart := now.Add(-time.Duration(days) * 24 * time.Hour).Unix()
 
-	totalQuota, err := opsConsumeQuotaSince(0)
+	// 一次扫描算全部区间（1.4M 行实测 ~9s，结果整体缓存 5 分钟）。
+	agg, err := queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query total consumption: "+err.Error())
+		common.ApiErrorMsg(c, "failed to query ops aggregates: "+err.Error())
 		return
 	}
-	// 今日/本月/本年/窗口：营收 + 成本 + 请求数一次查完。
-	today, err := opsAggregateSince(todayStart)
-	if err != nil {
-		common.ApiErrorMsg(c, "failed to query today aggregates: "+err.Error())
-		return
-	}
-	month, err := opsAggregateSince(monthStart)
-	if err != nil {
-		common.ApiErrorMsg(c, "failed to query month aggregates: "+err.Error())
-		return
-	}
-	year, err := opsAggregateSince(yearStart)
-	if err != nil {
-		common.ApiErrorMsg(c, "failed to query year aggregates: "+err.Error())
-		return
-	}
-	window, err := opsAggregateSince(windowStart)
-	if err != nil {
-		common.ApiErrorMsg(c, "failed to query window aggregates: "+err.Error())
-		return
-	}
+	totalQuota := agg.TotalRevenue
+	today, month, year, window := agg.Today, agg.Month, agg.Year, agg.Window
 
 	// 非管理员用户剩余额度合计与人数。Model(&User{}) 自动附加软删除过滤。
 	var remaining struct {

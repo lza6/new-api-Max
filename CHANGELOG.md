@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.159] - 2026-10-20
+
+### Performance
+- Ops overview now uses one full-table aggregate with conditional SUMs instead of five
+  separate scans (1.46M logs: ~9s cold, cached for 5 minutes instead of 60s).
+
 ## [v1.3.158] - 2026-10-20
 
 ### Added — 运营财务（营收/成本/利润）
