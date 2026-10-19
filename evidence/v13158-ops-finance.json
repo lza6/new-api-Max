@@ -1,0 +1,107 @@
+{
+  "task_id": "v13158-ops-finance",
+  "status": "done",
+  "timestamp": "2026-10-20T00:45:00+08:00",
+  "scope": [
+    "Append-only upstream cost history (channel x model, per-call / per-token)",
+    "Per-request cost snapshot in logs.cost_quota",
+    "Ops overview: today/month/year revenue, cost, profit, margin, projections, daily top-up advice",
+    "Daily series and model-cost admin APIs + UI",
+    "Consume logs always record client IP; cost hidden from user logs"
+  ],
+  "commands_executed": [
+    {
+      "cmd": "go test ./model/ -run 'TestModelCost|TestValidateModelCostInput|TestConsumeLogRecordsCostSnapshotAndIP' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/model"
+    },
+    {
+      "cmd": "go test ./controller/ -run 'TestOpsOverview|TestOpsRanking' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/controller"
+    },
+    {
+      "cmd": "TEST_MYSQL_DSN=... TEST_POSTGRES_DSN=... go test ./model/ -run 'TestDBConformance' -count=1",
+      "exit_code": 0,
+      "raw_output_tail": "ok (sqlite/mysql/postgres: ModelCost + logs.cost_quota idempotent)"
+    },
+    {
+      "cmd": "cd web && bun run typecheck && bunx oxlint -c .oxlintrc.json src/features/ops-panel && bun run i18n:check && bun run build",
+      "exit_code": 0,
+      "raw_output_tail": "tsgo OK; oxlint clean; i18n 0 missing; build succeeded"
+    },
+    {
+      "cmd": "node scripts/ui-e2e-ops-profit.cjs http://127.0.0.1:18123",
+      "exit_code": 0,
+      "raw_output_tail": "11 passed / 0 failed (profit card, projections, top-up advice, 4 cost rules)"
+    },
+    {
+      "cmd": "deploy-zero-downtime.sh v1.3.158 / v1.3.159",
+      "exit_code": 0,
+      "raw_output_tail": "healthy; external 200; version header matches"
+    },
+    {
+      "cmd": "production: GET /api/admin/ops/overview (temporary root user, deleted afterwards)",
+      "exit_code": 0,
+      "raw_output_tail": "today_revenue=10470400 today_cost=2801460 today_profit=7668940 margin=73.24%; month_revenue=829453940; year_revenue=914167216"
+    },
+    {
+      "cmd": "production: real relay request model=glm-5.3-flash then SQL log inspection",
+      "exit_code": 0,
+      "raw_output_tail": "channel_id=49 quota=3000 cost_quota=1000 ip=172.18.0.1 (docker bridge for local probe)"
+    }
+  ],
+  "files_changed": [
+    "model/model_cost.go",
+    "model/model_cost_test.go",
+    "model/log.go",
+    "model/main.go",
+    "model/consume_log_flusher_test.go",
+    "model/db_conformance_test.go",
+    "controller/ops_panel.go",
+    "controller/ops_panel_test.go",
+    "router/training-data-router.go",
+    "web/src/features/ops-panel/api.ts",
+    "web/src/features/ops-panel/types.ts",
+    "web/src/features/ops-panel/index.tsx",
+    "web/src/features/ops-panel/components/profit-overview.tsx",
+    "web/src/features/ops-panel/components/model-cost-settings.tsx",
+    "web/src/i18n/locales/en.json",
+    "web/src/i18n/locales/zh.json",
+    "scripts/ui-e2e-ops-profit.cjs",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "tests": [
+    {"name": "TestModelCostTemporalSelection", "type": "unit", "status": "pass", "evidence": "before/after effective_from selects different rules; 2 rows remain"},
+    {"name": "TestModelCostFallsBackToChannelDefault", "type": "unit", "status": "pass"},
+    {"name": "TestModelCostPerToken", "type": "unit", "status": "pass"},
+    {"name": "TestConsumeLogRecordsCostSnapshotAndIP", "type": "unit", "status": "pass", "evidence": "0.0007 CNY -> 48 quota; IP=203.0.113.9"},
+    {"name": "TestOpsOverviewProfitAndMargin", "type": "controller", "status": "pass", "evidence": "revenue 1.5M, cost 0.5M, profit 1M, margin 66.67%"},
+    {"name": "TestDBConformanceAutoMigrateIdempotent", "type": "integration", "status": "pass", "evidence": "sqlite/mysql/postgres"},
+    {"name": "ui-e2e-ops-profit.cjs", "type": "browser-e2e", "status": "pass", "evidence": "11/11"}
+  ],
+  "coverage_summary": null,
+  "seams_touched": [
+    "billing settlement -> consume log -> cost snapshot",
+    "admin ops API -> log aggregation -> UI",
+    "AutoMigrate -> SQLite/MySQL/PostgreSQL (new table + new column)",
+    "user log serialization excludes cost"
+  ],
+  "mock_scenarios_covered": [
+    "temporal cost rule selection",
+    "per-call and per-token cost math",
+    "cost snapshot with configured / unconfigured channel",
+    "profit aggregation with non-consume logs excluded"
+  ],
+  "browser_validation": {
+    "performed": true,
+    "detail": "Local gateway + seeded 4 cost rules + profit card/cost table; 11/11 assertions, screenshot evidence/v13158-ops-profit.png"
+  },
+  "limitations": [
+    "Costs are estimates from configured upstream prices; payment fees, refunds, FX and labor are not included (gross, not net).",
+    "Logs created before the first cost rule have cost_quota=0; the UI shows cost_tracking_since and warns.",
+    "If the log database is switched to ClickHouse, logs.cost_quota needs a manual migration.",
+    "Monthly/yearly projections are extrapolations from elapsed days, not guarantees."
+  ]
+}

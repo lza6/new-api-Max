@@ -152,3 +152,27 @@
 - 任务协议预检：请求体超限返回 **413**，其它错误带真实原因。
 - **踩坑**：首次打 tag 漏 stage `relay_responses.go`，服务器构建失败；
   已用干净 worktree 验证 tag 可编译后重打 tag 并重建。
+
+---
+
+## 7. v1.3.158/159 运营财务（2026-10-20）
+
+### 已落地
+- `model_costs` append-only 成本历史（渠道×模型，call/token，微元）。
+- 结算时把成本快照写入 `logs.cost_quota`；报表只 SUM 快照 → 调价不改写历史。
+- 运营面板：今日/本月/本年营收、成本、毛利、毛利率；预计月/年利润；
+  建议每日上游充值（日均成本×1.5）；未配置成本时显式警告；成本起始时间提示。
+- `GET /api/admin/ops/daily` 逐日财务序列；`GET/POST /api/admin/ops/model-costs`。
+- 使用日志始终记录调用者 IP；成本字段 `json:"-"`，普通用户不可见。
+
+### 生产配置
+- 渠道 49：deepseek-v4.1-flash 0.0007、step-5-preview 0.00007、
+  gpt-6-luna 0.0007、glm-5.3-flash 0.002（人民币元/次，共 4 行）。
+
+### 验证
+- `go test ./model/ -run 'TestModelCost|TestValidateModelCostInput|TestConsumeLogRecordsCostSnapshotAndIP'` PASS
+- `go test ./controller/ -run 'TestOpsOverview|TestOpsRanking'` PASS
+- 三库 conformance（含 ModelCost + logs.cost_quota）PASS
+- 前端 typecheck/oxlint/i18n/build PASS；浏览器 E2E `ui-e2e-ops-profit.cjs` 11/11
+- 生产真实请求：glm-5.3-flash → `quota=3000, cost_quota=1000`，IP 已记录；用户日志无 cost_quota
+- 今日总览：10,470,400 / 2,801,460 / 7,668,940（margin 73.24%）
