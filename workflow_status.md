@@ -146,3 +146,9 @@
 - `cd relaykit && GOWORK=off go build ./...` PASS
 - `go build ./...` PASS
 - 生产部署与 E2E：见下方追加
+
+### v1.3.157 追加
+- Claude 切断流的 completion 计入 `tool_use` 块（约 40 token/块）。
+- 任务协议预检：请求体超限返回 **413**，其它错误带真实原因。
+- **踩坑**：首次打 tag 漏 stage `relay_responses.go`，服务器构建失败；
+  已用干净 worktree 验证 tag 可编译后重打 tag 并重建。
