@@ -157,3 +157,17 @@ func TestAssignDisplayLogIds(t *testing.T) {
 
 	assert.NotPanics(t, func() { assignDisplayLogIds(nil, 0) })
 }
+
+// 建表 SQL 与幂等补列清单必须同步：任何新增列只能出现在一处时，存量 CH 表会缺列，
+// 而 GORM INSERT 含未知列会让所有消费日志写入失败。
+func TestClickHouseExtraColumnsMatchCreateTable(t *testing.T) {
+	sql := clickHouseLogCreateTableSQL(0)
+	for _, def := range clickHouseLogExtraColumnDefs {
+		name := def
+		if i := strings.IndexByte(def, ' '); i > 0 {
+			name = def[:i]
+		}
+		assert.Contains(t, sql, name+" ", "create table SQL must declare column %q", name)
+	}
+	assert.Contains(t, clickHouseLogExtraColumnDefs, "cost_quota Int64 DEFAULT 0")
+}

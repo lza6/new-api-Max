@@ -324,7 +324,8 @@ func RecordTopupLog(userId int, content string, callerIp string, paymentMethod s
 	}
 }
 
-// userSettingRecordIp reports whether consume/error logs should store the client IP.
+// userSettingRecordIp reports whether **error** logs should store the client IP.
+// Consume logs always store it (operator requirement), regardless of this setting.
 // Reads the user setting from the request context when the auth middleware has already
 // loaded it (relay hot path), falling back to GetUserSetting otherwise. Either way it
 // returns the same value; nothing is cached or mutated here, so this only avoids a
@@ -502,9 +503,10 @@ type RecordTaskBillingLogParams struct {
 }
 
 // RecordTaskBillingLog 记录任务结算差异（consume 差额 / refund）。
-// **不在这里计算上游成本**：任务的上游成本在提交时已由 RecordConsumeLog 按
-// 渠道×模型记录（按次规则）；结算差额是同一次上游调用的调整，再计一次会重复。
-// 任务没有 usage token，因此 token 规则不适用于任务类。
+// **不在这里计算上游成本**：按次规则的成本在提交时已由 LogTaskConsumption
+// 的 RecordConsumeLog 记录一次；结算差额是同一次上游调用的调整，再计一次会重复。
+// 已知缺口：token 重算类任务（RecalculateTaskQuotaByTokens）没有把 usage 快照到
+// 成本里，因此 token 规则下这类任务的上游成本恒为 0（利润会被高估）。
 func RecordTaskBillingLog(params RecordTaskBillingLogParams) {
 	if params.LogType == LogTypeConsume && !common.LogConsumeEnabled {
 		return

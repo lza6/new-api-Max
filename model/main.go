@@ -498,12 +498,16 @@ func migrateClickHouseLogDB() error {
 // 与运营财务在 SQL 侧直接 SUM 这些列——缺列会导致端点报 "Unknown identifier"，
 // 更严重的是 GORM INSERT 会包含未知列，**所有消费日志写入失败**。
 // ALTER 用 ADD COLUMN IF NOT EXISTS，幂等；CH 支持该语法。
+// clickHouseLogExtraColumnDefs 是 ClickHouse 建表 SQL 之外**仍需幂等补列**的定义。
+// 新增 Log 列时，建表 SQL 与这里必须同时更新；测试会校验两者的列名一致。
+var clickHouseLogExtraColumnDefs = []string{
+	"request_bytes Int64 DEFAULT 0",
+	"response_bytes Int64 DEFAULT 0",
+	"cost_quota Int64 DEFAULT 0",
+}
+
 func ensureClickHouseLogColumns() error {
-	for _, col := range []string{
-		"request_bytes Int64 DEFAULT 0",
-		"response_bytes Int64 DEFAULT 0",
-		"cost_quota Int64 DEFAULT 0",
-	} {
+	for _, col := range clickHouseLogExtraColumnDefs {
 		if err := LOG_DB.Exec("ALTER TABLE logs ADD COLUMN IF NOT EXISTS " + col).Error; err != nil {
 			return err
 		}

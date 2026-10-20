@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -219,18 +220,52 @@ func marginPercent(revenue, profit int64) *float64 {
 	return &v
 }
 
+// opsOverviewLocalCache 是无 Redis 部署的进程内兜底缓存。
+// 总览冷查询在 1.46M 行日志上约 9s；没有 Redis 时不能每次打开面板都扫一遍。
+type opsOverviewLocalCacheEntry struct {
+	key     string
+	data    opsOverviewData
+	expires time.Time
+}
+
+var opsOverviewLocal struct {
+	mu    sync.Mutex
+	entry opsOverviewLocalCacheEntry
+}
+
+func getLocalOpsOverview(key string) (opsOverviewData, bool) {
+	opsOverviewLocal.mu.Lock()
+	defer opsOverviewLocal.mu.Unlock()
+	e := opsOverviewLocal.entry
+	if e.key == key && time.Now().Before(e.expires) {
+		return e.data, true
+	}
+	return opsOverviewData{}, false
+}
+
+func setLocalOpsOverview(key string, data opsOverviewData) {
+	opsOverviewLocal.mu.Lock()
+	opsOverviewLocal.entry = opsOverviewLocalCacheEntry{key: key, data: data, expires: time.Now().Add(opsOverviewCacheTTL)}
+	opsOverviewLocal.mu.Unlock()
+}
+
 // GetOpsOverview GET /api/ops/overview?days=14
 // 当日/累计消耗、非管理员用户剩余额度合计、日均消耗与「还能运营多少天」。
 func GetOpsOverview(c *gin.Context) {
 	days := parseOpsIntParam(c, "days", opsDefaultAverageDays, opsMaxAverageDays)
 
-	// 全表 SUM 属慢查（与 /api/log/overview 同类），60s 结果缓存根治重复扫描；
-	// 缓存值仅 7 个标量，无 OOM 风险。Redis 未启用时静默跳过。
+	// 全表聚合属慢查：结果缓存 5 分钟。先查进程内缓存（无 Redis 部署的兜底），
+	// 再查 Redis（多实例共享）；缓存值仅标量，无 OOM 风险。
 	cacheKey := "ops:overview:" + strconv.Itoa(days)
+	if hit, ok := getLocalOpsOverview(cacheKey); ok {
+		common.ApiSuccess(c, hit)
+		return
+	}
 	if common.RedisEnabled {
 		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
 			var hit opsOverviewData
 			if common.Unmarshal([]byte(cached), &hit) == nil {
+				setLocalOpsOverview(cacheKey, hit)
 				common.ApiSuccess(c, hit)
 				return
 			}
@@ -320,6 +355,7 @@ func GetOpsOverview(c *gin.Context) {
 			_ = common.RedisSet(cacheKey, string(raw), opsOverviewCacheTTL)
 		}
 	}
+	setLocalOpsOverview(cacheKey, data)
 	common.ApiSuccess(c, data)
 }
 

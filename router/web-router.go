@@ -56,13 +56,14 @@ func SetWebRouter(router *gin.Engine, assets WebAssets, pluginDispatcher gin.Han
 		},
 		static.Serve("/", frontendFS),
 		func(c *gin.Context) {
-			// 不存在的构建产物路径直接 404：static.Serve 对缺失文件不会 Abort，
-			// 若继续落到下面的 SPA 注入，会变成「无需限流的 SSR 渲染入口」。
-			if strings.HasPrefix(c.Request.RequestURI, "/v1") ||
-				strings.HasPrefix(c.Request.RequestURI, "/api") ||
-				strings.HasPrefix(c.Request.RequestURI, "/assets") ||
-				strings.HasPrefix(c.Request.RequestURI, "/static/") ||
-				c.Request.RequestURI == "/static" {
+			// 用**解码后的 URL.Path** 判定：编码形态（/static%2F...）在 RequestURI 里
+			// 不匹配前缀，但会被 static/限流层当作 /static/...，不能留下绕过口子。
+			path := c.Request.URL.Path
+			if strings.HasPrefix(path, "/v1") ||
+				strings.HasPrefix(path, "/api") ||
+				strings.HasPrefix(path, "/assets") ||
+				strings.HasPrefix(path, "/static/") ||
+				path == "/static" {
 				controller.RelayNotFound(c)
 				return
 			}

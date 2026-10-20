@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.161] - 2026-10-20
+
+### Fixed
+- The `/static` 404 guard now uses the decoded URL path, so encoded variants such as
+  `/static%2F...` can no longer skip the page rate limit and fall through to SPA rendering.
+- Ops overview now has a process-local 5-minute cache fallback: without Redis, every panel
+  load would otherwise run the 1.46M-row aggregate (~9s).
+
+### Tests
+- ClickHouse CREATE-table / ALTER-column consistency test.
+- Token-cost overflow test now asserts the exact saturated value (a mere >0 assertion could
+  not detect removal of the guard).
+
+### Docs
+- Corrected task-billing and IP-recording comments to match behavior; documented that
+  token-recalculation task paths do not snapshot token costs yet.
+
 ## [v1.3.160] - 2026-10-20
 
 ### Fixed (second independent review)
