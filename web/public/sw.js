@@ -1,5 +1,7 @@
 /* Service Worker: cache hashed static assets only; never cache API/auth or HTML navigation. */
-const VERSION = 'v1.2.33.1'
+// `VERSION` is rewritten at build time by `scripts/stamp-sw.mjs` (package version
+// + hash of the emitted asset list). Editing it here has no effect on the build.
+const VERSION = 'unstamped'
 
 self.addEventListener('install', () => {
   self.skipWaiting()
@@ -33,7 +35,13 @@ self.addEventListener('fetch', (event) => {
       try {
         const res = await fetch(request)
         const copy = res.clone()
-        await cache.put(request, copy)
+        try {
+          await cache.put(request, copy)
+        } catch {
+          // Quota/eviction failure must not turn a successful network response
+          // into a failed one (the old code returned `hit || Response.error()`
+          // here, and `hit` is undefined on this path).
+        }
         return res
       } catch {
         return hit || Response.error()

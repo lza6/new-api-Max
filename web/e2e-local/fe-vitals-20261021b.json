@@ -1,0 +1,144 @@
+{
+  "measuredAt": "2026-10-20T23:21:22.991Z",
+  "mode": "local, no throttle",
+  "mountedMs": 1728,
+  "vitals": {
+    "fcp": 3960,
+    "lcp": 3960,
+    "lcpElement": "H1",
+    "lcpCandidates": [
+      {
+        "t": 3960,
+        "size": 27608,
+        "tag": "H1",
+        "text": "统一 API 网关，服务于海量 AI 模型"
+      }
+    ],
+    "cls": 0.001,
+    "domContentLoaded": 1328,
+    "load": 1533,
+    "transferKB": 1037
+  },
+  "resources": [
+    {
+      "name": "vendor-ui-primitives.be94e2a93a.js",
+      "start": 110,
+      "end": 156,
+      "transferKB": 111
+    },
+    {
+      "name": "vendor-tanstack.41b48fabbb.js",
+      "start": 111,
+      "end": 180,
+      "transferKB": 51
+    },
+    {
+      "name": "lib-react.1f6c1ac356.js",
+      "start": 112,
+      "end": 195,
+      "transferKB": 59
+    },
+    {
+      "name": "68218.1c11b74bd7.js",
+      "start": 112,
+      "end": 232,
+      "transferKB": 204
+    },
+    {
+      "name": "index.87fc11065f.js",
+      "start": 113,
+      "end": 246,
+      "transferKB": 229
+    },
+    {
+      "name": "index.8d34aef4f6.css",
+      "start": 113,
+      "end": 171,
+      "transferKB": 63
+    },
+    {
+      "name": "public-sans-latin-wght-normal.035c7fe496.woff2",
+      "start": 113,
+      "end": 185,
+      "transferKB": 26
+    },
+    {
+      "name": "lora-latin-wght-normal.f60a385cfb.woff2",
+      "start": 114,
+      "end": 191,
+      "transferKB": 37
+    },
+    {
+      "name": "3161.350d7be2a6.js",
+      "start": 810,
+      "end": 1287,
+      "transferKB": 172
+    },
+    {
+      "name": "vendor-icon-libs.3a2abaf027.js",
+      "start": 1672,
+      "end": 1728,
+      "transferKB": 16
+    },
+    {
+      "name": "34437.4803a527d4.js",
+      "start": 1674,
+      "end": 1733,
+      "transferKB": 3
+    },
+    {
+      "name": "99273.73ae3c6fe5.js",
+      "start": 1676,
+      "end": 1738,
+      "transferKB": 4
+    },
+    {
+      "name": "2860.1d78a104ef.js",
+      "start": 1677,
+      "end": 1742,
+      "transferKB": 6
+    },
+    {
+      "name": "69928.b491f78471.js",
+      "start": 1680,
+      "end": 1745,
+      "transferKB": 3
+    },
+    {
+      "name": "31926.ccdc1131e7.js",
+      "start": 1681,
+      "end": 1749,
+      "transferKB": 3
+    },
+    {
+      "name": "83756.f5730d9fb2.js",
+      "start": 1683,
+      "end": 1755,
+      "transferKB": 25
+    },
+    {
+      "name": "76625.d9f77db348.js",
+      "start": 1684,
+      "end": 1762,
+      "transferKB": 13
+    },
+    {
+      "name": "69645.19ca23e5fc.js",
+      "start": 2034,
+      "end": 3835,
+      "transferKB": 6
+    },
+    {
+      "name": "71808.b4c82cd169.js",
+      "start": 2035,
+      "end": 3839,
+      "transferKB": 3
+    },
+    {
+      "name": "90143.0070ec9856.js",
+      "start": 2061,
+      "end": 3841,
+      "transferKB": 3
+    }
+  ]
+}

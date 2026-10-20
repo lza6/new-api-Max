@@ -36,6 +36,17 @@ type Capability = 'unknown' | 'ok' | 'unsupported'
 function detectWebglCapability(reducedMotion: boolean): Capability {
   if (reducedMotion) {return 'unsupported'}
   if (typeof window === 'undefined') {return 'unknown'}
+  // Data-saver / 2g-3g users: the scene is a 234KB gzip chunk and a continuous
+  // 60fps loop, which is not worth it on a metered or slow link.
+  const connection = (
+    navigator as Navigator & {
+      connection?: { saveData?: boolean; effectiveType?: string }
+    }
+  ).connection
+  if (connection?.saveData === true) {return 'unsupported'}
+  if (connection?.effectiveType && /(^|-)2g$|(^|-)3g$/.test(connection.effectiveType)) {
+    return 'unsupported'
+  }
   if (
     typeof navigator !== 'undefined' &&
     typeof navigator.hardwareConcurrency === 'number' &&
@@ -98,6 +109,18 @@ export function WebglHero(props: WebglHeroProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [capability, setCapability] = useState<Capability>('unknown')
   const [inView, setInView] = useState(false)
+  // The scene is wrapped in `hidden sm:block` (desktop-only enhancement). Gating
+  // the mount as well stops mobile from downloading the 234KB gzip three.js
+  // chunk and running a 60fps loop behind an invisible canvas.
+  const [isWideViewport, setIsWideViewport] = useState(false)
+
+  useEffect(() => {
+    const mql = window.matchMedia('(min-width: 640px)')
+    const onChange = () => setIsWideViewport(mql.matches)
+    onChange()
+    mql.addEventListener('change', onChange)
+    return () => mql.removeEventListener('change', onChange)
+  }, [])
 
   useEffect(() => {
     setCapability(detectWebglCapability(Boolean(shouldReduce)))
@@ -120,7 +143,8 @@ export function WebglHero(props: WebglHeroProps) {
     return () => observer.disconnect()
   }, [])
 
-  const useWebgl = capability === 'ok' && inView && !shouldReduce
+  const useWebgl =
+    capability === 'ok' && inView && !shouldReduce && isWideViewport
 
   return (
     <div

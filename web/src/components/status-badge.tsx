@@ -167,6 +167,16 @@ export function StatusBadge({
     onClick?.(e)
   }
 
+  // Copying is an action, so it must be reachable without a mouse: the badge
+  // renders as a focusable `role="button"` and accepts Enter/Space (WCAG 2.1.1).
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLSpanElement>) => {
+    if (!copyable) {return}
+    if (e.key !== 'Enter' && e.key !== ' ') {return}
+    e.preventDefault()
+    e.stopPropagation()
+    copyToClipboard(copyText || label || '')
+  }
+
   const content =
     children ??
     (label ? (
@@ -190,12 +200,15 @@ export function StatusBadge({
               type === 'underline' && 'border-b border-current pb-px'
             ),
         textColorMap[computedVariant],
-        pulse && 'animate-pulse',
+        pulse && 'animate-pulse motion-reduce:animate-none',
         copyable &&
-          'cursor-copy hover:brightness-95 active:scale-95 dark:hover:brightness-110',
+          'cursor-copy hover:brightness-95 active:scale-95 dark:hover:brightness-110 focus-visible:ring-ring rounded-sm focus-visible:ring-2 focus-visible:outline-none',
         className
       )}
       onClick={handleClick}
+      onKeyDown={handleKeyDown}
+      role={copyable ? 'button' : undefined}
+      tabIndex={copyable ? 0 : undefined}
       title={title}
       {...props}
     >

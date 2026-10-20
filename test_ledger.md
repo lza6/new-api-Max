@@ -247,3 +247,16 @@
 已修：ui/dialog 高度与滚动、alert-dialog 高度与宽度、dialog 100vh→100dvh、抽屉页脚安全区、附件删除按钮触屏误触、dashboard 管理端 section 越权可见、wallet 失败显示 0 余额、空兑换码无提示、系统设置失败渲染默认值、导出 CSV 静默失败与 JSON 当 csv。
 
 未验证：320px 弹窗可视性（需真实登录路由）；全量 vitest 仍超时未完成。
+
+## 2026-10-21 前端第三轮（性能小项 + 可访问性）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 前端类型 | `cd web && bun run typecheck` | PASS |
+| 前端构建（含 SW 版本注入） | `cd web && bun run build` | PASS；`[stamp-sw] VERSION = 1.0.0-478a2884` |
+| 定向测试 | `npx vitest run src/features/home src/components/__tests__ src/features/auth` | 14 文件 / 95 用例 PASS |
+| 首屏实测 | `node e2e-local/fe-vitals.cjs` | 传输 1281→**1037KB**；LCP 4076→**3960ms**；CLS 0.001；three.js **未加载**（390×844） |
+| KaTeX CSS 抽离 | 构建产物扫描 | 入口 CSS `KaTeX_Main` 命中 0；移入 `static/css/async/29217.*.css` |
+| 全量 vitest | `npx vitest run --pool=forks --maxWorkers=2` | 见下（未完成/结果） |
+
+已改：webgl-hero 视口与省流门控、KaTeX CSS 动态化、SW 版本注入与 cache.put 容错、StatusBadge 键盘可达与 reduced-motion、登录 autocomplete。
