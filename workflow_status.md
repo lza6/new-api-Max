@@ -285,3 +285,16 @@
 - commit `4ccbb3a8d` / tag `v1.3.164` / Release 201；蓝绿 **3000→3001**，版本头 v1.3.164，
   healthz/readyz 200，0 个 500；生产浏览器 E2E **16/16**（`计划书/e2e-evidence/v1.3.164-ui/`）。
 - 回滚：`deploy-zero-downtime.sh v1.3.163`。
+
+## 13. 剩余风险收口（2026-10-21，v1.3.165）
+
+| 原风险 | 处理 | 证据/结论 |
+|---|---|---|
+| 成本覆盖率仅 7.9% | **实测今日 99.14%**（12,173,450 中 12,068,850 命中）；本月 3.21% 是 10-20 前无成本规则的历史，面板已标注起始日 | 生产 SQL 聚合；不可追溯补历史成本（无历史成本数据，强行补=伪造财务） |
+| 大日志表冷查询 9.8s | 新增覆盖索引 `idx_log_type_created_finance`，生产 `CREATE INDEX CONCURRENTLY` 预建；PG Index Only Scan **12.2s→1.67s**；接口冷 2.99s、热 0.002s | `EXPLAIN (ANALYZE)`；三库 conformance PASS（103s） |
+| 登录时序侧信道 | 账号不存在/无密码分支执行一次 dummy bcrypt；可注入校验器单测证明执行 | `model/user.go`；两个单测 |
+| 注册用户名/邮箱枚举 | 预检只查用户名；邮箱验证开启时用户名冲突也返回统一成功响应并发通知 | `controller/user.go` |
+| 历史 e2e/测试账号 | 13 个账号已**禁用**（status=2、role=1、清空口令），撤销 102 条会话与 39 个 token；备份表 `_bak_testusers_20261021` | logs 128 条保留（财务记录不删），账号不可再登录 |
+| FX 快照 | **不适用**：`cost_quota`/`quota` 均为结算时写入的整数快照；生产 `USDExchangeRate=1`，历史金额不随汇率改写。展示层换算不修改数据 | 无 schema 变更 |
+| 本机 PostgreSQL 服务损坏 | **受权限阻塞**：服务以 NetworkService 运行，修复需管理员改服务/ACL；已用 `initdb` 临时实例完成三库验证 | 复现命令写入 test_ledger |
+| 其它会话未提交文件 | **不动**：`controller/webhook.go`、`model/shadow_price.go` 等属其他会话，未经授权不提交 | git status 仍显示为未暂存 |

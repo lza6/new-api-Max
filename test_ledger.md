@@ -204,3 +204,16 @@
 - 运营面板冷启动时财务聚合可能 >2s；断言前必须等「利润与成本」可见，固定 sleep 会把「加载中」误判成缺失。
 - 页面在后台有轮询时 `waitUntil: 'networkidle'` 会 30s 超时；改用 `domcontentloaded` + 元素等待。
 - SSH 隧道偶发「ESTABLISHED 卡住」，表现为新连接一起挂 → 按 PID 重启隧道即可。
+
+## 2026-10-21 v1.3.165 验证（真实执行）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 三库 conformance（含财务覆盖索引） | `TEST_MYSQL_DSN=… TEST_POSTGRES_DSN=… go test ./model/ -run TestDBConformance` | PASS（103.3s） |
+| 登录时延拉平 | `go test ./model/ -run TestValidateAndFill` | PASS |
+| 注册相关 | `go test ./controller/ -run TestRegister` | PASS |
+| 构建/vet | `go build ./...`、`go vet ./model ./controller` | PASS |
+| 生产索引 | `EXPLAIN (ANALYZE)` | Parallel Index Only Scan，12.2s→1.67s |
+| 运营接口 | 服务器本机鉴权调用 | 冷 2.99s / 热 0.002s，均 200 |
+| 覆盖率 | 生产 SQL | 今日 99.14%；本月 3.21%（10-20 前无规则） |
+| 测试账号治理 | SQL | 13 个禁用、102 会话与 39 token 撤销；备份 `_bak_testusers_20261021` |
