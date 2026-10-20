@@ -44,7 +44,11 @@ function readCachedHomeContent(): string {
 async function fetchHomePageContent(): Promise<string> {
   try {
     const response = await getHomePageContent()
-    const content = response.success && response.data ? response.data : ''
+    // 后端契约是字符串；网关错误页/中间层可能返回对象。未校验时该对象会被写进
+    // localStorage 并交给 marked()，抛错后由路由 errorComponent 接住 —— 整个首页
+    // 变成 500，而不是「没有自定义首页」。边界处一律按字符串校验。
+    const content =
+      response.success && typeof response.data === 'string' ? response.data : ''
     if (content) {
       localStorage.setItem(STORAGE_KEY, content)
     } else {

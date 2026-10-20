@@ -168,6 +168,9 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
 const root = ReactDOM.createRoot(rootElement)
 // 等语言包就绪再挂载：避免首屏（尤其 Setup 向导）用 fallback 渲染后闪切当前语言。
 // 所有语言包（含 en）均为按需加载；加载失败时 i18nReady 也会 resolve，不永久阻塞首屏。
+// 注：曾试过「最多等 300ms 再渲染」的降级方案，Playwright 实测无收益（瓶颈在
+// JS 解析与后续路由 chunk 的串行，不在等待语言包本身），且会让慢网用户先看到
+// 英文再切中文，已回退。
 void i18nReady.then(() => {
   root.render(
     <StrictMode>

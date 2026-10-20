@@ -217,3 +217,20 @@
 | 运营接口 | 服务器本机鉴权调用 | 冷 2.99s / 热 0.002s，均 200 |
 | 覆盖率 | 生产 SQL | 今日 99.14%；本月 3.21%（10-20 前无规则） |
 | 测试账号治理 | SQL | 13 个禁用、102 会话与 39 token 撤销；备份 `_bak_testusers_20261021` |
+
+## 2026-10-21 前端首屏与边界健壮性（真实浏览器）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 前端类型 | `cd web && bun run typecheck` | PASS（exit 0） |
+| 前端构建 | `cd web && bun run build` | PASS（23874.0 kB raw / 7457.0 kB gzip） |
+| 前端 lint | `cd web && bun run lint` | exit 1：33 条告警全在未跟踪的 `e2e-local/*.cjs`，`src/` 零问题（既有噪声） |
+| 畸形响应回归 | `cd web && node e2e-local/fe-malformed-api.cjs` | PASS（`isErrorPage:false`、`hasNav:true`、无 pageerror） |
+| 首屏 vitals | `cd web && node e2e-local/fe-vitals.cjs` | FCP=LCP 4076ms（H1）、CLS 0.002；入口 JS 653 kB gzip；语言包 172 kB gzip 且串行 |
+| 全量 vitest | `cd web && bun run test` | **未完成**（>8 分钟无输出，进程终止）；本轮改动为 CSS/动画/两处边界校验，改用定向验证 |
+
+### 新增噪声/坑（前端测量）
+- 静态服务器若在请求回调里同步 `gzipSync`，Node 单线程会把 3 kB 的 chunk 拖到 1.9s，**误判成应用慢**。必须启动时预压缩。
+- `#root` 自带 `#app-boot-loader`，用 `#root.children.length > 0` 判断「已渲染」会提前成立；应等 `#app-boot-loader` 被 detach。
+- `/api/setup` 返回未初始化会整体重定向到 `/setup`，测首页必须 mock 成 `{success:true,data:{status:true}}`。
+- `/api/home_page_content`、`/api/notice` 返回对象时旧代码会抛错并让整页 500（已修）。

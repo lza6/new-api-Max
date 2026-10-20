@@ -100,9 +100,12 @@ export function useNotifications() {
   } = useNotificationStore()
 
   // Extract notice content
-  const noticeContent = noticeResponse?.success
-    ? (noticeResponse.data || '').trim()
-    : ''
+  // 公告接口契约是字符串；非字符串（网关错误页/中间层对象）会在渲染期抛
+  // `trim is not a function`，被路由 errorComponent 接住后整页变成 500。
+  const noticeContent =
+    noticeResponse?.success && typeof noticeResponse.data === 'string'
+      ? noticeResponse.data.trim()
+      : ''
 
   // Calculate unread counts
   const unreadCounts = useMemo(() => {

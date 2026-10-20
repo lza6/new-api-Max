@@ -113,12 +113,15 @@ For commercial licensing, please contact support@quantumnous.com
     cursor: pointer;
   }
 
-  /* Prevent focus zoom on mobile devices */
+  /* Prevent focus zoom on mobile devices.
+   * `max(16px, 1rem)` keeps the iOS "focus zoom" threshold (16px) while still
+   * honoring a user-raised root font size — a hard `16px` would override the
+   * reader's own text-size preference. */
   @media screen and (max-width: 767px) {
     input,
     select,
     textarea {
-      font-size: 16px !important;
+      font-size: max(16px, 1rem) !important;
     }
   }
 }
@@ -568,14 +571,13 @@ For commercial licensing, please contact support@quantumnous.com
       box-shadow 150ms ease;
   }
 
-  @media (min-width: 641px) {
+  /* Hover affordances only where a real pointer exists: on touch screens
+   * `:hover` sticks after a tap and leaves the card looking permanently
+   * elevated. 40rem matches the `sm` breakpoint (no more 641px magic value). */
+  @media (min-width: 40rem) and (hover: hover) {
     [data-slot='card']:not([data-card-hover='false']):hover {
       transform: translateY(-1px);
-      box-shadow: 0 4px 12px rgb(0 0 0 / 0.06);
-    }
-
-    .dark [data-slot='card']:not([data-card-hover='false']):hover {
-      box-shadow: 0 4px 12px rgb(0 0 0 / 0.3);
+      box-shadow: var(--elevation-hover);
     }
   }
 

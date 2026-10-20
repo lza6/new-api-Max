@@ -97,6 +97,7 @@ For commercial licensing, please contact support@quantumnous.com
    * mapping declaration is not a self-referential cycle. */
   --shadow-card: var(--elevation-card);
   --shadow-raised: var(--elevation-raised);
+  --shadow-hover: var(--elevation-hover);
   --shadow-drawer: var(--elevation-drawer);
   --shadow-popover: var(--elevation-popover);
   --shadow-overlay: var(--elevation-overlay);
@@ -200,6 +201,9 @@ For commercial licensing, please contact support@quantumnous.com
    * `@theme inline` block) to avoid a self-referential token cycle. */
   --elevation-card: 0 1px 2px oklch(0 0 0 / 0.05), 0 1px 1px oklch(0 0 0 / 0.04);
   --elevation-raised: 0 4px 8px oklch(0 0 0 / 0.08), 0 2px 4px oklch(0 0 0 / 0.05);
+  /* Hover lift for interactive cards (see the `[data-slot='card']:hover` rule
+   * in index.css). Dark mode needs a heavier shadow to stay legible. */
+  --elevation-hover: 0 4px 12px oklch(0 0 0 / 0.06);
   --elevation-drawer: -8px 0 24px oklch(0 0 0 / 0.12), 0 4px 12px oklch(0 0 0 / 0.06);
   --elevation-popover: 0 4px 16px oklch(0 0 0 / 0.12), 0 2px 6px oklch(0 0 0 / 0.06);
   --elevation-overlay: 0 8px 32px oklch(0 0 0 / 0.18), 0 4px 12px oklch(0 0 0 / 0.08);
@@ -278,6 +282,7 @@ For commercial licensing, please contact support@quantumnous.com
     inset 0 1px 0 oklch(1 0 0 / 0.03);
   --elevation-raised: 0 4px 8px oklch(0 0 0 / 0.65), 0 2px 4px oklch(0 0 0 / 0.55),
     inset 0 1px 0 oklch(1 0 0 / 0.04);
+  --elevation-hover: 0 4px 12px oklch(0 0 0 / 0.3);
   --elevation-drawer: -8px 0 24px oklch(0 0 0 / 0.7), 0 4px 12px oklch(0 0 0 / 0.6);
   --elevation-popover: 0 4px 16px oklch(0 0 0 / 0.65), 0 2px 6px oklch(0 0 0 / 0.55),
     inset 0 1px 0 oklch(1 0 0 / 0.04);

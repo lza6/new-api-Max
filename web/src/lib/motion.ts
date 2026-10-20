@@ -36,10 +36,12 @@ export const MOTION_TRANSITION: Record<string, Transition> = {
 }
 
 export const MOTION_VARIANTS = {
+  // 整页转场只动 opacity + transform：`filter: blur()` 会让整棵子树在每一帧
+  // 重新栅格化（低端机实测掉帧），且 blur 动画期间无法被 GPU 单独合成。
   pageEnter: {
-    initial: { opacity: 0, y: 8, filter: 'blur(4px)' },
-    animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
-    exit: { opacity: 0, y: -4, filter: 'blur(2px)' },
+    initial: { opacity: 0, y: 8 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -4 },
   },
   fadeIn: {
     initial: { opacity: 0 },

@@ -95,6 +95,13 @@ export default defineConfig(({ envMode }) => {
       // Preload the body font and raise its fetch priority. The woff2 hashes are
       // build-time, so use the tag descriptor form instead of hardcoding URLs;
       // the regex only matches files that exist, so a missing one is a no-op.
+      // `lora-latin` is the face of the hero H1 (LCP element). Without a preload
+      // the browser only discovers it after the H1 renders (measured: request
+      // starts at ~3.0s), so the LCP text first paints in the fallback serif and
+      // is repainted when the font lands. With the preload it completes at
+      // ~0.22s. NOTE: this did **not** lower the measured LCP timestamp — the
+      // remaining delay is elsewhere (see e2e-local/fe-vitals.cjs) — it is kept
+      // only to remove the late font swap on the LCP element.
       tags: [
         {
           tag: 'link',
@@ -104,6 +111,16 @@ export default defineConfig(({ envMode }) => {
             type: 'font/woff2',
             crossorigin: true,
             href: '/static/font/public-sans-latin-wght-normal.035c7fe496.woff2',
+          },
+        },
+        {
+          tag: 'link',
+          attrs: {
+            rel: 'preload',
+            as: 'font',
+            type: 'font/woff2',
+            crossorigin: true,
+            href: '/static/font/lora-latin-wght-normal.f60a385cfb.woff2',
           },
         },
       ],

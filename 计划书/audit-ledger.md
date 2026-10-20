@@ -273,3 +273,20 @@ G8 大文件拆分（禁止大重构）。
 
 复验：`go build ./...` PASS、定向 model 测试 PASS、`bun run typecheck` PASS、
 订阅组件测试 6/6、金额格式化 4/4。
+
+## 九、2026-10-21 前端首屏与边界健壮性审计（v1.3.165）
+
+只读审计 + 真实浏览器测量（`web/e2e-local/fe-vitals.cjs`、`fe-malformed-api.cjs`）。
+
+| 级别 | 问题 | 状态 |
+|---|---|---|
+| P1 | 首帧 4076ms：入口 JS 653 kB gzip → 语言包 172 kB gzip（`main.tsx` await `i18nReady`）→ 路由 chunk 串行；LCP 元素为 hero `<h1>` | 未修（产品取舍：预加载/拆分/接受闪切三选一，待拍板） |
+| P1 | `/api/home_page_content`、`/api/notice` 返回非字符串 → 渲染期抛错 → 路由 errorComponent → **整页 500** | 已修 + 浏览器回归 PASS |
+| P2 | 整页转场 `filter: blur(4px)` | 已修（只留 opacity + translateY） |
+| P2 | 移动端输入框 `font-size:16px !important` 阻止字体缩放 | 已修（`max(16px,1rem)`） |
+| P2 | 卡片 hover 未按 `(hover:hover)` 门控 + 硬编码阴影 | 已修（新增 `--elevation-hover`） |
+| P2 | `theme-color` 与 `index.html` 不一致，且只改第一个 meta | 未修（低收益视觉项） |
+| P3 | `sw.js` 的 `VERSION` 写死 `v1.2.33.1` | 未修（需构建注入） |
+
+**反证记录**：曾假设「Lora 字体晚到拖高 LCP」，预加载后字体从 3.0s 提前到 0.14s，但 LCP 时间戳不变 → 假设被推翻，注释已按事实修正。
+**回退记录**：「最多等语言包 300ms 再渲染」实测无收益且慢网会闪英文，已回退并留注释。
