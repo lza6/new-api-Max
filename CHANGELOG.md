@@ -2,6 +2,25 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.164] - 2026-10-21
+
+### Fixed
+- **Graph transport now forces certificate verification** even when
+  `TLS_INSECURE_SKIP_VERIFY=1` has already mutated `http.DefaultTransport`
+  (`common.Init` rewrites it in place; the lazily built sink cloned the polluted
+  transport, so training-data uploads would silently skip verification).
+- **Model success limiter ordering restored**: the success slot is reserved
+  before the total-request token bucket and refunded when the total check
+  rejects, so a success-limited request no longer consumes total-request quota.
+  A panic in the handler now refunds via `defer` instead of leaking the slot
+  until the window expires.
+
+### Tests
+- Handler-level assertion that the success counter is a `v2` ZSET (the previous
+  test called the helper directly and could not catch a routing-layer key
+  regression), panic-refund test, and a TLS-pollution regression test that
+  mutates `http.DefaultTransport` before constructing the sink.
+
 ## [v1.3.163] - 2026-10-21
 
 ### Fixed

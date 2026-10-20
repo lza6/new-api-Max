@@ -100,16 +100,67 @@ func TestModelSuccessSlotsExpireWithWindow(t *testing.T) {
 	assert.True(t, ok, "窗口过期后应重新放行")
 }
 
-// 键名升级必须彻底：旧版本把同一语义存成 LIST，若新代码复用旧键会 WRONGTYPE。
-func TestModelSuccessReservationIgnoresLegacyListKey(t *testing.T) {
+// 中间件实际使用的键必须是 v2 ZSET：旧版本把同一语义存成 LIST，
+// 若代码回退旧键（或仍对新键用 list 命令）会 WRONGTYPE 让请求 500。
+// 本测试走真实 handler，而不是直接调 reserveRedisSuccessSlot（后者会掩盖路由层回退）。
+func TestRedisRateLimitHandlerWritesV2ZSetKey(t *testing.T) {
 	server, client := newModelLimitRedis(t)
-	ctx := context.Background()
-	legacyKey := "rateLimit:MRRLS:group:42"
-	server.Push(legacyKey, "2026-01-01T00:00:00.000Z")
+	previous := common.RDB
+	common.RDB = client
+	t.Cleanup(func() { common.RDB = previous })
 
-	_, ok, err := reserveRedisSuccessSlot(ctx, client, "rateLimit:MRRLS:v2:group:42", 5, 60)
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 9)
+		c.Next()
+	})
+	router.GET("/v1/chat/completions", redisRateLimitHandler(60, 0, 5, "default"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil))
+	require.Equal(t, http.StatusOK, w.Code)
+
+	key := "rateLimit:MRRLS:v2:default:9"
+	require.Equal(t, "zset", server.Type(key), "成功计数必须写在 v2 ZSET 键上")
+	count, err := client.ZCard(context.Background(), key).Result()
 	require.NoError(t, err)
-	assert.True(t, ok)
+	assert.EqualValues(t, 1, count)
+
+	// 旧 LIST 键即使存在也不得被读写（存在也不影响本次请求）。
+	_, err = server.Push("rateLimit:MRRLS:default:9", "2026-01-01T00:00:00.000Z")
+	require.NoError(t, err)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil))
+	assert.Equal(t, http.StatusOK, w2.Code)
+}
+
+// 下游 panic 时也必须退还名额，否则槽位会一直占满到窗口结束。
+func TestRedisRateLimitHandlerRefundsOnPanic(t *testing.T) {
+	_, client := newModelLimitRedis(t)
+	previous := common.RDB
+	common.RDB = client
+	t.Cleanup(func() { common.RDB = previous })
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 11)
+		c.Next()
+	})
+	router.GET("/v1/chat/completions", redisRateLimitHandler(60, 0, 1, "default"), func(c *gin.Context) {
+		panic("boom")
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil))
+	require.Equal(t, http.StatusInternalServerError, w.Code)
+
+	count, err := client.ZCard(context.Background(), "rateLimit:MRRLS:v2:default:11").Result()
+	require.NoError(t, err)
+	assert.EqualValues(t, 0, count, "panic 后槽位必须已退还")
 }
 
 // 中间件层：失败请求必须退还，成功请求占用名额。

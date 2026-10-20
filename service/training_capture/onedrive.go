@@ -3,6 +3,7 @@ package training_capture
 import (
 	"bytes"
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -238,12 +239,28 @@ func NewOneDriveSink(cfg OneDriveConfig) *oneDriveSink {
 	}
 }
 
-// newOneDriveTransport 返回 Graph 专用 Transport：TLS 校验保持默认（开启）。
+// newOneDriveTransport 返回 Graph 专用 Transport：TLS 校验**强制开启**。
+//
+// 为什么不能直接 `http.DefaultTransport.Clone()` 了事：common.Init 在
+// TLS_INSECURE_SKIP_VERIFY=true 时会**就地改写 http.DefaultTransport**
+// （见 common/init.go）。sink 是懒构造的，晚于 Init，Clone 会继承
+// InsecureSkipVerify=true —— 训练数据上传就会在关闭校验的情况下裸奔。
+// 这里克隆后显式清掉该标志，并保留 NextProtos（HTTP/2）等其余配置。
 func newOneDriveTransport() *http.Transport {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.MaxIdleConns = 100
 	transport.MaxIdleConnsPerHost = 32
 	transport.IdleConnTimeout = 90 * time.Second
+
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	if transport.TLSClientConfig != nil {
+		cfg = transport.TLSClientConfig.Clone()
+	}
+	cfg.InsecureSkipVerify = false
+	if cfg.MinVersion == 0 {
+		cfg.MinVersion = tls.VersionTLS12
+	}
+	transport.TLSClientConfig = cfg
 	return transport
 }
 

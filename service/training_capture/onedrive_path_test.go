@@ -2,6 +2,7 @@ package training_capture
 
 import (
 	"context"
+	"crypto/tls"
 	"io"
 	"net/http"
 	"strings"
@@ -251,4 +252,24 @@ func TestNewOneDriveSinkUsesDedicatedVerifiedTransport(t *testing.T) {
 	// 也不能给 Graph 用共享的不校验证书池。
 	require.NotNil(t, transport.TLSClientConfig)
 	assert.False(t, transport.TLSClientConfig.InsecureSkipVerify, "Graph 专用 Transport 不得关闭证书校验")
+}
+
+// 回归：common.Init 在 TLS_INSECURE_SKIP_VERIFY=true 时会就地改写
+// http.DefaultTransport；sink 懒构造晚于 Init，Clone 会继承该污染。
+// 本测试先复现污染，再断言 Graph Transport 仍然校验证书。
+func TestOneDriveTransportIgnoresGlobalTLSInsecureSkipVerify(t *testing.T) {
+	original := http.DefaultTransport
+	polluted, ok := original.(*http.Transport)
+	require.True(t, ok)
+	polluted = polluted.Clone()
+	polluted.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	http.DefaultTransport = polluted
+	t.Cleanup(func() { http.DefaultTransport = original })
+
+	sink := NewOneDriveSink(OneDriveConfig{Tenant: "t", ClientID: "c", ClientSecret: "s", DriveID: "d"})
+	transport, ok := sink.client.Transport.(*http.Transport)
+	require.True(t, ok)
+	require.NotNil(t, transport.TLSClientConfig)
+	assert.False(t, transport.TLSClientConfig.InsecureSkipVerify,
+		"即使全局关闭了证书校验，Graph 上传也必须校验证书")
 }

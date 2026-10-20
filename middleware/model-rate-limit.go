@@ -95,12 +95,39 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, g
 		ctx := context.Background()
 		rdb := common.RDB
 
-		// 1. 检查总请求数限制（含失败次数）。先做这一步：它不影响成功计数，
-		//    被拒时无需退还任何成功槽位。
+		// 1. 原子预占成功名额。
+		//    计数按分组隔离：不同分组有各自的限额，共用一个 key 会让 A 组挤占 B 组额度。
+		//    **必须先占位再处理请求**：若等请求成功后再记录，并发请求会同时通过
+		//    「未达上限」的判断，成功数可以超过限额（旧实现的真实缺陷）。
+		successKey := fmt.Sprintf("rateLimit:%s:%s:%s:%s", ModelRequestRateLimitSuccessCountMark, modelSuccessLimitKeyVersion, group, userId)
+		member, allowed, err := reserveRedisSuccessSlot(ctx, rdb, successKey, successMaxCount, duration)
+		if err != nil {
+			logger.LogError(ctx, fmt.Sprintf("model rate limit: success reservation failed user=%s group=%s err=%v", userId, group, err))
+			abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
+			return
+		}
+		if !allowed {
+			abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到请求数限制：%d分钟内最多请求%d次", setting.ModelRequestRateLimitDurationMinutes, successMaxCount))
+			return
+		}
+		// 被总请求限流拒绝的请求不应占用成功名额（旧顺序也是如此）。
+		refundOnExit := true
+		defer func() {
+			// panic 也要退还，否则槽位会一直占到这个窗口结束。
+			if r := recover(); r != nil {
+				refundRedisSuccessSlot(ctx, rdb, successKey, member)
+				panic(r)
+			}
+			if refundOnExit {
+				refundRedisSuccessSlot(ctx, rdb, successKey, member)
+			}
+		}()
+
+		// 2. 检查总请求数限制（含失败次数；令牌桶）。
 		if totalMaxCount > 0 {
 			totalKey := fmt.Sprintf("rateLimit:total:%s:%s", group, userId)
 			tb := limiter.New(ctx, rdb)
-			allowed, err := tb.Allow(
+			allowed, err = tb.Allow(
 				ctx,
 				totalKey,
 				limiter.WithCapacity(rateLimitCapacity(totalMaxCount, duration)),
@@ -118,29 +145,11 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, g
 			}
 		}
 
-		// 2. 原子预占成功名额。
-		//    计数按分组隔离：不同分组有各自的限额，共用一个 key 会让 A 组挤占 B 组额度。
-		//    **必须先占位再处理请求**：若等请求成功后再记录，并发请求会同时通过
-		//    「未达上限」的判断，成功数可以超过限额（旧实现的真实缺陷）。
-		successKey := fmt.Sprintf("rateLimit:%s:%s:%s:%s", ModelRequestRateLimitSuccessCountMark, modelSuccessLimitKeyVersion, group, userId)
-		member, allowed, err := reserveRedisSuccessSlot(ctx, rdb, successKey, successMaxCount, duration)
-		if err != nil {
-			logger.LogError(ctx, fmt.Sprintf("model rate limit: success reservation failed user=%s group=%s err=%v", userId, group, err))
-			abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
-			return
-		}
-		if !allowed {
-			abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到请求数限制：%d分钟内最多请求%d次", setting.ModelRequestRateLimitDurationMinutes, successMaxCount))
-			return
-		}
-
 		// 3. 处理请求
 		c.Next()
 
-		// 4. 失败请求退还名额（成功计数只统计成功请求）。
-		if c.Writer.Status() >= 400 {
-			refundRedisSuccessSlot(ctx, rdb, successKey, member)
-		}
+		// 4. 成功才保留名额；失败请求退还。
+		refundOnExit = c.Writer.Status() >= 400
 	}
 }
 
@@ -153,14 +162,7 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, 
 		totalKey := ModelRequestRateLimitCountMark + group + ":" + userId
 		successKey := ModelRequestRateLimitSuccessCountMark + modelSuccessLimitKeyVersion + group + ":" + userId
 
-		// 1. 检查总请求数限制（当totalMaxCount为0时跳过）
-		if totalMaxCount > 0 && !inMemoryRateLimiter.Request(totalKey, totalMaxCount, duration) {
-			c.Status(http.StatusTooManyRequests)
-			c.Abort()
-			return
-		}
-
-		// 2. 原子预占成功名额（与 Redis 路径同语义：先占位，失败再退还）。
+		// 1. 原子预占成功名额（与 Redis 路径同语义：先占位，失败/被总限流拒绝再退还）。
 		reserved := false
 		if successMaxCount > 0 && duration > 0 {
 			if !inMemoryRateLimiter.Request(successKey, successMaxCount, duration) {
@@ -170,14 +172,31 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, 
 			}
 			reserved = true
 		}
+		refundOnExit := reserved
+		defer func() {
+			if r := recover(); r != nil {
+				if refundOnExit {
+					inMemoryRateLimiter.Refund(successKey)
+				}
+				panic(r)
+			}
+			if refundOnExit {
+				inMemoryRateLimiter.Refund(successKey)
+			}
+		}()
+
+		// 2. 检查总请求数限制（当totalMaxCount为0时跳过）
+		if totalMaxCount > 0 && !inMemoryRateLimiter.Request(totalKey, totalMaxCount, duration) {
+			c.Status(http.StatusTooManyRequests)
+			c.Abort()
+			return
+		}
 
 		// 3. 处理请求
 		c.Next()
 
-		// 4. 失败请求退还名额
-		if reserved && c.Writer.Status() >= 400 {
-			inMemoryRateLimiter.Refund(successKey)
-		}
+		// 4. 成功才保留名额；失败请求退还。
+		refundOnExit = reserved && c.Writer.Status() >= 400
 	}
 }
 
