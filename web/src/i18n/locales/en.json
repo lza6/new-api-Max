@@ -7394,6 +7394,7 @@
     "Output cost per 1M tokens (CNY)": "Output cost per 1M tokens (CNY)",
     "Note (optional)": "Note (optional)",
     "Price adjustment": "Price adjustment",
-    "Usage logs always record the caller IP; this switch only controls error logs.": "Usage logs always record the caller IP; this switch only controls error logs."
+    "Usage logs always record the caller IP; this switch only controls error logs.": "Usage logs always record the caller IP; this switch only controls error logs.",
+    "Cost coverage: only {{percent}}% of today's revenue matched a cost rule. Unconfigured requests are counted at cost 0, so the margin is overstated.": "Cost coverage: only {{percent}}% of today's revenue matched a cost rule. Unconfigured requests are counted at cost 0, so the margin is overstated."
   }
 }

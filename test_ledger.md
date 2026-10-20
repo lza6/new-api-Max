@@ -1,6 +1,6 @@
 # test_ledger.md — 验证台账（防重复跑 / 防误判回归）
 
-> 只记录实际执行的命令与观察到的结果。最后更新：2026-10-17。
+ > 只记录实际执行的命令与观察到的结果。最后更新：2026-10-20。
 
 ## 已 PASS（本轮实际运行）
 
@@ -55,7 +55,7 @@
 - 安全：1 Critical（编码路径计费绕过）、2 High（开放重定向、ops IDOR）→ 已修。
 - Go：2 P1（审批未绑定参数、请求体多次物化）→ 已修。
 - 前端：4 P1（失败误报成功、错误当空列表、存量语言与 canonical、未翻译前缀 lang）→ 已修。
-- 仍未验证：MySQL/PostgreSQL conformance、真实上游 fine-tune/batch、真实 MCP 客户端、生产环境。
+- 仍未验证：真实上游 fine-tune/batch、真实 MCP 客户端（MySQL/PostgreSQL conformance 已于 2026-10-18 补测 PASS）。
 
 ## 生产部署验收（2026-10-18）
 | 项 | 命令/证据 | 结果 |
@@ -130,3 +130,26 @@
 | 订阅组件 | `vitest run .../plans-compare-table.test.tsx` | 6/6 PASS |
 
 证据已刷新：`计划书/e2e-evidence/v1.3.150/`、`evidence/subscription-first-purchase-20261018.json`。
+
+## 2026-10-19/20 v1.3.154–v1.3.162 验证（真实执行）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 采集归属/删除/重试 | `go test ./service/training_capture/ -count=1` | PASS（72–80s） |
+| 干净 worktree tag 构建 | `git worktree add --detach /tmp/v<tag> <tag> && go build ./...` | PASS（v1.3.154/157/158/159/160/161） |
+| 三库 conformance（含 ModelCost + logs.cost_quota） | 真实 SQLite/MySQL/PG `go test ./model/ -run TestDBConformance` | PASS（128–143s） |
+| 运营财务 | `go test ./model/ -run 'TestModelCost|TestConsumeLogRecordsCostSnapshotAndIP'` | PASS |
+| 运营面板 | `go test ./controller/ -run 'TestOpsOverview|TestOpsRanking'` | PASS |
+| 上游对标 | `go test ./relay/channel/openai|ollama|claude`、`./middleware`、`./service`、`./common` | PASS |
+| 前端 | `bun run typecheck` / `oxlint` / `vitest` / `i18n:check` / `build` | PASS |
+| 浏览器 E2E（导出分页/下载提示） | `node scripts/ui-e2e-export.cjs` | 6/6 PASS |
+| 浏览器 E2E（利润卡/成本表） | `node scripts/ui-e2e-ops-profit.cjs` | 11/11 PASS |
+| 生产采集 E2E | `scripts/prod-capture-e2e.sh`（a/b/lb3/v155/v156/v157） | 两账号均落盘；分片可解压、kind 合法；数据已清理 |
+| 生产财务 API | 临时 Root 用户 GET `/api/admin/ops/overview` | 今日 10,470,400 / 2,801,460 / 7,668,940（73.24%）；冷 9.8s / 热 0.0s |
+| 生产成本快照 | glm-5.3-flash 真实请求 | `quota=3000 cost_quota=1000 ip=172.18.0.1`；用户日志无 cost_quota |
+| 生产静态守卫 | `/static/nope` 与 `/static%2Fnope` | 均 404；真实资源 200 |
+| 三轮独立审查 | reviewer 子代理 | 最终 **Approve** |
+
+### 已知噪声
+- `go test -race ./service/training_capture/` 4 次中 1 次“全 PASS 后二进制非零”，未复现。
+- ClickHouse 路径为 SQL/单测验证，未接真实 CH 实例。

@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.162] - 2026-10-20
+
+### Fixed
+- Redis limiter no longer caches a script SHA with `sync.Once`. `redis.Script.Run`
+  falls back to EVAL on NOSCRIPT, so a Redis restart / failover / SCRIPT FLUSH no longer
+  turns every model-rate-limit check into a 500 (the limiter is currently disabled in
+  production, but the bug was latent).
+- Cost coverage is now measurable: `logs.cost_rule_id` (0 = no rule) and
+  `today/month_cost_coverage_percent` (revenue-weighted). The profit card warns when
+  today's revenue is not fully covered instead of silently counting unconfigured models
+  as zero cost (which overstated margins).
+- ClickHouse create/ensure column lists include `cost_rule_id`.
+
+### Docs
+- Plan-document audit completed: **zero deletion candidates** under the strict rules;
+  manifest at `计划书/archive/2026-10-20-doc-audit/MANIFEST.md`.
+- Fixed stale versions/contradictions in `workflow_status.md`, `test_ledger.md`,
+  `policy.md`, `计划书/README.md`, and the ops SOP/ADR references to the deleted
+  `计划书/workflow_status.md`.
+- Backfilled CHANGELOG entries for v1.3.150/v1.3.151.
+
 ## [v1.3.161] - 2026-10-20
 
 ### Fixed
@@ -192,6 +213,21 @@ Upstream-alignment hardening (security, billing correctness, container awareness
 - Subscription first-purchase E2E: 5/5 (plan creation, discounted list price, UI display, balance charge = 80 × QuotaPerUnit, cleanup).
 - Three-DB conformance: SQLite / MySQL 5.7 / PostgreSQL 15 PASS.
 - Training capture package tests PASS.
+
+## [v1.3.151] - 2026-10-18
+
+### Fixed
+- Training capture multi-account ownership is fail-closed when an account cannot be
+  listed; read fallbacks no longer change write ownership; OneDrive 404 maps to
+  `ErrFileNotFound` so a delete on the wrong account cannot report success; failed
+  capture signals are retried (bounded) instead of being dropped.
+
+## [v1.3.150] - 2026-10-18
+
+### Added
+- Training data capture multi-account load balancing (`TRAINING_ONEDRIVE_2_*`):
+  directories are pinned to one account; existing data wins, new directories hash;
+  reads merge accounts. Production E2E verified both accounts receive data.
 
 ## [v1.3.149] - 2026-10-18
 

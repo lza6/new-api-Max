@@ -172,10 +172,11 @@ func TestOpsOverviewProfitAndMargin(t *testing.T) {
 	now := common.GetTimestamp()
 
 	for _, row := range []model.Log{
-		{UserId: 1, Type: model.LogTypeConsume, Quota: 1_000_000, CostQuota: 400_000, CreatedAt: now},
-		{UserId: 1, Type: model.LogTypeConsume, Quota: 500_000, CostQuota: 100_000, CreatedAt: now},
+		{UserId: 1, Type: model.LogTypeConsume, Quota: 1_000_000, CostQuota: 400_000, CostRuleId: 1, CreatedAt: now},
+		{UserId: 1, Type: model.LogTypeConsume, Quota: 500_000, CostQuota: 100_000, CostRuleId: 1, CreatedAt: now},
 		// 非 consume 日志不得计入营收/成本。
 		{UserId: 1, Type: model.LogTypeTopup, Quota: 9_999_999, CostQuota: 9_999_999, CreatedAt: now},
+		{UserId: 2, Type: model.LogTypeConsume, Quota: 100_000, CostQuota: 0, CostRuleId: 0, CreatedAt: now},
 	} {
 		require.NoError(t, db.Create(&row).Error)
 	}
@@ -197,11 +198,13 @@ func TestOpsOverviewProfitAndMargin(t *testing.T) {
 	require.True(t, envelope.Success)
 	d := envelope.Data
 
-	assert.Equal(t, int64(1_500_000), d.TodayRevenueQuota)
+	assert.Equal(t, int64(1_600_000), d.TodayRevenueQuota)
 	assert.Equal(t, int64(500_000), d.TodayCostQuota)
-	assert.Equal(t, int64(1_000_000), d.TodayProfitQuota)
+	assert.Equal(t, int64(1_100_000), d.TodayProfitQuota)
 	require.NotNil(t, d.TodayMarginPercent)
-	assert.InDelta(t, 66.6667, *d.TodayMarginPercent, 0.01)
+	assert.InDelta(t, 68.75, *d.TodayMarginPercent, 0.01)
+	require.NotNil(t, d.TodayCostCoveragePercent)
+	assert.InDelta(t, 93.75, *d.TodayCostCoveragePercent, 0.01)
 	assert.Equal(t, d.TodayRevenueQuota, d.MonthRevenueQuota, "本月应包含今天")
 	assert.Equal(t, d.TodayProfitQuota, d.YearProfitQuota, "本年应包含今天")
 	assert.True(t, d.CostConfigured)

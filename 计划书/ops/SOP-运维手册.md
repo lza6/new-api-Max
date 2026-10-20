@@ -34,7 +34,7 @@
 | 查**容器状态 / 何时起的 / 重启次数** | `docker ps --filter name=new-api` | 容器名 `new-api`（`docker-compose.yml:20`） |
 | 查**存活探针**（进程活着即 200） | `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/healthz` | `router/main.go:29` |
 | 查**就绪探针**（主库+日志库可达才 200，否则 503） | `curl -s -o /dev/null -w '%{http_code}\n' http://127.0.0.1:3000/readyz` | `router/main.go:30`、`router/main.go:26-27` |
-| 查**应用状态**（Caddy 健康检查用的就是这个） | `curl -s http://127.0.0.1:3000/api/status` | `router/api-router.go:26`、`deploy/Caddyfile.example:59-70` |
+| 查**应用状态**（版本头/公告等） | `curl -s http://127.0.0.1:3000/api/status` | `router/api-router.go:26`。注意：Caddy **主上游健康检查用 `/healthz`**（`deploy/Caddyfile.example:70`）；`/assets/*` 的 handle_path 例外使用 `/api/status`（`:60`） |
 | 看**最近日志** | `docker logs --since 10m new-api` | — |
 | 看**磁盘** | `df -h /` 和 `docker system df` | `计划书/ops/disk-guard.example.sh:26,51`、`计划书/ops/deploy-zero-downtime.example.sh:111` |
 | 看**内存 / 重启** | `docker stats --no-stream new-api` | 部署脚本给容器设 `--memory 900m`（`计划书/ops/deploy-zero-downtime.example.sh:44`） |
@@ -308,7 +308,7 @@ curl -s http://127.0.0.1:3000/metrics | grep -E '^process_(goroutines|memory_hea
 
 判读：`process_goroutines` 持续上升不回落 → 大概率 goroutine 泄漏（如未 stop 的 ticker）；
 `process_memory_heap_objects` 与 alloc 同步上涨 → 大概率有「只加不减」的 map/slice。
-（指标清单来源：`计划书/workflow_status.md` Batch-10 章节。）
+（指标清单来源：根 `workflow_status.md`；Batch-10 原文见 `git log --all -- 计划书/workflow_status.md`。）
 
 > ✅ **生产已开启 `METRICS_ENABLED`**（2026-10-19 实测 `/metrics` 返回 200，
 > 含 `training_capture_*` 系列）。若某实例返回 SPA HTML，按 §5.6 检查该实例的 env。
@@ -316,7 +316,7 @@ curl -s http://127.0.0.1:3000/metrics | grep -E '^process_(goroutines|memory_hea
 已修复的 4 处**真实**无界点（曾经的内存增长源）：`web_protection_tracker` 的 `banCache`
 （8192 硬上界）、`url_guard` 的 `ssrfCache`（4096）、`tokenizer` 的 `tokenEncoderMap`
 （512）、`token-rate-limit` 的 `tokenQBSBuckets`（空闲淘汰）
-（`计划书/workflow_status.md` Batch-10 第二章）。
+（`workflow_status.md` 当前版本；Batch-10 原文见 `git log --all -- 计划书/workflow_status.md`）。
 
 容器内存上限 `900m`（`计划书/ops/deploy-zero-downtime.example.sh:44`）。
 
@@ -427,7 +427,7 @@ docker logs new-api 2>&1 | grep -i 'SESSION_SECRET'
 排除：`curl -s http://127.0.0.1:<端口>/metrics | head -1` 应以 `# TYPE` 开头；
 若返回 `<!doctype html>`，说明**当前实例**没开（注意蓝绿两个端口可能配置不同）。
 端点本身受保护：可信来源 IP 放行，否则要求 root 会话（`middleware/metrics_auth.go`）。
-**是否在生产开启需运维/产品决策**（开启后即可观察内存/goroutine 趋势与 loop 心跳）。
+**生产已开启（2026-10-19 实测 200）**；如需关闭，再按运维/产品决策执行。
 
 ### 5.7 磁盘涨了先别删镜像
 

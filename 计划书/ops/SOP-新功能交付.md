@@ -5,7 +5,10 @@
 > `.claude/skills/add-gateway-feature/SKILL.md`（同一流程的 skill 形态）。
 >
 > **本文所有路径/命令都来自本仓库真实文件并标注 `file:line`；核实不了的标「待验证」。**
-> 最后核对：2026-10-16（对照 `VERSION` = `v1.3.147`）。
+> 最后核对：2026-10-20（对照 `VERSION` = `v1.3.161`）。
+>
+> 注：`计划书/workflow_status.md` 已于 2026-10-18 删除；本文对它的行号引用是历史证据，
+> 原文用 `git log --all -- 计划书/workflow_status.md` 找回；当前状态见根 `workflow_status.md`。
 
 ---
 

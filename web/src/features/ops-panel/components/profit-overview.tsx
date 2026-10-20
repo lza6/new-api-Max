@@ -110,6 +110,19 @@ export function ProfitOverview() {
           </span>
         </div>
       )}
+      {d.cost_configured &&
+        d.today_cost_coverage_percent != null &&
+        d.today_cost_coverage_percent < 99.9 && (
+          <div className='text-warning flex items-start gap-2 border-b px-4 py-2 text-xs sm:px-5'>
+            <TriangleAlert className='mt-0.5 size-4 shrink-0' />
+            <span>
+              {t(
+                "Cost coverage: only {{percent}}% of today's revenue matched a cost rule. Unconfigured requests are counted at cost 0, so the margin is overstated.",
+                { percent: formatNumber(d.today_cost_coverage_percent) }
+              )}
+            </span>
+          </div>
+        )}
 
       <div className='divide-border/60 grid gap-3 p-4 sm:grid-cols-3 sm:p-5'>
         {rows.map((row) => (

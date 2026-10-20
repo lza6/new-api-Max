@@ -504,6 +504,7 @@ var clickHouseLogExtraColumnDefs = []string{
 	"request_bytes Int64 DEFAULT 0",
 	"response_bytes Int64 DEFAULT 0",
 	"cost_quota Int64 DEFAULT 0",
+	"cost_rule_id Int64 DEFAULT 0",
 }
 
 func ensureClickHouseLogColumns() error {
@@ -551,6 +552,7 @@ CREATE TABLE IF NOT EXISTS logs (
 	model_name String DEFAULT '',
 	quota Int32 DEFAULT 0,
 	cost_quota Int64 DEFAULT 0,
+	cost_rule_id Int64 DEFAULT 0,
 	prompt_tokens Int32 DEFAULT 0,
 	completion_tokens Int32 DEFAULT 0,
 	use_time Int32 DEFAULT 0,

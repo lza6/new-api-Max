@@ -57,6 +57,9 @@ export interface OpsOverview {
   daily_average_cost_quota: number
   recommended_daily_topup_quota: number
   cost_configured: boolean
+  /** 今日/本月成本规则覆盖率（营收加权，0~100；营收为 0 时为 null）。 */
+  today_cost_coverage_percent: number | null
+  month_cost_coverage_percent: number | null
   /** 最早的成本生效时间（unix 秒）；早于它的日志没有成本快照。 */
   cost_tracking_since: number
 }

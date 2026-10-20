@@ -71,7 +71,10 @@ type Log struct {
 	// CostQuota 上游成本（额度单位），由 model_cost 在结算时**快照**写入。
 	// json:"-"：这是管理员财务口径，绝不能随用户日志返回。
 	// 聚合只 SUM 本列，因此调价不会重写历史利润。
-	CostQuota        int64 `json:"-" gorm:"bigint;default:0"`
+	CostQuota int64 `json:"-" gorm:"bigint;default:0"`
+	// CostRuleId 本次请求命中的成本规则 ID；0 = 未配置成本。
+	// 报表用它计算「成本覆盖率」，避免未配置模型按 0 成本抬高毛利率。
+	CostRuleId       int   `json:"-" gorm:"bigint;default:0"`
 	PromptTokens     int   `json:"prompt_tokens" gorm:"default:0"`
 	CompletionTokens int   `json:"completion_tokens" gorm:"default:0"`
 	UseTime          int   `json:"use_time" gorm:"default:0"`
@@ -420,9 +423,11 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 	// 写入 logs.cost_quota。之后调价只追加新规则，不会改写这条历史记录，
 	// 因此日报/月报/年报的利润始终可复现。
 	costQuota := int64(0)
+	costRuleId := 0
 	if !params.SkipCost {
 		if ruleQuota, ruleId, ok := RequestCostQuota(params.ChannelId, params.ModelName, params.PromptTokens, params.CompletionTokens, time.Unix(createdAt, 0)); ok {
 			costQuota = ruleQuota
+			costRuleId = int(ruleId)
 			if params.Other == nil {
 				params.Other = NewLogOther()
 			}
@@ -449,6 +454,7 @@ func RecordConsumeLog(c *gin.Context, userId int, params RecordConsumeLogParams)
 		ModelName:        params.ModelName,
 		Quota:            params.Quota,
 		CostQuota:        costQuota,
+		CostRuleId:       costRuleId,
 		ChannelId:        params.ChannelId,
 		TokenId:          params.TokenId,
 		UseTime:          params.UseTimeSeconds,

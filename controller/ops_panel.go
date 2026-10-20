@@ -104,6 +104,10 @@ type opsOverviewData struct {
 	RecommendedDailyTopupQuota float64 `json:"recommended_daily_topup_quota"`
 	// 是否配置过任何成本规则；未配置时成本=0，利润数字会偏高，前端必须提示。
 	CostConfigured bool `json:"cost_configured"`
+	// 成本规则覆盖率（按营收加权，0~100；营收为 0 时为 null）。
+	// 未覆盖的请求按 0 成本计算，覆盖率越低，毛利率越不可信。
+	TodayCostCoveragePercent *float64 `json:"today_cost_coverage_percent"`
+	MonthCostCoveragePercent *float64 `json:"month_cost_coverage_percent"`
 	// 最早的成本生效时间（unix 秒）。早于它的日志没有成本快照。
 	CostTrackingSince int64 `json:"cost_tracking_since"`
 }
@@ -150,6 +154,22 @@ type opsFinancialAggregates struct {
 	Month        opsAggregate
 	Year         opsAggregate
 	Window       opsAggregate
+	// 成本规则覆盖率（按**营收加权**）：命中成本规则的请求贡献的营收 ÷ 总营收。
+	// 未配置成本的模型贡献的营收越少，利润越可信。
+	TodayCoveredRevenue int64
+	MonthCoveredRevenue int64
+}
+
+// coveragePercent 覆盖率（0~100）；总营收为 0 时返回 nil。
+func coveragePercent(total, covered int64) *float64 {
+	if total <= 0 {
+		return nil
+	}
+	v := float64(covered) / float64(total) * 100
+	if v > 100 {
+		v = 100
+	}
+	return &v
 }
 
 func queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart int64) (opsFinancialAggregates, error) {
@@ -163,6 +183,8 @@ func queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart 
 		YearCost      int64 `gorm:"column:year_cost"`
 		WindowRevenue int64 `gorm:"column:window_revenue"`
 		WindowCost    int64 `gorm:"column:window_cost"`
+		TodayCovered  int64 `gorm:"column:today_covered"`
+		MonthCovered  int64 `gorm:"column:month_covered"`
 	}
 	err := model.LOG_DB.Model(&model.Log{}).
 		Where("type = ?", model.LogTypeConsume).
@@ -174,8 +196,10 @@ func queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart 
 			COALESCE(SUM(CASE WHEN created_at >= ? THEN quota ELSE 0 END), 0) AS year_revenue,
 			COALESCE(SUM(CASE WHEN created_at >= ? THEN cost_quota ELSE 0 END), 0) AS year_cost,
 			COALESCE(SUM(CASE WHEN created_at >= ? THEN quota ELSE 0 END), 0) AS window_revenue,
-			COALESCE(SUM(CASE WHEN created_at >= ? THEN cost_quota ELSE 0 END), 0) AS window_cost`,
-			todayStart, todayStart, monthStart, monthStart, yearStart, yearStart, windowStart, windowStart).
+			COALESCE(SUM(CASE WHEN created_at >= ? THEN cost_quota ELSE 0 END), 0) AS window_cost,
+			COALESCE(SUM(CASE WHEN created_at >= ? AND cost_rule_id > 0 THEN quota ELSE 0 END), 0) AS today_covered,
+			COALESCE(SUM(CASE WHEN created_at >= ? AND cost_rule_id > 0 THEN quota ELSE 0 END), 0) AS month_covered`,
+			todayStart, todayStart, monthStart, monthStart, yearStart, yearStart, windowStart, windowStart, todayStart, monthStart).
 		Scan(&row).Error
 	if err != nil {
 		return opsFinancialAggregates{}, err
@@ -186,6 +210,8 @@ func queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart 
 		Month:        opsAggregate{Revenue: row.MonthRevenue, Cost: row.MonthCost},
 		Year:         opsAggregate{Revenue: row.YearRevenue, Cost: row.YearCost},
 		Window:       opsAggregate{Revenue: row.WindowRevenue, Cost: row.WindowCost},
+		TodayCoveredRevenue: row.TodayCovered,
+		MonthCoveredRevenue: row.MonthCovered,
 	}, nil
 }
 
@@ -343,6 +369,8 @@ func GetOpsOverview(c *gin.Context) {
 		RecommendedDailyTopupQuota: dailyAverageCost * opsTopUpBufferRatio,
 		CostConfigured:             costCount > 0,
 		CostTrackingSince:          costSince,
+		TodayCostCoveragePercent:   coveragePercent(today.Revenue, agg.TodayCoveredRevenue),
+		MonthCostCoveragePercent:   coveragePercent(month.Revenue, agg.MonthCoveredRevenue),
 	}
 	// 日均消耗为 0 时不给「还能运营几天」（返回 null），避免除零得到 +Inf。
 	if dailyAverage > 0 {

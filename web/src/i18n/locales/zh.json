@@ -7394,6 +7394,7 @@
     "Output cost per 1M tokens (CNY)": "输出成本 / 百万 token（元）",
     "Note (optional)": "备注（可选）",
     "Price adjustment": "调价",
-    "Usage logs always record the caller IP; this switch only controls error logs.": "使用日志始终记录调用者 IP；此开关仅控制错误日志。"
+    "Usage logs always record the caller IP; this switch only controls error logs.": "使用日志始终记录调用者 IP；此开关仅控制错误日志。",
+    "Cost coverage: only {{percent}}% of today's revenue matched a cost rule. Unconfigured requests are counted at cost 0, so the margin is overstated.": "成本覆盖率：今日只有 {{percent}}% 的营收命中了成本规则。未配置的请求按 0 成本计算，毛利率会被高估。"
   }
 }

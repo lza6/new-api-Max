@@ -1,7 +1,7 @@
 # workflow_status.md — 训练数据采集（多账号归属安全）终局闭环
 
-> 最后更新：2026-10-19 08:00（Asia/Shanghai）
-> 当前生产：`new-api:v1.3.155`（`freeapi.tingfengai.art` / 154.37.208.171，容器 healthy，上游 3000）
+> 最后更新：2026-10-20 18:00（Asia/Shanghai）
+> 当前生产：`new-api:v1.3.162`（`freeapi.tingfengai.art` / 154.37.208.171，容器 healthy，上游随蓝绿交替）
 
 ## 1. 任务契约（本轮）
 
@@ -202,3 +202,39 @@
   本轮问题不需要新的第三方技能；避免引入不可控依赖。
 - 计划文档审计：由只读子代理扫描 `计划书/` 与根目录计划类 md，
   产出保留/归档/删除清单后再执行（见第 9 节，待其返回）。
+
+---
+
+## 9. 计划文档审计与清理（2026-10-20）
+
+- 扫描：`计划书/` 下 22 篇 md + 根目录计划类文档；仅读，未删除任何文件。
+- 结论：按「含未闭环/TODO/决策项即不可删除」的严格规则，**删除候选 0 个**。
+- Manifest：`计划书/archive/2026-10-20-doc-audit/MANIFEST.md`（含永久保留/历史证据/开放项）。
+- 本轮修正的文档事实：
+  - 根 `workflow_status.md`、`test_ledger.md`、`policy.md`、`计划书/README.md` 的版本与互相矛盾引用；
+  - `SOP-运维手册.md`：Caddy 主上游健康检查实际用 `/healthz`、METRICS 生产已开启；
+  - `黄金范例.md` / `SOP-新功能交付.md` / `ADR-架构决策记录.md`：对已删除
+    `计划书/workflow_status.md` 的引用改为「历史证据，git 找回」；
+  - `CHANGELOG.md` 补录 v1.3.150/151。
+- 仍开放的审计项（不可删）：`scan-billing` P1×2、`scan-auth` P2×4、`scan-contract` P2×2、
+  `critic-v1.3.129-132` 若干、`geo-safe` 浏览器 E2E/条款裁决、`hotpath-stress` 3 项、
+  `audit-ledger` 消耗排行/累计充值/Claude 计费。
+
+## 10. Agent 管理 Agent：高价值 backlog（2026-10-20 联网检索）
+
+| 优先级 | 项 | 状态 |
+|---|---|---|
+| P0 | Redis 限流脚本 NOSCRIPT → 500（`common/limiter` sync.Once + EvalSha） | **本轮已修**（Script.Run 自动回退） |
+| P0 | 模型限流「先查后记」非原子（并发可绕过） | 未修（生产该限流默认关闭；记录） |
+| P0 | AutoMigrate 在老 postgres 驱动下可能重写大表（上游 #4054） | 未修（需升级 gorm/驱动并全量回归，风险中） |
+| P1 | 非流式上游 body 无读超时 | 未修（记录） |
+| P1 | 成本/营收绑定当前汇率，历史人民币值会随汇率变化 | 未修（本实例 1:1；需 `cost_micros`/`fx_rate` 快照） |
+| P1 | 未配置成本模型的毛利偏高 | **本轮已修**（`cost_rule_id` + 覆盖率告警） |
+| P1 | SSE 注释心跳被丢弃 / fallover 下网关 ping 关闭 | 未修（记录） |
+| P1 | 上游 FIN 无终止事件被当正常结束 | 未修（记录） |
+| P1 | OneDrive 429 未读 Retry-After | 未修（记录） |
+| P2 | OneDrive 用默认 Transport（每 host 2 空闲连接） | 未修（可改用 `common.NewOutboundClient`） |
+| P2 | 大日志表聚合缺覆盖索引（9s 冷查询） | 未修（已用单聚合+缓存缓解；覆盖索引需 PG 分支） |
+| P3 | 构建镜像 Go patch 版本落后 | 未修（下次镜像升级） |
+
+说明：未修项不是「不知道」，而是本轮风险/收益排序后留给下一轮；均记录在案，禁止当作已完成。
