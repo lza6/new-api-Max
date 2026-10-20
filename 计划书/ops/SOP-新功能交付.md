@@ -50,6 +50,21 @@ make db-check          # Makefile:53-54 → scripts/db-conformance.ps1
 
 迁移**至少跑两次**（fresh + 上一版升级）证明幂等（`AGENTS.md:97`）。
 
+### 2.1 财务/成本数据（v1.3.158+）
+
+| 规则 | 依据 |
+|---|---|
+| 金额存**整数微元**（1 元 = 1e6），禁止 float 累加 | `model/model_cost.go` |
+| 成本规则 **append-only**（带 `effective_from`），无 UPDATE/DELETE | `model/model_cost.go`、`router/training-data-router.go` |
+| 每个请求结算时把当时成本**快照**写入 `logs.cost_quota`；报表只 SUM 快照 | `model/log.go` |
+| 成本字段 `json:"-"`，普通用户日志不可见 | `model/log.go`、`model/formatUserLogs` |
+| **给 Log 加列必须三处同步**：GORM、ClickHouse CREATE、`ensureClickHouseLogColumns` | `model/main.go`、`model/clickhouse_log_test.go` |
+| 大日志表聚合用一条 `SUM(CASE WHEN...)` + 5 分钟缓存（含进程内兜底） | `controller/ops_panel.go` |
+| 任务类按次成本在提交时记一次；结算/退款不重复；罚金 `SkipCost` | `service/task_billing.go`、`service/violation_fee.go` |
+
+**验收**：`TestModelCost*`、`TestConsumeLogRecordsCostSnapshotAndIP`、
+`TestOpsOverviewProfitAndMargin`、`TestClickHouse*`、三库 conformance 全 PASS。
+
 ---
 
 ## 阶段 3：接口与路由
