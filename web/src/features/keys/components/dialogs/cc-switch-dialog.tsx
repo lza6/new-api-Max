@@ -101,7 +101,7 @@ export function CCSwitchDialog(props: Props) {
   const [name, setName] = useState<string>(APP_CONFIGS.claude.defaultName)
   const [models, setModels] = useState<Record<string, string>>({})
 
-  const { data: modelsData } = useQuery({
+  const { data: modelsData, isError, refetch } = useQuery({
     queryKey: ['user-models-ccswitch'],
     queryFn: async () => requireServerSuccess(await getUserModels()),
     enabled: props.open,
@@ -201,6 +201,21 @@ export function CCSwitchDialog(props: Props) {
           />
         </div>
 
+        {isError && (
+          <div className='border-destructive/40 bg-destructive/5 flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-xs'>
+            <span className='text-destructive'>{t('Failed to load')}</span>
+            <Button
+              size='sm'
+              variant='outline'
+              onClick={() => {
+                void refetch()
+              }}
+            >
+              {t('Retry')}
+            </Button>
+          </div>
+        )}
+
         {currentConfig.modelFields.map((field) => (
           <div key={field.key} className='space-y-2'>
             <Label>
@@ -216,7 +231,7 @@ export function CCSwitchDialog(props: Props) {
                 setModels((prev) => ({ ...prev, [field.key]: v }))
               }
               placeholder={t('Select or enter model name')}
-              emptyText={t('No models found')}
+              emptyText={isError ? t('Failed to load') : t('No models found')}
             />
           </div>
         ))}

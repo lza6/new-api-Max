@@ -84,6 +84,12 @@ export function ChannelsPrimaryButtons() {
   const queryClient = useQueryClient()
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [showConsistencyDialog, setShowConsistencyDialog] = useState(false)
+  // These two fire one upstream request per enabled channel. Without a pending
+  // guard a double click doubles the upstream traffic (historically this is how
+  // channels got rate-limited into 429s).
+  const [bulkRunning, setBulkRunning] = useState<null | 'test' | 'balance'>(
+    null
+  )
   const [isRepairingConsistency, setIsRepairingConsistency] = useState(false)
   const [comboDrawerOpen, setComboDrawerOpen] = useState(false)
   const currentUser = useAuthStore((s) => s.auth.user)
@@ -226,8 +232,15 @@ export function ChannelsPrimaryButtons() {
             <DropdownMenuSeparator className='sm:hidden' />
 
             <DropdownMenuItem
-              onClick={() => {
-                handleTestAllChannels(queryClient)
+              disabled={bulkRunning !== null}
+              onClick={async () => {
+                if (bulkRunning) {return}
+                setBulkRunning('test')
+                try {
+                  await handleTestAllChannels(queryClient)
+                } finally {
+                  setBulkRunning(null)
+                }
               }}
             >
               {t('Test All Channels')}
@@ -237,8 +250,15 @@ export function ChannelsPrimaryButtons() {
             </DropdownMenuItem>
 
             <DropdownMenuItem
-              onClick={() => {
-                handleUpdateAllBalances(queryClient)
+              disabled={bulkRunning !== null}
+              onClick={async () => {
+                if (bulkRunning) {return}
+                setBulkRunning('balance')
+                try {
+                  await handleUpdateAllBalances(queryClient)
+                } finally {
+                  setBulkRunning(null)
+                }
               }}
             >
               {t('Update All Balances')}
