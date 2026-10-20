@@ -23,7 +23,7 @@ async function waitAppReady(page) {
 }
 async function uiLogin(context) {
   const p = await context.newPage()
-  await p.goto('/sign-in', { waitUntil: 'networkidle' })
+  await p.goto('/sign-in', { waitUntil: 'domcontentloaded' })
   await p.locator('input[name="username"]').waitFor({ state: 'visible', timeout: 20000 })
   await p.locator('input[name="username"]').fill(USER)
   await p.locator('input[name="password"]').fill(PASS)
@@ -34,8 +34,10 @@ async function uiLogin(context) {
     const checked = isInput ? await consent.isChecked().catch(() => false) : aria === 'true'
     if (!checked) await consent.click({ force: true }).catch(() => {})
   }
-  await p.locator('button[type="submit"]').first().click()
-  await p.waitForURL((u) => !u.pathname.includes('/sign-in'), { timeout: 25000 }).catch(() => {})
+  const submit = p.locator('button[type="submit"]').first()
+  if (await submit.isDisabled().catch(() => false)) console.log('  [login] submit disabled, retry consent')
+  await submit.click({ timeout: 10000 })
+  await p.waitForURL((u) => !u.pathname.includes('/sign-in'), { timeout: 15000 }).catch(() => {})
   await waitAppReady(p)
   const url = p.url()
   const txt = (await p.locator('body').innerText().catch(() => '')) || ''
@@ -52,8 +54,11 @@ async function main() {
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
   page.on('pageerror', (e) => errors.push('pageerror: ' + e.message))
 
-  await page.goto('/ops-panel', { waitUntil: 'networkidle' })
+  await page.goto('/ops-panel', { waitUntil: 'domcontentloaded' })
   await waitAppReady(page)
+  // 冷启动时财务聚合可能耗时数秒：等利润卡片真正出现再断言，避免把「加载中」判成缺失
+  await page.getByText(/利润与成本|Profit & Cost/).first().waitFor({ state: 'visible', timeout: 30000 }).catch(() => {})
+  await page.waitForTimeout(1500)
   const text = (await page.locator('body').innerText().catch(() => '')) || ''
   fs.writeFileSync(OUT + '/debug-ops-body.txt', text)
   check('运营面板渲染', text.length > 200, 'len=' + text.length)
@@ -86,7 +91,7 @@ async function main() {
   const mlogin = await uiLogin(mobile)
   check('320px 上下文 UI 登录', mlogin.ok, mlogin.url)
   const mp = mlogin.page
-  await mp.goto('/ops-panel', { waitUntil: 'networkidle' })
+  await mp.goto('/ops-panel', { waitUntil: 'domcontentloaded' })
   await waitAppReady(mp)
   const overflow = await mp.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }))
   check('320px 运营面板无横向溢出', overflow.sw <= overflow.iw, JSON.stringify(overflow))
@@ -94,7 +99,7 @@ async function main() {
 
   // 隐私页文案（安全设置页 → 隐私卡片）。复用同一标签页，避免新标签页首帧鉴权竞态。
   const pp = page
-  await pp.goto('/security', { waitUntil: 'networkidle' })
+  await pp.goto('/security', { waitUntil: 'domcontentloaded' })
   await waitAppReady(pp)
   const ptext = (await pp.locator('body').innerText().catch(() => '')) || ''
   check('隐私页文案与实际行为一致', /使用日志始终记录|Usage logs always record/.test(ptext), ptext.slice(0, 200))

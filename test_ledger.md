@@ -188,3 +188,19 @@
 - 本机 PostgreSQL 服务（postgresql-x64-16）**无法启动**（子进程 0xC0000142，服务损坏）；
   改用 `initdb` 临时实例 `C:/pgtmp2`（端口 55432，trust 认证）完成真实 PG 验证，用完即停。
 - MySQL 服务正常运行，数据库 `newapi_conformance_test` 可复用。
+
+## 2026-10-21 v1.3.164 复审修复后验证
+
+| 范围 | 命令/方式 | 结果 |
+|---|---|---|
+| OneDrive TLS 污染回归 | `go test ./service/training_capture/ -run 'TestOneDriveTransportIgnoresGlobalTLSInsecureSkipVerify|TestNewOneDriveSink'` | PASS（先污染 DefaultTransport 再构造 sink） |
+| 限流 handler 级键类型 | `go test ./middleware/ -run 'TestRedisRateLimitHandlerWritesV2ZSetKey|TestRedisRateLimitHandlerRefundsOnPanic'` | PASS（v2 键为 zset；panic 后槽位 0） |
+| 三包全量 | `go test ./middleware/ ./common/ ./service/training_capture/` | PASS（26.2s / 11.4s / 32.7s） |
+| 干净归档构建 | `git archive HEAD` → `go build ./...` | PASS |
+| 线上版本 | 服务器 `curl` | `x-new-api-version: v1.3.164`，healthz/readyz 200，15 分钟 0 个 500 |
+| 生产浏览器 E2E | `node scripts/ui-e2e-prod-finance.cjs` | **16/16 PASS**（证据 `计划书/e2e-evidence/v1.3.164-ui/`） |
+
+### 新增噪声/坑（生产 UI E2E）
+- 运营面板冷启动时财务聚合可能 >2s；断言前必须等「利润与成本」可见，固定 sleep 会把「加载中」误判成缺失。
+- 页面在后台有轮询时 `waitUntil: 'networkidle'` 会 30s 超时；改用 `domcontentloaded` + 元素等待。
+- SSH 隧道偶发「ESTABLISHED 卡住」，表现为新连接一起挂 → 按 PID 重启隧道即可。

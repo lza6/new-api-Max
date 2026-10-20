@@ -275,3 +275,13 @@
 - 生产浏览器 E2E **16/16**（证据 `计划书/e2e-evidence/v1.3.163-ui/`）；临时管理员与 2 条会话已删。
 - 轻量压测（服务器本机）：300 请求并发 20 → **300/300 = 200**，1.1s；外网 `/api/status` 200 / 108ms。
 - 回滚：`/opt/new-api/deploy-zero-downtime.sh v1.3.162`（镜像仍在本地）。
+
+### v1.3.164 复审后修复与再次上线（2026-10-21）
+- 独立复审抓到 1 个真实 P1：`common.Init` 在 `TLS_INSECURE_SKIP_VERIFY=true` 时就地改写
+  `http.DefaultTransport`，懒构造的 OneDrive sink 克隆后仍会跳过证书校验。已显式清标志并保留 HTTP/2，
+  补「先污染再构造」回归测试。
+- 同时修正：成功槽先于总请求桶预占、被拒退还（恢复旧语义）；panic 路径 `defer` 退还；
+  handler 级断言 v2 键为 ZSET（原测试直接调 helper，无法发现路由层回退）。
+- commit `4ccbb3a8d` / tag `v1.3.164` / Release 201；蓝绿 **3000→3001**，版本头 v1.3.164，
+  healthz/readyz 200，0 个 500；生产浏览器 E2E **16/16**（`计划书/e2e-evidence/v1.3.164-ui/`）。
+- 回滚：`deploy-zero-downtime.sh v1.3.163`。
