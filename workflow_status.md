@@ -266,3 +266,12 @@
 | 非流式读超时 | **已有界**：整请求受 `RELAY_TIMEOUT` 与 ctx 约束 | 复核 |
 | 大日志表覆盖索引（P2） | **暂不做**：1.46M 行写入频繁，五列索引放大写放大；已有 5 分钟单聚合+进程缓存 | 实测冷 9.8s / 热 0.0s |
 | 审计 P1 复核 | 认证两条 P1 早已闭环；Stripe 两条为误报 | `计划书/audit/` 复核节 |
+
+### v1.3.163 发布与线上验收（2026-10-21）
+- commit `e27aa6972`，tag `v1.3.163` 已推 origin main；GitHub Release 已建（HTTP 201）。
+- 服务器本地构建 `new-api:v1.3.163`（9 分钟），`deploy-zero-downtime.sh` 蓝绿 **3001→3000**。
+- 线上：`x-new-api-version: v1.3.163`、`/healthz` `/readyz` 200、15 分钟 0 个 500、
+  采集 worker `sink=onedrive` 正常启动。
+- 生产浏览器 E2E **16/16**（证据 `计划书/e2e-evidence/v1.3.163-ui/`）；临时管理员与 2 条会话已删。
+- 轻量压测（服务器本机）：300 请求并发 20 → **300/300 = 200**，1.1s；外网 `/api/status` 200 / 108ms。
+- 回滚：`/opt/new-api/deploy-zero-downtime.sh v1.3.162`（镜像仍在本地）。

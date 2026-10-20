@@ -172,3 +172,19 @@
 - SPA 的滚动发生在内部 `overflow-auto` 容器，Playwright `locator.scrollIntoViewIfNeeded` 与 `scrollIntoView` 对其无效；截图前需把 `scrollHeight > clientHeight` 且 `overflow-y:auto|scroll` 的容器 `scrollTop = scrollHeight`。
 - 登录受 `CriticalRateLimit`（20 次 / 20 分钟 / IP）限制；连续重跑会 429。隧道下服务端看到的 IP 是 `127.0.0.1`，窗口耗尽只能等窗口过期，勿反复重试。
 - 新标签页打开已登录站点存在鉴权首帧竞态（偶发跳 `/sign-in`）；同一标签页内导航稳定。
+
+## 2026-10-21 v1.3.163 验证（真实执行）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 成功限流原子性 | `go test ./middleware/ -run 'TestModelSuccess|TestRedisRateLimitHandler'` | PASS（60 并发恰好 10 个通过；失败退还；窗口过期） |
+| 中间件/common 全量 | `go test ./middleware/ ./common/` | PASS（57.8s / 18.6s） |
+| 采集全量 | `go test ./service/training_capture/` | PASS（38.7s） |
+| 三库 conformance（含旧库漂移收敛） | `TEST_MYSQL_DSN=... TEST_POSTGRES_DSN=... go test ./model/ -run TestDBConformance` | PASS（141.7s；SQLite + MySQL + 临时 PostgreSQL 16 实例 55432） |
+| 干净归档构建 | `git archive HEAD | tar -x` + 复制 `web/dist` + `go build ./...` | PASS |
+| 构建/vet | `go build ./...`、`go vet ./middleware ./common ./service/training_capture ./model` | PASS |
+
+### 环境说明
+- 本机 PostgreSQL 服务（postgresql-x64-16）**无法启动**（子进程 0xC0000142，服务损坏）；
+  改用 `initdb` 临时实例 `C:/pgtmp2`（端口 55432，trust 认证）完成真实 PG 验证，用完即停。
+- MySQL 服务正常运行，数据库 `newapi_conformance_test` 可复用。
