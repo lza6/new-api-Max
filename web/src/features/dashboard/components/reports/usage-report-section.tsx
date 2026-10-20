@@ -34,6 +34,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { useStatus } from '@/hooks/use-status'
+import { handleServerError } from '@/lib/handle-server-error'
 
 import {
   exportUsageReportCsv,
@@ -125,6 +126,8 @@ export function UsageReportSection() {
       link.click()
       link.remove()
       URL.revokeObjectURL(url)
+    } catch (error) {
+      handleServerError(error, t('Failed to create export'))
     } finally {
       setExporting(false)
     }

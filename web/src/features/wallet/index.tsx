@@ -20,9 +20,11 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
+import { ErrorState } from '@/components/error-state'
 import { useStatus } from '@/hooks/use-status'
 import { useSystemConfig } from '@/hooks/use-system-config'
 import { getSelf } from '@/lib/api'
+import { handleServerError } from '@/lib/handle-server-error'
 
 import { AffiliateRewardsCard } from './components/affiliate-rewards-card'
 import { BillingHistoryDialog } from './components/dialogs/billing-history-dialog'
@@ -64,6 +66,7 @@ export function Wallet(props: WalletProps) {
   const { t } = useTranslation()
   const [user, setUser] = useState<UserWalletData | null>(null)
   const [userLoading, setUserLoading] = useState(true)
+  const [userError, setUserError] = useState(false)
   const [topupAmount, setTopupAmount] = useState(0)
   const [selectedPreset, setSelectedPreset] = useState<number | null>(null)
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
@@ -111,20 +114,25 @@ export function Wallet(props: WalletProps) {
     useWaffoPancakePayment()
 
   // Fetch and refresh user data
+  // `getSelf` 走 `skipErrorHandler`，全局拦截器不会提示，失败必须在这里显式处理：
+  // 否则卡片直接渲染 `user?.quota ?? 0`，用户会把「加载失败」看成「余额被清零」。
   const fetchUser = useCallback(async () => {
     try {
       setUserLoading(true)
       const response = await getSelf()
       if (response.success && response.data) {
         setUser(response.data as UserWalletData)
+        setUserError(false)
+      } else {
+        setUserError(true)
       }
     } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to fetch user data:', error)
+      setUserError(true)
+      handleServerError(error, t('Failed to load'))
     } finally {
       setUserLoading(false)
     }
-  }, [])
+  }, [t])
 
   useEffect(() => {
     fetchUser()
@@ -213,9 +221,9 @@ export function Wallet(props: WalletProps) {
   }
 
   // Handle redemption
+  // 不要在这里对空输入早退：`useRedemption` 内部已有「请输入兑换码」的提示，
+  // 早退会让点击变成「毫无反应」。
   const handleRedeem = async () => {
-    if (!redemptionCode) {return}
-
     const success = await redeemCode(redemptionCode)
     if (success) {
       setRedemptionCode('')
@@ -289,7 +297,16 @@ export function Wallet(props: WalletProps) {
         <SectionPageLayout.Title>{t('Wallet')}</SectionPageLayout.Title>
         <SectionPageLayout.Content>
           <div className='mx-auto flex w-full max-w-7xl flex-col gap-4 sm:gap-5'>
-            <WalletStatsCard user={user} loading={userLoading} />
+            {userError && !user && !userLoading ? (
+              <ErrorState
+                title={t('Failed to load')}
+                onRetry={() => {
+                  void fetchUser()
+                }}
+              />
+            ) : (
+              <WalletStatsCard user={user} loading={userLoading} />
+            )}
 
             <WalletUsageEndpointsCard />
 

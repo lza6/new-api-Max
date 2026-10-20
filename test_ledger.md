@@ -234,3 +234,16 @@
 - `#root` 自带 `#app-boot-loader`，用 `#root.children.length > 0` 判断「已渲染」会提前成立；应等 `#app-boot-loader` 被 detach。
 - `/api/setup` 返回未初始化会整体重定向到 `/setup`，测首页必须 mock 成 `{success:true,data:{status:true}}`。
 - `/api/home_page_content`、`/api/notice` 返回对象时旧代码会抛错并让整页 500（已修）。
+
+## 2026-10-21 前端第二轮（多代理审计后修复）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 前端类型 | `cd web && bun run typecheck` | PASS |
+| 前端构建 | `cd web && bun run build` | PASS（23876.9 kB / 7458.0 kB gzip） |
+| 定向组件测试 | `npx vitest run src/features/wallet src/features/dashboard src/components/ui/__tests__/a11y-smoke.test.tsx` | 8 文件 / 47 用例 PASS（132s） |
+| 改动文件 lint | `npx oxlint -c .oxlintrc.json <changed files>` | 无新增 error（prompt-input 2 条既有 warning） |
+
+已修：ui/dialog 高度与滚动、alert-dialog 高度与宽度、dialog 100vh→100dvh、抽屉页脚安全区、附件删除按钮触屏误触、dashboard 管理端 section 越权可见、wallet 失败显示 0 余额、空兑换码无提示、系统设置失败渲染默认值、导出 CSV 静默失败与 JSON 当 csv。
+
+未验证：320px 弹窗可视性（需真实登录路由）；全量 vitest 仍超时未完成。

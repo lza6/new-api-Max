@@ -41,7 +41,9 @@ export const sideDrawerFormClassName = (className?: string) =>
 
 export const sideDrawerFooterClassName = (className?: string) =>
   cn(
-    'border-border/70 bg-background/95 grid grid-cols-2 gap-2 border-t px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:flex sm:flex-row sm:justify-end sm:px-6 sm:py-4',
+    // 底部安全区：iPhone 的 Home Indicator 约 34px，`py-3` 只有 12px，
+    // 会把最后一行的「保存/取消」压进手势区。
+    'border-border/70 bg-background/95 grid grid-cols-2 gap-2 border-t px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/80 sm:flex sm:flex-row sm:justify-end sm:px-6 sm:pt-4 sm:pb-[max(1rem,env(safe-area-inset-bottom))]',
     className
   )
 

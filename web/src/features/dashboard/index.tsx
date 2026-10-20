@@ -22,6 +22,7 @@ import { useState, useCallback, useMemo, lazy, Suspense } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { SectionPageLayout } from '@/components/layout'
+import { EmptyState } from '@/components/empty-state'
 import { FadeIn } from '@/components/page-transition'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -48,6 +49,7 @@ import {
 } from './lib'
 import {
   type DashboardSectionId,
+  ADMIN_ONLY_SECTIONS,
   DASHBOARD_DEFAULT_SECTION,
   DASHBOARD_SECTION_IDS,
 } from './section-registry'
@@ -59,6 +61,27 @@ import type {
 } from './types'
 
 const route = getRouteApi('/_authenticated/dashboard/$section')
+
+/**
+ * 直接访问管理端 section 时（手改 URL / 旧书签）给非管理员的兜底。
+ * 之前 `reports` 只按 `isAdmin` 决定是否渲染内容，没做权限兜底 → 标题有了、
+ * 内容区全空白，用户不知道是没权限还是页面坏了。
+ */
+function AdminOnlyNotice(props: { onBack: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <FadeIn>
+      <EmptyState
+        title={t('Admin Only')}
+        action={
+          <Button variant='outline' onClick={props.onBack}>
+            {t('Back')}
+          </Button>
+        }
+      />
+    </FadeIn>
+  )
+}
 
 const LOG_STAT_CARD_FALLBACK_KEYS = [
   'count',
@@ -257,7 +280,9 @@ export function Dashboard() {
   const visibleSections = useMemo(
     () =>
       DASHBOARD_SECTION_IDS.filter(
-        (section) => section !== 'overview' && (section !== 'users' || isAdmin)
+        (section) =>
+          section !== 'overview' &&
+          (isAdmin || !ADMIN_ONLY_SECTIONS.has(section))
       ),
     [isAdmin]
   )
@@ -400,16 +425,19 @@ export function Dashboard() {
               </FadeIn>
             </>
           )}
-          {activeSection === 'users' && (
-            <FadeIn>
-              <Suspense fallback={<ModelChartsFallback />}>
-                <LazyUserCharts
-                  filters={userChartsFilters}
-                  onFiltersChange={setUserChartsFilters}
-                />
-              </Suspense>
-            </FadeIn>
-          )}
+          {activeSection === 'users' &&
+            (isAdmin ? (
+              <FadeIn>
+                <Suspense fallback={<ModelChartsFallback />}>
+                  <LazyUserCharts
+                    filters={userChartsFilters}
+                    onFiltersChange={setUserChartsFilters}
+                  />
+                </Suspense>
+              </FadeIn>
+            ) : (
+              <AdminOnlyNotice onBack={() => handleSectionChange('models')} />
+            ))}
           {activeSection === 'flow' && (
             <FadeIn>
               <Suspense fallback={<ModelChartsFallback />}>
@@ -420,13 +448,16 @@ export function Dashboard() {
               </Suspense>
             </FadeIn>
           )}
-          {activeSection === 'reports' && isAdmin && (
-            <FadeIn>
-              <Suspense fallback={<ModelChartsFallback />}>
-                <LazyUsageReportSection />
-              </Suspense>
-            </FadeIn>
-          )}
+          {activeSection === 'reports' &&
+            (isAdmin ? (
+              <FadeIn>
+                <Suspense fallback={<ModelChartsFallback />}>
+                  <LazyUsageReportSection />
+                </Suspense>
+              </FadeIn>
+            ) : (
+              <AdminOnlyNotice onBack={() => handleSectionChange('models')} />
+            ))}
         </div>
       </SectionPageLayout.Content>
     </SectionPageLayout>

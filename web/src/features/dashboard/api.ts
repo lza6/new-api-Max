@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { api } from '@/lib/api'
+import { createServerError } from '@/lib/server-error-message'
 
 import type {
   FlowQuotaDataItem,
@@ -150,5 +151,18 @@ export async function exportUsageReportCsv(params: {
     params,
     responseType: 'blob',
   })
+  // A 200 can still carry a JSON error envelope (business failure or an upstream
+  // error page). Without this check the caller downloads that JSON as a `.csv`.
+  const contentType = String(res.headers?.['content-type'] ?? '')
+  if (!contentType.includes('text/csv') && !contentType.includes('application/octet-stream')) {
+    const text = await (res.data as Blob).text()
+    let payload: unknown = text
+    try {
+      payload = JSON.parse(text)
+    } catch {
+      // Not JSON: surface the raw text as the error message.
+    }
+    throw createServerError(payload)
+  }
   return res.data as Blob
 }

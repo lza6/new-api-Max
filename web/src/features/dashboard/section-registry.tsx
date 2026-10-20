@@ -55,7 +55,15 @@ const DASHBOARD_SECTIONS = [
 
 export type DashboardSectionId = (typeof DASHBOARD_SECTIONS)[number]['id']
 
-const ADMIN_ONLY_SECTIONS = new Set<string>(['users', 'reports'])
+/**
+ * Sections that require an administrator role. Single source of truth for both
+ * the tab filter and the direct-URL guard in `dashboard/index.tsx` — keeping two
+ * hand-written lists is how `reports` used to leak into the non-admin tab bar.
+ */
+export const ADMIN_ONLY_SECTIONS: ReadonlySet<string> = new Set([
+  'users',
+  'reports',
+])
 
 const dashboardRegistry = createSectionRegistry<
   DashboardSectionId,

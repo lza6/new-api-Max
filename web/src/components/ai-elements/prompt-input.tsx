@@ -327,11 +327,15 @@ export function PromptInputAttachment({
           </div>
           <Button
             aria-label={t('Remove attachment')}
-            className='absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [&>svg]:size-2.5'
+            // 触屏没有 hover：基础态必须 `pointer-events-none`，否则 20px 缩略图上的
+            // 44px 命中区会盖住右侧文件名，用户点文件名预览时会误删附件。coarse
+            // pointer 下改为常显；`icon-xs` 留在 compact 白名单里，避免被撑到 44px。
+            className='pointer-events-none absolute inset-0 size-5 cursor-pointer rounded p-0 opacity-0 transition-opacity group-hover:pointer-events-auto group-hover:opacity-100 [@media(pointer:coarse)]:pointer-events-auto [@media(pointer:coarse)]:opacity-100 [&>svg]:size-2.5'
             onClick={(e) => {
               e.stopPropagation()
               attachments.remove(data.id)
             }}
+            size='icon-xs'
             type='button'
             variant='ghost'
           >
