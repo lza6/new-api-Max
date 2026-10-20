@@ -523,10 +523,7 @@ func runWorker(stop <-chan struct{}, done chan<- struct{}) {
 		if err != nil {
 			captureStats.TotalUploadErrors.Add(1)
 			consecutiveErrors++
-			backoff := workerErrorBackoff * time.Duration(1<<min(consecutiveErrors, 6))
-			if backoff > workerMaxBackoff {
-				backoff = workerMaxBackoff
-			}
+			backoff := nextWorkerBackoff(consecutiveErrors, err)
 			logWorkerError(signal, err, consecutiveErrors)
 
 			// **重试**：信号已被 `ReceiveWithStop` 取走，不重试就永久丢。
@@ -570,6 +567,26 @@ func runWorker(stop <-chan struct{}, done chan<- struct{}) {
 			captureStats.BytesUploaded.Add(uploadedBytes)
 		}
 	}
+}
+
+// nextWorkerBackoff 计算失败后的退避时长。
+//
+// 指数退避是默认值；若上游通过 Retry-After 明确要求更久的等待
+// （OneDrive 429 常见），取两者较大值，但不超过 workerMaxBackoff。
+// 抽成纯函数是为了能在测试里断言策略而不真的 sleep。
+func nextWorkerBackoff(consecutive int, err error) time.Duration {
+	backoff := workerErrorBackoff * time.Duration(1<<min(consecutive, 6))
+	if backoff > workerMaxBackoff {
+		backoff = workerMaxBackoff
+	}
+	var retryAfter *retryAfterError
+	if errors.As(err, &retryAfter) && retryAfter.after > backoff {
+		backoff = retryAfter.after
+		if backoff > workerMaxBackoff {
+			backoff = workerMaxBackoff
+		}
+	}
+	return backoff
 }
 
 func logWorkerError(signal CaptureSignal, err error, consecutive int) {

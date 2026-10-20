@@ -2,6 +2,43 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.163] - 2026-10-21
+
+### Fixed
+- **Model success-rate limit is now atomic.** Success slots are reserved with a
+  single Lua `ZSET` script before the request and refunded when the request
+  fails. The previous check-then-record flow (`LLEN` before, `LPUSH` after) let
+  concurrent requests pass the "under the limit" check together, so the
+  per-group success limit could be exceeded; failed requests also burned quota
+  through a separate `_check` counter in the in-memory path. The key version is
+  bumped to `MRRLS:v2` so legacy LIST keys cannot produce `WRONGTYPE`.
+- **Training-capture OneDrive honours `Retry-After`.** 429 responses now carry
+  the server-provided delay (seconds or HTTP-date, capped at the worker's max
+  backoff); the worker waits at least that long instead of only using
+  exponential backoff.
+- **Graph calls no longer use the default transport.** The OneDrive sink builds
+  a dedicated cloned transport (`MaxIdleConnsPerHost=32`) and keeps certificate
+  verification on, so training-data uploads never inherit
+  `TLS_INSECURE_SKIP_VERIFY` from the shared outbound pool.
+
+### Tests
+- Concurrency test proves exactly `max` reservations under 60 goroutines; refund
+  and sliding-window expiry tests; handler-level test that a failed request does
+  not consume a success slot.
+- New legacy-drift `AutoMigrate` convergence test on real MySQL and PostgreSQL:
+  a narrowed column is repaired once and **not** rewritten on the next start.
+- OneDrive `Retry-After` parsing/status/backoff/transport tests.
+- Three-database conformance (SQLite/MySQL/PostgreSQL) PASS, including the new
+  drift-convergence case.
+
+### Docs
+- Audit recheck (`计划书/audit/scan-auth.md`, `scan-billing.md`): both auth P1s
+  were already fixed in earlier batches; the two Stripe "P1"s were false
+  positives — `StripeUnitPrice` is local-currency-per-USD, not a credit ratio.
+- Production UI acceptance recorded: ops profit/cost panel, cost-rule table,
+  320px layout and privacy copy verified in a real browser (16/16), with
+  screenshots under `计划书/e2e-evidence/v1.3.162-ui/`.
+
 ## [v1.3.162] - 2026-10-20
 
 ### Fixed

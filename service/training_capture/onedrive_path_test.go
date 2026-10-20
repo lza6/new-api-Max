@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -189,4 +190,65 @@ func TestOneDriveDeleteMaps404ToErrFileNotFound(t *testing.T) {
 	err := sink.DeleteFile(ctx, "2026-10-18/u-1/m/missing.jsonl.gz")
 	require.Error(t, err, "404 不能吞成成功")
 	assert.ErrorIs(t, err, ErrFileNotFound)
+}
+
+func TestParseRetryAfter(t *testing.T) {
+	now := time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)
+	cases := []struct {
+		name  string
+		value string
+		want  time.Duration
+	}{
+		{"seconds", "2", 2 * time.Second},
+		{"plus_seconds", "+5", 5 * time.Second},
+		{"zero", "0", 0},
+		{"negative", "-3", 0},
+		{"invalid", "soon", 0},
+		{"empty", "  ", 0},
+		{"http_date_future", now.Add(7 * time.Second).Format(http.TimeFormat), 7 * time.Second},
+		{"http_date_past", now.Add(-time.Minute).Format(http.TimeFormat), 0},
+		{"capped", "99999", workerMaxBackoff},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, parseRetryAfter(tc.value, now))
+		})
+	}
+}
+
+func TestStatusErrorCarriesRetryAfterOn429(t *testing.T) {
+	resp := jsonResponse(`{}`, http.StatusTooManyRequests)
+	resp.Header.Set("Retry-After", "3")
+
+	err := statusError("onedrive upload", resp)
+	var retryAfter *retryAfterError
+	require.ErrorAs(t, err, &retryAfter, "429 必须携带 Retry-After 供 worker 使用")
+	assert.Equal(t, 3*time.Second, retryAfter.after)
+
+	plain := statusError("onedrive upload", jsonResponse(`{}`, http.StatusInternalServerError))
+	assert.NotErrorAs(t, plain, &retryAfter, "500 不应伪造 Retry-After")
+}
+
+func TestNextWorkerBackoffHonorsRetryAfter(t *testing.T) {
+	short := &retryAfterError{err: assert.AnError, after: 30 * time.Second}
+	long := &retryAfterError{err: assert.AnError, after: 10 * time.Minute}
+
+	// 第 1 次失败：基础退避 4s，但服务端要求 30s → 取 30s。
+	assert.Equal(t, 30*time.Second, nextWorkerBackoff(1, short))
+	// 服务端要求超过上限时仍封顶。
+	assert.Equal(t, workerMaxBackoff, nextWorkerBackoff(1, long))
+	// 普通错误保持原指数退避。
+	assert.Equal(t, 4*time.Second, nextWorkerBackoff(1, assert.AnError))
+}
+
+func TestNewOneDriveSinkUsesDedicatedVerifiedTransport(t *testing.T) {
+	sink := NewOneDriveSink(OneDriveConfig{Tenant: "t", ClientID: "c", ClientSecret: "s", DriveID: "d"})
+	transport, ok := sink.client.Transport.(*http.Transport)
+	require.True(t, ok, "必须使用可调优的 *http.Transport")
+	assert.NotSame(t, http.DefaultTransport, transport, "不能直接用默认 Transport")
+	assert.Equal(t, 32, transport.MaxIdleConnsPerHost, "需高于默认 2，避免分片上传反复建连")
+	// 云盘上传必须保持 TLS 校验：即使全局 TLS_INSECURE_SKIP_VERIFY 打开，
+	// 也不能给 Graph 用共享的不校验证书池。
+	require.NotNil(t, transport.TLSClientConfig)
+	assert.False(t, transport.TLSClientConfig.InsecureSkipVerify, "Graph 专用 Transport 不得关闭证书校验")
 }

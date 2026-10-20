@@ -6,11 +6,13 @@ import (
 	"math"
 	"net/http"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
 	"github.com/lza6/new-api-Max/common/limiter"
 	"github.com/lza6/new-api-Max/constant"
+	"github.com/lza6/new-api-Max/logger"
 	"github.com/lza6/new-api-Max/setting"
 
 	"github.com/gin-gonic/gin"
@@ -20,60 +22,70 @@ import (
 const (
 	ModelRequestRateLimitCountMark        = "MRRL"
 	ModelRequestRateLimitSuccessCountMark = "MRRLS"
-	modelRateLimitTimeFormat              = "2006-01-02T15:04:05.000Z"
+	// 成功计数键的版本后缀。旧实现把成功计数存成 Redis LIST（LPUSH/LTRIM），
+	// 新实现改用 ZSET（按时间戳滑动窗口、可精确退还）。键名必须升级，
+	// 否则在旧 LIST 键上跑 ZADD 会 WRONGTYPE，让所有请求 500。
+	modelSuccessLimitKeyVersion = "v2"
 )
 
-// 检查Redis中的请求限制
-func checkRedisRateLimit(ctx context.Context, rdb *redis.Client, key string, maxCount int, duration int64) (bool, error) {
-	// 如果maxCount为0，表示不限制
-	if maxCount == 0 {
-		return true, nil
-	}
+// 成功计数槽位序号：保证同一纳秒内并发的预留仍有唯一 member。
+var modelSuccessSlotSeq atomic.Uint64
 
-	// 获取当前计数
-	length, err := rdb.LLen(ctx, key).Result()
+// reserveSuccessSlotScript 原子地「清理过期 → 判限额 → 预留一个槽位」。
+//
+// 旧实现是 LLen 判断 + 请求后 LPUSH 记录，两者分开执行：并发请求会同时看到
+// length < max 而全部放行，实际成功数可以轻易超过上限（也就是「限流形同虚设」）。
+// Lua 在 Redis 单线程里完成判定与占位，判限额与占位之间没有可插入的窗口。
+//
+// KEYS[1] 成功计数 ZSET
+// ARGV[1] 当前毫秒时间戳  ARGV[2] 窗口毫秒  ARGV[3] 上限  ARGV[4] 本次 member
+var reserveSuccessSlotScript = redis.NewScript(`
+local key = KEYS[1]
+local now = tonumber(ARGV[1])
+local window = tonumber(ARGV[2])
+local maxCount = tonumber(ARGV[3])
+local member = ARGV[4]
+if window > 0 then
+  redis.call('ZREMRANGEBYSCORE', key, '-inf', now - window)
+end
+if maxCount > 0 and redis.call('ZCARD', key) >= maxCount then
+  if window > 0 then redis.call('PEXPIRE', key, window) end
+  return 0
+end
+redis.call('ZADD', key, now, member)
+if window > 0 then redis.call('PEXPIRE', key, window) end
+return 1
+`)
+
+// refundSuccessSlotScript 退还一个预留槽位（请求最终失败时调用）。
+var refundSuccessSlotScript = redis.NewScript(`
+return redis.call('ZREM', KEYS[1], ARGV[1])
+`)
+
+// reserveRedisSuccessSlot 预占一个成功请求名额。返回的 member 用于失败时退还。
+func reserveRedisSuccessSlot(ctx context.Context, rdb *redis.Client, key string, maxCount int, duration int64) (string, bool, error) {
+	if maxCount <= 0 || duration <= 0 {
+		// 未配置上限或窗口无效 → 不做成功数限制（与旧实现一致）。
+		return "", true, nil
+	}
+	member := fmt.Sprintf("%d-%d", time.Now().UnixNano(), modelSuccessSlotSeq.Add(1))
+	windowMs := duration * 1000
+	reserved, err := reserveSuccessSlotScript.Run(ctx, rdb, []string{key},
+		time.Now().UnixMilli(), windowMs, maxCount, member).Int()
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
-
-	// 如果未达到限制，允许请求
-	if length < int64(maxCount) {
-		return true, nil
-	}
-
-	// 检查时间窗口
-	oldTimeStr, _ := rdb.LIndex(ctx, key, -1).Result()
-	oldTime, err := time.Parse(modelRateLimitTimeFormat, oldTimeStr)
-	if err != nil {
-		return false, err
-	}
-
-	nowTimeStr := time.Now().UTC().Format(modelRateLimitTimeFormat)
-	nowTime, err := time.Parse(modelRateLimitTimeFormat, nowTimeStr)
-	if err != nil {
-		return false, err
-	}
-	// 如果在时间窗口内已达到限制，拒绝请求
-	subTime := nowTime.Sub(oldTime).Seconds()
-	if int64(subTime) < duration {
-		rdb.Expire(ctx, key, time.Duration(setting.ModelRequestRateLimitDurationMinutes)*time.Minute)
-		return false, nil
-	}
-
-	return true, nil
+	return member, reserved == 1, nil
 }
 
-// 记录Redis请求
-func recordRedisRequest(ctx context.Context, rdb *redis.Client, key string, maxCount int) {
-	// 如果maxCount为0，不记录请求
-	if maxCount == 0 {
+// refundRedisSuccessSlot 归还预留；失败只记日志，不能影响请求结果。
+func refundRedisSuccessSlot(ctx context.Context, rdb *redis.Client, key, member string) {
+	if member == "" {
 		return
 	}
-
-	now := time.Now().UTC().Format(modelRateLimitTimeFormat)
-	rdb.LPush(ctx, key, now)
-	rdb.LTrim(ctx, key, 0, int64(maxCount-1))
-	rdb.Expire(ctx, key, time.Duration(setting.ModelRequestRateLimitDurationMinutes)*time.Minute)
+	if err := refundSuccessSlotScript.Run(ctx, rdb, []string{key}, member).Err(); err != nil {
+		logger.LogWarn(ctx, fmt.Sprintf("model rate limit: refund success slot failed key=%s err=%v", key, err))
+	}
 }
 
 // Redis限流处理器
@@ -83,13 +95,37 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, g
 		ctx := context.Background()
 		rdb := common.RDB
 
-		// 1. 检查成功请求数限制
-		// 计数必须**按分组隔离**：不同分组有各自的限额，共用一个 key
-		// 会让 A 组的消耗挤占 B 组的额度（切换分组后额度莫名变少）。
-		successKey := fmt.Sprintf("rateLimit:%s:%s:%s", ModelRequestRateLimitSuccessCountMark, group, userId)
-		allowed, err := checkRedisRateLimit(ctx, rdb, successKey, successMaxCount, duration)
+		// 1. 检查总请求数限制（含失败次数）。先做这一步：它不影响成功计数，
+		//    被拒时无需退还任何成功槽位。
+		if totalMaxCount > 0 {
+			totalKey := fmt.Sprintf("rateLimit:total:%s:%s", group, userId)
+			tb := limiter.New(ctx, rdb)
+			allowed, err := tb.Allow(
+				ctx,
+				totalKey,
+				limiter.WithCapacity(rateLimitCapacity(totalMaxCount, duration)),
+				limiter.WithRate(int64(totalMaxCount)),
+				limiter.WithRequested(duration),
+			)
+			if err != nil {
+				logger.LogError(ctx, fmt.Sprintf("model rate limit: total check failed user=%s group=%s err=%v", userId, group, err))
+				abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
+				return
+			}
+			if !allowed {
+				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到总请求数限制：%d分钟内最多请求%d次，包括失败次数，请检查您的请求是否正确", setting.ModelRequestRateLimitDurationMinutes, totalMaxCount))
+				return
+			}
+		}
+
+		// 2. 原子预占成功名额。
+		//    计数按分组隔离：不同分组有各自的限额，共用一个 key 会让 A 组挤占 B 组额度。
+		//    **必须先占位再处理请求**：若等请求成功后再记录，并发请求会同时通过
+		//    「未达上限」的判断，成功数可以超过限额（旧实现的真实缺陷）。
+		successKey := fmt.Sprintf("rateLimit:%s:%s:%s:%s", ModelRequestRateLimitSuccessCountMark, modelSuccessLimitKeyVersion, group, userId)
+		member, allowed, err := reserveRedisSuccessSlot(ctx, rdb, successKey, successMaxCount, duration)
 		if err != nil {
-			fmt.Println("检查成功请求数限制失败:", err.Error())
+			logger.LogError(ctx, fmt.Sprintf("model rate limit: success reservation failed user=%s group=%s err=%v", userId, group, err))
 			abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
 			return
 		}
@@ -98,36 +134,12 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, g
 			return
 		}
 
-		//2.检查总请求数限制并记录总请求（当totalMaxCount为0时会自动跳过，使用令牌桶限流器
-		if totalMaxCount > 0 {
-			totalKey := fmt.Sprintf("rateLimit:total:%s:%s", group, userId)
-			// 初始化
-			tb := limiter.New(ctx, rdb)
-			allowed, err = tb.Allow(
-				ctx,
-				totalKey,
-				limiter.WithCapacity(rateLimitCapacity(totalMaxCount, duration)),
-				limiter.WithRate(int64(totalMaxCount)),
-				limiter.WithRequested(duration),
-			)
-
-			if err != nil {
-				fmt.Println("检查总请求数限制失败:", err.Error())
-				abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
-				return
-			}
-
-			if !allowed {
-				abortWithOpenAiMessage(c, http.StatusTooManyRequests, fmt.Sprintf("您已达到总请求数限制：%d分钟内最多请求%d次，包括失败次数，请检查您的请求是否正确", setting.ModelRequestRateLimitDurationMinutes, totalMaxCount))
-			}
-		}
-
-		// 4. 处理请求
+		// 3. 处理请求
 		c.Next()
 
-		// 5. 如果请求成功，记录成功请求
-		if c.Writer.Status() < 400 {
-			recordRedisRequest(ctx, rdb, successKey, successMaxCount)
+		// 4. 失败请求退还名额（成功计数只统计成功请求）。
+		if c.Writer.Status() >= 400 {
+			refundRedisSuccessSlot(ctx, rdb, successKey, member)
 		}
 	}
 }
@@ -139,7 +151,7 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, 
 	return func(c *gin.Context) {
 		userId := strconv.Itoa(c.GetInt("id"))
 		totalKey := ModelRequestRateLimitCountMark + group + ":" + userId
-		successKey := ModelRequestRateLimitSuccessCountMark + group + ":" + userId
+		successKey := ModelRequestRateLimitSuccessCountMark + modelSuccessLimitKeyVersion + group + ":" + userId
 
 		// 1. 检查总请求数限制（当totalMaxCount为0时跳过）
 		if totalMaxCount > 0 && !inMemoryRateLimiter.Request(totalKey, totalMaxCount, duration) {
@@ -148,21 +160,23 @@ func memoryRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, 
 			return
 		}
 
-		// 2. 检查成功请求数限制
-		// 使用一个临时key来检查限制，这样可以避免实际记录
-		checkKey := successKey + "_check"
-		if !inMemoryRateLimiter.Request(checkKey, successMaxCount, duration) {
-			c.Status(http.StatusTooManyRequests)
-			c.Abort()
-			return
+		// 2. 原子预占成功名额（与 Redis 路径同语义：先占位，失败再退还）。
+		reserved := false
+		if successMaxCount > 0 && duration > 0 {
+			if !inMemoryRateLimiter.Request(successKey, successMaxCount, duration) {
+				c.Status(http.StatusTooManyRequests)
+				c.Abort()
+				return
+			}
+			reserved = true
 		}
 
 		// 3. 处理请求
 		c.Next()
 
-		// 4. 如果请求成功，记录到实际的成功请求计数中
-		if c.Writer.Status() < 400 {
-			inMemoryRateLimiter.Request(successKey, successMaxCount, duration)
+		// 4. 失败请求退还名额
+		if reserved && c.Writer.Status() >= 400 {
+			inMemoryRateLimiter.Refund(successKey)
 		}
 	}
 }

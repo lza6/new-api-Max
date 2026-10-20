@@ -197,3 +197,14 @@
 - 全程**未修改任何文件**。
 - **未调用任何真实支付/充值接口**，未发起任何外部付费请求。
 - P1/P2 的定性均以 `file:line` 为证据；凡未经实际运行验证的结论已明确标注「静态确认」或「未验证」，未宣称「已修复」或「无 bug」。
+
+---
+
+## 复核（2026-10-20，HEAD `2bf6aa364`）
+
+| 项 | 复核结论 | 证据 |
+|---|---|---|
+| P1-1 Stripe 单价口径 | **误报，维持现状**：`StripeUnitPrice` 的语义是「本币 / USD」汇率，不是应计入到账额度的系数。后台字段文案写明 `Unit price (local currency / USD)`、`e.g., 8 means 8 local currency per USD` | `web/src/features/system-settings/integrations/payment-settings-section.tsx:1382-1396`；`getStripePayMoney` 用它把「USD 额度」换算成实付本币，`Money` 记录请求额度、到账 = `Money × QuotaPerUnit`，三者自洽 |
+| P1-2 TOKENS 模式最小充值 ×QuotaPerUnit | **误报，维持现状**：TOKENS 展示下 `amount` 的单位就是 token，`min_topup`（USD）换算成 token 才是同一单位；`getStripePayMoney` 同样先除 `QuotaPerUnit`。删掉乘法反而会让最小充值变成「1 token」 | `controller/topup_stripe.go:433-460`；`setting/operation_setting` 的 `quota_display_type` |
+
+教训：审计条目必须回到**渲染该字段的组件**确认语义（见记忆 `ui-label-authority-is-the-component`），不能只看变量名推断单位。

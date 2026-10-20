@@ -252,3 +252,17 @@
 - 截图证据：`计划书/e2e-evidence/v1.3.162-ui/`（5 张，已逐张查看核对）。
 - 临时验证账号 `ui_e2e_1792500016` 与 22 条会话已删除，未留下 tokens/logs；隧道已关闭。
 - 结论：**UI 层已验证**，不再只是接口/单测结论。验证手法与坑写入 `test_ledger.md` 与记忆。
+
+## 12. v1.3.163 收口批次（2026-10-21）
+
+| 事项 | 结论 | 证据 |
+|---|---|---|
+| 模型成功限流非原子（P0） | **已修**：Lua ZSET 预占 + 失败退还；键升级 `MRRLS:v2` | `middleware/model-rate-limit.go`；60 并发恰好 10 个通过 |
+| 失败请求烧成功额度（P1） | **已修**：内存路径去掉 `_check` 计数器，改预占/退还 | handler 级测试 |
+| OneDrive 429 忽略 Retry-After（P1） | **已修**：解析秒数/HTTP-date 并与指数退避取大，封顶 2 分钟 | `parseRetryAfter` / `nextWorkerBackoff` 测试 |
+| OneDrive 用默认 Transport（P2） | **已修**：专用克隆 Transport（32 空闲连接），且不允许继承跳过 TLS 校验 | 单测断言 `InsecureSkipVerify=false` |
+| AutoMigrate 旧库漂移重写（P0 疑点） | **已验证不成立**：真实 MySQL/PG 漂移后一次修复、二次零变更 | 新 conformance 用例，三库 PASS（141s） |
+| SSE 注释心跳 / FIN 无终止事件 | **不改**：注释行按设计丢弃（网关自建 ping）；「终止事件」语义按 provider 不同，通用强制会误杀 Ollama/Claude | 代码复核 |
+| 非流式读超时 | **已有界**：整请求受 `RELAY_TIMEOUT` 与 ctx 约束 | 复核 |
+| 大日志表覆盖索引（P2） | **暂不做**：1.46M 行写入频繁，五列索引放大写放大；已有 5 分钟单聚合+进程缓存 | 实测冷 9.8s / 热 0.0s |
+| 审计 P1 复核 | 认证两条 P1 早已闭环；Stripe 两条为误报 | `计划书/audit/` 复核节 |

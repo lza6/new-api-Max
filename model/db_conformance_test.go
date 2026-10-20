@@ -172,6 +172,51 @@ func TestDBConformanceAutoMigrateIdempotent(t *testing.T) {
 	}
 }
 
+// TestDBConformanceAutoMigrateConvergesAfterLegacyDrift proves that a schema
+// created by an older release with a drifted column definition converges in one
+// migration and does NOT emit ALTER on every subsequent start.
+//
+// Why it matters: upstream reports (#4054) of AutoMigrate rewriting large tables
+// on every boot come from dialects where GORM and the server disagree on a
+// column's canonical type; the schema then oscillates ALTER <-> ALTER forever.
+// The fresh-database idempotency test cannot catch that, because there is no
+// drift to converge from. SQLite is skipped: it cannot alter a column type, so
+// the drift cannot be reproduced there.
+func TestDBConformanceAutoMigrateConvergesAfterLegacyDrift(t *testing.T) {
+	for _, dialect := range conformanceDialects(t) {
+		if dialect.name == "sqlite" {
+			continue
+		}
+		t.Run(dialect.name, func(t *testing.T) {
+			db, dbType := dialect.openDB(t)
+			require.NoError(t, db.Migrator().DropTable(&User{}))
+			require.NoError(t, db.AutoMigrate(&User{}))
+
+			// Simulate a legacy schema: display_name narrower than the model's type.
+			var alter string
+			switch dbType {
+			case common.DatabaseTypeMySQL:
+				alter = "ALTER TABLE users MODIFY display_name varchar(32)"
+			case common.DatabaseTypePostgreSQL:
+				alter = `ALTER TABLE users ALTER COLUMN display_name TYPE varchar(32)`
+			default:
+				t.Skipf("unsupported dialect %v", dbType)
+			}
+			require.NoError(t, db.Exec(alter).Error)
+
+			recorder := &migrationSQLRecorder{}
+			recordingDB := db.Session(&gorm.Session{Logger: recorder})
+			require.NoError(t, recordingDB.AutoMigrate(&User{}), "converging migration failed")
+			assert.NotEmpty(t, recorder.schemaMutations(), "first run after drift should repair the schema")
+
+			recorder.reset()
+			require.NoError(t, recordingDB.AutoMigrate(&User{}), "second migration failed")
+			assert.Empty(t, recorder.schemaMutations(),
+				"schema must be stable after convergence; got: %v", recorder.schemaMutations())
+		})
+	}
+}
+
 // TestDBConformanceLogsIndexes proves the F2/F3/F4 composite indexes on logs and
 // the task_events retention index survive migration on every dialect.
 func TestDBConformanceLogsIndexes(t *testing.T) {

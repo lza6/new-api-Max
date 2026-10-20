@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -228,11 +229,72 @@ func init() {
 func NewOneDriveSink(cfg OneDriveConfig) *oneDriveSink {
 	return &oneDriveSink{
 		cfg: cfg,
-		// 复用项目的共享出站 client 约定（连接池复用）。
-		// 但**不复用 SSRF-protected client**：Graph 是固定受信端点，
-		// 且 SSRF 校验会拒绝我们主动配置的域名解析结果。
-		client: &http.Client{Timeout: onedriveRequestTimeout},
+		// 专用连接池：Graph 是固定受信端点，但**不复用 common 的共享出站
+		// Transport** —— 后者会随 TLS_INSECURE_SKIP_VERIFY 关闭证书校验，
+		// 而云盘上传（含训练数据）必须始终校验 TLS。
+		// 这里从 DefaultTransport 克隆并只调高每主机空闲连接数，
+		// 避免默认的 MaxIdleConnsPerHost=2 在高频分片上传时反复建连。
+		client: &http.Client{Timeout: onedriveRequestTimeout, Transport: newOneDriveTransport()},
 	}
+}
+
+// newOneDriveTransport 返回 Graph 专用 Transport：TLS 校验保持默认（开启）。
+func newOneDriveTransport() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.MaxIdleConns = 100
+	transport.MaxIdleConnsPerHost = 32
+	transport.IdleConnTimeout = 90 * time.Second
+	return transport
+}
+
+// retryAfterError 携带服务端 Retry-After 提示；worker 用它决定退避时长。
+type retryAfterError struct {
+	err   error
+	after time.Duration
+}
+
+func (e *retryAfterError) Error() string { return e.err.Error() }
+func (e *retryAfterError) Unwrap() error { return e.err }
+
+// statusError 把非预期状态码包装成错误；429 附带 Retry-After。
+func statusError(op string, resp *http.Response) error {
+	err := fmt.Errorf("%s returned %d", op, resp.StatusCode)
+	if resp.StatusCode != http.StatusTooManyRequests {
+		return err
+	}
+	return &retryAfterError{err: err, after: parseRetryAfter(resp.Header.Get("Retry-After"), time.Now())}
+}
+
+// parseRetryAfter 解析 Retry-After（秒数或 HTTP-date）。非法/缺失返回 0。
+func parseRetryAfter(value string, now time.Time) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	// 纯数字：秒。允许前导 +（部分代理会这么发）。
+	seconds, err := strconv.ParseInt(strings.TrimPrefix(value, "+"), 10, 64)
+	if err == nil {
+		if seconds <= 0 {
+			return 0
+		}
+		// 上限避免被异常值拖死 worker；与 workerMaxBackoff 对齐。
+		if time.Duration(seconds)*time.Second > workerMaxBackoff {
+			return workerMaxBackoff
+		}
+		return time.Duration(seconds) * time.Second
+	}
+	when, err := http.ParseTime(value)
+	if err != nil {
+		return 0
+	}
+	delay := when.Sub(now)
+	if delay <= 0 {
+		return 0
+	}
+	if delay > workerMaxBackoff {
+		return workerMaxBackoff
+	}
+	return delay
 }
 
 func (s *oneDriveSink) Name() string { return "onedrive" }
@@ -281,7 +343,7 @@ func (s *oneDriveSink) token(ctx context.Context) (string, error) {
 	}
 	if resp.StatusCode != http.StatusOK {
 		// **不回显 body 全文**：错误响应里可能带 client_secret 的片段。
-		return "", fmt.Errorf("onedrive token request returned %d", resp.StatusCode)
+		return "", statusError("onedrive token request", resp)
 	}
 
 	var payload struct {
@@ -421,7 +483,7 @@ func (s *oneDriveSink) createFolder(ctx context.Context, parentPath, name string
 		}
 		return nil
 	}
-	return fmt.Errorf("onedrive create folder %q returned %d", name, resp.StatusCode)
+	return statusError(fmt.Sprintf("onedrive create folder %q", name), resp)
 }
 
 // isFolderAt 回读 parentPath/name，报告它是否**确实是目录**。
@@ -500,7 +562,7 @@ func (s *oneDriveSink) WritePart(ctx context.Context, path string, data []byte) 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("onedrive upload %q returned %d", itemPath, resp.StatusCode)
+		return "", statusError(fmt.Sprintf("onedrive upload %q", itemPath), resp)
 	}
 
 	var result struct {

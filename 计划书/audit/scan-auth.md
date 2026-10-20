@@ -122,3 +122,17 @@
 3. **`/api/user/login/encryption-key`（`router/api-router.go:90`）与各支付 webhook 端点无独立限流**：仅受 `GlobalAPIRateLimit`（默认 360 次 / 180s / IP，`common/init.go:160-162`）兜底。是否可接受取决于部署形态，未实测其滥用成本。
 4. **本机 curl 全局无法 HTTPS**：所有 HTTPS 探测均通过 `node -e` 完成；未对生产发起任何攻击性请求，P1/P2 的「复现方式」均为静态推导，未在运行实例上执行。
 5. **Cryptographic Storage / Logging Cheat Sheet 原文**：未抓取，P2-6、P2-7 的条款出处为方向性引用，未逐字核对。
+
+---
+
+## 5. 复核（2026-10-20，HEAD `2bf6aa364`）
+
+| 项 | 复核结论 | 证据 |
+|---|---|---|
+| P1-1 登录账号枚举 | **已修复**：`ErrUserNoPassword` 返回与「用户名或密码错误」完全一致的通用文案，provider 名称只进审计 | `controller/user.go:112-138`（注释直接引用 OWASP）；`recordLoginFailureAudit(... "no_password_use_oauth:"+provider)` |
+| P1-2 账号级失败计数/锁定 | **已修复**：账号键失败台账 + 指数退避锁定，成功即清零；锁定判定早于 bcrypt | `service/account_lockout.go`（`AccountLockoutStatus` / `RecordPasswordAuthFailure` / `RecordPasswordAuthSuccess`）、`controller/user.go:96-112`、`controller/user.go:291-315`；单测 `service/account_lockout_test.go` 10 例 |
+| P2-5 改密后 PAT 仍有效 | **已修复**：撤销会话时同步撤销 access_token | `model/user_session.go:737` 调用 `RevokeUserAccessToken` |
+| P2-3 登录时序侧信道 | **仍存在**：账号不存在/无密码时不执行昂贵的口令校验 | `model/user.go:1150-1170`；建议后续对固定 dummy hash 校验一次拉平时延 |
+| P2-4 注册用户名枚举 | **仍存在**：用户名已存在返回 `MsgUserExists`，与邮箱路径的统一响应不一致 | `controller/user.go:426-434` |
+
+结论：两条 P1 均已在本轮之前的批次闭环；剩余两条 P2 已记录，不构成本轮阻塞。

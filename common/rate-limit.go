@@ -80,3 +80,21 @@ func (l *InMemoryRateLimiter) Request(key string, maxRequestNum int, duration in
 	}
 	return true
 }
+
+// Refund 释放一次先前由 Request 预留的额度。
+//
+// 用于「先预留、失败再退还」的限流语义（如只统计成功请求）：
+// 请求开始即占用一个槽位，避免并发下「先查后记」被同时放行；
+// 若请求最终失败，再把槽位退回。
+//
+// 退掉的是最新一条时间戳。在并发窗口里这不等价于退回「本次」的那条，
+// 但计数正确、窗口仍单调推进，对本进程内存降级路径足够。
+func (l *InMemoryRateLimiter) Refund(key string) {
+	l.mutex.Lock()
+	defer l.mutex.Unlock()
+	queue, ok := l.store[key]
+	if !ok || len(*queue) == 0 {
+		return
+	}
+	*queue = (*queue)[:len(*queue)-1]
+}
