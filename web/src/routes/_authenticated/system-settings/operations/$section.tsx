@@ -22,7 +22,7 @@ import { OperationsSettings } from '@/features/system-settings/operations'
 import {
   OPERATIONS_DEFAULT_SECTION,
   OPERATIONS_SECTION_IDS,
-} from '@/features/system-settings/operations/section-registry.tsx'
+} from '@/features/system-settings/operations/sections'
 
 export const Route = createFileRoute(
   '/_authenticated/system-settings/operations/$section'

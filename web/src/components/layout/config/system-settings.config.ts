@@ -28,14 +28,14 @@ import {
   Wrench,
 } from 'lucide-react'
 
-import { getAuthSectionNavItems } from '@/features/system-settings/auth/section-registry.tsx'
-import { getBillingSectionNavItems } from '@/features/system-settings/billing/section-registry.tsx'
-import { getContentSectionNavItems } from '@/features/system-settings/content/section-registry.tsx'
-import { getFeatureSwitchSectionNavItems } from '@/features/system-settings/feature-switches/section-registry.tsx'
-import { getModelsSectionNavItems } from '@/features/system-settings/models/section-registry.tsx'
-import { getOperationsSectionNavItems } from '@/features/system-settings/operations/section-registry.tsx'
-import { getSecuritySectionNavItems } from '@/features/system-settings/security/section-registry.tsx'
-import { getSiteSectionNavItems } from '@/features/system-settings/site/section-registry.tsx'
+import { getAuthSectionNavItems } from '@/features/system-settings/auth/sections'
+import { getBillingSectionNavItems } from '@/features/system-settings/billing/sections'
+import { getContentSectionNavItems } from '@/features/system-settings/content/sections'
+import { getFeatureSwitchSectionNavItems } from '@/features/system-settings/feature-switches/sections'
+import { getModelsSectionNavItems } from '@/features/system-settings/models/sections'
+import { getOperationsSectionNavItems } from '@/features/system-settings/operations/sections'
+import { getSecuritySectionNavItems } from '@/features/system-settings/security/sections'
+import { getSiteSectionNavItems } from '@/features/system-settings/site/sections'
 
 import type { NavGroup, SidebarView } from '../types'
 

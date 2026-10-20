@@ -22,7 +22,7 @@ import { FeatureSwitchesSettings } from '@/features/system-settings/feature-swit
 import {
   FEATURE_SWITCH_DEFAULT_SECTION,
   FEATURE_SWITCH_SECTION_IDS,
-} from '@/features/system-settings/feature-switches/section-registry.tsx'
+} from '@/features/system-settings/feature-switches/sections'
 
 export const Route = createFileRoute(
   '/_authenticated/system-settings/feature-switches/$section'

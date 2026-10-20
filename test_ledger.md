@@ -260,3 +260,14 @@
 | 全量 vitest | `npx vitest run --pool=forks --maxWorkers=2` | 见下（未完成/结果） |
 
 已改：webgl-hero 视口与省流门控、KaTeX CSS 动态化、SW 版本注入与 cache.put 容错、StatusBadge 键盘可达与 reduced-motion、登录 autocomplete。
+
+## 2026-10-21 前端第四轮（性能 P0 拆包）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 类型检查 | `cd web && bun run typecheck` | PASS |
+| 分区元数据契约 | `npx vitest run src/features/system-settings/__tests__/section-metadata.test.ts` | 8/8 PASS（109s） |
+| 构建 | `cd web && bun run build` | PASS；入口 index 233.2→**34.5KB** gzip；`[stamp-sw] VERSION = 1.0.0-e2538897` |
+| 首屏实测 | `node e2e-local/fe-vitals.cjs` | 传输 1037→**818KB**；DCL 1328→**731ms**；挂载 1775→**1137ms**；LCP 3960→**3704ms** |
+
+做法：新增 8 个 `system-settings/<区>/sections.ts` 轻量元数据；16 个路由 + `layout/config/system-settings.config.ts` 改从它 import；注册表不动；契约测试防漂移。

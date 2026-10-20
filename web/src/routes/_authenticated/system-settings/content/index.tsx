@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { CONTENT_DEFAULT_SECTION } from '@/features/system-settings/content/section-registry.tsx'
+import { CONTENT_DEFAULT_SECTION } from '@/features/system-settings/content/sections'
 
 export const Route = createFileRoute(
   '/_authenticated/system-settings/content/'

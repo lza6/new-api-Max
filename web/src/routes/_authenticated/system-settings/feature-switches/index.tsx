@@ -18,7 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
-import { FEATURE_SWITCH_DEFAULT_SECTION } from '@/features/system-settings/feature-switches/section-registry.tsx'
+import { FEATURE_SWITCH_DEFAULT_SECTION } from '@/features/system-settings/feature-switches/sections'
 
 export const Route = createFileRoute(
   '/_authenticated/system-settings/feature-switches/'
