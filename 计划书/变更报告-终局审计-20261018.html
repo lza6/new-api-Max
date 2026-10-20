@@ -758,6 +758,10 @@ B 成功且为空（B 本来就没这个目录）
       <td>文案明确：开关只控制错误日志</td></tr>
   <tr><td>P3</td><td>413 修复缺状态码级测试</td>
       <td>新增：超限 → 413；小 JSON 语法错误仍 400</td></tr>
+  <tr><td>P3</td><td>编码路径 <code>/static%2F…</code> 仍可绕过限流并落到 SPA</td>
+      <td>404 守卫改用解码后的 <code>URL.Path</code>（v1.3.161）</td></tr>
+  <tr><td>P2</td><td>无 Redis 部署时总览每次打开都跑全表聚合</td>
+      <td>进程内 5 分钟缓存兜底（v1.3.161）</td></tr>
 </table>
 
 <h2 id="quiz">19. 测验（必须通过）</h2>
