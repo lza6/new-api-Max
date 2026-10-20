@@ -61,24 +61,24 @@ func sanitizeClickHouseLikePattern(input string) (string, error) {
 type Log struct {
 	Id        int    `json:"id" gorm:"index:idx_created_at_id,priority:2;index:idx_user_id_id,priority:2;index:idx_log_type_created_id,priority:3"`
 	UserId    int    `json:"user_id" gorm:"index;index:idx_user_id_id,priority:1;index:idx_log_user_type_created,priority:1"`
-	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_log_type_created_id,priority:2;index:idx_log_user_type_created,priority:3"`
-	Type      int    `json:"type" gorm:"index:idx_log_type_created_id,priority:1;index:idx_log_user_type_created,priority:2"`
+	CreatedAt int64  `json:"created_at" gorm:"bigint;index:idx_created_at_id,priority:1;index:idx_log_type_created_id,priority:2;index:idx_log_user_type_created,priority:3;index:idx_log_type_created_finance,priority:2"`
+	Type      int    `json:"type" gorm:"index:idx_log_type_created_id,priority:1;index:idx_log_user_type_created,priority:2;index:idx_log_type_created_finance,priority:1"`
 	Content   string `json:"content"`
 	Username  string `json:"username" gorm:"index;index:index_username_model_name,priority:2;default:''"`
 	TokenName string `json:"token_name" gorm:"index;default:''"`
 	ModelName string `json:"model_name" gorm:"index;index:index_username_model_name,priority:1;default:''"`
-	Quota     int    `json:"quota" gorm:"default:0"`
+	Quota     int    `json:"quota" gorm:"default:0;index:idx_log_type_created_finance,priority:3"`
 	// CostQuota 上游成本（额度单位），由 model_cost 在结算时**快照**写入。
 	// json:"-"：这是管理员财务口径，绝不能随用户日志返回。
 	// 聚合只 SUM 本列，因此调价不会重写历史利润。
-	CostQuota int64 `json:"-" gorm:"bigint;default:0"`
+	CostQuota int64 `json:"-" gorm:"bigint;default:0;index:idx_log_type_created_finance,priority:4"`
 	// CostRuleId 本次请求命中的成本规则 ID；0 = 未配置成本。
 	// 报表用它计算「成本覆盖率」，避免未配置模型按 0 成本抬高毛利率。
-	CostRuleId       int   `json:"-" gorm:"bigint;default:0"`
-	PromptTokens     int   `json:"prompt_tokens" gorm:"default:0"`
-	CompletionTokens int   `json:"completion_tokens" gorm:"default:0"`
-	UseTime          int   `json:"use_time" gorm:"default:0"`
-	IsStream         bool  `json:"is_stream"`
+	CostRuleId       int  `json:"-" gorm:"bigint;default:0;index:idx_log_type_created_finance,priority:5"`
+	PromptTokens     int  `json:"prompt_tokens" gorm:"default:0"`
+	CompletionTokens int  `json:"completion_tokens" gorm:"default:0"`
+	UseTime          int  `json:"use_time" gorm:"default:0"`
+	IsStream         bool `json:"is_stream"`
 	// RequestBytes/ResponseBytes 每请求流量字节（供站点权威统计/带宽排行直接 SUM，
 	// 避免全表扫 other JSON；旧行无值按 0 计入，不影响既有 other 口径）。
 	// 注：不再挂 idx_logs_traffic——该复合索引（request_bytes,response_bytes）缺

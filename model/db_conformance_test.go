@@ -230,6 +230,10 @@ func TestDBConformanceLogsIndexes(t *testing.T) {
 				assert.True(t, db.Migrator().HasIndex(tableName, idx),
 					"expected composite index %s on %s (%s)", idx, tableName, dialect.name)
 			}
+			// 运营财务聚合是 1.4M+ 行上的 type=2 全表 SUM；覆盖索引让 PG 走
+			// Index Only Scan（实测 12.2s → 1.7s），必须在三库都建出来。
+			assert.True(t, db.Migrator().HasIndex(tableName, "idx_log_type_created_finance"),
+				"expected finance covering index on %s (%s)", tableName, dialect.name)
 			assert.True(t, db.Migrator().HasIndex("task_events", "idx_task_events_created_at"),
 				"expected retention index on task_events (%s)", dialect.name)
 			// B2-4：任务轮询正向活跃态复合索引 (status, progress, submit_time)。

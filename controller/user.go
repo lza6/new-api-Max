@@ -419,17 +419,25 @@ func Register(c *gin.Context) {
 			return
 		}
 	}
-	emailForExistCheck := ""
-	if common.EmailVerificationEnabled {
-		emailForExistCheck = user.Email
-	}
-	exist, err := model.CheckUserExistOrDeleted(user.Username, emailForExistCheck)
+	// 防枚举：邮箱验证开启时，预检**只查用户名**。若把邮箱一起查，
+	// 「邮箱已注册」会在这里就以 MsgUserExists 提前暴露，绕过后面的统一响应。
+	// 邮箱冲突留给 Insert 的 ErrEmailAlreadyTaken 分支（与成功响应一致 + 异步通知）。
+	exist, err := model.CheckUserExistOrDeleted(user.Username, "")
 	if err != nil {
 		common.ApiErrorI18n(c, i18n.MsgDatabaseError)
 		common.SysLog(fmt.Sprintf("CheckUserExistOrDeleted error: %v", err))
 		return
 	}
 	if exist {
+		if common.EmailVerificationEnabled && user.Email != "" {
+			// 用户名被占用时也返回与成功一致的响应，并异步给该邮箱发「已有账号」通知，
+			// 用户仍能从邮件得知如何继续（OWASP ASVS V2.2.1：注册响应不得区分账号是否存在）。
+			sendEmailAlreadyRegisteredNotice(user.Email)
+			c.JSON(http.StatusOK, gin.H{"success": true, "message": ""})
+			return
+		}
+		// 未开启邮箱验证时没有替代通知渠道：此时明确提示「用户名已存在」，
+		// 否则用户会以为注册成功却无法登录。该端点在路由层已有独立限流。
 		common.ApiErrorI18n(c, i18n.MsgUserExists)
 		return
 	}

@@ -93,3 +93,57 @@ func TestLoginProviderDisplayName(t *testing.T) {
 		assert.Equal(t, "some-new-provider", LoginProviderDisplayName("some-new-provider"))
 	})
 }
+
+// 时延拉平：账号不存在 / 无密码账号也必须执行一次口令校验，
+// 否则响应耗时差异会暴露账号是否存在（OWASP 账号枚举旁路）。
+func TestValidateAndFillEqualizesTimingForMissingAccount(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	calls := 0
+	usedHash := ""
+	previous := validatePasswordAndHash
+	validatePasswordAndHash = func(_ string, hash string) bool {
+		calls++
+		usedHash = hash
+		return false
+	}
+	t.Cleanup(func() { validatePasswordAndHash = previous })
+
+	login := User{Username: "definitely-not-registered-xyz", Password: "guess"}
+	err := login.ValidateAndFill()
+
+	require.ErrorIs(t, err, ErrInvalidCredentials)
+	assert.Equal(t, 1, calls, "账号不存在时必须执行一次 dummy 口令校验")
+	assert.Equal(t, dummyPasswordHash, usedHash)
+}
+
+func TestValidateAndFillEqualizesTimingForNoPasswordAccount(t *testing.T) {
+	setupUserUpdateTestState(t)
+
+	oauthUser := User{
+		Username:    "timing-no-password",
+		Email:       "timing-oauth@example.com",
+		Password:    "",
+		Role:        common.RoleCommonUser,
+		Status:      common.UserStatusEnabled,
+		Group:       "default",
+		AuthVersion: 1,
+		AffCode:     "timing-aff",
+		Source:      UserSourceLinuxDO,
+	}
+	require.NoError(t, DB.Create(&oauthUser).Error)
+
+	calls := 0
+	previous := validatePasswordAndHash
+	validatePasswordAndHash = func(_ string, _ string) bool {
+		calls++
+		return false
+	}
+	t.Cleanup(func() { validatePasswordAndHash = previous })
+
+	login := User{Username: oauthUser.Username, Password: "guess"}
+	err := login.ValidateAndFill()
+
+	require.ErrorIs(t, err, ErrUserNoPassword)
+	assert.Equal(t, 1, calls, "无密码账号也必须执行一次 dummy 口令校验")
+}

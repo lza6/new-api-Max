@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.165] - 2026-10-21
+
+### Performance
+- Added a finance covering index on `logs`:
+  `idx_log_type_created_finance (type, created_at, quota, cost_quota, cost_rule_id)`.
+  The ops overview aggregate (1.4M+ rows, `type = 2`) now runs as a PostgreSQL
+  index-only scan: **12.2s → 1.67s** on production. The index was created on the
+  live database with `CREATE INDEX CONCURRENTLY` before deploying, so startup
+  migration only verifies it; new installations create it via AutoMigrate.
+
+### Security
+- Login timing no longer distinguishes "account does not exist" / "account has
+  no password" from a wrong password: both branches run one bcrypt comparison
+  against a fixed dummy hash (OWASP account-enumeration timing side channel).
+- Registration pre-check no longer queries the email when email verification is
+  enabled, so an already-registered email cannot be detected at the
+  `MsgUserExists` step; the email conflict is handled by the existing generic
+  response plus asynchronous notice.
+
+### Tests
+- Three-database conformance asserts the finance index exists on
+  SQLite/MySQL/PostgreSQL.
+- Unit tests prove the dummy-hash verification runs for missing and
+  passwordless accounts (via an injectable validator, no flaky timing asserts).
+
 ## [v1.3.164] - 2026-10-21
 
 ### Fixed

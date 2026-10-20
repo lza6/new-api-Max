@@ -1137,6 +1137,17 @@ func deleteUserAuthenticationData(tx *gorm.DB, userId int) error {
 	return deleteUserOAuthBindingsByUserId(tx, userId)
 }
 
+// dummyPasswordHash 是一个固定的 bcrypt 哈希（明文随机、不可用于登录）。
+// 账号不存在或未设置密码时也执行一次等价成本的口令校验，抹平「存在/不存在」
+// 的响应时延差异——否则攻击者可用处理时间旁路枚举账号（OWASP Authentication
+// Cheat Sheet：business logic can bring a discrepancy factor related to
+// processing time）。
+const dummyPasswordHash = "$2a$10$N9qo8uLOickgx2ZMRZoMyeIjZAgcfl7p92ldGxad68LJZdL17lhWy"
+
+// validatePasswordAndHash 是间接层：测试可替换它来断言「时延拉平分支确实执行了
+// 一次口令校验」，而不必依赖不稳定的耗时断言。
+var validatePasswordAndHash = common.ValidatePasswordAndHash
+
 // ValidateAndFill check password & user status
 func (user *User) ValidateAndFill() (err error) {
 	// When querying with struct, GORM will only query with non-zero fields,
@@ -1151,6 +1162,8 @@ func (user *User) ValidateAndFill() (err error) {
 	err = DB.Where("username = ? OR email = ?", username, username).First(user).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// 时延拉平：账号不存在时也做一次 bcrypt 比对（固定 dummy 哈希）。
+			validatePasswordAndHash(password, dummyPasswordHash)
 			return ErrInvalidCredentials
 		}
 		return fmt.Errorf("%w: %v", ErrDatabase, err)
@@ -1158,9 +1171,11 @@ func (user *User) ValidateAndFill() (err error) {
 	if user.Password == "" {
 		// 账号存在但从未设置密码（第三方登录注册，见 user.Source）。
 		// 单独返回，便于登录失败时提示「请用对应第三方方式登录」，而非笼统错误。
+		// 同样执行一次 dummy 校验，避免「无密码账号」比「密码错误」显著更快。
+		validatePasswordAndHash(password, dummyPasswordHash)
 		return ErrUserNoPassword
 	}
-	okay := common.ValidatePasswordAndHash(password, user.Password)
+	okay := validatePasswordAndHash(password, user.Password)
 	if !okay || user.Status != common.UserStatusEnabled {
 		return ErrInvalidCredentials
 	}
