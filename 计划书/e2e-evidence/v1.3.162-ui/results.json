@@ -1,0 +1,88 @@
+{
+  "timestamp": "2026-10-20T13:43:27.934Z",
+  "pass": 16,
+  "fail": 0,
+  "results": [
+    {
+      "name": "UI 登录（生产管理员）",
+      "ok": true,
+      "detail": "https://freeapi.tingfengai.art:9600/dashboard/overview | 欢迎回来！"
+    },
+    {
+      "name": "运营面板渲染",
+      "ok": true,
+      "detail": "len=2306"
+    },
+    {
+      "name": "利润与成本区块",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "今日/本月/本年财务数字",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "覆盖率告警可见（营收未完全覆盖）",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "建议每日上游充值",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "成本规则表渲染",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "成本规则可见: deepseek-v4.1-flash",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "成本规则可见: step-5-preview",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "成本规则可见: gpt-6-luna",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "成本规则可见: glm-5.3-flash",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "添加成本规则入口",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "320px 上下文 UI 登录",
+      "ok": true,
+      "detail": "https://freeapi.tingfengai.art:9600/dashboard/overview"
+    },
+    {
+      "name": "320px 运营面板无横向溢出",
+      "ok": true,
+      "detail": "{\"sw\":320,\"iw\":320}"
+    },
+    {
+      "name": "隐私页文案与实际行为一致",
+      "ok": true,
+      "detail": "跳到主内容\nToggle Sidebar\n听风API\n主页\n控制台\n模型广场\n排行榜\n文档\n关于\n搜索\n⌘\nK\n3\n更改语言\nU\n聊天\n游乐场\n常规\n概览\n数据看板\nAPI 密钥\n使用日志\n审计日志\n任务日志\n个人\n钱包\n个人资料\n安全与访问\n管理员\n渠道\n模型\n用户\n兑换码\n订阅\n系统信息\n任务插件\nWeb 防护\n动作审批\n运营面板\n训练数据\nWebhook\n系统设置\n三步快速上手\n设置进度：0"
+    },
+    {
+      "name": "无未预期的运行时错误",
+      "ok": true,
+      "detail": ""
+    }
+  ],
+  "consoleErrors": []
+}

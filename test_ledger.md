@@ -153,3 +153,22 @@
 ### 已知噪声
 - `go test -race ./service/training_capture/` 4 次中 1 次“全 PASS 后二进制非零”，未复现。
 - ClickHouse 路径为 SQL/单测验证，未接真实 CH 实例。
+
+## 2026-10-20 生产运营面板 UI 真实验证（浏览器 + 截图）
+
+| 项 | 内容 | 结果 |
+|---|---|---|
+| 入口 | SSH 隧道 `9600 → 生产 443`；Playwright `--host-resolver-rules=MAP freeapi.tingfengai.art 127.0.0.1`；HTTPS + `ignoreHTTPSErrors` | 必须走 HTTPS：HTTP 隧道下 Secure Cookie 不下发，SPA 未登录 |
+| 登录方式 | **真实登录页** `/sign-in` 填表提交 | 不能用 `context.request.post`：APIRequestContext 不走 host-resolver-rules，会连真实公网 IP:9600 |
+| 脚本 | `node scripts/ui-e2e-prod-finance.cjs https://freeapi.tingfengai.art:9600 <临时管理员>` | **16/16 PASS** |
+| 断言 | 利润与成本区块、今日/本月/本年三个口径、覆盖率告警、建议每日充值、成本规则表 4 条规则、添加规则入口、隐私文案 | 全部命中 |
+| 截图 | `计划书/e2e-evidence/v1.3.162-ui/{ops-profit-card,ops-cost-settings,ops-desktop-full,ops-mobile-320,profile-privacy}.png` | 已人工查看：数字/表格/中文文案与 DOM 一致 |
+| 移动端 | 320px `scrollWidth <= innerWidth` | PASS（卡片纵向堆叠，无横向溢出） |
+| 隐私页 | `/security` → 隐私卡片 | 文案“使用日志始终记录调用者 IP；此开关仅控制错误日志。” |
+| 控制台 | 全程 0 JS error | PASS |
+| 清理 | 临时管理员 `ui_e2e_1792500016` + 22 条 user_sessions 已删除；隧道已停 | 无残留测试账号 |
+
+### 新增噪声/坑（生产 UI E2E）
+- SPA 的滚动发生在内部 `overflow-auto` 容器，Playwright `locator.scrollIntoViewIfNeeded` 与 `scrollIntoView` 对其无效；截图前需把 `scrollHeight > clientHeight` 且 `overflow-y:auto|scroll` 的容器 `scrollTop = scrollHeight`。
+- 登录受 `CriticalRateLimit`（20 次 / 20 分钟 / IP）限制；连续重跑会 429。隧道下服务端看到的 IP 是 `127.0.0.1`，窗口耗尽只能等窗口过期，勿反复重试。
+- 新标签页打开已登录站点存在鉴权首帧竞态（偶发跳 `/sign-in`）；同一标签页内导航稳定。
