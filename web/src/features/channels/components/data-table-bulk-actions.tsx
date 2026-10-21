@@ -23,6 +23,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
 import { DataTableBulkActions as BulkActionsToolbar } from '@/components/data-table'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Dialog } from '@/components/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +60,7 @@ export function DataTableBulkActions<TData>({
   const queryClient = useQueryClient()
   const [showTagDialog, setShowTagDialog] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [tagValue, setTagValue] = useState('')
   const currentUser = useAuthStore((s) => s.auth.user)
   const canEditSensitive = hasPermission(
@@ -90,12 +92,17 @@ export function DataTableBulkActions<TData>({
     handleBatchDisable(selectedIds, queryClient, handleClearSelection)
   }
 
-  const handleDeleteAll = () => {
+  const handleDeleteAll = async () => {
     if (!canEditSensitive) {return}
-    handleBatchDelete(selectedIds, queryClient, () => {
-      setShowDeleteConfirm(false)
-      handleClearSelection()
-    })
+    setDeleting(true)
+    try {
+      await handleBatchDelete(selectedIds, queryClient, () => {
+        setShowDeleteConfirm(false)
+        handleClearSelection()
+      })
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const handleSetTag = () => {
@@ -254,38 +261,19 @@ export function DataTableBulkActions<TData>({
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
+      <ConfirmDialog
         open={showDeleteConfirm}
         onOpenChange={setShowDeleteConfirm}
         title={t('Delete Channels?')}
-        description={
-          <>
-            {t('Are you sure you want to delete')}
-            {selectedIds.length}{' '}
-            {t('channel(s)? This action cannot be undone.')}
-          </>
-        }
-        contentHeight='auto'
-        footer={
-          <>
-            <Button
-              variant='outline'
-              onClick={() => setShowDeleteConfirm(false)}
-            >
-              {t('Cancel')}
-            </Button>
-            <Button
-              variant='destructive'
-              onClick={handleDeleteAll}
-              disabled={!canEditSensitive}
-            >
-              {t('Delete')}
-            </Button>
-          </>
-        }
-      >
-        {' '}
-      </Dialog>
+        desc={`${t('Are you sure you want to delete')} ${selectedIds.length} ${t('channel(s)? This action cannot be undone.')}`}
+        confirmText={t('Delete')}
+        destructive
+        isLoading={deleting}
+        disabled={!canEditSensitive}
+        handleConfirm={() => {
+          void handleDeleteAll()
+        }}
+      />
     </>
   )
 }

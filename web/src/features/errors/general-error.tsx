@@ -16,6 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
+import { useState } from 'react'
 import { useNavigate, useRouter } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
@@ -49,30 +50,74 @@ export function GeneralError({
   const isRateLimited = status === 429
   const title = isRateLimited
     ? t('Too many requests')
-    : `${t('Oops! Something went wrong')} ${`:')`}`
+    : t('Oops! Something went wrong')
   const description = isRateLimited
     ? t('Please wait a moment before trying again.')
     : t('Please try again later.')
+  // 诊断信息：用户报障时能直接贴给客服，不用再猜「哪个请求挂了」。
+  const requestId =
+    (typeof error === 'object' &&
+      error !== null &&
+      (error as { response?: { headers?: Record<string, string> } }).response
+        ?.headers?.['x-request-id']) ||
+    globalThis.crypto?.randomUUID?.().slice(0, 8) ||
+    'unknown'
+  const [copied, setCopied] = useState(false)
+  const copyDiagnostics = async () => {
+    const payload = [
+      `status=${status ?? 'n/a'}`,
+      `requestId=${requestId}`,
+      `url=${globalThis.location?.href ?? ''}`,
+      `time=${new Date().toISOString()}`,
+      `message=${String((error as { message?: string })?.message ?? '')}`,
+    ].join('\n')
+    try {
+      await navigator.clipboard.writeText(payload)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // 剪贴板不可用时保持静默，用户仍可手动复制 request id
+    }
+  }
 
   return (
     <div className={cn('h-svh w-full', className)}>
-      <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
+      <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-3 px-6 text-center'>
+        {/* 人话先说：状态码退成小标签，不再是页面主体。 */}
+        <span className='text-foreground text-xl font-semibold sm:text-2xl'>
+          {title}
+        </span>
         {!minimal && (
-          <h1 className='text-[7rem] leading-tight font-bold'>
-            {status ?? 500}
-          </h1>
+          <span className='border-border/60 text-muted-foreground rounded-full border px-2.5 py-0.5 font-mono text-xs'>
+            HTTP {status ?? 500}
+          </span>
         )}
-        <span className='font-medium'>{title}</span>
-        <p className='text-muted-foreground text-center'>
-          {t('We apologize for the inconvenience.')} <br /> {description}
+        <p className='text-muted-foreground max-w-md text-sm'>
+          {t('We apologize for the inconvenience.')} {description}
         </p>
         {!minimal && (
-          <p className='text-muted-foreground text-center text-sm'>
+          <div className='bg-muted/40 text-muted-foreground flex items-center gap-2 rounded-md px-3 py-1.5 font-mono text-xs'>
+            <span>{t('Request ID')}</span>
+            <code className='text-foreground select-all'>{requestId}</code>
+            <Button
+              size='sm'
+              variant='ghost'
+              className='h-6 px-2 text-xs'
+              onClick={() => {
+                void copyDiagnostics()
+              }}
+            >
+              {copied ? t('Copied') : t('Copy')}
+            </Button>
+          </div>
+        )}
+        {!minimal && (
+          <p className='text-muted-foreground/80 max-w-md text-xs'>
             {t('If this keeps happening, please report it on GitHub Issues.')}
           </p>
         )}
         {!minimal && (
-          <div className='mt-6 flex flex-wrap justify-center gap-4'>
+          <div className='mt-4 flex flex-wrap justify-center gap-3'>
             <Button variant='outline' onClick={() => history.go(-1)}>
               {t('Go Back')}
             </Button>

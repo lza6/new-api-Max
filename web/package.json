@@ -23,7 +23,8 @@
     "i18n:sync": "node scripts/sync-i18n.mjs",
     "i18n:check": "node scripts/check-missing-i18n.cjs",
     "knip": "knip",
-    "i18n:common": "node scripts/scan-i18n-common.mjs --merge && node scripts/build-i18n-common.mjs"
+    "i18n:common": "node scripts/scan-i18n-common.mjs --merge && node scripts/build-i18n-common.mjs",
+    "i18n:terminology": "node scripts/check-terminology.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",

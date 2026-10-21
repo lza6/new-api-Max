@@ -33,6 +33,7 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
@@ -120,11 +121,11 @@ export function CheckinSettingsSection({
   const enabled = form.watch('enabled')
 
   // P1 管理员重置所有签到（福利重置）：清空全部签到记录，用户可重新签到。
+  // 不可逆操作走项目统一的 ConfirmDialog（原 window.confirm 与设计系统断裂）。
   const [resetting, setResetting] = useState(false)
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false)
   const resetAllCheckins = async () => {
-    if (!window.confirm(t('Reset all check-in records? Users can check in again.'))) {
-      return
-    }
+    setConfirmResetOpen(false)
     setResetting(true)
     try {
       const res = await api.post('/api/user/checkins/reset')
@@ -297,7 +298,7 @@ export function CheckinSettingsSection({
         <Button
           variant='outline'
           size='sm'
-          onClick={resetAllCheckins}
+          onClick={() => setConfirmResetOpen(true)}
           disabled={resetting}
           className='text-muted-foreground'
         >
@@ -310,6 +311,18 @@ export function CheckinSettingsSection({
           )}
         </p>
       </div>
+      <ConfirmDialog
+        open={confirmResetOpen}
+        onOpenChange={setConfirmResetOpen}
+        title={t('Reset all check-in records? Users can check in again.')}
+        desc={t('This action cannot be undone.')}
+        confirmText={t('Reset')}
+        destructive
+        isLoading={resetting}
+        handleConfirm={() => {
+          void resetAllCheckins()
+        }}
+      />
     </SettingsSection>
   )
 }
