@@ -149,7 +149,7 @@ interface TrafficSourcesProps {
 function TrafficSources({ rows, label }: TrafficSourcesProps) {
   return (
     <div className='mt-10 border-t border-border/40 pt-8'>
-      <p className='text-muted-foreground/70 mb-5 text-center text-[11px] font-medium tracking-[0.28em] uppercase'>
+      <p className='text-muted-foreground mb-5 text-center text-xs font-medium tracking-[0.28em] uppercase'>
         {label('Traffic sources (30 days)')}
       </p>
       <ul className='mx-auto flex max-w-2xl flex-col gap-3'>
@@ -174,7 +174,7 @@ function TrafficSources({ rows, label }: TrafficSourcesProps) {
           </li>
         ))}
       </ul>
-      <p className='text-muted-foreground/50 mt-4 text-center text-[11px]'>
+      <p className='text-muted-foreground mt-4 text-center text-xs'>
         {label('Classified by the referrer on the first visit of each day')}
       </p>
     </div>

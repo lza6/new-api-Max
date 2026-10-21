@@ -84,7 +84,7 @@ function StatusHero(props: { data: PublicStatusData | null }) {
           />
         )}
       </div>
-      <p className='text-muted-foreground/80 max-w-2xl text-sm'>
+      <p className='text-muted-foreground max-w-2xl text-sm'>
         {t(
           'Measurements of this gateway taken by the gateway itself: dependency reachability, request-log statistics and background task activity.'
         )}
