@@ -67,7 +67,7 @@ export const dotColorMap = {
 } as const
 
 export const textColorMap = {
-  success: 'text-success',
+  success: 'text-(--success-text)',
   warning: 'text-warning',
   danger: 'text-destructive',
   info: 'text-info',

@@ -119,7 +119,7 @@ function TrafficStatsBody({ data, label }: TrafficStatsBodyProps) {
             <span className='font-serif text-3xl font-medium tracking-tight tabular-nums md:text-4xl'>
               {formatCompactNumber(c.value || 0)}
             </span>
-            <span className='text-muted-foreground/70 text-[11px] tracking-wide'>
+            <span className='text-muted-foreground text-xs tracking-wide'>
               {c.title}
             </span>
           </div>

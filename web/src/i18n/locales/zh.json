@@ -7419,6 +7419,7 @@
     "Must be ≥ 0": "必须 ≥ 0",
     "Must be ≥ 1": "必须 ≥ 1",
     "Must be ≤ 2,147,483,647": "必须 ≤ 2,147,483,647",
-    "Username is required": "用户名必填"
+    "Username is required": "用户名必填",
+    "Referral link": "推荐链接"
   }
 }

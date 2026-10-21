@@ -7353,6 +7353,7 @@
     "Must be ≥ 0": "必須 ≥ 0",
     "Must be ≥ 1": "必須 ≥ 1",
     "Must be ≤ 2,147,483,647": "必須 ≤ 2,147,483,647",
-    "Username is required": "使用者名稱必填"
+    "Username is required": "使用者名稱必填",
+    "Referral link": "推薦連結"
   }
 }

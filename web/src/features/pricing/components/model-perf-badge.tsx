@@ -88,7 +88,8 @@ export const ModelPerfBadge = memo(function ModelPerfBadge(
               {hasSuccessRate ? `${successRate.toFixed(1)}%` : '—%'}
             </span>
           </dt>
-          <dd
+          <dd className='mt-1'>
+            <span
             role='img'
             aria-label={t(
               'Recent success-rate samples; gray bars indicate missing data.'
@@ -96,7 +97,7 @@ export const ModelPerfBadge = memo(function ModelPerfBadge(
             title={t(
               'Recent success-rate samples; gray bars indicate missing data.'
             )}
-            className='mt-1 flex h-3 w-24 items-center justify-between'
+            className='flex h-3 w-24 items-center justify-between'
           >
             {STATUS_SLOTS.map((slot) => {
               const rate = statusRates[slot]
@@ -116,6 +117,7 @@ export const ModelPerfBadge = memo(function ModelPerfBadge(
                 />
               )
             })}
+            </span>
           </dd>
         </div>
         <div title={t('Average latency')} className='shrink-0'>

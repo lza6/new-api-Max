@@ -100,6 +100,7 @@ export function AffiliateRewardsCard({
 
         <div className='flex items-center gap-2'>
           <Input
+            aria-label={t('Referral link')}
             value={affiliateLink}
             readOnly
             className='border-muted bg-background/70 h-9 min-w-0 flex-1 font-mono text-xs'
