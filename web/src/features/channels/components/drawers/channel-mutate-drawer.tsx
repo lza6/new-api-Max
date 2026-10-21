@@ -63,6 +63,7 @@ import {
   sideDrawerSectionClassName,
   sideDrawerSwitchItemClassName,
 } from '@/components/drawer-layout'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { JsonCodeEditor } from '@/components/json-code-editor'
 import { JsonEditor } from '@/components/json-editor'
 import { MultiSelect } from '@/components/multi-select'
@@ -636,6 +637,8 @@ export function ChannelMutateDrawer({
   >()
   const [advancedSettingsOpen, setAdvancedSettingsOpen] = useState(false)
   const [paramOverrideEditorOpen, setParamOverrideEditorOpen] = useState(false)
+  // 5000+ 行的渠道编辑抽屉：误关/误按 Esc 会静默丢掉十几处修改，必须拦一道。
+  const [confirmCloseOpen, setConfirmCloseOpen] = useState(false)
   const [advancedCustomEditorOpen, setAdvancedCustomEditorOpen] =
     useState(false)
   const [clipboardConnectionInfo, setClipboardConnectionInfo] =
@@ -1796,19 +1799,30 @@ export function ChannelMutateDrawer({
   )
 
   // Handle drawer close
+  const closeDrawer = useCallback(() => {
+    onOpenChange(false)
+    form.reset(CHANNEL_FORM_DEFAULT_VALUES)
+    advancedNavScrollPendingRef.current = false
+    setActiveEditorSectionId(CHANNEL_EDITOR_SECTION_IDS.identity)
+    setExpandedEditorNavItemId(undefined)
+    setAdvancedSettingsOpen(false)
+    setClipboardConnectionInfo(null)
+  }, [onOpenChange, form])
+
   const handleOpenChange = useCallback(
     (v: boolean) => {
-      onOpenChange(v)
-      if (!v) {
-        form.reset(CHANNEL_FORM_DEFAULT_VALUES)
-        advancedNavScrollPendingRef.current = false
-        setActiveEditorSectionId(CHANNEL_EDITOR_SECTION_IDS.identity)
-        setExpandedEditorNavItemId(undefined)
-        setAdvancedSettingsOpen(false)
-        setClipboardConnectionInfo(null)
+      if (v) {
+        onOpenChange(true)
+        return
       }
+      // 有未保存修改时先确认（不再无声丢弃）
+      if (form.formState.isDirty) {
+        setConfirmCloseOpen(true)
+        return
+      }
+      closeDrawer()
     },
-    [onOpenChange, form]
+    [onOpenChange, form.formState.isDirty, closeDrawer]
   )
 
   return (
@@ -5048,6 +5062,20 @@ export function ChannelMutateDrawer({
         }}
         detailItems={statusCodeRiskDetailItems}
         onConfirm={() => handleStatusCodeRiskAction(true)}
+      />
+
+      {/* 未保存修改时的关闭确认（N5） */}
+      <ConfirmDialog
+        open={confirmCloseOpen}
+        onOpenChange={setConfirmCloseOpen}
+        title={t('Unsaved changes')}
+        desc={t('You have unsaved changes. Are you sure you want to leave?')}
+        confirmText={t('Leave')}
+        destructive
+        handleConfirm={() => {
+          setConfirmCloseOpen(false)
+          closeDrawer()
+        }}
       />
     </>
   )
