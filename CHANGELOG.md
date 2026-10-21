@@ -2,6 +2,21 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.174] - 2026-10-21
+
+### Fixed
+- **The channel editor drawer no longer discards edits silently.** It is a
+  5000-line form; pressing Esc or clicking Cancel used to close it and reset the
+  form with no warning. It now checks `form.formState.isDirty` and asks
+  "未保存的更改 / 取消 / 离开" through the shared `ConfirmDialog` before closing.
+  Verified in production with a real admin: open the drawer, edit the channel
+  name, press Cancel → confirm dialog appears and the drawer stays open.
+
+### Notes
+- N7 (empty-state actions) and N3 (typed confirmation for billing changes) are
+  still open; both need per-page callbacks / new copy and are tracked in the
+  Nielsen backlog rather than half-implemented here.
+
 ## [v1.3.173] - 2026-10-21
 
 ### Added

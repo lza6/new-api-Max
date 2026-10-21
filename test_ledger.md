@@ -416,3 +416,18 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 | 临时账号 | `zz-verify-temp6` 已删，`zz-verify-temp%` 剩余 **0** |
 
 备注：命令面板截图为列表顶部视图，「快捷操作」组在滚动区下方，改由 DOM innerText 断言（已通过）。
+
+## 2026-10-21 v1.3.174 渠道抽屉未保存保护（N5）
+
+| 项 | 结果 |
+|---|---|
+| 类型检查 / 构建 | PASS |
+| 渠道测试 | `vitest run src/features/channels` → **58 用例 PASS**（55.7s） |
+| 部署 | v1.3.174 蓝绿上线，healthy，0 个 5xx |
+| 生产验收 | `PROD_VERIFY_USER=zz-verify-temp7 node web/e2e-local/prod-channel-unsaved-verify.cjs` → **PASS**：打开创建渠道抽屉 → 填渠道名 → 点取消 → 弹出「未保存的更改 / 取消 / 离开」且抽屉不关 |
+| 截图 | `nielsen-channel-unsaved.png`（已人工查看） |
+| 临时账号 | `zz-verify-temp7` 已删，剩余 **0** |
+
+### 测试脚本踩坑（已修）
+抽屉里的输入框没有 `name` 属性（Base UI 生成 id），只能按 placeholder 定位；
+「取消」按钮比 Esc 更接近真实路径；`[role=dialog]` 之外确认框是 `[role=alertdialog]`。
