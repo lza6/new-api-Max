@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.178] - 2026-10-21
+
+### Accessibility (N11 — axe WCAG 2.1 A/AA on production)
+- Axe audit across 8 production routes (/, /pricing, /status, /sign-in,
+  /dashboard/models, /system-settings/site/system-info, /wallet, /keys) now reports
+  **zero critical/serious violations**. Four categories were fixed:
+  - contrast (10 → 0): social-proof labels, the status description, pricing metric
+    values and the pricing-type badge sat between 2.2:1 and 3.9:1. Text now uses
+    full-opacity muted colour, emerald/cyan-700 instead of 600, and three new
+    text-only tokens (`--success-text`, `--chart-4-text`, `--warning-text`).
+  - definition-list (6 → 0): the pricing performance badge put `role="img"` on a
+    `<dd>`; the role moved to an inner `<span>`.
+  - label (1 → 0): the wallet referral-link input had no accessible name.
+  - button-name (1 → 0): the table page-size select had no accessible name.
+- Added `web/e2e-local/prod-axe-audit.cjs` so the same audit can be re-run after any
+  UI change (runs against production through the 443 tunnel).
+
 ## [v1.3.174] - 2026-10-21
 
 ### Fixed

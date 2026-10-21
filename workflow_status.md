@@ -4,12 +4,12 @@
 
 | 项 | 值 | 校验命令 |
 |---|---|---|
-| 线上版本 | `v1.3.174` | `ssh ... 'docker ps --format "{{.Image}}"'` |
+| 线上版本 | `v1.3.178` | `ssh ... 'docker ps --format "{{.Image}}"'` |
 | 部署时间 | 2026-10-21（蓝绿，端口 3000） | — |
 | 代码 SHA | `git rev-parse origin/main` | `git log origin/main -1` |
-| 回滚镜像 | `new-api:v1.3.173`（保留最近 4 个版本） | `docker images new-api` |
-| 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.173` | — |
-| VERSION 文件 | `v1.3.174` | `cat VERSION` |
+| 回滚镜像 | `new-api:v1.3.177`（保留最近 4 个版本） | `docker images new-api` |
+| 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.177` | — |
+| VERSION 文件 | `v1.3.178` | `cat VERSION` |
 
 `VERSION` / 最新 tag / `CHANGELOG` 首条 / 本表四者一致；若不一致，必须先修本文档。
 
