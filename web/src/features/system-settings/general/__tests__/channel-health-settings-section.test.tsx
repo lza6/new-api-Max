@@ -25,6 +25,8 @@ import { afterEach, describe, expect, test, vi } from 'vitest'
 vi.mock('../../components/settings-page-context', () => ({
   SettingsPageProvider: (props: { children: ReactNode }) => props.children,
   useSuppressSettingsSectionHeader: () => false,
+  // 新增的 dirty 登记 hook：mock 里保持 no-op，避免测试依赖路由上下文
+  useSettingsDirtyRegistration: () => undefined,
   SettingsPageTitleStatusPortal: () => null,
   SettingsPageActionsPortal: (props: { children: ReactNode }) => props.children,
   SettingsPageFormActions: (props: { onSave: () => void; isSaving?: boolean; isSaveDisabled?: boolean; saveLabel?: string }) => (

@@ -34,7 +34,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
-import { FormNavigationGuard } from '../components/form-navigation-guard'
 import {
   SettingsForm,
   SettingsFormGrid,
@@ -134,7 +133,6 @@ export function SystemInfoSection({ defaultValues }: SystemInfoSectionProps) {
 
   return (
     <>
-      <FormNavigationGuard when={isDirty} />
 
       <SettingsSection title={t('System Information')}>
         <Form {...form}>

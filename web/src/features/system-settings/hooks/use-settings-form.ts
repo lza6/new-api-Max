@@ -26,6 +26,8 @@ import {
 } from 'react-hook-form'
 import { toast } from 'sonner'
 
+import { useSettingsDirtyRegistration } from '../components/settings-page-context'
+
 type SettingsFormOptions<T extends FieldValues> = UseFormProps<T> & {
   onSubmit: (data: T, changedFields: Record<string, unknown>) => Promise<void>
   compareValues?: (a: unknown, b: unknown) => boolean
@@ -194,6 +196,10 @@ export function useSettingsForm<T extends FieldValues>({
   )
 
   const form = useForm<T>({ ...formOptions, defaultValues: expandedDefaults })
+
+  // 页面级「未保存离开」保护由 SettingsPageProvider 统一渲染，这里只需登记 dirty。
+  // 在 Provider 外（如对话框里的表单）是无副作用的 no-op。
+  useSettingsDirtyRegistration(form.formState.isDirty)
 
   const defaultValuesRef = useRef<T>((expandedDefaults ?? ({} as T)) as T)
   const baselineRef = useRef<Record<string, unknown>>(

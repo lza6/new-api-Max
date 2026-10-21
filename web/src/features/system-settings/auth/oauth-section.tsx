@@ -42,7 +42,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { handleServerError } from '@/lib/handle-server-error'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
-import { FormNavigationGuard } from '../components/form-navigation-guard'
 import {
   SettingsForm,
   SettingsSwitchContent,
@@ -370,7 +369,6 @@ export function OAuthSection(props: OAuthSectionProps) {
 
   return (
     <>
-      <FormNavigationGuard when={form.formState.isDirty} />
 
       <SettingsSection title={t('OAuth Integrations')}>
         <Form {...form}>

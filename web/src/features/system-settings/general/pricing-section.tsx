@@ -43,7 +43,6 @@ import { Switch } from '@/components/ui/switch'
 import { DEFAULT_CURRENCY_CONFIG } from '@/stores/system-config-store'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
-import { FormNavigationGuard } from '../components/form-navigation-guard'
 import {
   SettingsForm,
   SettingsSwitchContent,
@@ -146,7 +145,6 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
 
   return (
     <>
-      <FormNavigationGuard when={isDirty} />
 
       <SettingsSection title={t('Pricing & Display')}>
         <Form {...form}>

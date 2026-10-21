@@ -19,7 +19,12 @@ For commercial licensing, please contact support@quantumnous.com
 import { RotateCcw, Save } from 'lucide-react'
 import {
   createContext,
+  useCallback,
   useContext,
+  useEffect,
+  useId,
+  useMemo,
+  useState,
   type ComponentProps,
   type ReactNode,
   type RefObject,
@@ -29,17 +34,36 @@ import { useTranslation } from 'react-i18next'
 
 import { Button } from '@/components/ui/button'
 
+import { FormNavigationGuard } from './form-navigation-guard'
+
 type SettingsPageContextValue = {
   actionsContainer: HTMLDivElement | null
   titleStatusContainer: HTMLSpanElement | null
   suppressSectionHeader: boolean
+  /**
+   * 各 section 的 `useSettingsForm` 通过它把 dirty 状态登记上来，页面级只渲染
+   * 一个 `FormNavigationGuard`。这样新增 section 不会漏掉「未保存离开」保护——
+   * 之前 42 处 `SettingsPageFormActions` 里只有 7 个文件手挂了 guard。
+   */
+  registerDirty: (id: string, dirty: boolean) => void
 }
 
 const SettingsPageContext = createContext<SettingsPageContextValue>({
   actionsContainer: null,
   titleStatusContainer: null,
   suppressSectionHeader: false,
+  registerDirty: () => undefined,
 })
+
+/** 把某个表单的 dirty 状态登记到页面级 guard（在 Provider 外调用是 no-op）。 */
+export function useSettingsDirtyRegistration(isDirty: boolean) {
+  const { registerDirty } = useContext(SettingsPageContext)
+  const id = useId()
+  useEffect(() => {
+    registerDirty(id, isDirty)
+    return () => registerDirty(id, false)
+  }, [id, isDirty, registerDirty])
+}
 
 type SettingsPageProviderProps = {
   actionsContainer: HTMLDivElement | null
@@ -49,14 +73,35 @@ type SettingsPageProviderProps = {
 }
 
 export function SettingsPageProvider(props: SettingsPageProviderProps) {
+  const [dirtyById, setDirtyById] = useState<Record<string, boolean>>({})
+  const registerDirty = useCallback((id: string, dirty: boolean) => {
+    setDirtyById((previous) =>
+      previous[id] === dirty ? previous : { ...previous, [id]: dirty }
+    )
+  }, [])
+  const anyDirty = useMemo(
+    () => Object.values(dirtyById).some(Boolean),
+    [dirtyById]
+  )
+  const value = useMemo(
+    () => ({
+      actionsContainer: props.actionsContainer,
+      titleStatusContainer: props.titleStatusContainer ?? null,
+      suppressSectionHeader: props.suppressSectionHeader ?? true,
+      registerDirty,
+    }),
+    [
+      props.actionsContainer,
+      props.titleStatusContainer,
+      props.suppressSectionHeader,
+      registerDirty,
+    ]
+  )
+
   return (
-    <SettingsPageContext.Provider
-      value={{
-        actionsContainer: props.actionsContainer,
-        titleStatusContainer: props.titleStatusContainer ?? null,
-        suppressSectionHeader: props.suppressSectionHeader ?? true,
-      }}
-    >
+    <SettingsPageContext.Provider value={value}>
+      {/* 页面级唯一的未保存离开保护：覆盖所有使用 useSettingsForm 的 section。 */}
+      <FormNavigationGuard when={anyDirty} />
       {props.children}
     </SettingsPageContext.Provider>
   )

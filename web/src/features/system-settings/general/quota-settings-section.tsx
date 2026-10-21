@@ -45,7 +45,6 @@ import {
 } from '@/lib/format'
 
 import { FormDirtyIndicator } from '../components/form-dirty-indicator'
-import { FormNavigationGuard } from '../components/form-navigation-guard'
 import {
   SettingsForm,
   SettingsSwitchContent,
@@ -154,7 +153,6 @@ export function QuotaSettingsSection({
 
   return (
     <SettingsSection title={t('Quota Settings')}>
-      <FormNavigationGuard when={isDirty} />
 
       {!complianceConfirmed ? (
         <Alert variant='destructive'>
