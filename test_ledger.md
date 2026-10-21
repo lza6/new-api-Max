@@ -362,3 +362,13 @@
 | 临时账号清理 | SQL | `zz-verify-temp%` 剩余 0 |
 
 修复内容：test-setup 补 ReadableStream + afterEach 还原 i18n 语言；oauth/ratio TabsList 窄屏 3 列；Uptime StatusDot 加 role/aria-label；theme-color 改读 `--theme-color` 令牌并更新全部 meta；移除从未生效的 `vendor-react` cacheGroup。
+
+## 2026-10-21 v1.3.169 压测与运行观察
+
+| 项 | 数据 |
+|---|---|
+| 压测对象 | `GET /api/status`（公开只读，经 9600 SSH 隧道打 HTTPS，**未触发任何上游/付费调用**） |
+| 场景 | 并发 20 × 15.4s |
+| 结果 | 1144 请求，**0 错误**，QPS **74.4**，p50 234ms / p95 276ms / p99 1488ms / max 1705ms |
+| 说明 | 隧道本身约 200ms RTT，延迟绝对值不代表公网直连；错误率为 0 是关键结论 |
+| 运行观察 | 部署后 10 分钟：内存 157–525MB 波动（上限 900MB），CPU 22–70% 周期波动，600 行日志 0 个 5xx |
