@@ -290,3 +290,17 @@
 
 ### 部署
 - `ssh -o BatchMode=yes root@154.37.208.171` → `Permission denied (password)`，**无密钥登录**，部署阻塞（§2.4.1）。
+
+## 2026-10-21 v1.3.166 生产部署与生产冒烟
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 镜像构建 | 服务器 `docker build -t new-api:v1.3.166 .` | PASS（exit 0） |
+| 预检 | 3002 临时容器 `/api/status`、入口 chunk、`/sw.js` | 200；`VERSION = 1.0.0-e37d2e97` |
+| 蓝绿部署 | `./deploy-zero-downtime.sh v1.3.166` | PASS，切 3001，外网自检 200 |
+| 线上版本 | `curl -I https://.../api/status` | `x-new-api-version: v1.3.166` |
+| 页面可用性 | `/` `/pricing` `/status` `/dashboard/models` `/system-settings/site/system-info` | 全 200 |
+| 日志 | `docker logs --tail 500` | 0 个 5xx，无 panic/ERROR |
+| 生产浏览器冒烟 | `node web/e2e-local/prod-smoke-v13166.cjs` | **8/8 PASS**（390/1440 × 4 路径） |
+
+未覆盖：管理员登录态页面（无凭证）；全量 vitest（环境无法一次跑完，见上节）。
