@@ -431,3 +431,16 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 ### 测试脚本踩坑（已修）
 抽屉里的输入框没有 `name` 属性（Base UI 生成 id），只能按 placeholder 定位；
 「取消」按钮比 Esc 更接近真实路径；`[role=dialog]` 之外确认框是 `[role=alertdialog]`。
+
+## 2026-10-21 v1.3.179/180 计费类改动 L3 输入确认（N3）
+
+| 项 | 结果 |
+|---|---|
+| `ConfirmDialog.requireTypedText` | 新增可选 prop：渲染输入框，未逐字输入时确认按钮禁用 |
+| 回归测试 | `npx vitest run src/components/__tests__/confirm-dialog.test.tsx` → **2/2 PASS**（含「无该 prop 时行为不变」） |
+| 计费分区接入 | 保存时若改动 `QuotaPerUnit` / `USDExchangeRate` / 展示币种 / 自定义汇率 → 弹「修改价格换算？」并要求输入 `QUOTA` |
+| 构建 / 类型 | PASS |
+| 设置模块测试 | 57 用例 PASS |
+| 部署 | v1.3.179 → v1.3.180 蓝绿上线，healthy，0 个 5xx |
+| 生产交互验收 | **未取得**：该实例展示币种已是 CNY 且「每单位额度」未渲染，headless 下切换下拉的脚本挂起（已终止）。组件级契约测试覆盖了核心行为，生产点测留待下一轮 |
+| 临时账号 | `zz-verify-temp9` 已删，剩余 **0** |

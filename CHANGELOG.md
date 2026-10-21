@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.180] - 2026-10-21
+
+### Added
+- `ConfirmDialog` accepts `requireTypedText`. When set it renders an input and
+  keeps the confirm button disabled until the user types the exact string — the
+  L3 level of the destructive-action contract in `web/AGENTS.md §3.17`.
+- Pricing settings use it: saving after changing `QuotaPerUnit`, `USDExchangeRate`,
+  the display currency, or the custom exchange rate now opens
+  "Change pricing conversion?" and requires typing `QUOTA`. Those fields change
+  what every user sees as their balance and price, so a single mis-click is not
+  enough anymore.
+- Regression test `src/components/__tests__/confirm-dialog.test.tsx` locks both the
+  typed-confirmation behaviour and the unchanged behaviour when the prop is absent.
+
+### Verified
+- typecheck / build PASS; system-settings 57 cases PASS; ConfirmDialog 2/2 PASS.
+- Production: `v1.3.180` healthy, 0 5xx.
+- Limitation: the pricing screen on the live instance does not render
+  "Quota Per Unit" (display currency is CNY), so the end-to-end dialog was not
+  captured in the browser this round — the contract is covered by the component
+  test above.
+
 ## [v1.3.178] - 2026-10-21
 
 ### Accessibility (N11 — axe WCAG 2.1 A/AA on production)
