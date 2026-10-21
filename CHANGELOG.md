@@ -2,6 +2,30 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.172] - 2026-10-21
+
+### Changed
+- All error screens (401 / 403 / 404 / 503) lead with a human sentence instead of
+  a 7rem HTTP code; the code is now a small chip and no longer the main visual.
+- The generic error screen (500 / 429) shows a copyable **Request ID** plus a
+  diagnostic payload (status, request id, URL, timestamp, message) so users can
+  report a failure without guessing which request broke.
+
+### Fixed
+- `Reset all check-in records` and `Delete Channels` no longer use
+  `window.confirm` / a hand-rolled dialog footer. Both go through the project
+  `ConfirmDialog` (destructive styling, loading state, disabled while pending).
+
+### i18n
+- Every `quota` string in zh / zh-TW now says 额度 / 額度 instead of mixing
+  配额 / 容量 / 配額. New gate: `bun run i18n:terminology`.
+
+### Decisions recorded (no code change)
+- `计划书/ops/DECISION-claude-billing.md` — Claude cache-token billing stays as
+  is until a production impact query and a shadow comparison exist.
+- `计划书/ops/测试分片矩阵.md` — CI is the authoritative full test gate; the
+  local shard matrix (≈880 cases measured) is the local equivalent.
+
 ## [v1.3.170] - 2026-10-21
 
 ### Added

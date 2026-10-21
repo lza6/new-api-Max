@@ -388,3 +388,17 @@
 ### 本轮踩到的测试自身缺陷（已修）
 `prod-smoke` 用「`#root` 有子节点」判断渲染完成，但 index.html 的 `#app-boot-loader` 就在 `#root` 内；
 React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改为等 loader detach + `h1` 有文本。
+
+## 2026-10-21 v1.3.171/172 尼尔森整改与生产验收
+
+| 项 | 结果 |
+|---|---|
+| 术语门禁 | `node scripts/check-terminology.mjs` → **PASS**（zh/zh-TW 含 quota 的键已无「配额/容量」） |
+| i18n 完整性 | `node scripts/check-missing-i18n.cjs` → **OK (0 missing)** |
+| 定向测试 | `vitest run src/features/channels src/features/system-settings src/features/errors` → **21 文件 / 115 用例 PASS** |
+| 部署 | v1.3.171（N1/N4/N8）→ 3000；v1.3.172（错误页统一）→ 2001/3000 蓝绿，均 healthy |
+| 生产截图验收 | `PROD_VERIFY_USER=... prod-usability-verify.cjs` → **PASS**；截图 `nielsen-error-page.png` / `nielsen-checkin-confirm.png` / `nielsen-wallet.png` 已人工查看 |
+| 404 页 | 人话标题「糟糕！页面未找到！」+ `HTTP 404` 小标签 + 返回/返回主页；不再以巨型状态码为主体 |
+| 签到重置 | 走 ConfirmDialog：「重置所有签到记录？用户将可重新签到。」/「此操作无法撤消。」/ 取消·重置（destructive） |
+| 钱包术语 | 页面出现「额度」，无「配额/容量」 |
+| 临时账号 | 5 个 `zz-verify-temp*` 全部清理，剩余 **0** |
