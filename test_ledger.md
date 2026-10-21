@@ -271,3 +271,22 @@
 | 首屏实测 | `node e2e-local/fe-vitals.cjs` | 传输 1037→**818KB**；DCL 1328→**731ms**；挂载 1775→**1137ms**；LCP 3960→**3704ms** |
 
 做法：新增 8 个 `system-settings/<区>/sections.ts` 轻量元数据；16 个路由 + `layout/config/system-settings.config.ts` 改从它 import；注册表不动；契约测试防漂移。
+
+## 2026-10-21 第五轮：推送与测试矩阵
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 已推送 | `git push origin main` | `7783c3795..453ddb0b3`（5 个提交） |
+| 渠道 + 密钥测试 | `npx vitest run src/features/channels src/features/keys` | 18 文件 / **121 用例 PASS**（183s） |
+| usage-logs + components + lib | `npx vitest run src/features/usage-logs src/components src/lib` | 57 文件 / **382 通过、4 失败**（283s） |
+| 全量单进程 | `npx vitest run` / `--pool=forks --maxWorkers=2` / 三分区并行 | **均超时无输出**（最长 35 分钟），本机 jsdom 导入成本过高，未取得全量结果 |
+
+### 4 个失败用例（与本轮改动无关）
+- `usage-logs/.../mobile-filter.test.tsx`（×2）：找不到中文按钮「本月」——i18n 异步加载竞态，两次运行失败数不同（2 vs 4）证明是 flaky。
+- `usage-logs/.../task-event-stream.test.tsx`：`ReferenceError: ReadableStream is not defined`（jsdom 环境缺 API）。
+- `usage-logs/.../cost-detail-panel.test.tsx`：找不到 "Model ratio" 文案（同 i18n）。
+
+判定依据：本轮 55 个改动文件里**没有任何 usage-logs / i18n / test-setup / vitest 配置**（`git diff --name-only 7783c3795..HEAD` 核对），且失败用例数量在两次运行间变化。
+
+### 部署
+- `ssh -o BatchMode=yes root@154.37.208.171` → `Permission denied (password)`，**无密钥登录**，部署阻塞（§2.4.1）。
