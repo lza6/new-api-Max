@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.173] - 2026-10-21
+
+### Added
+- Command palette now has a **Quick actions** group (API keys / Wallet / Usage logs /
+  Status) next to navigation and theme, so the most common destinations are one
+  Ctrl/⌘+K away. Verified in production: palette opens from the keyboard and the
+  group contains all four actions.
+- `web/AGENTS.md` gains **§3.17 Usability contract** — the enforceable subset of
+  Nielsen's heuristics: four-state matrix, submit contract, three levels of
+  destructive actions, three-layer error copy, terminology, consistency and
+  accessibility rules.
+
+### Fixed
+- 24 Zod validation messages (e.g. "Username is required") were rendered in
+  English inside a Chinese UI. `FormMessage` already routes messages through
+  `t()`, so the keys simply did not exist; they are now translated for zh /
+  zh-TW and registered in en.json.
+
+### Verified
+- `bun run i18n:terminology` PASS, `check-missing-i18n` 0 missing.
+- 20 component/user test files, 99 cases PASS.
+- Production: version header `v1.3.173`, 0 5xx in the last 400 log lines.
+
 ## [v1.3.172] - 2026-10-21
 
 ### Changed

@@ -402,3 +402,17 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 | 签到重置 | 走 ConfirmDialog：「重置所有签到记录？用户将可重新签到。」/「此操作无法撤消。」/ 取消·重置（destructive） |
 | 钱包术语 | 页面出现「额度」，无「配额/容量」 |
 | 临时账号 | 5 个 `zz-verify-temp*` 全部清理，剩余 **0** |
+
+## 2026-10-21 v1.3.173 尼尔森 N9/N12/N16
+
+| 项 | 结果 |
+|---|---|
+| N9 命令面板 | Ctrl+K 打开；DOM innerText 含「快捷操作」+ API 密钥/钱包/使用日志/状态；生产截图已存 |
+| N16 校验文案 | 24 条 zod 消息补进 zh/zh-TW/en；`check-missing-i18n` 0 missing；`check-terminology` PASS |
+| N12 契约 | `web/AGENTS.md` §3.17 可用性契约（四态/提交/破坏性三级/错误三层/术语/一致性/a11y） |
+| 构建 | `bun run build` PASS |
+| 测试 | `vitest run src/components src/features/users` → 20 文件 / **99 用例 PASS** |
+| 部署 | v1.3.173 蓝绿上线，healthy，0 个 5xx，`x-new-api-version: v1.3.173` |
+| 临时账号 | `zz-verify-temp6` 已删，`zz-verify-temp%` 剩余 **0** |
+
+备注：命令面板截图为列表顶部视图，「快捷操作」组在滚动区下方，改由 DOM innerText 断言（已通过）。
