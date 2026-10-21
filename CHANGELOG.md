@@ -2,6 +2,31 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.169] - 2026-10-21
+
+### Fixed
+- Four long-standing flaky frontend tests: jsdom has no `ReadableStream`
+  (now polyfilled from `node:stream/web`) and one spec switched the shared
+  i18next instance to zh without restoring it (`afterEach` now resets to `en`).
+  Both previously failing files pass twice in a row (15/15).
+- `TabsList` no longer overlaps at 320px: the OAuth section uses
+  `grid-cols-3 sm:grid-cols-6`, the ratio card adds `max-sm:grid-cols-3`.
+  Verified in production at 320×640 (`tabsOverflow = 0`, no page overflow).
+- Uptime status dots expose `role="img"` with an accessible label instead of
+  encoding state with colour alone.
+- `theme-color` now comes from a `--theme-color` design token and updates every
+  meta tag; the old code wrote a hard-coded `#020817` into the first tag only.
+
+### Changed
+- Dropped the `vendor-react` cache group from `rsbuild.config.ts`; it never
+  applied (Rsbuild's built-in `lib-react` group wins), so the config now matches
+  the actual output.
+
+### Known issues (pre-existing)
+- Settings sections use 42 separate `SettingsPageFormActions` call sites and only
+  a handful register `FormNavigationGuard`; unifying that is a framework-level
+  change tracked separately.
+
 ## [v1.3.168] - 2026-10-21
 
 ### Performance

@@ -345,3 +345,20 @@
 
 关键经验：**本地 mock 测不到生产首屏的全部文案**（OAuth 按钮、模型广场、排行榜、文档页），
 必须用生产实测收集缺失 key 再补齐——已固化为 `web/scripts/merge-prod-i18n-missing.mjs`。
+
+## 2026-10-21 v1.3.169 部署与验收（flaky/tabs/uptime/theme-color）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 类型检查 | `cd web && bun run typecheck` | PASS |
+| 构建 | `cd web && bun run build` | PASS |
+| 定向测试（dashboard/system-settings/components） | `npx vitest run src/features/dashboard src/features/system-settings src/components/__tests__` | 16 文件 / **108 用例 PASS** |
+| 原 4 个 flaky 用例 | 同一命令连跑 2 次 | **15/15 PASS ×2**（此前 2~4 个失败） |
+| 部署 | `./deploy-zero-downtime.sh v1.3.169` | PASS，切 3000，外网自检 200 |
+| 线上版本 | `curl -I .../api/status` | `x-new-api-version: v1.3.169` |
+| 5xx | `docker logs --tail 400` | 0 |
+| 生产公开冒烟 | `node web/e2e-local/prod-smoke-v13166.cjs` | **8/8 PASS** |
+| 生产管理员 + 320px | `PROD_VERIFY_USER=zz-verify-temp3 node web/e2e-local/prod-admin-verify.cjs` | PASS；`/` 与 `/system-settings/auth/oauth` 在 320px：`overflow=false`、`tabsOverflow=0` |
+| 临时账号清理 | SQL | `zz-verify-temp%` 剩余 0 |
+
+修复内容：test-setup 补 ReadableStream + afterEach 还原 i18n 语言；oauth/ratio TabsList 窄屏 3 列；Uptime StatusDot 加 role/aria-label；theme-color 改读 `--theme-color` 令牌并更新全部 meta；移除从未生效的 `vendor-react` cacheGroup。
