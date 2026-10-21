@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useState } from 'react'
 import type { Resolver } from 'react-hook-form'
 import { useTranslation } from 'react-i18next'
 import * as z from 'zod'
@@ -51,6 +52,7 @@ import {
 import { SettingsPageFormActions } from '../components/settings-page-context'
 import { SettingsSection } from '../components/settings-section'
 import { useSettingsForm } from '../hooks/use-settings-form'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { useUpdateOption } from '../hooks/use-update-option'
 import { safeNumberFieldProps } from '../utils/numeric-field'
 
@@ -135,6 +137,18 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
       },
     })
 
+  // L3：改额度单位/汇率会立刻改变全站余额与价格显示，保存前要求逐字确认。
+  const [confirmPricingOpen, setConfirmPricingOpen] = useState(false)
+  const dirty = form.formState.dirtyFields
+  const criticalChanged = Boolean(dirty.QuotaPerUnit || dirty.USDExchangeRate)
+  const handleSaveClick = () => {
+    if (criticalChanged) {
+      setConfirmPricingOpen(true)
+      return
+    }
+    handleSubmit()
+  }
+
   const displayType = form.watch('general_setting.quota_display_type') ?? 'USD'
   const displayInCurrencyEnabled = form.watch('DisplayInCurrencyEnabled')
   const showTokensOnlyOption = displayType === 'TOKENS'
@@ -145,12 +159,26 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
 
   return (
     <>
+      <ConfirmDialog
+        open={confirmPricingOpen}
+        onOpenChange={setConfirmPricingOpen}
+        title={t('Change pricing conversion?')}
+        desc={t(
+          'Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.'
+        )}
+        confirmText={t('Save Changes')}
+        requireTypedText='QUOTA'
+        handleConfirm={() => {
+          setConfirmPricingOpen(false)
+          handleSubmit()
+        }}
+      />
 
       <SettingsSection title={t('Pricing & Display')}>
         <Form {...form}>
           <SettingsForm onSubmit={handleSubmit}>
             <SettingsPageFormActions
-              onSave={handleSubmit}
+              onSave={handleSaveClick}
               onReset={handleReset}
               isSaving={updateOption.isPending || isSubmitting}
               isResetDisabled={!isDirty}

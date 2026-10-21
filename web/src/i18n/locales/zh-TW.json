@@ -7354,6 +7354,9 @@
     "Must be ≥ 1": "必須 ≥ 1",
     "Must be ≤ 2,147,483,647": "必須 ≤ 2,147,483,647",
     "Username is required": "使用者名稱必填",
-    "Referral link": "推薦連結"
+    "Referral link": "推薦連結",
+    "Type {{text}} to confirm": "輸入 {{text}} 以確認",
+    "Change pricing conversion?": "修改價格換算？",
+    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "修改額度單位或匯率會立刻改變所有使用者的餘額與價格顯示。"
   }
 }

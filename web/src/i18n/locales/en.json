@@ -7420,6 +7420,9 @@
     "Must be ≥ 1": "Must be ≥ 1",
     "Must be ≤ 2,147,483,647": "Must be ≤ 2,147,483,647",
     "Username is required": "Username is required",
-    "Referral link": "Referral link"
+    "Referral link": "Referral link",
+    "Type {{text}} to confirm": "Type {{text}} to confirm",
+    "Change pricing conversion?": "Change pricing conversion?",
+    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user."
   }
 }

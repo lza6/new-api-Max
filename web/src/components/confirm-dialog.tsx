@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { Loader2 } from 'lucide-react'
+import * as React from 'react'
 import { useTranslation } from 'react-i18next'
 
 import {
@@ -29,6 +30,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 
 type ConfirmDialogProps = {
@@ -44,6 +46,11 @@ type ConfirmDialogProps = {
   isLoading?: boolean
   className?: string
   children?: React.ReactNode
+  /**
+   * L3 破坏性操作：要求用户逐字输入这段文本才能确认（计费/价格类改动）。
+   * 未输入或输入不符时确认按钮禁用。
+   */
+  requireTypedText?: string
 }
 
 export function ConfirmDialog(props: ConfirmDialogProps) {
@@ -58,9 +65,15 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
     destructive,
     isLoading,
     disabled = false,
+    requireTypedText,
     handleConfirm,
     ...actions
   } = props
+  const [typed, setTyped] = React.useState('')
+  React.useEffect(() => {
+    if (!props.open) {setTyped('')}
+  }, [props.open])
+  const typedOk = !requireTypedText || typed === requireTypedText
   return (
     <AlertDialog {...actions}>
       <AlertDialogContent className={cn(className)}>
@@ -70,6 +83,20 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
             {desc}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {requireTypedText && (
+          <div className='grid gap-1.5'>
+            <label className='text-muted-foreground text-xs' htmlFor='confirm-typed'>
+              {t('Type {{text}} to confirm', { text: requireTypedText })}
+            </label>
+            <Input
+              id='confirm-typed'
+              autoComplete='off'
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              disabled={isLoading}
+            />
+          </div>
+        )}
         {children}
         <AlertDialogFooter>
           <AlertDialogCancel disabled={isLoading}>
@@ -78,7 +105,7 @@ export function ConfirmDialog(props: ConfirmDialogProps) {
           <Button
             variant={destructive ? 'destructive' : 'default'}
             onClick={handleConfirm}
-            disabled={disabled || isLoading}
+            disabled={disabled || isLoading || !typedOk}
           >
             {isLoading && (
               <Loader2 className='mr-1.5 size-4 animate-spin' aria-hidden='true' />
