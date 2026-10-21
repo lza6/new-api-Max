@@ -2,6 +2,50 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.166] - 2026-10-21
+
+### Performance
+- Split system-settings section metadata (ids / titles / nav) into lightweight
+  `sections.ts` modules. Routes and the sidebar config no longer import the
+  component registries, so the entry bundle drops from **653KB to 332KB gzip**
+  (the `index` chunk alone: 233.2KB → 34.5KB).
+- The WebGL hero no longer mounts below 640px, on `saveData`, or on 2g/3g:
+  mobile stops downloading the 234KB three.js chunk and running an off-screen
+  60fps loop.
+- KaTeX stylesheet now loads together with the KaTeX JS instead of sitting in
+  the entry CSS (59 @font-face rules removed from first paint).
+- Service Worker version is injected at build time (`bun scripts/stamp-sw.mjs`);
+  a failed `cache.put` no longer turns a successful network response into an error.
+
+### Fixed
+- Dialogs had no max-height and no internal scroll: on phones the footer buttons
+  were pushed out of the viewport and unreachable.
+- `100vh` → `100dvh` in the shared dialog wrapper; drawer footers now respect
+  `env(safe-area-inset-bottom)`.
+- Attachment delete button was invisible but clickable on touch screens, and its
+  44px hit area covered the filename (tapping the name deleted the file).
+- Non-admin users could open an empty "Usage Report" tab; the dashboard now
+  filters admin-only sections from one source and renders a permission notice on
+  direct URL access.
+- Wallet showed a **0 balance** when `/api/user/self` failed; it now shows an
+  error state with retry.
+- An empty redemption code made the Redeem button do nothing; the validation
+  toast is reachable again.
+- System settings rendered code-default values (and allowed saving them) when
+  `/api/option/` failed; it now shows an error state instead.
+- CSV export swallowed failures and could download a JSON error envelope as
+  `.csv`; content-type is now validated.
+- Channel bulk actions (Test All / Update All Balances) could be clicked
+  repeatedly and multiply upstream requests; they are now guarded while running.
+- CC Switch rendered a failed model request as "No models found".
+- `home_page_content` / `notice` returning a non-string crashed the whole page
+  (route error boundary); both are validated at the boundary.
+- `StatusBadge` copy was mouse-only; it is now a focusable button (Enter/Space).
+- Mobile inputs use `max(16px, 1rem)` so a user-raised root font size is no
+  longer overridden.
+- Card hover effects are gated behind `(hover: hover)` to stop sticky hover on
+  touch; login inputs received `autoComplete`.
+
 ## [v1.3.165] - 2026-10-21
 
 ### Performance
