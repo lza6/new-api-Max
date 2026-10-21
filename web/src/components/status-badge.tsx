@@ -68,12 +68,12 @@ export const dotColorMap = {
 
 export const textColorMap = {
   success: 'text-(--success-text)',
-  warning: 'text-warning',
+  warning: 'text-(--warning-text)',
   danger: 'text-destructive',
   info: 'text-info',
   neutral: 'text-muted-foreground',
   purple: 'text-(--chart-4-text)',
-  amber: 'text-warning',
+  amber: 'text-(--warning-text)',
   blue: 'text-chart-1',
   cyan: 'text-chart-2',
   green: 'text-success',
@@ -82,12 +82,12 @@ export const textColorMap = {
   'light-blue': 'text-info',
   'light-green': 'text-emerald-500 dark:text-emerald-300',
   lime: 'text-chart-3',
-  orange: 'text-warning',
+  orange: 'text-(--warning-text)',
   pink: 'text-chart-5',
   red: 'text-destructive',
   teal: 'text-chart-2',
   violet: 'text-(--chart-4-text)',
-  yellow: 'text-warning',
+  yellow: 'text-(--warning-text)',
 } as const
 
 export type StatusVariant = keyof typeof dotColorMap
