@@ -17,7 +17,17 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { useLocation, useNavigate } from '@tanstack/react-router'
-import { ArrowRight, ChevronRight, Laptop, Moon, Sun } from 'lucide-react'
+import {
+  Activity,
+  ArrowRight,
+  ChevronRight,
+  KeyRound,
+  Laptop,
+  Moon,
+  ScrollText,
+  Sun,
+  Wallet,
+} from 'lucide-react'
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 
@@ -101,6 +111,27 @@ export function CommandMenu() {
                 })}
               </CommandGroup>
             ))}
+            <CommandSeparator />
+            {/* 命令面板不只导航：常用动作直接可达（尼尔森 H7 灵活性与效率）。 */}
+            <CommandGroup heading={t('Quick actions')}>
+              {[
+                { to: '/keys', label: 'API Keys', Icon: KeyRound },
+                { to: '/wallet', label: 'Wallet', Icon: Wallet },
+                { to: '/usage-logs', label: 'Usage Logs', Icon: ScrollText },
+                { to: '/status', label: 'Status', Icon: Activity },
+              ].map((action) => (
+                <CommandItem
+                  key={action.to}
+                  value={`quick-${action.to}`}
+                  onSelect={() => {
+                    runCommand(() => navigate({ to: action.to }))
+                  }}
+                >
+                  <action.Icon className='size-4' />
+                  <span className='ms-1'>{t(action.label)}</span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
             <CommandSeparator />
             <CommandGroup heading='Theme'>
               <CommandItem onSelect={() => runCommand(() => setTheme('light'))}>
