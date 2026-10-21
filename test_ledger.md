@@ -332,3 +332,16 @@
 | 首屏覆盖审计 | `node e2e-local/i18n-common-audit.cjs` | **PASS**：/、/sign-in、/pricing、/status 缺失 key = 0（另有 6 个既有中文 key，非回归） |
 | 构建 | `bun run build` | PASS |
 | 首屏实测 | `node e2e-local/fe-vitals.cjs` | 阻塞语言包 172→**12KB**；LCP 3980→**3448ms**；挂载 1263→**1121ms** |
+
+## 2026-10-21 v1.3.167 / v1.3.168 语言包上线与生产验收
+
+| 项 | 结果 |
+|---|---|
+| v1.3.167 部署 | 蓝绿 → 3000，healthy，0 个 5xx |
+| v1.3.168 部署 | 蓝绿 → 3001，healthy，0 个 5xx（补齐生产首屏 49 个 key） |
+| 生产不闪英文（12 条公开路由） | `node web/e2e-local/prod-i18n-no-flash.cjs` → **PASS**（屏蔽整包语言包，`__i18nMissing` 中可翻译 key = 0） |
+| 管理员登录态（v1.3.168） | 临时账号 `zz-verify-temp2`（role=100）；登录 + `/dashboard/models`、`/system-settings/{site/system-info,operations/behavior,security/rate-limit}`、`/wallet`、`/keys` 全部正常渲染，无 error boundary、无 console error |
+| 临时账号清理 | user_sessions 1 行、logs 0 行、users 1 行已删；`zz-verify-temp%` 剩余 **0** |
+
+关键经验：**本地 mock 测不到生产首屏的全部文案**（OAuth 按钮、模型广场、排行榜、文档页），
+必须用生产实测收集缺失 key 再补齐——已固化为 `web/scripts/merge-prod-i18n-missing.mjs`。

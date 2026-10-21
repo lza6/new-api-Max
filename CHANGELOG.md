@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.168] - 2026-10-21
+
+### Performance
+- **First-paint locale is now a 12KB subset instead of the full 172KB bundle.**
+  `i18nReady` only waits for `locales/<lang>.common.json` (445–494 keys covering
+  every string the shell and public pages render); the full bundle keeps loading
+  in the background and re-renders once, so the UI never flashes English.
+  Local measurement: LCP 3980ms → 3448ms, React mount 1263ms → 1121ms.
+- Locale chunks are named (`i18n-common-<lang>` / `i18n-full-<lang>`) so the
+  first-paint window can be exercised in tests.
+
+### Added
+- `web/scripts/scan-i18n-common.mjs`, `build-i18n-common.mjs`,
+  `fix-i18n-common.mjs`, `merge-prod-i18n-missing.mjs` — the key-subset pipeline.
+- `i18next` `missingKeyHandler` records keys that fall back to their English
+  source, which is what the automated "no English flash" checks consume.
+- `web/e2e-local/i18n-common-audit.cjs` (local), `prod-i18n-no-flash.cjs`
+  (production, via the 443 tunnel) — both assert zero untranslated keys with the
+  full bundle blocked. Production run covers 12 public routes.
+- `web/e2e-local/prod-admin-verify.cjs` — real admin login against production,
+  walks dashboard / settings / wallet / keys, then the temporary account is
+  removed from the database.
+
+### Fixed
+- Added the 49 keys that production actually renders but a local mock does not
+  (OAuth buttons, model marketplace, rankings, docs).
+
+### Known issues (pre-existing, not introduced here)
+- Nav labels such as 主页 / 控制台 are passed to `t()` as Chinese source strings
+  coming from the server-side nav configuration; they have no entry in any locale
+  file, so an English UI shows them in Chinese.
+
 ## [v1.3.166] - 2026-10-21
 
 ### Performance
