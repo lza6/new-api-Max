@@ -4,21 +4,21 @@
 
 | 项 | 值 | 校验命令 |
 |---|---|---|
-| 线上版本 |  |  |
-| 部署时间 | 2026-10-21（蓝绿，端口 3000） |  |
-| 代码 SHA | 见  | origin/main |
-| 回滚镜像 | （保留最近 4 个版本） |  |
-| 回滚命令 |  | — |
-| VERSION 文件 |  |  |
+| 线上版本 | `v1.3.169` | `ssh ... 'docker ps --format "{{.Image}}"'` |
+| 部署时间 | 2026-10-21（蓝绿，端口 3000） | — |
+| 代码 SHA | `git rev-parse origin/main` | `git log origin/main -1` |
+| 回滚镜像 | `new-api:v1.3.168`（保留最近 4 个版本） | `docker images new-api` |
+| 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.168` | — |
+| VERSION 文件 | `v1.3.169` | `cat VERSION` |
 
- / 最新 tag / CHANGELOG 首条 / 本表四者一致；若不一致，必须先修本文档。
+`VERSION` / 最新 tag / `CHANGELOG` 首条 / 本表四者一致；若不一致，必须先修本文档。
 
 ---
 
 # workflow_status.md — 训练数据采集（多账号归属安全）终局闭环
 
 > 最后更新：2026-10-20 18:00（Asia/Shanghai）
-> 当前生产：`new-api:v1.3.162`（`freeapi.tingfengai.art` / 154.37.208.171，容器 healthy，上游随蓝绿交替）
+> 生产版本以 §0 为准（该批次完成时为 `v1.3.162`）
 
 ## 1. 任务契约（本轮）
 
