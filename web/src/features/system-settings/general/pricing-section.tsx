@@ -140,7 +140,12 @@ export function PricingSection({ defaultValues }: PricingSectionProps) {
   // L3：改额度单位/汇率会立刻改变全站余额与价格显示，保存前要求逐字确认。
   const [confirmPricingOpen, setConfirmPricingOpen] = useState(false)
   const dirty = form.formState.dirtyFields
-  const criticalChanged = Boolean(dirty.QuotaPerUnit || dirty.USDExchangeRate)
+  const criticalChanged = Boolean(
+    dirty.QuotaPerUnit ||
+      dirty.USDExchangeRate ||
+      dirty.general_setting?.quota_display_type ||
+      dirty.general_setting?.custom_currency_exchange_rate
+  )
   const handleSaveClick = () => {
     if (criticalChanged) {
       setConfirmPricingOpen(true)
