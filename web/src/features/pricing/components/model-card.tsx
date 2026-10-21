@@ -375,7 +375,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             </div>
             <div>
               <dt>{t('Today success')}</dt>
-              <dd className='text-emerald-600 dark:text-emerald-400 font-mono font-semibold tabular-nums'>
+              <dd className='text-emerald-700 dark:text-emerald-300 font-mono font-semibold tabular-nums'>
                 {formatNumber(props.stats.today_success)}
               </dd>
             </div>
@@ -387,7 +387,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             </div>
             <div>
               <dt>{t('30d success')}</dt>
-              <dd className='text-emerald-600 dark:text-emerald-400 font-mono font-semibold tabular-nums'>
+              <dd className='text-emerald-700 dark:text-emerald-300 font-mono font-semibold tabular-nums'>
                 {formatNumber(props.stats.days30_success)}
               </dd>
             </div>
@@ -395,7 +395,7 @@ export const ModelCard = memo(function ModelCard(props: ModelCardProps) {
             props.stats.compression_ratio > 0 ? (
               <div>
                 <dt>{t('Compression')}</dt>
-                <dd className='text-cyan-600 dark:text-cyan-400 font-mono font-semibold tabular-nums'>
+                <dd className='text-cyan-700 dark:text-cyan-300 font-mono font-semibold tabular-nums'>
                   -{Math.round((1 - props.stats.compression_ratio) * 100)}%
                 </dd>
               </div>

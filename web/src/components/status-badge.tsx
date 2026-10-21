@@ -72,7 +72,7 @@ export const textColorMap = {
   danger: 'text-destructive',
   info: 'text-info',
   neutral: 'text-muted-foreground',
-  purple: 'text-chart-4',
+  purple: 'text-(--chart-4-text)',
   amber: 'text-warning',
   blue: 'text-chart-1',
   cyan: 'text-chart-2',
@@ -86,7 +86,7 @@ export const textColorMap = {
   pink: 'text-chart-5',
   red: 'text-destructive',
   teal: 'text-chart-2',
-  violet: 'text-chart-4',
+  violet: 'text-(--chart-4-text)',
   yellow: 'text-warning',
 } as const
 

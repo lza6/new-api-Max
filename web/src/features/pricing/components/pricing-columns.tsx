@@ -224,7 +224,7 @@ export function usePricingColumns(
         return (
           <div className='flex flex-col gap-0.5 text-xs leading-tight'>
             {compPct != null ? (
-              <span className='text-cyan-600 dark:text-cyan-400 tabular-nums'>
+              <span className='text-cyan-700 dark:text-cyan-300 tabular-nums'>
                 {t('Compression')} -{compPct}%
               </span>
             ) : null}
