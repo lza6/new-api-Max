@@ -28,9 +28,9 @@ export function ForbiddenError() {
   return (
     <div className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
-        <h1 className='text-[7rem] leading-tight font-bold'>403</h1>
-        <span className='font-medium'>{t('Access Forbidden')}</span>
-        <p className='text-muted-foreground text-center'>
+        <span className='text-foreground text-xl font-semibold sm:text-2xl'>{t('Access Forbidden')}</span>
+        <span className='border-border/60 text-muted-foreground rounded-full border px-2.5 py-0.5 font-mono text-xs'>HTTP 403</span>
+        <p className='text-muted-foreground max-w-md text-center text-sm'>
           {t("You don't have necessary permission")} <br />
           {t('to view this resource.')}
         </p>

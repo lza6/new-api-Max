@@ -25,11 +25,11 @@ export function MaintenanceError() {
   return (
     <div className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
-        <h1 className='text-[7rem] leading-tight font-bold'>503</h1>
-        <span className='font-medium'>
+        <span className='text-foreground text-xl font-semibold sm:text-2xl'>
           {t('Website is under maintenance!')}
         </span>
-        <p className='text-muted-foreground text-center'>
+        <span className='border-border/60 text-muted-foreground rounded-full border px-2.5 py-0.5 font-mono text-xs'>HTTP 503</span>
+        <p className='text-muted-foreground max-w-md text-center text-sm'>
           {t('The site is not available at the moment.')} <br />
           {t("We'll be back online shortly.")}
         </p>

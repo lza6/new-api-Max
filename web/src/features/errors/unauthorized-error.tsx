@@ -28,9 +28,9 @@ export function UnauthorisedError() {
   return (
     <div className='h-svh'>
       <div className='m-auto flex h-full w-full flex-col items-center justify-center gap-2'>
-        <h1 className='text-[7rem] leading-tight font-bold'>401</h1>
-        <span className='font-medium'>{t('Unauthorized Access')}</span>
-        <p className='text-muted-foreground text-center'>
+        <span className='text-foreground text-xl font-semibold sm:text-2xl'>{t('Unauthorized Access')}</span>
+        <span className='border-border/60 text-muted-foreground rounded-full border px-2.5 py-0.5 font-mono text-xs'>HTTP 401</span>
+        <p className='text-muted-foreground max-w-md text-center text-sm'>
           {t('Please log in with the appropriate credentials')} <br />{' '}
           {t('to access this resource.')}
         </p>
