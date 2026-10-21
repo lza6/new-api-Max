@@ -32,15 +32,25 @@ import { cn } from '@/lib/utils'
 
 export function ThemeSwitch() {
   const { t } = useTranslation()
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, resolvedTheme } = useTheme()
 
-  /* Update theme-color meta tag
-   * when theme is updated */
+  /* Update theme-color meta tags when the theme changes.
+   * index.html ships two media-scoped tags (light/dark); the old code only
+   * rewrote the first one with a hard-coded #020817 that matched neither.
+   * Now every tag gets the value of the `--theme-color` token, read after the
+   * `.dark` class has been applied by the theme provider. */
   useEffect(() => {
-    const themeColor = theme === 'dark' ? '#020817' : '#fff'
-    const metaThemeColor = document.querySelector("meta[name='theme-color']")
-    if (metaThemeColor) {metaThemeColor.setAttribute('content', themeColor)}
-  }, [theme])
+    const frame = requestAnimationFrame(() => {
+      const token = getComputedStyle(document.documentElement)
+        .getPropertyValue('--theme-color')
+        .trim()
+      const color = token || (resolvedTheme === 'dark' ? '#0a0a0a' : '#ffffff')
+      document
+        .querySelectorAll("meta[name='theme-color']")
+        .forEach((meta) => meta.setAttribute('content', color))
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [resolvedTheme])
 
   return (
     <DropdownMenu modal={false}>

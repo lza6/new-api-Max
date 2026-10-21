@@ -57,13 +57,6 @@ export default defineConfig(({ envMode }) => {
           priority: 10,
           enforce: true,
         },
-        'vendor-react': {
-          test: /node_modules[\\/](react|react-dom)[\\/]/,
-          name: 'vendor-react',
-          chunks: 'all',
-          priority: 0,
-          enforce: true,
-        },
         'vendor-ui-primitives': {
           test: /node_modules[\\/](@base-ui|@radix-ui)[\\/]/,
           name: 'vendor-ui-primitives',

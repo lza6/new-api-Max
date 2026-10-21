@@ -73,6 +73,21 @@ const PATHS = [
     await page.screenshot({ path: `e2e-local/prod-admin-${path.replaceAll('/', '_')}.png` }).catch(() => {})
   }
 
+  // 320px 窄屏检查：确保 Tabs 不叠印、页面无横向溢出
+  const narrow = await browser.newContext({ baseURL: BASE, ignoreHTTPSErrors: true, viewport: { width: 320, height: 640 }, isMobile: true, hasTouch: true, storageState: await context.storageState() })
+  const np = await narrow.newPage()
+  for (const path of ['/', '/system-settings/auth/oauth']) {
+    await np.goto(BASE + path, { waitUntil: 'domcontentloaded', timeout: 60000 })
+    await np.waitForFunction(() => (document.querySelector('#root')?.children.length ?? 0) > 0, { timeout: 30000 }).catch(() => {})
+    await np.waitForTimeout(2000)
+    const info = await np.evaluate(() => ({
+      overflow: document.documentElement.scrollWidth > window.innerWidth + 1,
+      tabsOverflow: [...document.querySelectorAll('[data-slot="tabs-trigger"]')].filter((el) => el.scrollWidth > el.clientWidth + 1).length,
+      textLen: document.body.innerText.replace(/s+/g, ' ').trim().length,
+    }))
+    results.push({ step: '320' + path, url: np.url(), ...info, errors: [] })
+  }
+  await narrow.close()
   await browser.close()
   console.log(JSON.stringify(results, null, 2))
   const bad = results.filter((r) => r.isErrorPage || r.textLen < 120 || (r.errors && r.errors.length > 0) || !r.url.includes(r.step ?? ''))

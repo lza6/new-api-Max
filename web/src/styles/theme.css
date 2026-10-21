@@ -106,6 +106,9 @@ For commercial licensing, please contact support@quantumnous.com
 :root {
   --radius: 1rem;
   --app-header-height: 3rem;
+  /* 浏览器 UI（地址栏/状态栏）取色：与 `--background` 同源，避免 JS 里写死
+   * `#020817` 这类与 index.html 声明不一致的魔法值。 */
+  --theme-color: #ffffff;
   /* Static build-channel fallback consumed when JS hasn't booted yet. */
   --app-rev: '2k6e8r7p';
   /* Currently active body font. The font axis swaps this between
@@ -211,6 +214,7 @@ For commercial licensing, please contact support@quantumnous.com
 
 .dark {
   /* OpenAI-like dark mode with a crisp charcoal canvas. */
+  --theme-color: #0a0a0a;
   --background: oklch(0.235 0 0);
   --foreground: oklch(0.965 0 0);
   --card: oklch(0.285 0 0);

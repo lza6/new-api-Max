@@ -41,8 +41,25 @@ const STATUS_COLOR_MAP: Record<number, string> = {
 const DEFAULT_STATUS_COLOR = 'bg-muted-foreground/40'
 
 const StatusDot = memo(function StatusDot(props: { status: number }) {
+  const { t } = useTranslation()
   const color = STATUS_COLOR_MAP[props.status] ?? DEFAULT_STATUS_COLOR
-  return <span className={cn('inline-block size-2 rounded-full', color)} />
+  // 颜色之外必须给出文本等价物：色盲/读屏用户无法区分「宕机」和「维护中」。
+  const label =
+    props.status === 1
+      ? t('Online')
+      : props.status === 0
+        ? t('Down')
+        : props.status === 2
+          ? t('Pending')
+          : t('Unknown')
+  return (
+    <span
+      role='img'
+      aria-label={label}
+      title={label}
+      className={cn('inline-block size-2 rounded-full', color)}
+    />
+  )
 })
 
 export function UptimePanel() {

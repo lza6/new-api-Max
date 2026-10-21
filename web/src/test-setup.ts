@@ -17,6 +17,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import '@testing-library/jest-dom/vitest'
+import { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { cleanup, configure } from '@testing-library/react'
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
@@ -41,8 +42,11 @@ beforeAll(async () => {
   })
 })
 
-afterEach(() => {
+afterEach(async () => {
   cleanup()
+  // 测试共享同一个 i18next 实例：某个用例切到 zh/zh-TW 后若不还原，同 worker
+  // 后续文件会继承该语言，产生「找不到本月/找不到英文按钮」这类 flaky。
+  await i18next.changeLanguage('en')
 })
 
 Object.defineProperty(window, 'matchMedia', {
@@ -122,5 +126,15 @@ for (const name of ['localStorage', 'sessionStorage'] as const) {
     enumerable: true,
     writable: true,
     value: storage,
+  })
+}
+
+// jsdom 没有实现 ReadableStream（Node 18+ 才有），SSE/流式解析相关用例会抛
+// `ReferenceError: ReadableStream is not defined`。补一个 Node 原生实现。
+if (typeof globalThis.ReadableStream === 'undefined') {
+  Object.defineProperty(globalThis, 'ReadableStream', {
+    configurable: true,
+    writable: true,
+    value: NodeReadableStream,
   })
 }
