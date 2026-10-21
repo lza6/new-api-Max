@@ -40,9 +40,11 @@ async function main() {
           timeout: 45000,
         })
         status = response ? response.status() : 0
-        // 冷启动时路由 chunk 可能 >2.5s；等 #root 真有子节点再判定
-        await page.waitForFunction(() => (document.querySelector('#root')?.children.length ?? 0) > 0, { timeout: 20000 })
-        await page.waitForTimeout(1200)
+        // 注意：index.html 的 #app-boot-loader 也在 #root 内，React 接管后 #root
+        // 会短暂为空 → 必须等 loader 被移除且 h1 有文本，否则会误判成白屏
+        await page.waitForSelector('#app-boot-loader', { state: 'detached', timeout: 45000 })
+        await page.waitForFunction(() => (document.querySelector('h1')?.textContent ?? '').trim().length > 0, { timeout: 45000 })
+        await page.waitForTimeout(800)
       } catch (error) {
         errors.push('goto: ' + String(error).slice(0, 160))
       }

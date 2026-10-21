@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.170] - 2026-10-21
+
+### Added
+- **Unsaved-changes protection now covers every settings page.** The dirty state
+  of each `useSettingsForm` instance is registered with `SettingsPageProvider`,
+  which renders a single `FormNavigationGuard`. Previously only 4 of the 42
+  settings sections remembered to mount the guard, so switching sections after
+  editing silently discarded the changes.
+  Verified against production: an untouched page navigates straight through; an
+  edited page shows "未保存的更改 / 留下来 / 离开" and stays on the page.
+
+### Changed
+- Removed the four per-section `FormNavigationGuard` instances so there is only
+  one router blocker on the page (two would fight over the same navigation).
+
+### Fixed (test infrastructure)
+- `prod-smoke` treated `#root` having children as "rendered", but the boot
+  loader also lives inside `#root`; it now waits for the loader to detach and
+  for an `h1` to have text. The old check could report a false "blank page" on
+  a cold load.
+
 ## [v1.3.169] - 2026-10-21
 
 ### Fixed

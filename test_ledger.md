@@ -372,3 +372,19 @@
 | 结果 | 1144 请求，**0 错误**，QPS **74.4**，p50 234ms / p95 276ms / p99 1488ms / max 1705ms |
 | 说明 | 隧道本身约 200ms RTT，延迟绝对值不代表公网直连；错误率为 0 是关键结论 |
 | 运行观察 | 部署后 10 分钟：内存 157–525MB 波动（上限 900MB），CPU 22–70% 周期波动，600 行日志 0 个 5xx |
+
+## 2026-10-21 v1.3.170 部署与「未保存保护」生产验收
+
+| 项 | 结果 |
+|---|---|
+| 类型检查 / 构建 | PASS |
+| 设置模块测试 | `npx vitest run src/features/system-settings` → **11 文件 / 57 用例 PASS** |
+| 部署 | `deploy-zero-downtime.sh v1.3.170` → 3001，healthy，0 个 5xx |
+| 线上版本 | `x-new-api-version: v1.3.170` |
+| **未保存保护（真实管理员）** | `PROD_VERIFY_USER=zz-verify-temp4 node web/e2e-local/prod-guard-verify.cjs` → **PASS**：无改动直接跳转（dialog=0）；改动后弹「未保存的更改 / 留下来 / 离开」且 URL 停留 |
+| 生产公开冒烟 | `prod-smoke-v13166.cjs` 连跑 **3 次全部 8/8 PASS** |
+| 临时账号清理 | `zz-verify-temp%` 剩余 **0** |
+
+### 本轮踩到的测试自身缺陷（已修）
+`prod-smoke` 用「`#root` 有子节点」判断渲染完成，但 index.html 的 `#app-boot-loader` 就在 `#root` 内；
+React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改为等 loader detach + `h1` 有文本。
