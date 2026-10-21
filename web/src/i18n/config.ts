@@ -32,58 +32,97 @@ import {
 
 /** 语言包懒加载器：每个语言一个动态 import（被拆成独立 chunk）。 */
 const localeLoaders: Record<string, () => Promise<{ default: unknown }>> = {
-  en: () => import('./locales/en.json'),
-  zhCN: () => import('./locales/zh.json'),
-  zhTW: () => import('./locales/zh-TW.json'),
-  fr: () => import('./locales/fr.json'),
-  ru: () => import('./locales/ru.json'),
-  ja: () => import('./locales/ja.json'),
-  vi: () => import('./locales/vi.json'),
+  en: () => import(/* webpackChunkName: 'i18n-full-en' */ './locales/en.json'),
+  zhCN: () => import(/* webpackChunkName: 'i18n-full-zhCN' */ './locales/zh.json'),
+  zhTW: () => import(/* webpackChunkName: 'i18n-full-zhTW' */ './locales/zh-TW.json'),
+  fr: () => import(/* webpackChunkName: 'i18n-full-fr' */ './locales/fr.json'),
+  ru: () => import(/* webpackChunkName: 'i18n-full-ru' */ './locales/ru.json'),
+  ja: () => import(/* webpackChunkName: 'i18n-full-ja' */ './locales/ja.json'),
+  vi: () => import(/* webpackChunkName: 'i18n-full-vi' */ './locales/vi.json'),
 }
+
+/**
+ * 首屏子集：只含壳层与公开页/登录页会渲染到的 key（`scripts/scan-i18n-common.mjs`
+ * 生成，约 300 条 / 7KB gzip，而整包 175KB gzip）。
+ *
+ * `main.tsx` 的 `i18nReady` 只等这一份，所以首屏不再被整包语言包串行阻塞；
+ * 整包在首屏渲染后后台补齐并触发一次重渲染。子集漏掉的 key 会短暂显示英文原键，
+ * 因此 `web/e2e-local/i18n-no-flash.cjs` 会用真实浏览器逐页检测「渲染文本等于
+ * 英文 key」的情况，漏一条就补进 `common-keys.json`。
+ */
+const commonLocaleLoaders: Record<string, () => Promise<{ default: unknown }>> =
+  {
+    en: () => import(/* webpackChunkName: 'i18n-common-en' */ './locales/en.common.json'),
+    zhCN: () => import(/* webpackChunkName: 'i18n-common-zhCN' */ './locales/zh.common.json'),
+    zhTW: () => import(/* webpackChunkName: 'i18n-common-zhTW' */ './locales/zh-TW.common.json'),
+    fr: () => import(/* webpackChunkName: 'i18n-common-fr' */ './locales/fr.common.json'),
+    ru: () => import(/* webpackChunkName: 'i18n-common-ru' */ './locales/ru.common.json'),
+    ja: () => import(/* webpackChunkName: 'i18n-common-ja' */ './locales/ja.common.json'),
+    vi: () => import(/* webpackChunkName: 'i18n-common-vi' */ './locales/vi.common.json'),
+  }
 
 const SUPPORTED = ['en', 'zhCN', 'zhTW', 'fr', 'ru', 'ja', 'vi']
 const LANGUAGE_STORAGE_KEY = 'i18nextLng'
 /** 默认语言：简体中文（新访客）。 */
 const DEFAULT_LANGUAGE = 'zhCN'
 
-const loadedLanguages = new Set<string>()
-const loadingPromises = new Map<string, Promise<void>>()
+const loadedCommon = new Set<string>()
+const commonLoadPromises = new Map<string, Promise<void>>()
+const loadedFull = new Set<string>()
+const fullLoadPromises = new Map<string, Promise<void>>()
+
+type LocaleModule = { default: unknown }
+
+/** 语言 JSON 形如 { translation: {...} }；剥掉外层后交给 addResourceBundle。 */
+function bundlePayload(mod: LocaleModule): Record<string, unknown> {
+  const bundle = mod.default as { translation?: Record<string, unknown> }
+  return bundle?.translation ?? (mod.default as Record<string, unknown>)
+}
+
+function loadBundle(
+  lang: string,
+  loader: (() => Promise<LocaleModule>) | undefined,
+  loaded: Set<string>,
+  inFlight: Map<string, Promise<void>>
+): Promise<void> {
+  if (!loader || loaded.has(lang)) {return Promise.resolve()}
+  const existing = inFlight.get(lang)
+  if (existing) {return existing}
+  const promise = loader()
+    .then((mod) => {
+      i18n.addResourceBundle(lang, 'translation', bundlePayload(mod), true, true)
+      loaded.add(lang)
+    })
+    .catch(() => {
+      // 加载失败：保留已注册的 fallback，不阻塞交互。
+    })
+    .finally(() => {
+      inFlight.delete(lang)
+    })
+  inFlight.set(lang, promise)
+  return promise
+}
+
+/** 首屏子集（阻塞首帧）。 */
+export function ensureCommonLanguageLoaded(code: string): Promise<void> {
+  const lang = code || DEFAULT_LANGUAGE
+  return loadBundle(lang, commonLocaleLoaders[lang], loadedCommon, commonLoadPromises)
+}
+
+/** 整包语言包（后台补齐；显式切换语言时也用它）。 */
+export function ensureFullLanguageLoaded(code: string): Promise<void> {
+  const lang = code || DEFAULT_LANGUAGE
+  return loadBundle(lang, localeLoaders[lang], loadedFull, fullLoadPromises)
+}
 
 /**
- * 确保指定语言包已加载并注册到 i18next。已加载则直接返回。
- * 切换语言前调用；失败时静默降级（保留 fallback en），不阻塞 UI。
+ * 确保指定语言**完整**可用。切换语言前调用；失败时静默降级（保留 fallback en），
+ * 不阻塞 UI。
  */
 export async function ensureLanguageLoaded(code: string): Promise<void> {
   const lang = code || DEFAULT_LANGUAGE
-  if (loadedLanguages.has(lang)) {
-    return
-  }
-  const existing = loadingPromises.get(lang)
-  if (existing) {
-    return existing
-  }
-  const loader = localeLoaders[lang]
-  if (!loader) {
-    return
-  }
-  const promise = loader()
-    .then((mod) => {
-      // 语言 JSON 形如 { translation: { ...keys } }。addResourceBundle 的
-      // resources 参数是**某个 namespace 下的直接键值**，因此要剥掉外层
-      // translation 层；否则键会变成 translation.translation.<key> 而查不到。
-      const bundle = mod.default as { translation?: Record<string, unknown> }
-      const payload = bundle?.translation ?? (mod.default as Record<string, unknown>)
-      i18n.addResourceBundle(lang, 'translation', payload, true, true)
-      loadedLanguages.add(lang)
-    })
-    .catch(() => {
-      // 加载失败：保留 fallback（en），不抛出——避免语言包网络问题阻塞交互。
-    })
-    .finally(() => {
-      loadingPromises.delete(lang)
-    })
-  loadingPromises.set(lang, promise)
-  return promise
+  await ensureCommonLanguageLoaded(lang)
+  await ensureFullLanguageLoaded(lang)
 }
 
 /** 读取用户显式选择的语言（localStorage）；无则 null。 */
@@ -210,6 +249,16 @@ i18n.use(initReactI18next).init({
   load: 'currentOnly',
   nsSeparator: false, // Allow literal colons in keys (e.g., URLs, labels)
   debug: import.meta.env.DEV,
+  // 记录「当前语言缺哪些 key」：首屏只加载 common 子集时，任何缺失的 key 都会
+  // 回退成英文原键（= 用户看到的「英文闪切」）。`e2e-local/i18n-common-audit.cjs`
+  // 会读这个数组，把漏掉的 key 并回 `common-keys.json`。
+  saveMissing: true,
+  missingKeyHandler: (_lngs: readonly string[], _ns: string, key: string) => {
+    if (typeof window === 'undefined') {return}
+    const w = window as Window & { __i18nMissing?: string[] }
+    w.__i18nMissing ??= []
+    if (!w.__i18nMissing.includes(key)) {w.__i18nMissing.push(key)}
+  },
   interpolation: {
     escapeValue: false, // not needed for react as it escapes by default
   },
@@ -222,9 +271,16 @@ i18n.use(initReactI18next).init({
 //
 // i18nReady：语言就绪 promise。main.tsx 会 await 它再 render，确保首屏（含
 // Setup 向导页）用正确语言渲染，而不是先用 fallback 渲染再闪切。
-export const i18nReady: Promise<void> = ensureLanguageLoaded(
-  initialLanguage
-).then(() => i18n.changeLanguage(initialLanguage).then(() => undefined))
+// 首屏只等「首屏子集」（~7KB gzip），整包在渲染后台补齐后再补一次文案。
+// 不采用「先按英文渲染再切中文」：那会闪英文，业主明确不接受。
+export const i18nReady: Promise<void> = (async () => {
+  await ensureCommonLanguageLoaded(initialLanguage)
+  await i18n.changeLanguage(initialLanguage)
+  void ensureFullLanguageLoaded(initialLanguage).then(() => {
+    // addResourceBundle 不会自动触发重渲染，主动通知一次。
+    i18n.emit('languageChanged', i18n.language)
+  })
+})()
 
 // 首屏语言确定后同步 <html lang>（i18nReady 完成后即可；同步设置一次）。
 void i18nReady.then(() => syncHtmlLang(initialLanguage))

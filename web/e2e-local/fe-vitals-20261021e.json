@@ -1,0 +1,186 @@
+{
+  "measuredAt": "2026-10-21T09:43:16.203Z",
+  "mode": "local, no throttle",
+  "mountedMs": 1121,
+  "vitals": {
+    "fcp": 3448,
+    "lcp": 3448,
+    "lcpElement": "H1",
+    "lcpCandidates": [
+      {
+        "t": 3448,
+        "size": 27608,
+        "tag": "H1",
+        "text": "统一 API 网关，服务于海量 AI 模型"
+      }
+    ],
+    "cls": 0.001,
+    "domContentLoaded": 684,
+    "load": 0,
+    "transferKB": 831
+  },
+  "resources": [
+    {
+      "name": "vendor-ui-primitives.ee95796523.js",
+      "start": 106,
+      "end": 163,
+      "transferKB": 111
+    },
+    {
+      "name": "vendor-tanstack.41b48fabbb.js",
+      "start": 108,
+      "end": 173,
+      "transferKB": 51
+    },
+    {
+      "name": "lib-react.1f6c1ac356.js",
+      "start": 109,
+      "end": 200,
+      "transferKB": 59
+    },
+    {
+      "name": "31241.ab9377f1f2.js",
+      "start": 109,
+      "end": 210,
+      "transferKB": 77
+    },
+    {
+      "name": "index.847e6f465b.js",
+      "start": 109,
+      "end": 213,
+      "transferKB": 34
+    },
+    {
+      "name": "index.8defa7c883.css",
+      "start": 109,
+      "end": 181,
+      "transferKB": 62
+    },
+    {
+      "name": "public-sans-latin-wght-normal.035c7fe496.woff2",
+      "start": 110,
+      "end": 185,
+      "transferKB": 26
+    },
+    {
+      "name": "lora-latin-wght-normal.f60a385cfb.woff2",
+      "start": 110,
+      "end": 192,
+      "transferKB": 37
+    },
+    {
+      "name": "i18n-common-zhCN.3ebb5dc392.js",
+      "start": 499,
+      "end": 638,
+      "transferKB": 12
+    },
+    {
+      "name": "i18n-full-zhCN.20a018f388.js",
+      "start": 721,
+      "end": 797,
+      "transferKB": 172
+    },
+    {
+      "name": "vendor-icon-libs.bf7c38212c.js",
+      "start": 943,
+      "end": 986,
+      "transferKB": 20
+    },
+    {
+      "name": "27625.c566e31c7c.js",
+      "start": 945,
+      "end": 1006,
+      "transferKB": 8
+    },
+    {
+      "name": "86712.9b122a9f9c.js",
+      "start": 946,
+      "end": 1011,
+      "transferKB": 42
+    },
+    {
+      "name": "3824.757b01d06a.js",
+      "start": 947,
+      "end": 1010,
+      "transferKB": 9
+    },
+    {
+      "name": "21110.d60f2e138c.js",
+      "start": 948,
+      "end": 1022,
+      "transferKB": 24
+    },
+    {
+      "name": "99273.f45727fee2.js",
+      "start": 949,
+      "end": 1025,
+      "transferKB": 4
+    },
+    {
+      "name": "2860.1d78a104ef.js",
+      "start": 950,
+      "end": 1029,
+      "transferKB": 6
+    },
+    {
+      "name": "69928.4d2543890d.js",
+      "start": 951,
+      "end": 1046,
+      "transferKB": 5
+    },
+    {
+      "name": "84380.fcb7f13613.js",
+      "start": 952,
+      "end": 1045,
+      "transferKB": 4
+    },
+    {
+      "name": "31926.3c95771d98.js",
+      "start": 952,
+      "end": 1046,
+      "transferKB": 3
+    },
+    {
+      "name": "16240.9fa2425051.js",
+      "start": 953,
+      "end": 1051,
+      "transferKB": 8
+    },
+    {
+      "name": "83756.2d4d7cea1a.js",
+      "start": 954,
+      "end": 1056,
+      "transferKB": 28
+    },
+    {
+      "name": "25212.1a27be7703.js",
+      "start": 955,
+      "end": 1059,
+      "transferKB": 2
+    },
+    {
+      "name": "76625.ca043f1212.js",
+      "start": 955,
+      "end": 1067,
+      "transferKB": 14
+    },
+    {
+      "name": "69645.19ca23e5fc.js",
+      "start": 1542,
+      "end": 3328,
+      "transferKB": 6
+    },
+    {
+      "name": "71808.b4c82cd169.js",
+      "start": 1544,
+      "end": 3333,
+      "transferKB": 3
+    },
+    {
+      "name": "90143.0070ec9856.js",
+      "start": 1568,
+      "end": 3335,
+      "transferKB": 3
+    }
+  ]
+}

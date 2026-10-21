@@ -304,3 +304,31 @@
 | 生产浏览器冒烟 | `node web/e2e-local/prod-smoke-v13166.cjs` | **8/8 PASS**（390/1440 × 4 路径） |
 
 未覆盖：管理员登录态页面（无凭证）；全量 vitest（环境无法一次跑完，见上节）。
+
+## 2026-10-21 生产管理员登录态验收（v1.3.166）
+
+按 memory `new-api-prod-ui-e2e-tunnel` 的手法实跑（443 隧道 + host-resolver-rules + 真实 /sign-in 表单）：
+
+| 项 | 结果 |
+|---|---|
+| 临时管理员 | DB 建 `zz-verify-temp`（id 1655, role=100），密码 bcrypt($2a$10) 由项目 `golang.org/x/crypto/bcrypt` 生成 |
+| 登录 | PASS（表单提交后离开 /sign-in） |
+| `/dashboard/models` | PASS，正文 700+ 字，无 error boundary |
+| `/system-settings/site/system-info` | **PASS**（截图确认：系统名称=听风API、服务器地址= https://freeapi.tingfengai.art 、页脚、关于 均为真实配置，非默认值） |
+| `/system-settings/operations/behavior` | PASS |
+| `/system-settings/security/rate-limit` | PASS |
+| `/wallet` | PASS |
+| `/keys` | PASS |
+| console error | 0（仅未登录时的 401 被过滤） |
+| 清理 | 删除 user 1 行、user_sessions 1 行、logs 0 行；`remaining=0` 已复核 |
+
+结论：v1.3.166 的 `system-settings` 元数据拆包在**真实登录态**下工作正常（分区路由 + 侧栏 + 表单数据都对）。
+
+## 2026-10-21 语言包拆分（首屏阻塞 172KB → 12KB）
+
+| 范围 | 命令 | 结果 |
+|---|---|---|
+| 生成 common | `node scripts/build-i18n-common.mjs` | 7 语言各 445 key；zh 10.0KB gzip |
+| 首屏覆盖审计 | `node e2e-local/i18n-common-audit.cjs` | **PASS**：/、/sign-in、/pricing、/status 缺失 key = 0（另有 6 个既有中文 key，非回归） |
+| 构建 | `bun run build` | PASS |
+| 首屏实测 | `node e2e-local/fe-vitals.cjs` | 阻塞语言包 172→**12KB**；LCP 3980→**3448ms**；挂载 1263→**1121ms** |
