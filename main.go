@@ -240,6 +240,12 @@ func main() {
 	controller.RegisterScheduledSystemTasks()
 	service.StartSystemTaskRunner()
 
+	// 日志日汇总刷新：把「按窗口全量聚合 logs」的统计查询改成读预聚合表。
+	// 只在 master 上跑——多副本会重复写同一批 (day_key, dim_type, dim_value) 行。
+	if common.IsMasterNode {
+		service.StartLogDailyStatsRefresh()
+	}
+
 	// Spec-008 训练数据采集：装配后端 + 启动消费 worker。
 	//
 	// **必须在启动时调用**，否则请求路径投递的信号无人消费 ——
@@ -339,6 +345,7 @@ func main() {
 	// Shutdown 排空活跃请求/SSE 流，最后关闭残余空闲连接并排空缓冲队列。
 	// 后台任务循环在 ctx 取消后立即停止取用下一 tick，stop 会等待 goroutine 真正退出。
 	service.StopSystemTaskRunner()
+	service.StopLogDailyStatsRefresh()
 	service.StopCodexCredentialAutoRefreshTask()
 	service.StopSubscriptionQuotaResetTask()
 	service.StopSystemInstanceReporter()

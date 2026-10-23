@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.189] - 2026-10-23
+
+Daily log statistics are pre-aggregated, so the stats endpoints stop scanning the whole
+`logs` table.
+
+### Added
+- **`log_daily_stats` summary table + `StartLogDailyStatsRefresh`.** `/api/log/traffic`,
+  both bandwidth leaderboards and `/api/site/stats` used to aggregate the entire requested
+  window straight off `logs` (1.84M rows / 3.5GB; ~1.8s for 30 days with the covering
+  index, degrading linearly — a year out it would be back to 4-5s). They now read a
+  per-day pre-aggregated table (≤ days × 2 rows, milliseconds). Refreshed every 10 minutes
+  on the master node; the first run backfills history (capped at 400 days). Queries fall
+  back to the raw scan when the summary does not cover the requested window, so a fresh
+  deployment, an un-finished backfill, or a ClickHouse log DB behaves exactly as before.
+  Dimension coverage is `total` and `by-model` — string dimensions only, because numeric
+  dimensions would need dialect-specific `CAST`. `/api/log/report`'s six dimensions keep
+  the original path.
+
 ## [v1.3.188] - 2026-10-23
 
 Production Postgres OOM chain closed; four audit P0/P1 defects fixed.
@@ -441,8 +459,10 @@ Visual identity batch 1 — "quiet instrument" token layer + dashboard pilot
 ### Decisions recorded (no code change)
 - `计划书/ops/DECISION-claude-billing.md` — Claude cache-token billing stays as
   is until a production impact query and a shadow comparison exist.
-- `计划书/ops/测试分片矩阵.md` — CI is the authoritative full test gate; the
-  local shard matrix (≈880 cases measured) is the local equivalent.
+- Test gate: CI is the authoritative full test gate. The local equivalent was a
+  hand-run shard matrix (≈880 cases measured in 5 batches); it has since been
+  superseded by `cd web && bun run test:shards` (T-A1), and the matrix itself is
+  archived under `docs/archive/plans/20261023/`.
 
 ## [v1.3.170] - 2026-10-21
 

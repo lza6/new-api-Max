@@ -457,7 +457,7 @@ func migrateLOGDB() error {
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		return migrateClickHouseLogDB()
 	}
-	if err := LOG_DB.AutoMigrate(&Log{}); err != nil {
+	if err := LOG_DB.AutoMigrate(&Log{}, &LogDailyStat{}); err != nil {
 		return err
 	}
 	return migrateLogTrafficIndex(LOG_DB)

@@ -3,6 +3,7 @@ package controller
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"sync"
 	"time"
@@ -217,16 +218,33 @@ func GetLogsTraffic(c *gin.Context) {
 		Bytes    int64 `gorm:"column:bytes"`
 	}
 	var dayRows []dayRow
-	if err := model.LOG_DB.Model(&model.Log{}).
-		Select(fmt.Sprintf("(created_at + %d) - ((created_at + %d) %% 86400) AS day_key", tzOffset, tzOffset),
-			"COUNT(*) AS requests",
-			"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
-		Group("day_key").
-		Order("day_key ASC").
-		Scan(&dayRows).Error; err != nil {
-		common.ApiErrorMsgLogged(c, "failed to query traffic", err)
-		return
+	// 优先读日汇总表：logs 已 184 万行，按窗口扫索引仍要约 1.8s 且随天数线性恶化
+	// （一年后回到 4-5s）；汇总表只读 ≤days 行，毫秒级。汇总表未覆盖整个窗口时
+	// 回退到下面的原查询（首次部署、历史回填未完成、或日志库是 ClickHouse）。
+	startDay := model.DayKeyFor(start)
+	usedSummary := false
+	if model.DailyStatsCovers(startDay) {
+		if agg, err := model.GetDailyStatsByDay(startDay); err == nil {
+			for _, r := range agg {
+				dayRows = append(dayRows, dayRow{DayKey: r.DayKey, Requests: r.Requests, Bytes: r.Bytes})
+			}
+			usedSummary = true
+		} else {
+			common.SysError("daily traffic: summary read failed, falling back to raw scan: " + err.Error())
+		}
+	}
+	if !usedSummary {
+		if err := model.LOG_DB.Model(&model.Log{}).
+			Select(fmt.Sprintf("(created_at + %d) - ((created_at + %d) %% 86400) AS day_key", tzOffset, tzOffset),
+				"COUNT(*) AS requests",
+				"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
+			Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
+			Group("day_key").
+			Order("day_key ASC").
+			Scan(&dayRows).Error; err != nil {
+			common.ApiErrorMsgLogged(c, "failed to query traffic", err)
+			return
+		}
 	}
 	byDay := make([]service.DailyTraffic, 0, len(dayRows))
 	var total, totalRequests int64
@@ -293,24 +311,48 @@ func GetSiteOverview(c *gin.Context) {
 			}
 		}
 	}
-	tx := model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeConsume)
-	if days > 0 {
-		tx = tx.Where("created_at >= ?", time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
-	}
 	var agg struct {
 		TotalRequests int64
 		TotalBytes    int64
 		TotalTokens   int64
 		TotalQuota    int64
 	}
-	if err := tx.Select(
-		"COUNT(*) AS total_requests, " +
-			"COALESCE(SUM(request_bytes),0)+COALESCE(SUM(response_bytes),0) AS total_bytes, " +
-			"COALESCE(SUM(prompt_tokens),0)+COALESCE(SUM(completion_tokens),0) AS total_tokens, " +
-			"COALESCE(SUM(quota),0) AS total_quota",
-	).Scan(&agg).Error; err != nil {
-		common.ApiErrorMsgLogged(c, "failed to query site overview", err)
-		return
+	// 优先读日汇总表：这是**公开未认证**端点，原实现对 167 万行做全表聚合
+	// （实测 10.7s），与 2026-10-23 OOM 事故同一机制。汇总表后毫秒级返回。
+	// 窗口：days>0 时要求汇总覆盖整个窗口；days=0（累计至今）时只要表非空即可，
+	// 口径上限 = 首次回填深度（400 天），当前存量仅 42 天，不受影响。
+	usedSummary := false
+	fromDay := int64(0)
+	if days > 0 {
+		fromDay = model.DayKeyFor(time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix())
+	}
+	summaryAvailable := model.DailyStatsEmpty() == false &&
+		(days == 0 || model.DailyStatsCovers(fromDay))
+	if summaryAvailable {
+		if row, err := model.GetSiteTotalsFromDailyStats(fromDay); err == nil {
+			agg.TotalRequests = row.Requests
+			agg.TotalBytes = row.Bytes
+			agg.TotalTokens = row.PromptTokens + row.CompletionTokens
+			agg.TotalQuota = row.Quota
+			usedSummary = true
+		} else {
+			common.SysError("site overview: summary read failed, falling back to raw scan: " + err.Error())
+		}
+	}
+	if !usedSummary {
+		tx := model.LOG_DB.Model(&model.Log{}).Where("type = ?", model.LogTypeConsume)
+		if days > 0 {
+			tx = tx.Where("created_at >= ?", time.Now().Add(-time.Duration(days)*24*time.Hour).Unix())
+		}
+		if err := tx.Select(
+			"COUNT(*) AS total_requests, " +
+				"COALESCE(SUM(request_bytes),0)+COALESCE(SUM(response_bytes),0) AS total_bytes, " +
+				"COALESCE(SUM(prompt_tokens),0)+COALESCE(SUM(completion_tokens),0) AS total_tokens, " +
+				"COALESCE(SUM(quota),0) AS total_quota",
+		).Scan(&agg).Error; err != nil {
+			common.ApiErrorMsgLogged(c, "failed to query site overview", err)
+			return
+		}
 	}
 	if common.RedisEnabled {
 		if raw, err := common.Marshal(gin.H{
@@ -384,17 +426,49 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 		Bytes    int64 `gorm:"column:bytes"`
 	}
 	var dayRows []dayRow
-	if err := model.LOG_DB.Model(&model.Log{}).
-		Select(fmt.Sprintf("(created_at + %d) - ((created_at + %d) %% 86400) AS day_key", tzOffset, tzOffset),
-			"COUNT(*) AS requests",
-			"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume, dayStart).
-		Group("day_key").
-		Order("bytes DESC, day_key ASC").
-		Scan(&dayRows).Error; err != nil {
-		common.ApiErrorMsgLogged(c, "failed to query bandwidth leaderboard", err)
-		return
+	// 与日流量同源：优先读汇总表，未覆盖窗口时回退原查询。
+	startDay := model.DayKeyFor(dayStart)
+	usedSummary := false
+	if model.DailyStatsCovers(startDay) {
+		if agg, err := model.GetDailyStatsByDay(startDay); err == nil {
+			for _, r := range agg {
+				dayRows = append(dayRows, dayRow{DayKey: r.DayKey, Requests: r.Requests, Bytes: r.Bytes})
+			}
+			usedSummary = true
+		} else {
+			common.SysError("bandwidth leaderboard: summary read failed, falling back to raw scan: " + err.Error())
+		}
 	}
+	if !usedSummary {
+		if err := model.LOG_DB.Model(&model.Log{}).
+			Select(fmt.Sprintf("(created_at + %d) - ((created_at + %d) %% 86400) AS day_key", tzOffset, tzOffset),
+				"COUNT(*) AS requests",
+				"COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes").
+			Where("type = ? AND created_at >= ?", model.LogTypeConsume, dayStart).
+			Group("day_key").
+			Order("bytes DESC, day_key ASC").
+			Scan(&dayRows).Error; err != nil {
+			common.ApiErrorMsgLogged(c, "failed to query bandwidth leaderboard", err)
+			return
+		}
+	}
+	// 汇总表返回按天升序，这里按调用方原有语义重排（bytes 降序，同日按 day_key 升序）。
+	slices.SortFunc(dayRows, func(a, b dayRow) int {
+		if a.Bytes != b.Bytes {
+			if a.Bytes > b.Bytes {
+				return -1
+			}
+			return 1
+		}
+		switch {
+		case a.DayKey < b.DayKey:
+			return -1
+		case a.DayKey > b.DayKey:
+			return 1
+		default:
+			return 0
+		}
+	})
 	byDay := make([]service.BandwidthDay, 0, len(dayRows))
 	for _, r := range dayRows {
 		date := time.Unix(r.DayKey-tzOffset, 0).In(time.Local).Format("2006-01-02")
@@ -448,18 +522,64 @@ func queryModelBandwidthLeaderboard(days, limit int) ([]service.BandwidthModel, 
 		Bytes     int64  `gorm:"column:bytes"`
 	}
 	var rows []bandwidthRow
-	q := model.LOG_DB.Model(&model.Log{}).
-		Select(`COALESCE(NULLIF(model_name, ''), '(unknown)') AS model_name`,
-			`COUNT(*) AS requests`,
-			`COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes`).
-		Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
-		Group("model_name").
-		Order("bytes DESC, model_name ASC")
-	if limit > 0 {
-		q = q.Limit(limit)
+	// 优先读日汇总表（dim=model）：读 ≤天数×模型数 行后在 Go 侧跨天汇总，
+	// 30 天 × 49 模型 ≈ 1500 行，远小于扫 130 万行日志。未覆盖窗口时回退原查询。
+	startDay := model.DayKeyFor(start)
+	usedSummary := false
+	if model.DailyStatsCovers(startDay) {
+		if agg, err := model.GetModelStatsByDay(startDay); err == nil {
+			byModel := make(map[string]*bandwidthRow, len(agg))
+			for _, r := range agg {
+				v, ok := byModel[r.DimValue]
+				if !ok {
+					v = &bandwidthRow{ModelName: r.DimValue}
+					byModel[r.DimValue] = v
+				}
+				v.Requests += r.Requests
+				v.Bytes += r.Bytes
+			}
+			for _, v := range byModel {
+				rows = append(rows, *v)
+			}
+			// 保持原 SQL 的排序语义：bytes 降序，同值按模型名升序。
+			slices.SortFunc(rows, func(a, b bandwidthRow) int {
+				if a.Bytes != b.Bytes {
+					if a.Bytes > b.Bytes {
+						return -1
+					}
+					return 1
+				}
+				switch {
+				case a.ModelName < b.ModelName:
+					return -1
+				case a.ModelName > b.ModelName:
+					return 1
+				default:
+					return 0
+				}
+			})
+			if limit > 0 && len(rows) > limit {
+				rows = rows[:limit]
+			}
+			usedSummary = true
+		} else {
+			common.SysError("model bandwidth: summary read failed, falling back to raw scan: " + err.Error())
+		}
 	}
-	if err := q.Scan(&rows).Error; err != nil {
-		return nil, err
+	if !usedSummary {
+		q := model.LOG_DB.Model(&model.Log{}).
+			Select(`COALESCE(NULLIF(model_name, ''), '(unknown)') AS model_name`,
+				`COUNT(*) AS requests`,
+				`COALESCE(SUM(request_bytes), 0) + COALESCE(SUM(response_bytes), 0) AS bytes`).
+			Where("type = ? AND created_at >= ?", model.LogTypeConsume, start).
+			Group("model_name").
+			Order("bytes DESC, model_name ASC")
+		if limit > 0 {
+			q = q.Limit(limit)
+		}
+		if err := q.Scan(&rows).Error; err != nil {
+			return nil, err
+		}
 	}
 	out := make([]service.BandwidthModel, 0, len(rows))
 	for _, r := range rows {
