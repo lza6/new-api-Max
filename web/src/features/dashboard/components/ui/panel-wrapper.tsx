@@ -68,7 +68,8 @@ export function PanelWrapper(props: PanelWrapperProps) {
   const resolvedEmptyMessage = props.emptyMessage ?? t('No data available')
   const height = props.height ?? 'h-64'
   const frameClassName = cn(
-    'overflow-hidden rounded-2xl border bg-card shadow-xs',
+    /* 视觉体系 §4.1 panel：表面明度 + 规则线表达层级，不再用 rounded-2xl + shadow-xs */
+    'border-rule bg-surface-1 overflow-hidden rounded-xl border',
     props.className
   )
 

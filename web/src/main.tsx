@@ -29,7 +29,6 @@ import { createAppQueryClient } from '@/lib/query-client'
 import { readCachedStatus, statusQueryOptions } from '@/lib/status-query'
 
 import { DirectionProvider } from './context/direction-provider'
-import { FontProvider } from './context/font-provider'
 import { ThemeProvider } from './context/theme-provider'
 import i18n, { i18nReady } from './i18n/config'
 import { routeLocaleBasepath } from './i18n/languages'
@@ -176,11 +175,9 @@ void i18nReady.then(() => {
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <FontProvider>
-            <DirectionProvider>
-              <RouterProvider router={router} />
-            </DirectionProvider>
-          </FontProvider>
+          <DirectionProvider>
+            <RouterProvider router={router} />
+          </DirectionProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </StrictMode>

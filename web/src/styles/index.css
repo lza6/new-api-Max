@@ -26,6 +26,10 @@ For commercial licensing, please contact support@quantumnous.com
  * that activates it. Loaded globally so font-switching is instantaneous
  * with no FOUT once the variable is fetched. */
 @import '@fontsource-variable/lora';
+/* Numeric face for data surfaces (额度 / TOKEN / 金额 / ID / 密钥).
+ * Latin + punctuation only — CJK body text is untouched. Consumed through
+ * `--numeric-font` → `font-numeric` (see theme.css). */
+@import '@fontsource-variable/jetbrains-mono';
 
 @import './theme.css';
 @import './theme-presets.css';

@@ -19,7 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 
-import { IconBadge } from '@/components/ui/icon-badge'
+import { Metric, MetricLabel, MetricValue } from '@/components/metric'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getUserQuotaDates } from '@/features/dashboard/api'
 import { useModelStatCardsConfig } from '@/features/dashboard/hooks/use-dashboard-config'
@@ -138,13 +138,12 @@ export function LogStatCards(props: LogStatCardsProps) {
       fullValue: formatted.fullValue,
       desc: config.description,
       icon: config.icon,
-      iconTone: config.iconTone,
     }
   })
 
   return (
-    <div className='overflow-hidden rounded-lg border'>
-      <div className='divide-border/60 grid min-w-0 grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
+    <div className='border-rule bg-surface-1 overflow-hidden rounded-xl border'>
+      <div className='divide-rule grid min-w-0 grid-cols-2 divide-x sm:grid-cols-3 lg:grid-cols-5'>
         {items.map((it, idx) => {
           const Icon = it.icon
           let valueContent
@@ -158,9 +157,7 @@ export function LogStatCards(props: LogStatCardsProps) {
           } else if (error) {
             valueContent = (
               <>
-                <div className='text-muted-foreground mt-1 font-mono text-base leading-tight font-bold tracking-tight tabular-nums sm:mt-2 sm:text-2xl sm:leading-normal'>
-                  --
-                </div>
+                <MetricValue className='mt-1 sm:mt-2' />
                 <div className='text-muted-foreground/40 mt-1 hidden text-xs md:block'>
                   {it.desc}
                 </div>
@@ -169,12 +166,9 @@ export function LogStatCards(props: LogStatCardsProps) {
           } else {
             valueContent = (
               <>
-                <div
-                  className='text-foreground mt-1 max-w-full truncate font-mono text-base leading-tight font-bold tracking-tight tabular-nums sm:mt-2 sm:text-2xl sm:leading-normal'
-                  title={it.fullValue}
-                >
+                <MetricValue className='mt-1 sm:mt-2' title={it.fullValue}>
                   {it.value}
-                </div>
+                </MetricValue>
                 <div className='text-muted-foreground/60 mt-1 hidden text-xs md:block'>
                   {it.desc}
                 </div>
@@ -192,20 +186,17 @@ export function LogStatCards(props: LogStatCardsProps) {
                   'col-span-2 sm:col-span-1'
               )}
             >
-              <div className='flex min-w-0 items-center gap-1.5 sm:gap-2'>
-                <IconBadge
-                  tone={it.iconTone}
-                  size='stat'
-                  className='size-4 rounded-sm sm:size-7 sm:rounded-md [&>svg]:size-2.5 sm:[&>svg]:size-3.5'
-                >
-                  <Icon />
-                </IconBadge>
-                <div className='text-muted-foreground truncate text-[11px] leading-4 font-medium tracking-wide uppercase sm:text-xs sm:tracking-wider'>
-                  {it.title}
+              <Metric>
+                <div className='flex min-w-0 items-center gap-1.5 sm:gap-2'>
+                  <Icon
+                    aria-hidden='true'
+                    className='text-muted-foreground size-3.5 shrink-0 sm:size-4'
+                  />
+                  <MetricLabel>{it.title}</MetricLabel>
                 </div>
-              </div>
 
-              {valueContent}
+                {valueContent}
+              </Metric>
             </div>
           )
         })}

@@ -1,0 +1,73 @@
+{
+  "base": "http://127.0.0.1:5173",
+  "generatedAt": "2026-10-23T03:19:15.402Z",
+  "pages": [
+    {
+      "page": "dashboard-overview",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\dashboard-overview-1440-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "width": 768,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\dashboard-overview-768-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\dashboard-overview-320-light.png"
+    },
+    {
+      "page": "dashboard-models",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\dashboard-models-1440-light.png"
+    },
+    {
+      "page": "dashboard-models",
+      "width": 768,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\dashboard-models-768-light.png"
+    },
+    {
+      "page": "dashboard-models",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\dashboard-models-320-light.png"
+    },
+    {
+      "page": "keys",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\keys-1440-light.png"
+    },
+    {
+      "page": "keys",
+      "width": 768,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\keys-768-light.png"
+    },
+    {
+      "page": "keys",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\keys-320-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "width": 1440,
+      "theme": "dark",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\v13182\\dashboard-overview-1440-dark.png"
+    }
+  ],
+  "afterLoginUrl": "http://127.0.0.1:5173/dashboard/overview",
+  "axe": {
+    "violations": []
+  },
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ]
+}

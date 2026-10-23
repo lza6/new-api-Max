@@ -315,3 +315,34 @@
 | FX 快照 | **不适用**：`cost_quota`/`quota` 均为结算时写入的整数快照；生产 `USDExchangeRate=1`，历史金额不随汇率改写。展示层换算不修改数据 | 无 schema 变更 |
 | 本机 PostgreSQL 服务损坏 | **受权限阻塞**：服务以 NetworkService 运行，修复需管理员改服务/ACL；已用 `initdb` 临时实例完成三库验证 | 复现命令写入 test_ledger |
 | 其它会话未提交文件 | **不动**：`controller/webhook.go`、`model/shadow_price.go` 等属其他会话，未经授权不提交 | git status 仍显示为未暂存 |
+
+---
+
+# v1.3.182 — 视觉批次 1（令牌层 + 概览试点）
+
+> 更新：2026-10-22。施工契约见 `计划书/视觉识别体系-反AI通用美学界面改造指南.md`（V0–V3）。
+
+## 交付内容
+
+| 卡片 | 内容 | 状态 |
+|---|---|---|
+| V0 | 删除死配置 `config/fonts.ts` + `context/font-provider.tsx`，`theme-customization.ts` 成为字体轴唯一真相 | ✅ |
+| V1 | 令牌层：`--surface-1/2/3`、`--rule*`、`--grid-*`、`--accent-quiet*`、`--motion-*`、`--ease-quiet`、`--font-numeric`；`--radius` 1rem→0.625rem；引入 JetBrains Mono（自托管） | ✅ |
+| V2 | `Card.tone`（panel/plain/inset）+ dashboard 试点：PanelWrapper、概览容器、性能健康面板改表面+规则线；彩虹渐变改中性面；`rounded-2xl` 归零 | ✅ |
+| V3 | `Metric`/`MetricLabel`/`MetricValue` 读数排版件 + dashboard 三处接入（读数条、模型分析条、概览卡） | ◐ 其余页面待接 |
+
+## 证据
+
+- 构建/门禁：`bun run typecheck`、`oxlint`（改动文件）、`bun run build`、`check-missing-i18n.cjs`、
+  `check-terminology.mjs`、`format --check` 全 PASS；全量 `vitest` 1 失败为**已知噪声**
+  （`task-event-stream.test.tsx`，单跑 6/6 PASS，见 `test_ledger.md:286`）。
+- knip 门禁 117 条"新增"经核对**全部为既有基线漂移**，无一条指向本批文件；**未改基线、未屏蔽**。
+- 真实浏览器 E2E：10 张截图 + axe 0 违规 → `计划书/e2e-evidence/v1.3.182/RESULTS.md`。
+- 浏览器实测：`--radius=.625rem`、metric 值 `JetBrains Mono Variable`+`tabular-nums`、
+  dashboard `rounded-2xl`=0、body 仍 `Public Sans`。
+
+## 已知边界
+
+1. 本地空库，读数为 0；真实数据形态下的读数条留到 V4/V6 之后复测。
+2. 暗色只覆盖概览一页。
+3. `knip-baseline.json` 陈旧（117 条漂移）是**既有问题**，本轮只如实记录，未擅自 `--update` 掩盖。

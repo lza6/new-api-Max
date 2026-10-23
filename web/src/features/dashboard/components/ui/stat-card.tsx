@@ -19,6 +19,7 @@ For commercial licensing, please contact support@quantumnous.com
 import type { LucideIcon } from 'lucide-react'
 import { useId, type ReactNode } from 'react'
 
+import { MetricLabel, MetricValue } from '@/components/metric'
 import { IconBadge, type IconBadgeTone } from '@/components/ui/icon-badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
@@ -52,6 +53,11 @@ interface StatCardProps {
   action?: ReactNode
   iconTone?: IconBadgeTone
   compactMobile?: boolean
+  /**
+   * `card`（默认，保持既有观感）｜`strip`（读数条：无粉彩图标底，标签走
+   * MetricLabel，数值走 MetricValue）。视觉体系 §4.2/§6。
+   */
+  variant?: 'card' | 'strip'
 }
 
 const TONE_CLASSES: Record<StatCardTone, string> = {
@@ -144,7 +150,11 @@ function buildLineSparkline(values?: number[]) {
   }
 }
 
-function LineSparkline(props: { values?: number[]; tone: StatCardTone }) {
+function LineSparkline(props: {
+  values?: number[]
+  tone: StatCardTone
+  strip?: boolean
+}) {
   const rawGradientId = useId()
   const gradientId = `stat-card-line-${rawGradientId.replaceAll(':', '')}`
   const paths = buildLineSparkline(props.values)
@@ -155,7 +165,7 @@ function LineSparkline(props: { values?: number[]; tone: StatCardTone }) {
     <div
       className={cn(
         'relative h-8 overflow-hidden rounded-lg',
-        LINE_TONE_CLASSES[props.tone]
+        props.strip ? 'text-primary' : LINE_TONE_CLASSES[props.tone]
       )}
       aria-hidden='true'
     >
@@ -185,7 +195,11 @@ function LineSparkline(props: { values?: number[]; tone: StatCardTone }) {
   )
 }
 
-function BarSparkline(props: { values?: number[]; tone: StatCardTone }) {
+function BarSparkline(props: {
+  values?: number[]
+  tone: StatCardTone
+  strip?: boolean
+}) {
   const sparkline = normalizeSparkline(props.values)
 
   return (
@@ -196,7 +210,7 @@ function BarSparkline(props: { values?: number[]; tone: StatCardTone }) {
           className={cn(
             'flex-1 rounded-t-sm bg-linear-to-t',
             bucket.height <= 0 && 'opacity-20',
-            TONE_CLASSES[props.tone]
+            props.strip ? 'bg-primary/45' : TONE_CLASSES[props.tone]
           )}
           style={{ height: `${bucket.height}%` }}
         />
@@ -236,6 +250,8 @@ export function StatCard(props: StatCardProps) {
   const tone = props.tone ?? 'accent-3'
   const iconTone = props.iconTone ?? ICON_TONE_BY_STAT_TONE[tone]
   const sparklineVariant = props.sparklineVariant ?? 'bars'
+  const isStrip = props.variant === 'strip'
+  const metricValueSize = props.compactMobile ? 'sm' : 'md'
   let valueContent: ReactNode
   if (props.loading) {
     valueContent = (
@@ -257,9 +273,7 @@ export function StatCard(props: StatCardProps) {
   } else if (props.error) {
     valueContent = (
       <div className='flex flex-col gap-1'>
-        <div className='text-muted-foreground mt-0.5 font-mono text-base font-bold tracking-tight break-all tabular-nums sm:text-2xl'>
-          --
-        </div>
+        <MetricValue size={metricValueSize} className='mt-0.5' emptyValue='—' />
         <p
           className={cn(
             'text-muted-foreground/60 line-clamp-1 text-[11px] sm:text-xs',
@@ -273,9 +287,9 @@ export function StatCard(props: StatCardProps) {
   } else {
     valueContent = (
       <div className='flex flex-col gap-1'>
-        <div className='text-foreground font-mono text-base font-semibold tracking-tight break-all tabular-nums sm:text-2xl'>
+        <MetricValue size={metricValueSize} title={String(props.value)}>
           {props.value}
-        </div>
+        </MetricValue>
         <p
           className={cn(
             'text-muted-foreground/60 line-clamp-1 text-[11px] leading-relaxed sm:text-xs',
@@ -292,9 +306,13 @@ export function StatCard(props: StatCardProps) {
   if (props.details?.length) {
     visualization = <StatCardDetails details={props.details} />
   } else if (sparklineVariant === 'line') {
-    visualization = <LineSparkline values={props.sparkline} tone={tone} />
+    visualization = (
+      <LineSparkline values={props.sparkline} tone={tone} strip={isStrip} />
+    )
   } else {
-    visualization = <BarSparkline values={props.sparkline} tone={tone} />
+    visualization = (
+      <BarSparkline values={props.sparkline} tone={tone} strip={isStrip} />
+    )
   }
 
   return (
@@ -305,20 +323,33 @@ export function StatCard(props: StatCardProps) {
       )}
     >
       <div className='flex items-start justify-between gap-1'>
-        <div className='text-muted-foreground flex items-center gap-1 text-[11px] font-medium sm:gap-2 sm:text-xs'>
-          <IconBadge
-            tone={iconTone}
-            size='stat'
-            className={cn(
-              props.compactMobile &&
-                'size-4 rounded-sm [&>svg]:size-2.5 sm:size-7 sm:rounded-md sm:[&>svg]:size-3.5'
-            )}
-          >
-            <Icon />
-          </IconBadge>
-          <span className='line-clamp-1 leading-snug sm:line-clamp-2'>
-            {props.title}
-          </span>
+        <div className='flex min-w-0 items-center gap-1 sm:gap-2'>
+          {isStrip ? (
+            <Icon
+              aria-hidden='true'
+              className='text-muted-foreground size-3.5 shrink-0 sm:size-4'
+            />
+          ) : (
+            <IconBadge
+              tone={iconTone}
+              size='stat'
+              className={cn(
+                props.compactMobile &&
+                  'size-4 rounded-sm [&>svg]:size-2.5 sm:size-7 sm:rounded-md sm:[&>svg]:size-3.5'
+              )}
+            >
+              <Icon />
+            </IconBadge>
+          )}
+          {isStrip ? (
+            <MetricLabel className='line-clamp-1 leading-snug sm:line-clamp-2'>
+              {props.title}
+            </MetricLabel>
+          ) : (
+            <span className='text-muted-foreground line-clamp-1 text-[11px] leading-snug font-medium sm:line-clamp-2 sm:text-xs'>
+              {props.title}
+            </span>
+          )}
         </div>
         {props.action && <div className='shrink-0'>{props.action}</div>}
       </div>

@@ -101,10 +101,26 @@ For commercial licensing, please contact support@quantumnous.com
   --shadow-drawer: var(--elevation-drawer);
   --shadow-popover: var(--elevation-popover);
   --shadow-overlay: var(--elevation-overlay);
+
+  /* ── 静默仪表（Quiet Instrument）令牌映射 ────────────────────────────
+   * 依据 `计划书/视觉识别体系-反AI通用美学界面改造指南.md` §3.3。
+   * 运行时值放在 `--surface-*` / `--rule-*` / `--numeric-font`（异名间接，
+   * 与 `--color-*` 同样的做法），避免 @theme 同名自引用。 */
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --font-numeric: var(--numeric-font);
+
+  /* 唯一的"高价值时刻"缓动：抽屉/弹层进入、stagger 揭示、一次性勾描。 */
+  --ease-quiet: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 :root {
-  --radius: 1rem;
+  /* Calibrated from 1rem → 0.625rem（视觉蓝图 D2）：容器 14px / 控件 10px /
+   * 药丸 full 三档纪律成立，同时保留下方 7 档乘数阶梯供外观抽屉的圆角轴使用。 */
+  --radius: 0.625rem;
   --app-header-height: 3rem;
   /* 浏览器 UI（地址栏/状态栏）取色：与 `--background` 同源，避免 JS 里写死
    * `#020817` 这类与 index.html 声明不一致的魔法值。 */
@@ -116,6 +132,32 @@ For commercial licensing, please contact support@quantumnous.com
    * in theme-presets.css. Default mirrors `--font-sans` so behavior is
    * identical when no font preference is set. */
   --font-body: var(--font-sans);
+
+  /* ── 静默仪表运行时令牌（视觉蓝图 §3.3）────────────────────────────
+   * 全部由 `--foreground` / `--background` / `--primary` 派生，因此 11 套
+   * 颜色预设与亮/暗两种主题都自动成立，`.dark` 里**不需要**重复定义。
+   * 用途约束（违反即视为观感缺陷）：
+   *   --surface-1/2/3  容器层级（2% / 4% / 6.5% 前景混入）
+   *   --rule           分区规则线（比 --border 更细更弱）
+   *   --rule-strong    强分组线（错误页顶线、危险区块）
+   *   --accent-quiet   当前选中 / hover 的弱化强调（不做装饰）
+   *   --grid-line/step 空态工程网格（24px 步进）
+   */
+  --numeric-font:
+    'JetBrains Mono Variable', ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+  --surface-1: color-mix(in oklch, var(--foreground) 2%, var(--background));
+  --surface-2: color-mix(in oklch, var(--foreground) 4%, var(--background));
+  --surface-3: color-mix(in oklch, var(--foreground) 6.5%, var(--background));
+  --rule: color-mix(in oklch, var(--foreground) 9%, transparent);
+  --rule-strong: color-mix(in oklch, var(--foreground) 16%, transparent);
+  --grid-line: color-mix(in oklch, var(--foreground) 5%, transparent);
+  --grid-step: 24px;
+  --accent-quiet: color-mix(in oklch, var(--primary) 9%, var(--background));
+  --accent-quiet-strong: color-mix(in oklch, var(--primary) 16%, var(--background));
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);

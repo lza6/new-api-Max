@@ -2,6 +2,69 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.182] - 2026-10-22
+
+Visual identity batch 1 — "quiet instrument" token layer + dashboard pilot
+(计划书/视觉识别体系-反AI通用美学界面改造指南.md, V0/V1/V2/V3).
+
+### Added
+- **Design tokens** (`web/src/styles/theme.css`): layered surfaces
+  (`--surface-1/2/3`), hairline rules (`--rule`, `--rule-strong`), empty-state
+  grid (`--grid-line`, `--grid-step`), quiet accent (`--accent-quiet*`), motion
+  durations (`--motion-fast/base/slow`) and one high-value easing
+  (`--ease-quiet`). Every value derives from `--foreground` / `--background` /
+  `--primary` via `color-mix(in oklch, …)`, so all 10 colour presets and both
+  themes get correct surfaces without per-preset overrides.
+- **Numeric face**: `@fontsource-variable/jetbrains-mono` (self-hosted, no CDN)
+  exposed as `--font-numeric` → `font-numeric`. Data surfaces (额度/TOKEN/金额/ID)
+  render tabular monospace; CJK body text is untouched (still Public Sans).
+- **`Card` tones** (`components/ui/card.tsx`): `tone?: 'default' | 'panel' |
+  'plain' | 'inset'`. `default` is byte-identical to before, so all 42 existing
+  call sites are unaffected. The new tones express hierarchy with surface
+  lightness + hairline rules instead of shadow stacking.
+- **`Metric` primitives** (`components/metric.tsx`): `Metric`, `MetricLabel`,
+  `MetricValue` — one implementation for readouts (11px muted micro-label,
+  monospace tabular value, separated unit, single `—` placeholder for empty
+  values). Covered by `components/__tests__/metric.test.tsx` (5 cases).
+
+### Changed
+- `--radius` 1rem → 0.625rem (visual blueprint D2): controls land at ~10px,
+  containers at ~14px, pills stay `rounded-full` — the uniform "template" radius
+  is gone. The 7-step radius ladder and the appearance drawer's radius axis still
+  work unchanged.
+- Dashboard pilot (`features/dashboard`): `StatCard` gained `variant='strip'`
+  (no pastel icon chip, single-colour sparkline), `PanelWrapper` and the overview
+  containers moved from `rounded-2xl + shadow-xs + bg-card` to
+  `rounded-xl + border-rule + bg-surface-1/2`, the credit-remaining panel's
+  three-stop rainbow gradient became `bg-surface-2`, and the models stat strip
+  now uses `Metric`/`MetricValue`. `rounded-2xl` count on the dashboard pages is
+  now **0** (was 6).
+
+### Removed
+- `web/src/config/fonts.ts` and `web/src/context/font-provider.tsx` (D5). The
+  provider only added a `font-{inter,manrope,system}` class to `<html>` that no
+  stylesheet defined and that `body` overrode anyway; the real font axis lives in
+  `lib/theme-customization.ts` (`default|sans|serif`). Dead config with two
+  competing sources of truth removed; `main.tsx` unwrapped accordingly.
+
+### Verified
+- `bun run typecheck` PASS · `bunx oxlint` on all touched files clean ·
+  `bun run build` PASS (font adds 40.4 kB latin woff2, 84 kB all subsets).
+- `vitest run src/features/dashboard src/components/ui` 54/54 PASS;
+  `vitest run src/components/__tests__/metric.test.tsx` 5/5 PASS.
+- Full suite: 1 failure — `usage-logs/.../task-event-stream.test.tsx`
+  (documented known noise in `test_ledger.md:286`, passes 6/6 in isolation).
+- Real browser E2E (Playwright, local backend + dev server, admin login):
+  10 screenshots (3 pages × 1440/768/320 + dark), axe WCAG 2.1 A/AA
+  **0 violations**, 1 benign console 401 before login.
+- In-browser token probe: `--radius` = `.625rem`, `--surface-1`/`--rule` resolve,
+  metric values render `JetBrains Mono Variable` + `tabular-nums`,
+  `rounded-2xl` = 0 on dashboard, body font still `Public Sans`.
+- `check-missing-i18n.cjs` 0 missing · `check-terminology.mjs` PASS ·
+  `format-with-protected-headers.mjs --check` clean.
+- Knip gate: 117 "new" dead-code entries are pre-existing baseline drift
+  (none reference the files in this change); documented, not masked.
+
 ## [v1.3.181] - 2026-10-21
 
 ### Fixed (N15, first slice)

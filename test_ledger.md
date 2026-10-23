@@ -461,3 +461,25 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 
 **未取得**：生产环境的「内部错误被洗白」实测——该分支只在真实内部错误时触发；
 本轮未人为构造生产故障，结论来自 Go 单测 + 代码审查 + 调用点未变（仅集中兜底）。
+
+## 2026-10-22 v1.3.182 视觉批次 1（令牌层 + 概览试点）
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 前端类型 | `cd web && bun run typecheck` | PASS（无输出） |
+| Lint（改动文件） | `bunx oxlint -c .oxlintrc.json <10 files>` | 0 error（1 warning 已修：测试内多余花括号） |
+| 构建 | `bun run build` | PASS；字体产物 `jetbrains-mono-latin` 40.4 kB，全子集 84 kB |
+| 定向测试 | `vitest run src/features/dashboard src/components/ui` | 54/54 PASS |
+| 读数组件测试 | `vitest run src/components/__tests__/metric.test.tsx` | 5/5 PASS |
+| 全量测试 | `bun run test` | **1 failed**：`usage-logs/.../task-event-stream.test.tsx`（已知噪声，见本文件 :286）；单独跑 6/6 PASS |
+| i18n | `node scripts/check-missing-i18n.cjs` | 0 missing |
+| 术语 | `node scripts/check-terminology.mjs` | PASS（额度统一） |
+| 格式 | `node scripts/format-with-protected-headers.mjs --check` | clean |
+| 死代码门禁 | `node scripts/knip-gate.mjs` | 117 条报为"新增"，经核对**全部为既有基线漂移**，无一条指向本批文件（未改基线、未屏蔽） |
+| 真实浏览器 E2E | `BASE=http://127.0.0.1:5173 node e2e-local/v13182-visual-local.cjs` | 登录成功 → /dashboard/overview；10 张截图；**axe 0 违规**；1 条登录前 401 console（良性） |
+| 令牌实测（浏览器内求值） | Playwright evaluate | `--radius=.625rem`；`--surface-1`/`--rule` 正常；metric 值 `JetBrains Mono Variable` + `tabular-nums`；dashboard `rounded-2xl` 计数 0；body 字体仍 `Public Sans` |
+
+**本地 E2E 环境要点（可复用）**：空库首次访问会跳 `/setup`，用
+`POST /api/setup {username,password,confirmPassword}` 直接初始化管理员；后端
+`SQLITE_PATH=<tmp>/v182.db PORT=3000 ./new-api-e2e.exe`，前端
+`bunx rsbuild dev --port 5173`（proxy → 3000）。
