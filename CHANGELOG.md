@@ -2,6 +2,35 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.188] - 2026-10-23
+
+Production Postgres OOM chain closed; four audit P0/P1 defects fixed.
+
+### Fixed
+- **Model rate limit failed closed on Redis errors.** Both the success-slot
+  reservation and the total-request check returned `500 rate_limit_check_failed`
+  when Redis errored. With `ModelRequestRateLimitEnabled=true`, one Redis blip
+  would turn every `/v1/*` relay call into a 500 while `/api/status` kept
+  returning 200 — probes keep steering traffic, replaying the 2026-09-29 outage
+  shape. Both paths now degrade to the in-process limiter, matching what IP/user
+  rate limiting has done since that incident.
+- **Tiered settlement could pay the user for a cache hit.** The save-time smoke
+  test only varies P/C/Len (CR/CC/Img/AI stay 0), so an expression whose discount
+  term exceeds the principal (e.g. `p*3 + c*15 - cr*6`) passed validation and
+  turned negative at runtime; `SettleBilling` then routed it through
+  `IncreaseUserQuota`, crediting the user on every cache hit. Negative cost is now
+  clamped to 0 with a logged audit record.
+- **Negative `p` / `page_size` produced a negative OFFSET.** `GetPageQuery` passed
+  negatives through, so `GetStartIdx()` returned a negative offset and
+  PostgreSQL/MySQL rejected the statement — `/api/log/` and `/api/log/self` 500ed.
+- **Day key used `/ 86400`, which breaks on MySQL.** MySQL's `/` is decimal
+  division, so the result failed to scan into int64. Switched to the integer form
+  `x - (x % 86400)` already documented in `model/usage_report.go`.
+
+### Tooling
+- `web/package.json` gained `test:shards`. The planning guide referenced
+  `bun run test:shards` in seven places but the script was never registered.
+
 ## [v1.3.187] - 2026-10-23
 
 Frontend suite goes fully green (1582/1582) and the dead-code gate is honest again.
