@@ -244,6 +244,9 @@ func main() {
 	// 只在 master 上跑——多副本会重复写同一批 (day_key, dim_type, dim_value) 行。
 	if common.IsMasterNode {
 		service.StartLogDailyStatsRefresh()
+		// 数据库 logs 表的保留策略（LogRetentionDays>0 才真正生效，默认 0=不清理）。
+		// 与「磁盘日志文件清理」是两件事：后者有手动入口，前者此前完全没有自动机制。
+		service.StartLogRetentionTask()
 	}
 
 	// Spec-008 训练数据采集：装配后端 + 启动消费 worker。
@@ -346,6 +349,7 @@ func main() {
 	// 后台任务循环在 ctx 取消后立即停止取用下一 tick，stop 会等待 goroutine 真正退出。
 	service.StopSystemTaskRunner()
 	service.StopLogDailyStatsRefresh()
+	service.StopLogRetentionTask()
 	service.StopCodexCredentialAutoRefreshTask()
 	service.StopSubscriptionQuotaResetTask()
 	service.StopSystemInstanceReporter()
