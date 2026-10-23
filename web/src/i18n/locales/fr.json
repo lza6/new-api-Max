@@ -7438,6 +7438,16 @@
     "Semantic Response Cache": "Cache de réponses sémantique",
     "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "Étend le cache de réponses par une correspondance de similarité : en cas d'absence de correspondance exacte, un prompt suffisamment proche d'un prompt en cache est servi depuis le cache au lieu d'appeler l'amont. Nécessite l'interrupteur Response Cache, des requêtes non-streaming et une liste blanche de modèles explicite. Une mauvaise correspondance renvoie la réponse à une autre question : commencez par un seuil élevé et surveillez les compteurs de succès.",
     "Turn off to fall back to exact-match caching only; nothing else changes.": "Désactivez pour revenir au cache par correspondance exacte uniquement ; rien d'autre ne change.",
-    "Invalid line: {{line}}": "Ligne invalide : {{line}}"
+    "Invalid line: {{line}}": "Ligne invalide : {{line}}",
+    "Scroll to bottom": "Faire défiler vers le bas",
+    "Toggle password visibility": "Afficher ou masquer le mot de passe",
+    "Remove tag": "Supprimer l'étiquette",
+    "Delete row": "Supprimer la ligne",
+    "Toggle Sidebar": "Afficher ou masquer la barre latérale",
+    "Decrement": "Diminuer",
+    "Increment": "Augmenter",
+    "Optional": "Facultatif",
+    "Database log retention (days)": "Conservation des journaux de base de données (jours)",
+    "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.": "Les journaux de consommation plus anciens que ce nombre de jours sont supprimés automatiquement (vérification toutes les 6 heures, suppression par lots). 0 les conserve indéfiniment."
   }
 }

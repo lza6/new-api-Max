@@ -7438,6 +7438,16 @@
     "Semantic Response Cache": "語意回應快取",
     "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "在精確快取未命中時按相似度重用歷史回應，省下一次上游呼叫。需要同時開啟「回應快取」開關、僅對非串流請求生效，且必須明確設定模型白名單。錯命中會把「另一個問題的答案」回給使用者，請從高門檻開始並盯住命中計數。",
     "Turn off to fall back to exact-match caching only; nothing else changes.": "關閉後只保留精確快取，其他行為不變。",
-    "Invalid line: {{line}}": "無效行：{{line}}"
+    "Invalid line: {{line}}": "無效行：{{line}}",
+    "Scroll to bottom": "捲動至底部",
+    "Toggle password visibility": "切換密碼可見性",
+    "Remove tag": "移除標籤",
+    "Delete row": "刪除列",
+    "Toggle Sidebar": "切換側邊欄",
+    "Decrement": "減少",
+    "Increment": "增加",
+    "Optional": "選填",
+    "Database log retention (days)": "資料庫日誌保留天數",
+    "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.": "超過該天數的消費日誌會被自動刪除（每 6 小時檢查一次，分批刪除）。0 表示永久保留。"
   }
 }

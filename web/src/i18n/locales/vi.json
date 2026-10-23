@@ -7438,6 +7438,16 @@
     "Semantic Response Cache": "Bộ nhớ đệm phản hồi ngữ nghĩa",
     "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "Mở rộng bộ nhớ đệm phản hồi bằng so khớp tương đồng: khi không khớp chính xác, một prompt đủ gần với prompt đã lưu sẽ được phục vụ từ bộ nhớ đệm thay vì gọi thượng nguồn. Cần bật công tắc bộ nhớ đệm phản hồi, chỉ áp dụng cho yêu cầu không streaming và phải có danh sách mô hình rõ ràng. Khớp sai sẽ trả lời một câu hỏi khác, nên hãy bắt đầu với ngưỡng cao và theo dõi bộ đếm lượt khớp.",
     "Turn off to fall back to exact-match caching only; nothing else changes.": "Tắt để chỉ còn bộ nhớ đệm khớp chính xác; không thay đổi gì khác.",
-    "Invalid line: {{line}}": "Dòng không hợp lệ: {{line}}"
+    "Invalid line: {{line}}": "Dòng không hợp lệ: {{line}}",
+    "Scroll to bottom": "Cuộn xuống cuối",
+    "Toggle password visibility": "Hiện hoặc ẩn mật khẩu",
+    "Remove tag": "Xóa thẻ",
+    "Delete row": "Xóa dòng",
+    "Toggle Sidebar": "Hiện hoặc ẩn thanh bên",
+    "Decrement": "Giảm",
+    "Increment": "Tăng",
+    "Optional": "Tùy chọn",
+    "Database log retention (days)": "Thời gian lưu log cơ sở dữ liệu (ngày)",
+    "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.": "Log tiêu thụ cũ hơn số ngày này sẽ bị xóa tự động (kiểm tra 6 giờ một lần, xóa theo lô). 0 là giữ vĩnh viễn."
   }
 }

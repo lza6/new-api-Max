@@ -86,12 +86,15 @@ import type { LogCleanupTask } from '../types'
 
 const logSettingsSchema = z.object({
   LogConsumeEnabled: z.boolean(),
+  // 0 = 永不清理；上限 3650 天（10 年）避免误填超大值把整表扫一遍。
+  LogRetentionDays: z.number().int().min(0).max(3650),
 })
 
 type LogSettingsFormValues = z.infer<typeof logSettingsSchema>
 
 type LogSettingsSectionProps = {
   defaultEnabled: boolean
+  defaultRetentionDays: number
 }
 
 type ServerLogInfo = {
@@ -147,6 +150,7 @@ function isActiveLogCleanupTask(task: LogCleanupTask | null) {
 
 export function LogSettingsSection({
   defaultEnabled,
+  defaultRetentionDays,
 }: LogSettingsSectionProps) {
   const { t } = useTranslation()
   const updateOption = useUpdateOption()
@@ -154,6 +158,7 @@ export function LogSettingsSection({
     resolver: zodResolver(logSettingsSchema),
     defaultValues: {
       LogConsumeEnabled: defaultEnabled,
+      LogRetentionDays: defaultRetentionDays,
     },
   })
 
@@ -181,8 +186,11 @@ export function LogSettingsSection({
   }, [])
 
   useEffect(() => {
-    form.reset({ LogConsumeEnabled: defaultEnabled })
-  }, [defaultEnabled, form])
+    form.reset({
+      LogConsumeEnabled: defaultEnabled,
+      LogRetentionDays: defaultRetentionDays,
+    })
+  }, [defaultEnabled, defaultRetentionDays, form])
 
   useEffect(() => {
     fetchServerLogInfo()
@@ -264,11 +272,20 @@ export function LogSettingsSection({
   }, [logCleanupActive, logCleanupTaskId, t])
 
   const onSubmit = async (values: LogSettingsFormValues) => {
-    if (values.LogConsumeEnabled === defaultEnabled) {return}
-    await updateOption.mutateAsync({
-      key: 'LogConsumeEnabled',
-      value: values.LogConsumeEnabled,
-    })
+    if (values.LogConsumeEnabled !== defaultEnabled) {
+      await updateOption.mutateAsync({
+        key: 'LogConsumeEnabled',
+        value: values.LogConsumeEnabled,
+      })
+    }
+    // 保留天数与「记录消费日志」互不影响，分开判断：
+    // 旧实现只在开关变化时才提交，改天数会被 early return 吞掉。
+    if (values.LogRetentionDays !== defaultRetentionDays) {
+      await updateOption.mutateAsync({
+        key: 'LogRetentionDays',
+        value: values.LogRetentionDays,
+      })
+    }
   }
 
   const handleRequestCleanLogs = () => {
@@ -367,6 +384,36 @@ export function LogSettingsSection({
                   <Switch
                     checked={field.value}
                     onCheckedChange={field.onChange}
+                  />
+                </FormControl>
+                <FormMessage />
+              </SettingsSwitchItem>
+            )}
+          />
+
+          <FormField
+            control={form.control}
+            name='LogRetentionDays'
+            render={({ field }) => (
+              <SettingsSwitchItem>
+                <SettingsSwitchContent>
+                  <FormLabel>{t('Database log retention (days)')}</FormLabel>
+                  <FormDescription>
+                    {t(
+                      'Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.'
+                    )}
+                  </FormDescription>
+                </SettingsSwitchContent>
+                <FormControl>
+                  <Input
+                    type='number'
+                    min={0}
+                    max={3650}
+                    value={field.value}
+                    onChange={(event) =>
+                      field.onChange(Number(event.target.value))
+                    }
+                    className='w-[120px]'
                   />
                 </FormControl>
                 <FormMessage />

@@ -7438,6 +7438,16 @@
     "Semantic Response Cache": "Семантический кэш ответов",
     "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "Расширяет кэш ответов сравнением похожести: при промахе точного совпадения запрос, достаточно близкий к закэшированному, обслуживается из кэша вместо вызова апстрима. Требует включённого кэша ответов, непоточных запросов и явного списка моделей. Ошибочное совпадение вернёт ответ на другой вопрос, поэтому начинайте с высокого порога и следите за счётчиками попаданий.",
     "Turn off to fall back to exact-match caching only; nothing else changes.": "Выключите, чтобы вернуться только к точному кэшированию; больше ничего не меняется.",
-    "Invalid line: {{line}}": "Неверная строка: {{line}}"
+    "Invalid line: {{line}}": "Неверная строка: {{line}}",
+    "Scroll to bottom": "Прокрутить вниз",
+    "Toggle password visibility": "Показать или скрыть пароль",
+    "Remove tag": "Удалить тег",
+    "Delete row": "Удалить строку",
+    "Toggle Sidebar": "Показать или скрыть боковую панель",
+    "Decrement": "Уменьшить",
+    "Increment": "Увеличить",
+    "Optional": "Необязательно",
+    "Database log retention (days)": "Хранение журналов базы данных (дни)",
+    "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.": "Журналы потребления старше указанного числа дней удаляются автоматически (проверка каждые 6 часов, пакетное удаление). 0 — хранить бессрочно."
   }
 }

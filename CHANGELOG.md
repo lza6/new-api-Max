@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.192] - 2026-10-23
+
+### Added
+- **Database log retention is configurable from the admin UI.** `LogRetentionDays` had
+  no setting on the Log Maintenance page — it could only be changed by writing the
+  `options` row directly, so the feature was invisible to operators. The section now has
+  a "Database log retention (days)" field (0 = keep forever, the default).
+- Fixed the same form's save handler: it returned early whenever the "record consumption"
+  switch was unchanged, which would have silently dropped a retention-only edit.
+
+### Changed
+- `/api/log/report` gains a 60-second Redis cache keyed by `(group_by, start, end)`.
+  Its six groupings — especially channel/user/group/token — fall outside the `logs`
+  covering index, so every switch of `group_by` re-scans the whole window. The payload is
+  display-only and cached with concrete types (not `gin.H`) to avoid int64 → float64 drift.
+
+## [v1.3.191] - 2026-10-23
+
+### Added
+- **Database log retention.** The admin page only ever offered a **one-shot** cleanup of
+  the *log files* under `/app/logs`; the `logs` table itself had **no automatic cleanup at
+  all**, so production had accumulated 1,861,886 rows / 3.5GB over 42 days — exactly what
+  fed the 2026-10-23 OOM. New `LogRetentionDays` option (0 = keep forever, the default)
+  is consumed by `StartLogRetentionTask`, which on the master enqueues the existing
+  **batched** `log_cleanup` system task every 6 hours. Batched on purpose: a single
+  DELETE over 1.8M rows would blow up WAL and lock the table for a long time.
+- First run after deploy removed 1,221,924 rows (09-11 → 10-16, i.e. exactly 7 days
+  retained). Historical statistics stay intact because `log_daily_stats` keeps its own
+  43-day aggregate (406 rows / 160KB).
+
 ## [v1.3.190] - 2026-10-23
 
 ### Fixed

@@ -7438,6 +7438,16 @@
     "Semantic Response Cache": "セマンティック レスポンス キャッシュ",
     "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "完全一致しない場合に、類似度でキャッシュ済み応答を再利用して上流呼び出しを 1 回省きます。「レスポンス キャッシュ」スイッチ、非ストリーミング要求、明示的なモデル許可リストが必要です。誤ヒットは別の質問への回答を返すため、高いしきい値から始めてヒット数を監視してください。",
     "Turn off to fall back to exact-match caching only; nothing else changes.": "オフにすると完全一致キャッシュのみに戻ります。他の動作は変わりません。",
-    "Invalid line: {{line}}": "無効な行: {{line}}"
+    "Invalid line: {{line}}": "無効な行: {{line}}",
+    "Scroll to bottom": "一番下までスクロール",
+    "Toggle password visibility": "パスワードの表示を切り替え",
+    "Remove tag": "タグを削除",
+    "Delete row": "行を削除",
+    "Toggle Sidebar": "サイドバーの表示を切り替え",
+    "Decrement": "減らす",
+    "Increment": "増やす",
+    "Optional": "任意",
+    "Database log retention (days)": "データベースログの保存期間（日）",
+    "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.": "指定した日数より古い消費ログは自動的に削除されます（6 時間ごとに確認、バッチ削除）。0 は永久に保持します。"
   }
 }

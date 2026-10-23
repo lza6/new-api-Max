@@ -7438,6 +7438,16 @@
     "Semantic Response Cache": "Semantic Response Cache",
     "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.",
     "Turn off to fall back to exact-match caching only; nothing else changes.": "Turn off to fall back to exact-match caching only; nothing else changes.",
-    "Invalid line: {{line}}": "Invalid line: {{line}}"
+    "Invalid line: {{line}}": "Invalid line: {{line}}",
+    "Scroll to bottom": "Scroll to bottom",
+    "Toggle password visibility": "Toggle password visibility",
+    "Remove tag": "Remove tag",
+    "Delete row": "Delete row",
+    "Toggle Sidebar": "Toggle Sidebar",
+    "Decrement": "Decrement",
+    "Increment": "Increment",
+    "Optional": "Optional",
+    "Database log retention (days)": "Database log retention (days)",
+    "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.": "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever."
   }
 }

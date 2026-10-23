@@ -55,12 +55,41 @@ func parseUsageReportParams(c *gin.Context) (groupBy string, start, end int64, o
 	return groupBy, start, end, true
 }
 
+// usageReportCache 是报表的可缓存载荷。用具体类型而不是 gin.H，
+// 避免 JSON 往返把 int64 变成 float64 后再写回响应造成类型漂移。
+type usageReportCache struct {
+	Rows     []model.UsageReportRow `json:"rows"`
+	Totals   model.UsageReportRow   `json:"totals"`
+	RowCount int                    `json:"row_count"`
+}
+
 // GetUsageReport 管理端用量/成本聚合报表（按模型/渠道/日/用户/分组/令牌）。
 // GET /api/log/report?group_by=model|channel|day|user|group|token&start=&end=
 func GetUsageReport(c *gin.Context) {
 	groupBy, start, end, ok := parseUsageReportParams(c)
 	if !ok {
 		return
+	}
+	// 60s 缓存：报表是展示口径，不参与计费。六维分组里 channel/user/group/token
+	// 不在 logs 的覆盖索引上，要回表扫窗口内全部行；管理端切换维度、反复刷新会
+	// 重复触发同样的聚合。日志保留策略上线后窗口已缩到 7 天，这里再加一层缓存兜底。
+	cacheKey := fmt.Sprintf("usage_report:%s:%d:%d", groupBy, start, end)
+	if common.RedisEnabled {
+		if cached, err := common.RedisGet(cacheKey); err == nil && cached != "" {
+			var payload usageReportCache
+			if common.Unmarshal([]byte(cached), &payload) == nil {
+				common.ApiSuccess(c, gin.H{
+					"group_by":  groupBy,
+					"start":     start,
+					"end":       end,
+					"rows":      payload.Rows,
+					"totals":    payload.Totals,
+					"totals_mb": float64(payload.Totals.TotalBytes) / (1024 * 1024),
+					"row_count": payload.RowCount,
+				})
+				return
+			}
+		}
 	}
 	rows, err := model.GetUsageReport(groupBy, start, end)
 	if err != nil {
@@ -78,6 +107,12 @@ func GetUsageReport(c *gin.Context) {
 		totals.RequestBytes += r.RequestBytes
 		totals.ResponseBytes += r.ResponseBytes
 		totals.TotalBytes += r.TotalBytes
+	}
+	if common.RedisEnabled {
+		payload := usageReportCache{Rows: rows, Totals: totals, RowCount: len(rows)}
+		if raw, err := common.Marshal(payload); err == nil {
+			_ = common.RedisSet(cacheKey, string(raw), time.Minute)
+		}
 	}
 	common.ApiSuccess(c, gin.H{
 		"group_by":  groupBy,

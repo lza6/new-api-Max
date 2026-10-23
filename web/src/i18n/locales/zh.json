@@ -7438,6 +7438,16 @@
     "Semantic Response Cache": "语义响应缓存",
     "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "在精确缓存未命中时按相似度复用历史响应，省掉一次上游调用。需要同时打开「响应缓存」开关、仅对非流式请求生效，并且必须显式配置模型白名单。错命中会把「另一个问题的答案」返回给用户，请从高阈值开始并盯住命中计数。",
     "Turn off to fall back to exact-match caching only; nothing else changes.": "关闭后只保留精确缓存，其它行为不变。",
-    "Invalid line: {{line}}": "无效行：{{line}}"
+    "Invalid line: {{line}}": "无效行：{{line}}",
+    "Scroll to bottom": "滚动到底部",
+    "Toggle password visibility": "切换密码可见性",
+    "Remove tag": "移除标签",
+    "Delete row": "删除行",
+    "Toggle Sidebar": "切换侧边栏",
+    "Decrement": "减少",
+    "Increment": "增加",
+    "Optional": "可选",
+    "Database log retention (days)": "数据库日志保留天数",
+    "Consume logs older than this many days are deleted automatically (checked every 6 hours, deleted in batches). 0 keeps them forever.": "超过该天数的消费日志会被自动删除（每 6 小时检查一次，分批删除）。0 表示永久保留。"
   }
 }

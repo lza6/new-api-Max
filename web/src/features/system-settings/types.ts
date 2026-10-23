@@ -359,6 +359,9 @@ export type OperationsSettings = {
   WorkerValidKey: string
   WorkerAllowHttpImageRequestEnabled: boolean
   LogConsumeEnabled: boolean
+  // 数据库 logs 表的保留天数（0 = 永不清理）。由后端 service.StartLogRetentionTask
+  // 每 6 小时消费一次，触发分批删除；与「磁盘日志文件清理」是两件事。
+  LogRetentionDays: number
   'performance_setting.disk_cache_enabled': boolean
   'performance_setting.disk_cache_threshold_mb': number
   'performance_setting.disk_cache_max_size_mb': number
