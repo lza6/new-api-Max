@@ -218,13 +218,20 @@ func LooksInternalError(msg string) bool {
 	return false
 }
 
+// requestIdForLog 取当前请求的 request id（缺失则生成并回写响应头），
+// 让「响应的 request_id」与「服务端日志里的 request id」始终是同一个值。
+func requestIdForLog(c *gin.Context) string {
+	requestId := c.GetHeader(RequestIdKey)
+	if requestId == "" {
+		requestId = NewRequestId()
+		c.Header(RequestIdKey, requestId)
+	}
+	return requestId
+}
+
 func ApiError(c *gin.Context, err error) {
 	if LooksInternalError(err.Error()) {
-		requestId := c.GetHeader(RequestIdKey)
-		if requestId == "" {
-			requestId = NewRequestId()
-			c.Header(RequestIdKey, requestId)
-		}
+		requestId := requestIdForLog(c)
 		// 原始错误只进服务端日志，带同一个 request id 便于对照排查。
 		SysError(fmt.Sprintf("internal error [%s] %s %s: %v", requestId, c.Request.Method, c.FullPath(), err))
 		c.JSON(http.StatusOK, gin.H{
@@ -245,6 +252,23 @@ func ApiErrorMsg(c *gin.Context, msg string) {
 	c.JSON(http.StatusOK, gin.H{
 		"success": false,
 		"message": msg,
+	})
+}
+
+// ApiErrorMsgLogged 返回调用方给定的固定文案，同时把底层错误写进服务端日志。
+//
+// 为什么需要它：`ApiErrorMsg(c, "前缀: "+err.Error())` 会把驱动/协议细节
+// （`sql:`、`json: cannot unmarshal`、`context deadline exceeded` …）原样送到
+// 用户界面，且绕过 ApiError 的脱敏。需要自定义提示语时用本函数：用户只看人话，
+// 细节进日志，两者用同一个 request id 串联。
+func ApiErrorMsgLogged(c *gin.Context, userMsg string, err error) {
+	if err != nil {
+		requestId := requestIdForLog(c)
+		SysError(fmt.Sprintf("api error [%s] %s %s: %v", requestId, c.Request.Method, c.FullPath(), err))
+	}
+	c.JSON(http.StatusOK, gin.H{
+		"success": false,
+		"message": userMsg,
 	})
 }
 

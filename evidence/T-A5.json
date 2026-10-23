@@ -1,0 +1,39 @@
+{
+  "task_id": "T-A5",
+  "title": "版本四口径机器校验",
+  "status": "done",
+  "timestamp": "2026-10-23T12:05:00+08:00",
+  "commands_executed": [
+    {
+      "cmd": "node scripts/check-version-consistency.mjs --self-test",
+      "exit_code": 0,
+      "raw_output_tail": "PASS consistent facts (exit 0, expected 0) / PASS changelog lags VERSION (exit 1) / PASS version bumped, tag pending (dev) (exit 0) / PASS version bumped, tag pending (release) (exit 1) / PASS tag newer than VERSION (impossible) (exit 1) / PASS readme claims old tag (exit 1) / PASS deployed behind (allowed) (exit 0) / PASS deployed ahead (impossible) (exit 1) / PASS bad VERSION format (exit 1)\nself-test: 9/9 passed"
+    },
+    {
+      "cmd": "node scripts/check-version-consistency.mjs",
+      "exit_code": 0,
+      "raw_output_tail": "VERSION v1.3.182 / CHANGELOG first heading v1.3.182 / newest git tag v1.3.181 / tag on HEAD v1.3.181 / workflow_status §0 deployed v1.3.181 / README claim v1.3.182 / note: VERSION ahead of newest tag — pending release / note: HEAD still tagged v1.3.181 (pending release) / note: §0 lags VERSION (deployment may be pending)\nRESULT: consistent"
+    },
+    {
+      "cmd": "node scripts/check-version-consistency.mjs --require-tag",
+      "exit_code": 1,
+      "raw_output_tail": "RESULT: inconsistent (VERSION v1.3.182 is not tagged yet) — expected in dev, this is the release-pipeline strict mode"
+    }
+  ],
+  "files_changed": [
+    "scripts/check-version-consistency.mjs (new)",
+    "计划书/README.md (stale version claim corrected to v1.3.182 / tag v1.3.181)"
+  ],
+  "tests": [
+    { "name": "self-test 9 fabricated fact sets", "type": "unit", "status": "pass", "evidence": "9/9 printed above" },
+    { "name": "real repo consistency", "type": "integration", "status": "pass", "evidence": "RESULT: consistent" }
+  ],
+  "bugs_found_and_fixed_during_implementation": [
+    "第一版把 tag!=VERSION 一律判错，导致正常「bump 后未打 tag」窗口天天红 → 改为 note，仅 --require-tag 严格（D-2026-10-23-02）",
+    "第一版 self-test 的 tag-pending 夹具自相矛盾（describeTag 改了但 readmeTagClaim 没改）→ 修正夹具后 9/9"
+  ],
+  "limitations": [
+    "只比较文本声明，不能证明线上真的在跑该版本（本机 HTTPS 直连不可用）",
+    "计划书/README.md 的声明仍靠人更新；门禁只能发现不一致，不能自动修正"
+  ]
+}

@@ -30,16 +30,24 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 
 function setupLocalStorage(initial: Record<string, string> = {}) {
   const store = new Map(Object.entries(initial))
-  const mock = {
-    getItem: (k: string) => (store.has(k) ? store.get(k)! : null),
-    setItem: (k: string, v: string) => void store.set(k, v),
-    removeItem: (k: string) => void store.delete(k),
-    clear: () => store.clear(),
-    key: () => null,
-    length: store.size,
-  }
-  vi.stubGlobal('window', { localStorage: mock })
-  vi.stubGlobal('localStorage', mock)
+  // jsdom 29 里 `window` 是不可重定义属性，`vi.stubGlobal('window', ...)` 会抛
+  // "Cannot redefine property: window"。被测代码读的是 `window.localStorage`，
+  // 而它与全局 `localStorage` 是同一个 Storage 实例，所以直接替换 Storage 方法
+  // 即可覆盖真实行为（afterEach 里 restoreAllMocks 复原）。
+  vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) =>
+    store.has(key) ? store.get(key)! : null
+  )
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(
+    (key: string, value: string) => {
+      store.set(key, value)
+    }
+  )
+  vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
+    store.delete(key)
+  })
+  vi.spyOn(Storage.prototype, 'clear').mockImplementation(() => {
+    store.clear()
+  })
   return store
 }
 
@@ -49,6 +57,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.restoreAllMocks()
   vi.resetModules()
 })
 

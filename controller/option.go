@@ -170,7 +170,7 @@ func UpdateOption(c *gin.Context) {
 	}
 	if option.Key == "TaskPublicAddress" && option.Value.(string) != "" {
 		if err := service.ValidateTaskArtifactBaseURL(option.Value.(string)); err != nil {
-			common.ApiErrorMsg(c, err.Error())
+			common.ApiError(c, err)
 			return
 		}
 	}
@@ -351,7 +351,7 @@ func UpdateOption(c *gin.Context) {
 	case "billing_setting.billing_expr":
 		expressions := make(map[string]string)
 		if err = common.UnmarshalJsonStr(option.Value.(string), &expressions); err != nil {
-			common.ApiErrorMsg(c, "计费表达式配置必须是模型到表达式的 JSON 对象: "+err.Error())
+			common.ApiErrorMsgLogged(c, "计费表达式配置必须是模型到表达式的 JSON 对象", err)
 			return
 		}
 		models := make([]string, 0, len(expressions))

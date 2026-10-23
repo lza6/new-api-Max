@@ -224,7 +224,7 @@ func GetLogsTraffic(c *gin.Context) {
 		Group("day_key").
 		Order("day_key ASC").
 		Scan(&dayRows).Error; err != nil {
-		common.ApiErrorMsg(c, "failed to query traffic: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query traffic", err)
 		return
 	}
 	byDay := make([]service.DailyTraffic, 0, len(dayRows))
@@ -308,7 +308,7 @@ func GetSiteOverview(c *gin.Context) {
 			"COALESCE(SUM(prompt_tokens),0)+COALESCE(SUM(completion_tokens),0) AS total_tokens, " +
 			"COALESCE(SUM(quota),0) AS total_quota",
 	).Scan(&agg).Error; err != nil {
-		common.ApiErrorMsg(c, "failed to query site overview: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query site overview", err)
 		return
 	}
 	if common.RedisEnabled {
@@ -391,7 +391,7 @@ func GetBandwidthLeaderboard(c *gin.Context) {
 		Group("day_key").
 		Order("bytes DESC, day_key ASC").
 		Scan(&dayRows).Error; err != nil {
-		common.ApiErrorMsg(c, "failed to query bandwidth leaderboard: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query bandwidth leaderboard", err)
 		return
 	}
 	byDay := make([]service.BandwidthDay, 0, len(dayRows))
@@ -490,7 +490,7 @@ func GetModelBandwidthLeaderboard(c *gin.Context) {
 	}
 	byModel, err := queryModelBandwidthLeaderboard(days, limit)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query model bandwidth leaderboard: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query model bandwidth leaderboard", err)
 		return
 	}
 	type row struct {
@@ -544,22 +544,22 @@ func GetModelStats(c *gin.Context) {
 	}
 	consumeToday, err := groupCount(model.LogTypeConsume, startOfToday)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query model stats", err)
 		return
 	}
 	errorToday, err := groupCount(model.LogTypeError, startOfToday)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query model stats", err)
 		return
 	}
 	consume30, err := groupCount(model.LogTypeConsume, start30d)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query model stats", err)
 		return
 	}
 	error30, err := groupCount(model.LogTypeError, start30d)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query model stats: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query model stats", err)
 		return
 	}
 	stats := service.MergeModelStats(consumeToday, errorToday, consume30, error30)

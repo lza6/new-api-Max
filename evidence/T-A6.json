@@ -1,0 +1,58 @@
+{
+  "task_id": "T-A6",
+  "title": "CI 门禁补齐（术语 + 版本口径）",
+  "status": "done",
+  "timestamp": "2026-10-23T12:02:00+08:00",
+  "scope_note": "本任务在接手时已被并行会话推进了一部分：它已加入 knip 死代码、i18n key usage、i18n locale coverage、design token drift 四个门禁，并新增 db-conformance job。本会话补上缺失的「术语」与「版本口径」两个门禁。",
+  "commands_executed": [
+    {
+      "cmd": "bun -e \"Bun.YAML.parse(await Bun.file('.github/workflows/ci.yml').text())\"",
+      "exit_code": 0,
+      "raw_output_tail": "YAML 解析: OK, jobs = backend, frontend, db-conformance\n[backend] 9 steps\n[frontend] 12 steps: Checkout | Set up Bun | Install dependencies | Lint changed frontend files | Typecheck | Knip dead-code gate | i18n key usage gate | i18n locale coverage gate | i18n terminology gate | Version consistency gate | Design token drift gate | Test\n[db-conformance] 6 steps"
+    },
+    {
+      "cmd": "cd web && node scripts/check-terminology.mjs",
+      "exit_code": 0,
+      "raw_output_tail": "[terminology] PASS（修好假绿后先 RED 4 处 → 修文案后 GREEN，见 T-B9a）"
+    },
+    {
+      "cmd": "node scripts/check-version-consistency.mjs",
+      "exit_code": 0,
+      "raw_output_tail": "RESULT: consistent"
+    },
+    {
+      "cmd": "cd web && node scripts/check-missing-i18n.cjs",
+      "exit_code": 0,
+      "raw_output_tail": "i18n missing-key check: OK (0 missing)"
+    },
+    {
+      "cmd": "cd web && node scripts/check-i18n-coverage.cjs",
+      "exit_code": 0,
+      "raw_output_tail": "i18n coverage check: OK (all locales translated)"
+    },
+    {
+      "cmd": "cd web && node scripts/ds-tokens-check.mjs",
+      "exit_code": 0,
+      "raw_output_tail": "ds-tokens: OK (659 tokens, source hash unchanged)"
+    },
+    {
+      "cmd": "cd web && node scripts/knip-gate.mjs",
+      "exit_code": 1,
+      "raw_output_tail": "报告 5 个新死导出（FeatureSwitchKind / FeatureSwitchListData / FeatureSwitchRisk / RelayAuditFinding / IconComponent）。这些文件属并行会话在下批改动范围（feature-switch、usage-logs 类型），本会话未擅自 --update 掩盖。"
+    }
+  ],
+  "files_changed": [".github/workflows/ci.yml (新增 2 个 step)"],
+  "tests": [
+    { "name": "CI 结构可解析", "type": "static", "status": "pass", "evidence": "Bun.YAML.parse 通过，3 jobs / frontend 12 steps" }
+  ],
+  "open_issue": {
+    "severity": "P1",
+    "summary": "knip 死代码门禁当前为红：5 个新死导出，来自并行会话的在途改动（feature-switch / usage-logs 类型）。",
+    "why_not_fixed_here": "这些文件不在本会话改动范围，且属于他会话正在进行的批次；擅自 --update 会把真实回归写进基线（脚本自身警告不要这么做）。",
+    "next_action": "该批次收口时一并删除或接入这些导出，再跑 node scripts/knip-gate.mjs 确认绿。"
+  },
+  "limitations": [
+    "未在真实 GitHub Actions 上跑过这些 step（需 push + PR）；本地只验证了脚本本身与 YAML 结构",
+    "frontend job 的 Test 步骤仍是单进程 bun run test，已知本机 >25 分钟跑不完（见 T-A1）"
+  ]
+}

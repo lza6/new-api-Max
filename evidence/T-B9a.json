@@ -1,0 +1,45 @@
+{
+  "task_id": "T-B9a",
+  "title": "N1 术语残余收口（quota → 额度）＋ 修复术语门禁假绿",
+  "status": "done",
+  "timestamp": "2026-10-23T11:58:00+08:00",
+  "problem": "1) zh.json / zh-TW.json 各有 2 个 key 仍把 quota 译成「配额/配額」；2) 更严重：术语门禁对它们报 PASS，因为豁免正则 /rate|limit|concurren/ 命中了 Unlimited 里的 limit 子串 —— 门禁看不到自己该抓的缺陷。",
+  "commands_executed": [
+    {
+      "cmd": "node scripts/check-terminology.mjs   (修复前)",
+      "exit_code": 0,
+      "raw_output_tail": "[terminology] PASS: quota 相关文案已统一为「额度」  ← 假绿"
+    },
+    {
+      "cmd": "node scripts/check-terminology.mjs   (只修门禁正则后，RED)",
+      "exit_code": 1,
+      "raw_output_tail": "zh.json: \"Enable unlimited quota for this API key\" -> \"为此 API 密钥启用无限配额\"\nzh.json: \"Unlimited Quota\" -> \"无限配额\"\nzh-TW.json: \"Enable unlimited quota for this API key\" -> \"為此 API 金鑰啟用無限配額\"\nzh-TW.json: \"Unlimited Quota\" -> \"無限配額\"\n[terminology] FAIL: 4 处配额/容量混用"
+    },
+    {
+      "cmd": "node scripts/check-terminology.mjs   (修文案后，GREEN)",
+      "exit_code": 0,
+      "raw_output_tail": "[terminology] PASS: quota 相关文案已统一为「额度」"
+    },
+    {
+      "cmd": "node scripts/check-missing-i18n.cjs",
+      "exit_code": 0,
+      "raw_output_tail": "i18n missing-key check: OK (0 missing)"
+    },
+    {
+      "cmd": "bunx vitest run src/i18n/locale-consistency.test.ts",
+      "exit_code": 0,
+      "raw_output_tail": "Test Files 1 passed (1) / Tests 2 passed (2)"
+    }
+  ],
+  "files_changed": [
+    "web/scripts/check-terminology.mjs (EXEMPT_KEY 改为词边界正则)",
+    "web/src/i18n/locales/zh.json (2 keys)",
+    "web/src/i18n/locales/zh-TW.json (2 keys)"
+  ],
+  "tests": [
+    { "name": "术语门禁 RED→GREEN", "type": "gate", "status": "pass", "evidence": "4 处 → 0 处" },
+    { "name": "locale-consistency（7 语言键集一致）", "type": "unit", "status": "pass", "evidence": "2/2" }
+  ],
+  "residual_scope_note": "「容量」在 zh.json 尚有 4 处（每渠道样本环容量 / 队列容量 / 突发容量 / 日志库容量），逐条确认均为 capacity 语义，不是 quota 误译，因此不动。",
+  "limitations": ["只覆盖 zh / zh-TW；其余 5 语言的 quota 译法未审（本就非中文，无此问题）"]
+}

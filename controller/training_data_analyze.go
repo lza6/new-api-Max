@@ -99,7 +99,7 @@ const analyzeSystemPrompt = `你是一名资深的产品与运营分析师。下
 func AnalyzeTrainingDataConversation(c *gin.Context) {
 	var req analyzeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		common.ApiErrorMsg(c, "invalid request body: "+err.Error())
+		common.ApiErrorMsgLogged(c, "invalid request body", err)
 		return
 	}
 	path := strings.Trim(strings.TrimSpace(req.Path), "/")

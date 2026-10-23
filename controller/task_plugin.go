@@ -44,7 +44,7 @@ type taskPluginUploadRequest struct {
 func UploadTaskPlugin(c *gin.Context) {
 	var request taskPluginUploadRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	if len(request.Source) > maxTaskPluginSourceBytes {
@@ -72,17 +72,17 @@ func UploadTaskPlugin(c *gin.Context) {
 	temporary := jsplugin.NewRegistry()
 	loaded, err := temporary.Register(request.Source, jsplugin.Options{})
 	if err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	if err = jsplugin.ValidateV1Meta(loaded.Meta); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	icon := strings.TrimSpace(request.Icon)
 	if icon != "" {
 		if _, _, err = jsplugin.DecodeIconDataURI(icon); err != nil {
-			common.ApiErrorMsg(c, err.Error())
+			common.ApiError(c, err)
 			return
 		}
 	}
@@ -92,7 +92,7 @@ func UploadTaskPlugin(c *gin.Context) {
 	}
 	if enabled && !request.Force {
 		if err = jsplugin.PreflightRoutingConflict(jsplugin.DefaultRegistry.Generation(), loaded); err != nil {
-			common.ApiErrorMsg(c, err.Error())
+			common.ApiError(c, err)
 			return
 		}
 	}
@@ -149,7 +149,7 @@ type taskPluginApproveRequest struct {
 func ApproveTaskPlugin(c *gin.Context) {
 	var request taskPluginApproveRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	key := c.Param("key")
@@ -457,7 +457,7 @@ type taskPluginDryRunRequest struct {
 func DryRunTaskPlugin(c *gin.Context) {
 	var request taskPluginDryRunRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	detailSource := ""
@@ -473,7 +473,7 @@ func DryRunTaskPlugin(c *gin.Context) {
 	}
 	loaded, err := jsplugin.NewRegistry().Register(detailSource, jsplugin.Options{Key: c.Param("key")})
 	if err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	args := make([]any, len(request.Args))
@@ -490,7 +490,7 @@ func DryRunTaskPlugin(c *gin.Context) {
 		output, err = loaded.Engine.CallMember(context.Background(), request.Hook, request.Member, args...)
 	}
 	if err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	common.ApiSuccess(c, output)
@@ -542,7 +542,7 @@ type taskPluginActivateRequest struct {
 func ActivateTaskPlugin(c *gin.Context) {
 	var request taskPluginActivateRequest
 	if err := c.ShouldBindJSON(&request); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	versions, err := model.ListTaskPluginVersions(c.Param("key"))
@@ -562,7 +562,7 @@ func ActivateTaskPlugin(c *gin.Context) {
 		return
 	}
 	if _, err = jsplugin.NewRegistry().Register(target.Source, jsplugin.Options{Key: target.Key, Version: target.Version}); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	if err = model.ActivateTaskPlugin(target.Key, target.Version); err != nil {
@@ -677,7 +677,7 @@ func GetTaskPluginMarketplaceSources(c *gin.Context) {
 func UpdateTaskPluginMarketplaceSources(c *gin.Context) {
 	var sources []setting.TaskPluginMarketplaceSource
 	if err := c.ShouldBindJSON(&sources); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	if sources == nil {

@@ -144,7 +144,7 @@ type FetchCustomOAuthDiscoveryRequest struct {
 func FetchCustomOAuthDiscovery(c *gin.Context) {
 	var req FetchCustomOAuthDiscoveryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		common.ApiErrorMsg(c, "无效的请求参数: "+err.Error())
+		common.ApiErrorMsgLogged(c, "无效的请求参数", err)
 		return
 	}
 
@@ -173,7 +173,7 @@ func FetchCustomOAuthDiscovery(c *gin.Context) {
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodGet, targetURL, nil)
 	if err != nil {
-		common.ApiErrorMsg(c, "创建 Discovery 请求失败: "+err.Error())
+		common.ApiErrorMsgLogged(c, "创建 Discovery 请求失败", err)
 		return
 	}
 	httpReq.Header.Set("Accept", "application/json")
@@ -181,7 +181,7 @@ func FetchCustomOAuthDiscovery(c *gin.Context) {
 	client := &http.Client{Timeout: 20 * time.Second}
 	resp, err := client.Do(httpReq)
 	if err != nil {
-		common.ApiErrorMsg(c, "获取 Discovery 配置失败: "+err.Error())
+		common.ApiErrorMsgLogged(c, "获取 Discovery 配置失败", err)
 		return
 	}
 	defer resp.Body.Close()
@@ -198,7 +198,7 @@ func FetchCustomOAuthDiscovery(c *gin.Context) {
 
 	var discovery map[string]any
 	if err = common.DecodeJson(resp.Body, &discovery); err != nil {
-		common.ApiErrorMsg(c, "解析 Discovery 配置失败: "+err.Error())
+		common.ApiErrorMsgLogged(c, "解析 Discovery 配置失败", err)
 		return
 	}
 
@@ -216,7 +216,7 @@ func FetchCustomOAuthDiscovery(c *gin.Context) {
 func CreateCustomOAuthProvider(c *gin.Context) {
 	var req CreateCustomOAuthProviderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		common.ApiErrorMsg(c, "无效的请求参数: "+err.Error())
+		common.ApiErrorMsgLogged(c, "无效的请求参数", err)
 		return
 	}
 
@@ -301,7 +301,7 @@ func UpdateCustomOAuthProvider(c *gin.Context) {
 
 	var req UpdateCustomOAuthProviderRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		common.ApiErrorMsg(c, "无效的请求参数: "+err.Error())
+		common.ApiErrorMsgLogged(c, "无效的请求参数", err)
 		return
 	}
 

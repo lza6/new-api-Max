@@ -205,11 +205,11 @@ func queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart 
 		return opsFinancialAggregates{}, err
 	}
 	return opsFinancialAggregates{
-		TotalRevenue: row.TotalRevenue,
-		Today:        opsAggregate{Revenue: row.TodayRevenue, Cost: row.TodayCost},
-		Month:        opsAggregate{Revenue: row.MonthRevenue, Cost: row.MonthCost},
-		Year:         opsAggregate{Revenue: row.YearRevenue, Cost: row.YearCost},
-		Window:       opsAggregate{Revenue: row.WindowRevenue, Cost: row.WindowCost},
+		TotalRevenue:        row.TotalRevenue,
+		Today:               opsAggregate{Revenue: row.TodayRevenue, Cost: row.TodayCost},
+		Month:               opsAggregate{Revenue: row.MonthRevenue, Cost: row.MonthCost},
+		Year:                opsAggregate{Revenue: row.YearRevenue, Cost: row.YearCost},
+		Window:              opsAggregate{Revenue: row.WindowRevenue, Cost: row.WindowCost},
 		TodayCoveredRevenue: row.TodayCovered,
 		MonthCoveredRevenue: row.MonthCovered,
 	}, nil
@@ -307,7 +307,7 @@ func GetOpsOverview(c *gin.Context) {
 	// 一次扫描算全部区间（1.4M 行实测 ~9s，结果整体缓存 5 分钟）。
 	agg, err := queryOpsFinancialAggregates(todayStart, monthStart, yearStart, windowStart)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to query ops aggregates: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query ops aggregates", err)
 		return
 	}
 	totalQuota := agg.TotalRevenue
@@ -322,7 +322,7 @@ func GetOpsOverview(c *gin.Context) {
 		Where("role < ?", common.RoleAdminUser).
 		Select("COALESCE(SUM(quota), 0) AS total, COUNT(*) AS user_count").
 		Scan(&remaining).Error; err != nil {
-		common.ApiErrorMsg(c, "failed to query remaining quota: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query remaining quota", err)
 		return
 	}
 
@@ -418,7 +418,7 @@ func GetOpsConsumptionRanking(c *gin.Context) {
 
 	adminIds, err := opsAdminUserIds()
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to resolve admin users: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to resolve admin users", err)
 		return
 	}
 
@@ -459,7 +459,7 @@ func GetOpsConsumptionRanking(c *gin.Context) {
 		Order("COALESCE(SUM(quota), 0) DESC, user_id ASC").
 		Limit(fetchLimit).
 		Scan(&rows).Error; err != nil {
-		common.ApiErrorMsg(c, "failed to query consumption ranking: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to query consumption ranking", err)
 		return
 	}
 
@@ -567,7 +567,7 @@ func GetOpsDailySeries(c *gin.Context) {
 		dayEnd := dayStart.AddDate(0, 0, 1)
 		agg, err := opsAggregateRange(dayStart.Unix(), dayEnd.Unix())
 		if err != nil {
-			common.ApiErrorMsg(c, "failed to query daily aggregates: "+err.Error())
+			common.ApiErrorMsgLogged(c, "failed to query daily aggregates", err)
 			return
 		}
 		items = append(items, opsDaySeriesItem{
@@ -594,7 +594,7 @@ func GetModelCosts(c *gin.Context) {
 	limit, _ := strconv.Atoi(c.Query("limit"))
 	rows, err := model.ListModelCosts(channelId, c.Query("model"), limit)
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to list model costs: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to list model costs", err)
 		return
 	}
 	common.ApiSuccess(c, gin.H{"items": rows})
@@ -613,12 +613,12 @@ func CreateModelCost(c *gin.Context) {
 		return
 	}
 	if err := model.ValidateModelCostInput(&in, time.Now()); err != nil {
-		common.ApiErrorMsg(c, err.Error())
+		common.ApiError(c, err)
 		return
 	}
 	row, err := model.CreateModelCost(in, c.GetInt("id"))
 	if err != nil {
-		common.ApiErrorMsg(c, "failed to create model cost: "+err.Error())
+		common.ApiErrorMsgLogged(c, "failed to create model cost", err)
 		return
 	}
 	recordUserSecurityAudit(c, c.GetInt("id"), "admin.model_cost.create", map[string]any{

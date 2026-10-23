@@ -17,7 +17,7 @@ import (
 func ResetAllCheckins(c *gin.Context) {
 	deleted, err := model.ResetAllCheckins()
 	if err != nil {
-		common.ApiErrorMsg(c, "重置签到失败："+err.Error())
+		common.ApiErrorMsgLogged(c, "重置签到失败", err)
 		return
 	}
 	common.ApiSuccess(c, gin.H{

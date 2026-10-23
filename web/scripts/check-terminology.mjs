@@ -12,7 +12,11 @@ import { join } from 'node:path'
 const root = process.cwd()
 const LOCALES = ['zh.json', 'zh-TW.json']
 const BANNED = /配额|容量|配額/
-const EXEMPT_KEY = /rate|limit|concurren/i
+// Word boundaries matter: the previous /rate|limit|concurren/ matched the
+// "limit" inside "Unlimited", so "Unlimited Quota => 无限配额" was exempted and
+// the gate reported PASS while two violations were live. A gate that cannot see
+// the defect it was written for is worse than no gate.
+const EXEMPT_KEY = /\b(rate|rates|limit|limits|limited|concurrency|concurrent)\b/i
 
 let violations = 0
 for (const file of LOCALES) {

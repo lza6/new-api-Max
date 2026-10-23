@@ -67,3 +67,30 @@ func TestApiErrorPassesThroughUserFacingMessages(t *testing.T) {
 	assert.True(t, strings.Contains(body, "额度不足"), "面向用户的文案必须原样保留：%s", body)
 	assert.NotContains(t, body, "internal_error")
 }
+
+// 自定义提示语 + 底层细节分离（N15 收口）：
+// 39 处 `ApiErrorMsg(c, "前缀: "+err.Error())` 会把驱动细节送进界面。
+// ApiErrorMsgLogged 让用户只看到人话，细节进服务端日志，两者共用一个 request id。
+func TestApiErrorMsgLoggedHidesDetailsButKeepsUserMessage(t *testing.T) {
+	ctx, recorder := newTestContext(t)
+
+	ApiErrorMsgLogged(ctx, "解析 Discovery 配置失败", errors.New("json: cannot unmarshal string into Go struct field"))
+
+	body := recorder.Body.String()
+	require.Contains(t, body, `"success":false`)
+	require.Contains(t, body, "解析 Discovery 配置失败", "调用方给定的文案必须原样返回")
+	require.NotContains(t, body, "cannot unmarshal", "底层错误不得进入响应体")
+	require.NotContains(t, body, "json:", "底层错误不得进入响应体")
+	// 日志侧与响应侧共享同一个 request id，便于用户报障时对照。
+	require.NotEmpty(t, ctx.Writer.Header().Get(RequestIdKey))
+}
+
+func TestApiErrorMsgLoggedToleratesNilError(t *testing.T) {
+	ctx, recorder := newTestContext(t)
+
+	ApiErrorMsgLogged(ctx, "参数不合法", nil)
+
+	body := recorder.Body.String()
+	require.Contains(t, body, "参数不合法")
+	require.NotContains(t, body, `"code"`, "固定文案路径不应附带 internal_error 码")
+}

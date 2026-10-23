@@ -1,0 +1,56 @@
+{
+  "task_id": "T-B2",
+  "title": "清最后 2 处原生 window.confirm + 删 0 调用死 hook",
+  "status": "done",
+  "timestamp": "2026-10-23T12:00:00+08:00",
+  "commands_executed": [
+    {
+      "cmd": "grep -rn \"window.confirm\" src | grep -v comment-lines   (before → after)",
+      "exit_code": 0,
+      "raw_output_tail": "before: 2 real call sites (waffo-pancake-settings-section.tsx:279, hooks/use-form-dirty-guard.ts:57) + 3 comment mentions\nafter: 0 real call sites, only 3 comment mentions remain"
+    },
+    {
+      "cmd": "grep -rn \"use-form-dirty-guard\" src",
+      "exit_code": 1,
+      "raw_output_tail": "0 references → 删除 src/features/system-settings/hooks/use-form-dirty-guard.ts"
+    },
+    {
+      "cmd": "bun run typecheck",
+      "exit_code": 0,
+      "raw_output_tail": "$ tsgo -b （无错误）"
+    },
+    {
+      "cmd": "bunx oxlint src/features/system-settings/integrations/waffo-pancake-settings-section.tsx",
+      "exit_code": 0,
+      "raw_output_tail": "无输出（0 问题）"
+    },
+    {
+      "cmd": "bunx vitest run src/i18n/locale-consistency.test.ts",
+      "exit_code": 0,
+      "raw_output_tail": "Tests 2 passed (2)"
+    },
+    {
+      "cmd": "cd web && node scripts/check-missing-i18n.cjs",
+      "exit_code": 0,
+      "raw_output_tail": "OK (0 missing)"
+    }
+  ],
+  "files_changed": [
+    "web/src/features/system-settings/integrations/waffo-pancake-settings-section.tsx（window.confirm → ConfirmDialog；handleCreatePair 拆出 createPair 以便确认后继续）",
+    "web/src/features/system-settings/hooks/use-form-dirty-guard.ts（删除，0 调用）"
+  ],
+  "design_note": "弃用原生 confirm 的三个真实理由：无法本地化（浏览器按系统语言）、样式与设计系统断裂、不可访问（无 focus trap / 无 aria）。ConfirmDialog 三条都满足。",
+  "i18n_decision": {
+    "first_attempt": "新增 2 个 key（'Create anyway' / 一段说明文案）",
+    "why_reverted": "src/i18n/locale-consistency.test.ts 强制 7 语言键集一致，新增 key 会让 fr/ja/ru/vi 缺键而红。改为复用既有 key：title 用原文案、desc 用 'This action cannot be undone.'（商品铸造后 SuccessURL 不可改，实为不可逆）、confirmText 用 'Create'。零新增 i18n 面积。"
+  },
+  "tests": [
+    { "name": "typecheck", "type": "static", "status": "pass", "evidence": "tsgo -b 无错" },
+    { "name": "locale-consistency", "type": "unit", "status": "pass", "evidence": "2/2" },
+    { "name": "oxlint 目标文件", "type": "static", "status": "pass", "evidence": "0 问题" }
+  ],
+  "limitations": [
+    "未做浏览器点测（该区域需管理员登录 + Waffo 商户凭据）；行为验证落在 typecheck/lint/单测与代码审读",
+    "该分区无既有 RTL 用例涵盖这条弹窗路径；建议后续补 1 条（已记入 project_specs T-B2 待办）"
+  ]
+}

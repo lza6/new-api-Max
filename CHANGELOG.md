@@ -69,6 +69,31 @@ Gate hardening + policy centre + semantic response cache (参考的结果计划�
   `go test ./service ./setting/...` green; `bun run typecheck` clean;
   `check-i18n-coverage` / `check-missing-i18n` / `ds-tokens-check` / `check-terminology` green.
 
+### Gates & error hygiene (independent batch, 2026-10-23)
+
+- **Version-consistency gate** (`scripts/check-version-consistency.mjs`): compares `VERSION`,
+  the first CHANGELOG heading, the newest git tag, `workflow_status.md` §0 and the
+  `计划书/README.md` claim. It caught a real drift while being written (README still said
+  v1.3.180 after v1.3.181 had shipped). `--self-test` covers 9 fabricated fact sets;
+  `--require-tag` is the strict release mode. Wired into CI.
+- **Terminology gate was false-green**: its exempt regex `/rate|limit|concurren/` matched the
+  `limit` inside `Unlimited`, so `Unlimited Quota → 无限配额` was skipped and the gate printed
+  PASS with 4 live violations. Now uses word boundaries; zh + zh-TW fixed to 「额度」.
+- **39 raw `err.Error()` responses closed** (N15 follow-up): `ApiErrorMsg(c, err.Error())`
+  bypassed the sanitizer in `common.ApiError`. Bare cases now call `ApiError`; prefixed cases use
+  the new `ApiErrorMsgLogged` (user sees plain copy, details go to the server log under the same
+  request id). 2 new tests in `common/gin_error_test.go`.
+- **`window.confirm` gone from real code paths** (N4): the Waffo/Pancake section uses the shared
+  `ConfirmDialog`; the 0-call `use-form-dirty-guard` hook was deleted.
+- **Frontend suite runner** (`web/scripts/test-shards.mjs`): splits the 199 test files into
+  balanced shards, prints one summary plus failure names. It also exposed a **test hang**
+  (`plan-comparison.test.tsx`): the i18n mock returned a new `t` on every render, so a
+  `useCallback([t, …])` + `useEffect([loadData])` pair looped forever — >6 min became 2.9 s.
+  Two failures previously masked by that hang are now visible and still open.
+- **Spec files generated, not hand-written**: `db_structure.md` (55 tables / 637 columns, from
+  `scripts/gen-db-structure.mjs` against a real AutoMigrate run), `project_specs.md`, and
+  `.agent/memory/*` with explicit authority declarations.
+
 ## [v1.3.182] - 2026-10-22
 
 Visual identity batch 1 — "quiet instrument" token layer + dashboard pilot

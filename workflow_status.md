@@ -346,3 +346,27 @@
 1. 本地空库，读数为 0；真实数据形态下的读数条留到 V4/V6 之后复测。
 2. 暗色只覆盖概览一页。
 3. `knip-baseline.json` 陈旧（117 条漂移）是**既有问题**，本轮只如实记录，未擅自 `--update` 掩盖。
+
+---
+
+## 14. 2026-10-23 主控会话：门禁可信度与错误面收口（真实执行）
+
+> 本条只记本会话（独立于并行批次）做了什么、验证到什么程度、哪些未闭环。
+> 详细证据：`evidence/T-A5.json`、`T-A6.json`、`T-A8.json`、`T-B1.json`、`T-B2.json`、`T-B9a.json`。
+
+| 任务 | 状态 | 关键证据 |
+|---|---|---|
+| T-A5 版本四口径门禁 | **done** | `scripts/check-version-consistency.mjs`；自测 9/9；真实仓库 `consistent`；已进 CI |
+| T-A6 CI 补门禁 | **done**（术语 + 版本两 step） | `Bun.YAML.parse(ci.yml)` = 3 jobs / frontend 12 steps |
+| T-A8 三份规格文件 | **done** | `db_structure.md`（55 表/637 列，脚本生成）、`project_specs.md`、`.agent/memory/×6` |
+| T-B1 39 处错误直抛 | **done** | 改写为 `ApiError` / 新增 `ApiErrorMsgLogged`；`go build`+`go vet`+`go test ./common/` 5/5 |
+| T-B2 清原生 confirm + 删死 hook | **done** | `window.confirm` 实调 0 处；`use-form-dirty-guard.ts` 已删；typecheck/lint/locale 全绿 |
+| T-B9a N1 术语残余 + 门禁假绿 | **done** | 门禁 RED 4 → 文案修复 → GREEN 0 |
+| T-A1 前端分片脚本 | **done（工具）/ 全量未绿** | `web/scripts/test-shards.mjs`；199 文件 5 片；948 通过 / 13 失败（失败均属并行批次模块） |
+| 死循环修复 | **done（额外发现）** | `plan-comparison.test.tsx` mock 的 `t` 不稳定导致无限 effect：>6 分钟 → 2.9 秒 |
+| T-A4 ClickHouse 真跑 | **blocked** | 本机 `docker: command not found`，需运行环境 |
+| T-A3 三库 conformance | **blocked** | 本机 PostgreSQL 服务损坏 + 需临时实例；本轮未跑 |
+| T-A2 controller `-shuffle` | **todo** | 全量约 600s 超时（已知噪声），需单独排 |
+| 生产部署 / 发版 | **未由本会话执行** | 并行会话已发布 v1.3.182 并留回滚点 v1.3.181（见 ledger 生产段）；本会话不重复部署，避免与其撞车 |
+
+**未闭环项（不掩饰）**：knip 死代码门禁当前 FAIL(1)；前端 13 条真实失败；ClickHouse 未验证；生产最终版本以并行会话的部署记录为准。

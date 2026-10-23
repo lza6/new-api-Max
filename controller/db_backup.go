@@ -74,7 +74,7 @@ func ImportDatabase(c *gin.Context) {
 	result, err := service.ImportDatabaseBackup(src)
 	if err != nil {
 		// 区分「文件格式问题」（用户可自行修正）与「服务端问题」。
-		common.ApiErrorMsg(c, "import failed: "+err.Error())
+		common.ApiErrorMsgLogged(c, "import failed", err)
 		return
 	}
 

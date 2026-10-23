@@ -1,0 +1,45 @@
+{
+  "task_id": "T-A8",
+  "title": "三份规格文件补全（project_specs / db_structure / .agent/memory）",
+  "status": "done",
+  "timestamp": "2026-10-23T11:52:00+08:00",
+  "commands_executed": [
+    {
+      "cmd": "go build -o /c/temp/specdump/new-api-dump.exe .",
+      "exit_code": 0,
+      "raw_output_tail": "产物 120MB，用于跑一次真实 AutoMigrate"
+    },
+    {
+      "cmd": "SQLITE_PATH=C:/temp/specdump/spec.db PORT=3311 SESSION_SECRET=dump_only_secret GIN_MODE=release ./new-api-dump.exe",
+      "exit_code": 0,
+      "raw_output_tail": "new-api-Max v0.0.0 ready in 1800 ms / Local: http://localhost:3311/ —— 迁移完成，spec.db 1.1MB"
+    },
+    {
+      "cmd": "node scripts/gen-db-structure.mjs --db C:/temp/specdump/spec.db --out db_structure.md",
+      "exit_code": 0,
+      "raw_output_tail": "wrote db_structure.md / tables: 55 / columns: 637 / bytes: 41753"
+    }
+  ],
+  "deliverables": [
+    { "path": "db_structure.md", "lines": 1336, "content": "55 张表 / 637 列 / 每表索引，全部由真实 AutoMigrate 结果生成（脚本 scripts/gen-db-structure.mjs），含权威关系声明与「SQLite 不代表 MySQL/PG 类型细节」的边界说明" },
+    { "path": "project_specs.md", "content": "任务状态权威源：轨道 A/B/C/D 共 32 张卡的状态机 + 证据指针 + 本会话 9 条已验证事实 + 更新规则" },
+    { "path": ".agent/memory/audit-history.md", "content": "12 轮审计索引 + 4 处未审计区域" },
+    { "path": ".agent/memory/verified-scope.md", "content": "已验证项（带命令与有效期）+ 3 条已知噪声" },
+    { "path": ".agent/memory/known-issues.md", "content": "P0×3 / P1×8 / 环境协作风险×4" },
+    { "path": ".agent/memory/optimization-log.md", "content": "只记实测数字，未实测的显式标注" },
+    { "path": ".agent/memory/change-index.md", "content": "本会话变更意图 + 他会话在途清单（不代提交）" },
+    { "path": ".agent/memory/decisions.md", "content": "6 条决策含代价" }
+  ],
+  "freshness_evidence": {
+    "evidence": "会话开始时 go build ./... 通过；端点起服务后 AutoMigrate 生成 55 表，与代码一致",
+    "caveat": "生成用的是一次性 SQLite；MySQL/PostgreSQL 的类型差异未覆盖（已在 db_structure.md §2 声明）"
+  },
+  "bad_input_found": {
+    "detail": "构建产出的版本号是 v0.0.0（未注入 ldflags），说明「VERSION 文件」与「二进制自报版本」是两条独立链路——发布时必须显式注入，否则线上 x-new-api-version 头不可信。",
+    "action": "已记入 known-issues；未擅自改构建脚本（Dockerfile/makefile 改动属发布链路，需单独批次）。"
+  },
+  "limitations": [
+    "db_structure.md 只覆盖主库，日志库（含 ClickHouse）不在其中",
+    "memory 文件是索引性质，正文仍在既有台账里（有意如此，避免第五份叙事）"
+  ]
+}

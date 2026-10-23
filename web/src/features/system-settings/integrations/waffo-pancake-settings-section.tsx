@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/confirm-dialog'
 import { Combobox } from '@/components/ui/combobox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -78,6 +79,9 @@ export function WaffoPancakeSettingsSection({
   const [phase, setPhase] = React.useState<'idle' | 'verifying'>('idle')
   const [catalog, setCatalog] = React.useState<CatalogStore[]>([])
   const [creatingPair, setCreatingPair] = React.useState(false)
+  // 空 Return URL 时创建商品：与设计系统统一的确认弹窗对齐，不再用原生
+  // window.confirm（N4 收口：原生 confirm 无法本地化、样式断裂、不可访问）。
+  const [confirmEmptyReturnOpen, setConfirmEmptyReturnOpen] = React.useState(false)
   const chosenStoreID = selectedBinding.storeID
   const chosenProductID = selectedBinding.productID
   const storeID = savedBinding.storeID
@@ -272,19 +276,17 @@ export function WaffoPancakeSettingsSection({
       )
       return
     }
+    if (!removeTrailingSlash(returnURL.trim())) {
+      setConfirmEmptyReturnOpen(true)
+      return
+    }
+    await createPair()
+  }
+
+  const createPair = async () => {
+    setConfirmEmptyReturnOpen(false)
     const { merchantID, privateKey } = readCreds()
     const trimmedReturn = removeTrailingSlash(returnURL.trim())
-    if (!trimmedReturn) {
-      if (
-        !window.confirm(
-          t(
-            'Payment return URL is empty. Create the product without a SuccessURL redirect?'
-          )
-        )
-      ) {
-        return
-      }
-    }
     setCreatingPair(true)
     try {
       const body = await createWaffoPancakePair({
@@ -599,6 +601,20 @@ export function WaffoPancakeSettingsSection({
           </div>
         </div>
       </div>
+
+      <ConfirmDialog
+        open={confirmEmptyReturnOpen}
+        onOpenChange={setConfirmEmptyReturnOpen}
+        title={t(
+          'Payment return URL is empty. Create the product without a SuccessURL redirect?'
+        )}
+        desc={t('This action cannot be undone.')}
+        confirmText={t('Create')}
+        isLoading={creatingPair}
+        handleConfirm={() => {
+          void createPair()
+        }}
+      />
     </div>
   )
 }

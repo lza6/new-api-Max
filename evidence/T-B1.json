@@ -1,0 +1,59 @@
+{
+  "task_id": "T-B1",
+  "title": "39 处 ApiErrorMsg(c, err.Error()) 改走脱敏路径",
+  "status": "done",
+  "timestamp": "2026-10-23T12:00:00+08:00",
+  "problem": "ApiErrorMsg 接收的是 string，绕过 common.ApiError 的 LooksInternalError 脱敏，导致 sql:/gorm:/json: cannot unmarshal/context deadline exceeded 等实现细节直达用户界面。",
+  "commands_executed": [
+    {
+      "cmd": "grep -rn \"ApiErrorMsg([^)]*err\\.Error()\" controller service middleware --include=*.go | grep -v _test | wc -l",
+      "exit_code": 0,
+      "raw_output_tail": "39  (before)\n0  (after)"
+    },
+    {
+      "cmd": "gofmt -w controller/*.go common/gin.go && go build ./...",
+      "exit_code": 0,
+      "raw_output_tail": "build clean (first attempt failed with setting/response_cache_setting/*.go: SemanticAllowModels undefined — that file was being edited concurrently by another session at 11:56; retried after they finished and it passed)"
+    },
+    {
+      "cmd": "go vet ./controller/",
+      "exit_code": 0,
+      "raw_output_tail": "no findings"
+    },
+    {
+      "cmd": "go test ./common/ -run 'TestApiError|TestLooksInternalError' -v",
+      "exit_code": 0,
+      "raw_output_tail": "PASS TestLooksInternalError / PASS TestApiErrorSanitizesInternalErrors / PASS TestApiErrorPassesThroughUserFacingMessages / PASS TestApiErrorMsgLoggedHidesDetailsButKeepsUserMessage / PASS TestApiErrorMsgLoggedToleratesNilError\nok github.com/lza6/new-api-Max/common 0.857s"
+    },
+    {
+      "cmd": "go test ./controller/ -run 'XXX_NoSuchTest'",
+      "exit_code": 0,
+      "raw_output_tail": "ok github.com/lza6/new-api-Max/controller 1.568s [no tests to run] — controller 测试包可编译"
+    }
+  ],
+  "files_changed": [
+    "common/gin.go (new helper ApiErrorMsgLogged + requestIdForLog, ApiError refactored to share request-id logic)",
+    "common/gin_error_test.go (2 new tests)",
+    "controller/checkin.go (1)",
+    "controller/custom_oauth.go (6)",
+    "controller/db_backup.go (1)",
+    "controller/log.go (8)",
+    "controller/ops_panel.go (8)",
+    "controller/option.go (2)",
+    "controller/task_plugin.go (12)",
+    "controller/training_data_analyze.go (1)"
+  ],
+  "rewrite_rules": [
+    "common.ApiErrorMsg(c, err.Error()) → common.ApiError(c, err)（11 处，交给既有脱敏器）",
+    "common.ApiErrorMsg(c, \"前缀: \"+err.Error()) → common.ApiErrorMsgLogged(c, \"前缀\", err)（28 处，用户只看人话，细节进日志并共用 request id）"
+  ],
+  "tests": [
+    { "name": "TestApiErrorMsgLoggedHidesDetailsButKeepsUserMessage", "type": "unit", "status": "pass", "evidence": "response body 不含 cannot unmarshal / json:；含调用方文案；response header 有 request id" },
+    { "name": "TestApiErrorMsgLoggedToleratesNilError", "type": "unit", "status": "pass", "evidence": "nil err 不 panic，响应无 code 字段" }
+  ],
+  "seams_touched": ["HTTP error response contract (message/code/request_id)", "server log format"],
+  "limitations": [
+    "未做真实 HTTP 端点级 E2E（需起服务+鉴权）；证明落在 handler 层的 helper 行为与编译/静态检查上",
+    "28 处带前缀的文案去掉了原始 err 尾巴，运维排障需查服务端日志（按 request id 对照），这是有意的取舍"
+  ]
+}

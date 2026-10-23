@@ -38,9 +38,16 @@ vi.mock('@/stores/auth-store', () => ({
     selector({ auth: { user: mocks.currentUser } }),
 }))
 
+// `t` 必须是**稳定引用**：PlanComparison 用 useCallback([isSignedIn, t]) 构造
+// loadData，再用 useEffect([loadData]) 触发加载。若 mock 每次渲染都新建 t，
+// loadData 身份每次都变 → effect 每次都跑 → setLoading 触发重渲染 → 无限循环，
+// 整个测试文件会挂死（实测 >6 分钟不结束、--testTimeout 也压不住）。
+// 这不是组件过度敏感，而是 mock 违反了 React 对依赖稳定性的前提。
+const stableT = (key: string) => key
+
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string) => key,
+    t: stableT,
     i18n: { resolvedLanguage: 'en', language: 'en' },
   }),
 }))
