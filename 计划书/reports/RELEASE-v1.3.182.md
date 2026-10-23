@@ -38,3 +38,17 @@ ssh root@154.37.208.171 'cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.181'
 
 V4 表格视觉统一 · V5 状态色令牌化存量清理 · V6 图表单色阶 · V7 三态视觉 ·
 V8 动效规范 · V9–V11 页面覆盖 · V12 视觉基线脚本 · V13 `ink` 结构差异套。
+
+---
+
+# v1.3.185（视觉批次 2：V4/V5/V6 + V7）
+
+- **提交**：`f7afe2ac6`（V4–V6）；`127749a52`（V7）
+- **部署**：2026-10-22 蓝绿，生产 `x-new-api-version: v1.3.185`，healthy，0 个 5xx
+- **回滚**：`./deploy-zero-downtime.sh v1.3.184`
+- **新增**：表格微标签（11px + tracking）、data-table 外框 `surface-1 + border-rule`、
+  `Alert` 的 success/warning/info 令牌变体、`lib/chart-palette.ts`（canvas 安全单色序列阶）、
+  空态 `surface-grid` 工程网格 + `EmptyMedia` aria-hidden
+- **验证**：typecheck / oxlint / build PASS；定向 vitest 81/81 + chart-palette 4/4 + empty-state 6/6；
+  浏览器实测 canvas 颜色管线（`--primary` → `#146fa8` → `ctx.fillStyle`）与表头 11px
+- **未完成**：V4b 数字列右对齐、V5 存量 `bg-*-50` 清扫、V6b `--chart-N` 令牌统一、V8–V13

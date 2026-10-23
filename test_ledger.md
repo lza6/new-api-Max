@@ -629,3 +629,20 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 - V4：`TableHead` 改微标签、`Table` 根移除 `[&_th]:text-sm` 覆盖、data-table 外框与移动端卡片列改 `border-rule + surface-1 + rounded-xl`。**数字列右对齐未做**（需要列级 metadata 契约，留待 V4b）。
 - V5：`Alert` 新增 `success/warning/info` 三个令牌变体；`system-tasks-panel` 状态色与进度条、`setup/database-step` 三条 Alert 全部令牌化（该文件调色板直写归零）。**全站存量 `bg-*-50` 未清完**，仍按批推进。
 - V6：新增 `lib/chart-palette.ts`（canvas 安全单色阶，读 `--primary`/`--background`）；dashboard 的 `getDashboardChartColors` 与 `USER_COLORS` 改用它。**`codex-usage-dialog` 等仍直接用 `--chart-N` 令牌**，令牌本身未改（避免 StatusBadge 的 `text-chart-N` 对比度回退），留待 V6b 统一。
+
+### v1.3.185 生产部署与线上验证（2026-10-22）
+
+| 验证 | 命令（服务器侧） | 结果 |
+|---|---|---|
+| 镜像构建 | `docker build -t new-api:v1.3.185 /opt/new-api-src-v185` | PASS |
+| 蓝绿切换 | `./deploy-zero-downtime.sh v1.3.185` | 3001→3000；新容器 200；自检 200；清理后磁盘 13G/78G |
+| 版本头 | `curl -sI --resolve … https://freeapi.tingfengai.art` | `HTTP/2 200` + `x-new-api-version: v1.3.185` |
+| 健康 | `/healthz`、`/readyz` | 200；`{"status":"ready","checks":{"database":"up","redis":"up"}}` |
+| 业务接口 | `/api/status` | 200 |
+| 首页 | `GET /` | 200，8666 字节，title 正常 |
+| 新样式产物 | 拉取 `index.987b66e7a5.css` | 含 `surface-grid`、`border-rule`（V4/V7 产物已上线） |
+| 运行期 | `docker logs \| grep -c ERROR/panic`；`RestartCount` | 0 / 0；0 restarts |
+
+**回滚点**：`new-api:v1.3.184`（`./deploy-zero-downtime.sh v1.3.184`）。本轮未触发回滚。
+**注**：本次部署的 HEAD 同时包含并行工作流的 v1.3.183/184（策略中心、语义缓存、i18n 门禁、
+策略中心文本域上限）；那部分后端行为不在本会话的验证范围内，线上仅确认健康检查/接口/日志无错。
