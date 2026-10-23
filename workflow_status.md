@@ -502,3 +502,49 @@
 | audit-ops | 单点故障/磁盘/安全面/可观测性/回滚/文档与现实差距 | 进行中 |
 
 产出将写入 `evidence/audit-20261023-{data,billing,frontend,ops}.json`，汇总后按 P0→P1 修复并走独立审查循环（≤3 轮）。
+
+## D. 已在生产执行但**不在仓库**的变更（服务器侧，务必记档）
+
+> 这些改动直接落在生产机，换个实例会丢失。已逐条实测。
+
+| # | 变更 | 位置 | 验证 |
+|---|---|---|---|
+| D-1 | postgres 扩容与调参：`mem_limit 1200m`、`shared_buffers 256MB`、`work_mem 8MB`、`maintenance_work_mem 128MB`、`jit=off`、`effective_cache_size 2GB`、`random_page_cost 1.1`、`effective_io_concurrency 100`、`shm_size 256m` | `/opt/new-api/docker-compose.yml`（备份 `*.bak-pre-sqltune-*`） | `pg_settings` 实测 |
+| D-2 | new-api 资源：1500m / swap 2400m / 2 core / `GOMEMLIMIT=1024MiB` | `deploy-zero-downtime.sh` + `docker update` | `docker inspect` 实测 |
+| D-3 | 覆盖索引 `idx_logs_type_created_stats (type,created_at) INCLUDE (model_name,request_bytes,response_bytes,prompt_tokens,completion_tokens,quota)` 182MB | 生产 DB | `indisvalid=t`；日流量 18.1s→1.8s、模型排行 9.6s→1.1s、`/api/site/stats` 10.7s→**0.41s** |
+| D-4 | 端口绑定收紧为 `127.0.0.1:${NEW_PORT}:3000`（原 `0.0.0.0:3001` 明文暴露公网，绕过 Caddy 的 TLS 与安全头） | `deploy-zero-downtime.sh` | `ss -tlnp` 显示 `LISTEN 127.0.0.1:3000` |
+| D-5 | Caddy `/metrics` 限本机（公网曾 200，暴露 114 条运营指标） | `/etc/caddy/Caddyfile`（备份 `*.bak-metrics-*`） | 外网 **404** / 本机 200 |
+| D-6 | Caddy 健康检查 `2s/2s` → `5s/5s`（容忍窗口 6s→15s，修 503 放大链） | 同上 | reload 后外网 10/10=200 |
+| D-7 | 每日数据库备份：`/opt/new-api/backup.sh`（pg_dump -Fc + `pg_restore -l` 校验 + 保留 7 天），cron `0 3 * * *` | 生产主机 | 实测产出 182MB dump、耗时 44s、校验通过 |
+| D-8 | fail2ban：`/etc/fail2ban/jail.local`（sshd, systemd backend, maxretry 4, bantime 1h） | 生产主机 | `fail2ban-client status sshd` = active |
+
+## E. 剩余待办（本轮未做，按优先级）
+
+| ID | 优先级 | 事项 | 阻塞原因 |
+|---|---|---|---|
+| E-1 | **P0** | 部署 v1.3.188（本轮全部代码修复尚未上线） | SSH 被 fail2ban 封禁（见 §F） |
+| E-2 | P0 | 生产删除死索引 `idx_logs_traffic`（60MB，`migrateLogTrafficIndex` 因 master 判定/时序未生效） | 同上 |
+| E-3 | P0 | SSH 改密钥登录 + 关密码登录（24h 16867 次撞库） | **需用户提供公钥**，否则锁死 |
+| E-4 | P1 | logs 保留策略（现 184 万行 / 42 天 / 3.5GB，`StartLogCleanupTask` 存在但无定时触发） | 删除数据属不可逆，**需用户定保留天数** |
+| E-5 | P1 | `/api/log/report` 六个维度的全窗口聚合（`model/usage_report.go`） | 分组列（channel/user/group/token）不在覆盖索引里，需评估是否再加索引 |
+| E-6 | P1 | 宿主 0 swap 而容器 `memswap 2400m` 是幻觉；`docker rm -f` 强杀旧容器导致在途流式请求 502（24h 53 个） | 需改容器停止策略 + 决定是否加 swap（历史教训：6G swap 打满反而更糟） |
+| E-7 | P1 | 内核 5.15.0-30（2022 年）已 reboot-required 17 天 | 重启需维护窗口，**需用户决定** |
+| E-8 | P2 | 前端审计代理未回（`evidence/audit-20261023-frontend.json` 缺失） | 代理未完成 |
+
+## F. 本轮阻塞：SSH 被自己装的 fail2ban 封禁
+
+**事实**：装 fail2ban 后，用于免交互 SSH 的 askpass 临时文件被 `/tmp` 反复清理，每次重试都计一次认证失败，累计超过 `maxretry=4`，触发 1 小时封禁（仅 22 端口、仅本机出口 IP）。**80/443 与线上服务不受影响**，封禁前后均无破坏性操作。
+
+**恢复方式（三选一）**：
+1. 等待 `bantime=1h` 自动解封（起始约 10:58 UTC，预计 **11:58 UTC** 恢复）；
+2. 用户通过云服务商控制台（VNC/救援模式）执行 `fail2ban-client unban --all`；
+3. 用户提供另一台可 SSH 的跳板。
+
+**解封后应立即执行**（防再次自锁）：
+```bash
+sed -i 's/^maxretry = 4/maxretry = 10/' /etc/fail2ban/jail.local
+sed -i '/^\[DEFAULT\]/a ignoreip = 127.0.0.1/::1' /etc/fail2ban/jail.local
+systemctl restart fail2ban
+cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.188
+docker exec postgres psql -U newapi -d "new-api" -X -c "DROP INDEX CONCURRENTLY idx_logs_traffic;"
+```
