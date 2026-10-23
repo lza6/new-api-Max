@@ -107,8 +107,9 @@ export const toModelListText = (raw: unknown): string => {
 const createSchema = () =>
   z.object({
     maxPromptChars: z.number().int().min(0).max(10000000),
-    modelLimits: z.string(),
-    semanticModels: z.string(),
+    // 两个文本域会原样写进 option；加上限避免一次粘贴把整份配置写爆。
+    modelLimits: z.string().max(20000),
+    semanticModels: z.string().max(20000),
     semanticSimilarity: z.number().min(0).max(1),
   })
 
