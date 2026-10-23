@@ -5,7 +5,7 @@ All notable changes to this project are documented here.
 ## [v1.3.184] - 2026-10-23
 
 ### Fixed
-- Policy-centre textareas (, ) now
+- Policy-centre textareas (per-model request budget, semantic cache models) now
   cap input at 20 000 characters before writing to options (review finding: an
   oversized paste could bloat the stored option).
 
