@@ -7424,6 +7424,20 @@
     "Type {{text}} to confirm": "Type {{text}} to confirm",
     "Change pricing conversion?": "Change pricing conversion?",
     "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.",
-    "The request could not be completed. Please try again later.": "The request could not be completed. Please try again later."
+    "The request could not be completed. Please try again later.": "The request could not be completed. Please try again later.",
+    "Unified Policy Center": "Unified Policy Center",
+    "Save policy center": "Save policy center",
+    "Maximum prompt characters": "Maximum prompt characters",
+    "Prompts longer than this are blocked when the policy engine is in enforce mode. 0 disables the check.": "Prompts longer than this are blocked when the policy engine is in enforce mode. 0 disables the check.",
+    "Semantic similarity threshold": "Semantic similarity threshold",
+    "How close a prompt must be to reuse a cached answer (0-1, default 0.97). Lower values save more money and risk answering a different question.": "How close a prompt must be to reuse a cached answer (0-1, default 0.97). Lower values save more money and risk answering a different question.",
+    "Per-model request budget (model=quota per line)": "Per-model request budget (model=quota per line)",
+    "A request whose estimated cost exceeds its model limit is blocked in enforce mode. Empty means no per-model limit.": "A request whose estimated cost exceeds its model limit is blocked in enforce mode. Empty means no per-model limit.",
+    "Semantic cache models (one per line)": "Semantic cache models (one per line)",
+    "Semantic cache only applies to these models. Leave empty to keep it off entirely.": "Semantic cache only applies to these models. Leave empty to keep it off entirely.",
+    "Semantic Response Cache": "Semantic Response Cache",
+    "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.": "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.",
+    "Turn off to fall back to exact-match caching only; nothing else changes.": "Turn off to fall back to exact-match caching only; nothing else changes.",
+    "Invalid line: {{line}}": "Invalid line: {{line}}"
   }
 }

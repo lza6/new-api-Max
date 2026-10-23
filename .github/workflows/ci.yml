@@ -113,6 +113,34 @@ jobs:
       - name: Knip dead-code gate (no new dead code)
         run: node scripts/knip-gate.mjs
 
+      # P0-1 gate hardening (v1.3.182). Before this, the i18n key-usage check was
+      # never wired into CI and it cannot see a locale that is simply missing
+      # translations: fr/ja/ru/vi were 95 keys short (zh-TW 66) while it printed
+      # "OK (0 missing)" — the missing keys fell back to English at runtime.
+      - name: i18n key usage gate
+        run: node scripts/check-missing-i18n.cjs
+
+      - name: i18n locale coverage gate
+        run: node scripts/check-i18n-coverage.cjs
+
+      # N1 terminology gate: one concept, one word. The script already existed
+      # (bun run i18n:terminology) but was only ever run by hand, so "配额" had
+      # crept back into 2 keys and nothing noticed.
+      - name: i18n terminology gate
+        run: node scripts/check-terminology.mjs
+
+      # T-A5 version consistency: VERSION / CHANGELOG / tag / §0 / README must
+      # agree. These drifted silently before (README still said v1.3.180 while
+      # v1.3.181 was shipped). Dev mode tolerates "bumped but not yet tagged".
+      - name: Version consistency gate
+        working-directory: ${{ github.workspace }}
+        run: node scripts/check-version-consistency.mjs
+
+      # Design tokens (theme.css / theme-presets.css) must match the committed
+      # snapshot; otherwise the parallel visual work (V1–V13) can drift silently.
+      - name: Design token drift gate
+        run: node scripts/ds-tokens-check.mjs
+
       - name: Test
         run: bun run test
   db-conformance:
