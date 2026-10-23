@@ -551,6 +551,40 @@
 处置：把 `AutoMigrate(&LogDailyStat{})` 兜底到 `RefreshLogDailyStats` 开头（v1.3.190），
 建不出来直接报错而不是静默退化成全表扫描。**根因仍未查清**，已列为待办 E-9。
 
+## H. 数据库日志保留策略（v1.3.191）
+
+### 用户反馈与核实结论
+用户问「日志我后台不是定 7 天自动清理吗？怎么没有」。核实：
+- 设置页的「Retain last N days」清理的是**磁盘日志文件**（`/app/logs`），且是**一次性手动触发**；
+- **`logs` 表本身从来没有任何自动清理机制**（只有一个手动 API `/api/system-task/log-cleanup`）；
+- 结果：该表累积 **186 万行 / 3.5GB / 42 天**，正是 2026-10-23 OOM 事故的燃料。
+
+### 实现
+| 组件 | 说明 |
+|---|---|
+| option `LogRetentionDays` | 0 = 永不清理（默认，避免升级即删数据）；正值 = 保留天数 |
+| `service.StartLogRetentionTask()` | master 每 6 小时检查一次，按天数控目标时间戳，入队既有的**分批** `log_cleanup` 系统任务 |
+| 为什么分批 | 186 万行单事务 DELETE 会撑爆 WAL 并长时间锁表 |
+| 幂等 | 目标时间戳滚动计算，重复触发无副作用；活跃任务由 `StartLogCleanupTask` 去重 |
+
+### 生产实测（2026-10-23 22:40）
+| 项 | 前 | 后 |
+|---|---|---|
+| `logs` 行数 | 1,861,886 | **639,962** |
+| 最老日期 | 2026-09-11（42 天） | **2026-10-16（7 天）** |
+| `log_cleanup` 任务 | — | **succeeded** |
+| 历史统计 | — | 汇总表仍保留 **43 天**（406 行 / 160KB）—— 删原始行不影响历史报表（预聚合的额外收益） |
+
+清理前备份：`/opt/backup/new-api/newapi-20261023-143842.dump`（184MB）。
+`VACUUM (ANALYZE) logs` 后 `n_dead_tup=0`；磁盘仍显示 3581MB，PG 不主动归还 OS，空间由 FSM 复用。
+
+## I. 其他 P1（同日完成）
+
+| 项 | 处置 | 验证 |
+|---|---|---|
+| 宿主 0 swap，容器却配 2400m swap（预算幻觉） | 加 **2GB swapfile**，`vm.swappiness=10`，写入 `/etc/fstab` 与 `sysctl.conf` | `free -m` 显示 Swap 2047MB；已用 16MB |
+| `docker rm -f` 强杀旧容器（24h 内 53 个 502） | 部署脚本改为 `docker stop -t 30` 再 `docker rm`，让 SIGTERM 触发 `main.go` 的 shutdown 排空 flusher 队列 | 本次部署耗时 92s（含 30s 优雅停止），外网 10/10=200 |
+
 ## E. 剩余待办（本轮未做，按优先级）
 
 | ID | 优先级 | 事项 | 阻塞原因 |
