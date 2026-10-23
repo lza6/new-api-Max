@@ -29,6 +29,13 @@ const alertVariants = cva(
         default: 'bg-card text-card-foreground',
         destructive:
           'bg-card text-destructive *:data-[slot=alert-description]:text-destructive/90 *:[svg]:text-current',
+        /* 视觉体系 §4.4：语义变体必须走令牌，禁止在调用点直写 bg-amber-50 之类 */
+        success:
+          'border-success/40 bg-success/8 text-success-text *:data-[slot=alert-description]:text-success-text/90 *:[svg]:text-current',
+        warning:
+          'border-warning/40 bg-warning/10 text-warning-text *:data-[slot=alert-description]:text-warning-text/90 *:[svg]:text-current',
+        info:
+          'border-info/40 bg-info/8 text-info *:data-[slot=alert-description]:text-info/90 *:[svg]:text-current',
       },
     },
     defaultVariants: {

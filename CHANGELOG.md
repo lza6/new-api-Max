@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.185] - 2026-10-22
+
+Visual identity batch 2 — table micro-labels, tokenised status colours, single-hue chart ramp (视觉体系 V4/V5/V6).
+
+### Changed
+- **Tables (V4)**: `TableHead` is now a micro-label (11px, muted, letter-spaced) and the
+  table root no longer forces `[&_th]:text-sm`, which used to win over the header class.
+  Data-table frames and mobile card lists moved to `border-rule + bg-surface-1 + rounded-xl`,
+  so dense tables read as one instrument surface instead of a bordered grey box.
+- **Status colours (V5)**: `Alert` gained token-based `success` / `warning` / `info` variants
+  (`--success-text` / `--warning-text` keep WCAG AA). The system-task panel and the setup
+  database step now use tokens instead of `bg-amber-50` / `bg-emerald-50` / `bg-sky-50`.
+
+### Added
+- **Chart ramp (V6)**: `lib/chart-palette.ts` builds a canvas-safe single-hue series ramp from
+  `--primary` / `--background` (normalises any CSS colour through a 2d context, falls back to a
+  fixed ramp without one). Dashboard charts use it instead of VChart's blue/cyan/yellow/orange/purple
+  default scheme; ordinal `USER_COLORS` follows the active preset and theme.
+
+### Verified
+- `bun run typecheck` PASS · oxlint on touched files clean · `bun run build` PASS.
+- `vitest run src/features/dashboard src/components/ui src/components/__tests__` 81/81 PASS;
+  `lib/__tests__/chart-palette.test.ts` 4/4 PASS.
+- Browser probe: `--primary` resolves to `#146fa8` and survives `ctx.fillStyle` normalisation,
+  so the ramp works on canvas; `/keys` header computes to 11px with 0.275px tracking.
+
+### Not done (tracked in test_ledger.md)
+- V4b: numeric column right-alignment needs a column metadata contract.
+- V5: the remaining `bg-{emerald,amber,sky,…}-50` backlog is swept per batch, not in one shot.
+- V6b: charts that reference `--chart-1..5` directly still use the old hue set, because those tokens
+  double as StatusBadge text colours and cannot be re-hued without a contrast audit.
+
 ## [v1.3.184] - 2026-10-23
 
 ### Fixed

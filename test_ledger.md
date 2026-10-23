@@ -611,3 +611,21 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 - 管理端 API 登录返回 JWT（`data.access_token`）+ refresh cookie；只带其一可能 401。Token 列表接口返回**掩码 key**，真 key 只能从创建响应 `data.key` 取。
 - 敏感词 option 是**换行分隔**文本（不是 JSON 数组）；`/api/option/` 用 **PUT**（POST 会落到 relay 报 `Invalid URL`）。
 - 生产 SSH：`py -3 .refscan/ssh.py "<cmd>"`；源码走服务器 `git clone`（SFTP 未开放，`cat >` 流式上传会 socket 关闭）。
+
+## 2026-10-22 v1.3.184 视觉批次 2（V4 表格 / V5 状态色 / V6 图表序列）
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 类型 | `cd web && bun run typecheck` | PASS |
+| Lint（改动文件） | `bunx oxlint -c .oxlintrc.json <8 files>` | 0 error（顺带修掉 charts.ts 既有 `parseFloat` warning） |
+| 构建 | `bun run build` | PASS（总产物 24571.4 kB，字体无新增） |
+| 定向测试 | `vitest run src/features/dashboard src/components/ui src/components/__tests__` | 81/81 PASS |
+| 图表色阶测试 | `vitest run src/lib/__tests__/chart-palette.test.ts` | 4/4 PASS（canvas 缺 2d context 时仍返回合法 hex） |
+| 浏览器实测：canvas 管线 | Playwright evaluate | `--primary` → `#146fa8`，`ctx.fillStyle` 规范化后仍是 `#146fa8` ⇒ **oklch→canvas 通路成立**，序列色不需要 color-mix |
+| 浏览器实测：表头 | `/keys` `th` computed | `font-size: 11px`、`letter-spacing: 0.275px`、颜色 muted ⇒ 微标签生效（并发现 `Table` 根的 `[&_th]:text-sm` 会压掉表头字号，已移除该覆盖） |
+| 浏览器实测：空态 | `/keys` | 网格 + 表框 surface-1 + 规则线，截图 `web/e2e-local/v13182/v183-keys-table.png` |
+
+**V4/V5/V6 的实际范围（如实记录）**
+- V4：`TableHead` 改微标签、`Table` 根移除 `[&_th]:text-sm` 覆盖、data-table 外框与移动端卡片列改 `border-rule + surface-1 + rounded-xl`。**数字列右对齐未做**（需要列级 metadata 契约，留待 V4b）。
+- V5：`Alert` 新增 `success/warning/info` 三个令牌变体；`system-tasks-panel` 状态色与进度条、`setup/database-step` 三条 Alert 全部令牌化（该文件调色板直写归零）。**全站存量 `bg-*-50` 未清完**，仍按批推进。
+- V6：新增 `lib/chart-palette.ts`（canvas 安全单色阶，读 `--primary`/`--background`）；dashboard 的 `getDashboardChartColors` 与 `USER_COLORS` 改用它。**`codex-usage-dialog` 等仍直接用 `--chart-N` 令牌**，令牌本身未改（避免 StatusBadge 的 `text-chart-N` 对比度回退），留待 V6b 统一。

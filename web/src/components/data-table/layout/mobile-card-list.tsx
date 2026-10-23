@@ -70,7 +70,7 @@ interface MobileCardListProps<TData> {
 
 function ListSkeleton() {
   return (
-    <div className='divide-y overflow-hidden rounded-lg border'>
+    <div className='border-rule divide-rule divide-y overflow-hidden rounded-xl border'>
       {[1, 2, 3, 4, 5].map((i) => (
         <div key={i} className='px-3 py-2.5'>
           <div className='flex items-center justify-between'>
@@ -95,7 +95,7 @@ function ListSkeleton() {
 
 function FallbackListSkeleton() {
   return (
-    <div className='divide-y overflow-hidden rounded-lg border'>
+    <div className='border-rule divide-rule divide-y overflow-hidden rounded-xl border'>
       {[1, 2, 3, 4, 5].map((i) => (
         <div key={i} className='space-y-1.5 px-3 py-2.5'>
           {[1, 2, 3].map((j) => (
@@ -180,7 +180,7 @@ export function MobileCardList<TData>(props: MobileCardListProps<TData>) {
   }
 
   return (
-    <div className='divide-y overflow-hidden rounded-lg border'>
+    <div className='border-rule divide-rule divide-y overflow-hidden rounded-xl border'>
       {enableRowSelection && (
         <label className='flex items-center gap-2 px-3 py-2 text-xs'>
           <Checkbox

@@ -16,7 +16,7 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { dataScheme as vchartDefaultDataScheme } from '@visactor/vchart/esm/theme/color-scheme/builtin/default'
+import { buildChartRamp } from '@/lib/chart-palette'
 
 import { MAX_CHART_TREND_POINTS } from '@/features/dashboard/constants'
 import type {
@@ -40,15 +40,8 @@ type TooltipLineItem = {
 }
 
 export function getDashboardChartColors(domainLength: number): string[] {
-  const scheme =
-    vchartDefaultDataScheme.find(
-      (item) => !item.maxDomainLength || domainLength <= item.maxDomainLength
-    ) ?? vchartDefaultDataScheme.at(-1)
-  if (!scheme) {return []}
-
-  return scheme.scheme.filter(
-    (color): color is string => typeof color === 'string'
-  )
+  // 视觉体系 §4.6：单色顺序阶（由 --primary 派生），替代 VChart 的蓝/青/黄/橙/紫多色盘
+  return buildChartRamp(Math.max(1, domainLength))
 }
 
 function renderQuotaCompat(rawQuota: number, digits = 4): string {
@@ -59,7 +52,7 @@ function renderQuotaCompat(rawQuota: number, digits = 4): string {
   const symbol = 'symbol' in meta ? meta.symbol : '$'
   const value = usd * rate
   const fixed = value.toFixed(digits)
-  if (parseFloat(fixed) === 0 && rawQuota > 0 && value > 0) {
+  if (Number.parseFloat(fixed) === 0 && rawQuota > 0 && value > 0) {
     return symbol + Math.pow(10, -digits).toFixed(digits)
   }
   return symbol + fixed
@@ -692,18 +685,11 @@ export function processChartData(
   }
 }
 
-const USER_COLORS = [
-  '#5B8FF9',
-  '#5AD8A6',
-  '#F6BD16',
-  '#E8684A',
-  '#6DC8EC',
-  '#9270CA',
-  '#FF9D4D',
-  '#269A99',
-  '#FF99C3',
-  '#5D7092',
-]
+const USER_COLORS_LENGTH = 10
+
+function userColors(): string[] {
+  return buildChartRamp(USER_COLORS_LENGTH)
+}
 
 export function processUserChartData(
   data: QuotaDataItem[],
@@ -731,7 +717,7 @@ export function processUserChartData(
         subtext: tt('No data available'),
       },
       legends: { visible: false },
-      color: { type: 'ordinal', range: USER_COLORS },
+      color: { type: 'ordinal', range: userColors() },
       background: { fill: 'transparent' },
     },
     spec_user_trend: {
@@ -746,7 +732,7 @@ export function processUserChartData(
         subtext: tt('No data available'),
       },
       legends: { visible: true, selectMode: 'single' },
-      color: { type: 'ordinal', range: USER_COLORS },
+      color: { type: 'ordinal', range: userColors() },
       point: { visible: false },
       background: { fill: 'transparent' },
     },
@@ -776,7 +762,7 @@ export function processUserChartData(
 
   const userColorMap = topUsers.reduce<Record<string, string>>(
     (acc, user, i) => {
-      acc[user] = USER_COLORS[i % USER_COLORS.length]
+      acc[user] = userColors()[i % USER_COLORS_LENGTH]
       return acc
     },
     {}
