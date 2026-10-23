@@ -2,6 +2,36 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.181] - 2026-10-21
+
+### Fixed (N15, first slice)
+- `common.ApiError` no longer returns raw driver/runtime text to the client. When
+  the error message looks like an implementation detail (`sql:`, `gorm:`,
+  `record not found`, `UNIQUE constraint failed`, `json: cannot unmarshal`,
+  `context deadline exceeded`, …) the response becomes:
+
+  ```json
+  { "success": false, "code": "internal_error", "request_id": "<id>",
+    "message": "The request could not be completed. … request ID: <id>" }
+  ```
+
+  The original error goes to the server log with the same request id.
+  User-facing messages ("额度不足，请充值") pass through unchanged.
+- The frontend maps `code: "internal_error"` to a localised retry message, so a
+  Chinese UI never shows a SQL string.
+
+### Verified
+- `go build ./...` PASS, `go vet ./common ./controller` clean.
+- `go test ./common/` PASS (incl. new sanitizer tests: case-insensitive hints,
+  sanitised path, pass-through path).
+- `go test ./controller/ -run 'TestRegister|TestLogin|TestOAuth'` PASS.
+- Frontend: typecheck/build PASS, `server-error-code.test.ts` 2/2 PASS,
+  i18n check 0 missing.
+- Production v1.3.181 healthy, 0 5xx, public smoke 8/8 PASS.
+- Limitation: the sanitised branch only fires on an actual internal failure, so it
+  was not observed against production traffic this round; it is covered by the Go
+  unit tests and the pre-existing call sites are unchanged.
+
 ## [v1.3.180] - 2026-10-21
 
 ### Added

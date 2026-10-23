@@ -444,3 +444,20 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 | 部署 | v1.3.179 → v1.3.180 蓝绿上线，healthy，0 个 5xx |
 | 生产交互验收 | **未取得**：该实例展示币种已是 CNY 且「每单位额度」未渲染，headless 下切换下拉的脚本挂起（已终止）。组件级契约测试覆盖了核心行为，生产点测留待下一轮 |
 | 临时账号 | `zz-verify-temp9` 已删，剩余 **0** |
+
+## 2026-10-21 v1.3.181 后端错误不外泄（N15 第一刀）
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 后端构建 | `go build ./...` | PASS |
+| 静态检查 | `go vet ./common ./controller` | 无输出 |
+| common 全量 | `go test ./common/ -count=1` | PASS（含新增 3 个用例：大小写无关匹配、洗白、透传） |
+| 控制器定向 | `go test ./controller/ -run 'TestRegister\|TestLogin\|TestOAuth' -count=1` | PASS |
+| 前端类型/构建 | `bun run typecheck` / `bun run build` | PASS |
+| 前端映射测试 | `vitest run src/lib/__tests__/server-error-code.test.ts` | 2/2 PASS |
+| i18n | `check-missing-i18n.cjs` | 0 missing |
+| 部署 | v1.3.181 蓝绿上线 | healthy，0 个 5xx，`x-new-api-version: v1.3.181` |
+| 生产冒烟 | `prod-smoke-v13166.cjs` | 8/8 PASS |
+
+**未取得**：生产环境的「内部错误被洗白」实测——该分支只在真实内部错误时触发；
+本轮未人为构造生产故障，结论来自 Go 单测 + 代码审查 + 调用点未变（仅集中兜底）。
