@@ -31,3 +31,20 @@
 | 2 | `main` 的上游是 `upstream/main`（QuantumNous） | `git rev-parse --abbrev-ref @{u}` = `upstream/main`；**推送必须显式 `git push origin main`**，否则会打向不属于本仓库的上游 |
 | 3 | 本机 HTTPS 直连不可用 | 记忆 `local-curl-schannel-broken.md`；生产探测需隧道 |
 | 4 | 本机 PostgreSQL 服务损坏（0xC0000142） | 三库验证需 `initdb` 临时实例 |
+
+## 2026-10-22 新增（视觉体系批次）
+
+| # | 问题 | 级别 | 证据 | 缺什么才能修 |
+|---|---|---|---|---|
+| 1 | **前端测试基线是红的**：整批并行 18 个文件失败 | P1 | 对照实验：`git worktree` 检出 `6f284de93` 后跑同 18 文件 → 14 文件 / 24 用例失败 | 需要专门一批「测试基线归零」：逐文件判断是产品行为变了还是用例过时；**禁止为变绿削断言** |
+| 2 | `knip-baseline.json` 陈旧，门禁报 117 条"新增" | P2 | `node web/scripts/knip-gate.mjs` 输出 | 逐条确认为既有积压后 `--update`（本轮只记录，未掩盖） |
+| 3 | GitHub HTTPS 推送会短时全断（TLS eof） | P2 | 2026-10-22 13:33–13:36 连续 10 次 `TLS connect error`，部署后重试恢复 | 无法根治（跨境链路）；对策=重试 + 用 `git archive` 直传服务器构建，部署不依赖 push |
+| 4 | 生产 CSS 经 lightningcss 降级，字面 `oklch(` 不出现在产物 | P3 | 服务器侧 `grep -c "oklch(" /tmp/s3.css` = 0，但 `transition-quiet`/`surface-grid`/`theme-preset=ink` 均在 | 生产视觉核对改为「令牌名 + axe」双证据，不再 grep 色值 |
+| 5 | Windows 上 `rmdir /S` 会顺着 junction 删掉真实 `node_modules` | P1（工装事故） | 2026-10-22 清理临时 worktree 后 typecheck 报 `bun: command not found: tsgo` | 已恢复（`bun install --frozen-lockfile`）；纪律：含 junction 的目录只删目录本身，或先删 junction 再删目录 |
+
+## 已修复（同一批次）
+
+| 问题 | 修复 | 证据 |
+|---|---|---|
+| `anthropic` 预设白字 on 陶土 `#e37756` 仅 **2.9:1**（WCAG AA 违规） | `--primary` 由 `oklch(0.685 0.142 38)` 改 `oklch(0.57 0.128 38)` | axe 亮/暗各 0 违规；11 预设 × 2 页全 0 |
+| `Table` 根 `[&_th]:text-sm` 压掉表头微标签字号（computed 14px） | 移除该后代覆盖 | 浏览器实测 `th` = 11px / tracking 0.275px |

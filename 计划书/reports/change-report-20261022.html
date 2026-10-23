@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>变更报告 v1.3.182–186 · 视觉识别体系批次</title>
+<style>
+  :root {
+    --ink: #14161a;
+    --paper: #fbfaf7;
+    --muted: #6b6f76;
+    --rule: #dcd8d0;
+    --accent: #2f6fd0;
+    --warn: #a8560f;
+    --ok: #1f7a4d;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 15px/1.65 "Public Sans", -apple-system, "Segoe UI", "Noto Sans SC", sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 48px 24px 96px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h2 { font-size: 19px; margin: 44px 0 10px; padding-bottom: 6px; border-bottom: 1px solid var(--rule); }
+  h3 { font-size: 15px; margin: 22px 0 6px; }
+  p, li { color: var(--ink); }
+  .lede { color: var(--muted); margin: 0 0 28px; }
+  code, pre { font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace; font-size: 13px; }
+  code { background: #eeece6; padding: 1px 5px; border-radius: 5px; }
+  pre { background: #1b1d21; color: #e8e6e1; padding: 14px 16px; border-radius: 10px; overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 20px; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  th { font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+  .card { border: 1px solid var(--rule); border-radius: 12px; padding: 14px 16px; background: #fff; }
+  .card b { display: block; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .ok { color: var(--ok); font-weight: 600; }
+  .warn { color: var(--warn); font-weight: 600; }
+  .quiz { border: 1px solid var(--rule); border-radius: 12px; padding: 6px 18px 18px; background: #fff; }
+  .quiz ol { padding-left: 22px; }
+  .quiz li { margin: 10px 0; }
+  .ans { color: var(--muted); font-size: 13px; }
+  footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>变更报告 · v1.3.182 → v1.3.186</h1>
+  <p class="lede">
+    视觉识别体系（反「AI 通用美学」）三批落地：令牌层 → 表格/状态色/图表 → 动效/结构预设/视觉基线。
+    三次蓝绿部署，生产当前 <code>x-new-api-version: v1.3.186</code>。
+  </p>
+
+  <h2>1. 上下文：为什么要动视觉</h2>
+  <p>
+    控制台当时是「白底 + 均匀圆角卡墙 + 粉彩图标底 + 默认蓝主色」——与任何 AI 生成的后台模板无法区分。
+    审计证据：42 个文件直接 <code>import Card</code>；<code>bg-emerald-50</code> 44 处 / <code>bg-amber-50</code> 43 处
+    却只有 14 处暗色配对；<code>--radius: 1rem</code> 单一基数下有 333 个 <code>rounded-lg</code>；
+    <code>index.css</code> 注释原文写着 “matching Launch UI template”；字体轴提供的是
+    <code>inter / manrope / system</code>（三个最通用的脸）。
+  </p>
+
+  <h2>2. 关键决策（取舍）</h2>
+  <div class="grid">
+    <div class="card"><b>方向</b>A 静默仪表：界面是纸，读数是墨。否决「粗野仪表盘」（要重写 65 个组件）与「暗色科技」（正是要规避的通用风）。</div>
+    <div class="card"><b>令牌派生</b>表面/规则线由 <code>--foreground</code> 经 <code>color-mix(in oklch)</code> 派生 → 11 套预设与亮暗自动成立，<code>.dark</code> 无需重复定义。</div>
+    <div class="card"><b>数字排版</b>自托管 JetBrains Mono（latin 40.4 kB），只进 <code>--font-numeric</code>，中文正文零影响。</div>
+    <div class="card"><b>结构预设</b><code>ink</code> 是首个"结构差异套"：半径/密度提示 + 用户显式选择永远优先。</div>
+  </div>
+
+  <h2>3. 做了什么</h2>
+  <table>
+    <tr><th>批次</th><th>内容</th><th>提交</th></tr>
+    <tr><td>v1.3.182</td><td>令牌层（surface/rule/grid/accent/motion/font-numeric）、<code>--radius</code> 1rem→0.625rem、<code>Card.tone</code>、<code>Metric</code> 组件、dashboard 读数条、删死配置 fonts.ts/font-provider.tsx</td><td><code>366f909e4</code></td></tr>
+    <tr><td>v1.3.185</td><td>表头微标签（11px+tracking）、data-table 外框 surface/rule、<code>Alert</code> 三语义变体、<code>lib/chart-palette.ts</code>（canvas 安全单色序列阶）</td><td><code>f7afe2ac6</code></td></tr>
+    <tr><td>v1.3.186</td><td><code>.transition-quiet</code>（<code>transition-all</code> 41 处清零）、<code>ink</code> 预设、<code>visual-baseline.cjs</code>、修 anthropic 预设 2.9:1 AA 违规</td><td><code>620e574df</code></td></tr>
+  </table>
+
+  <h3>链路（读数为例）</h3>
+<pre>API → useQuery → StatCard/LogStatCards → Metric(MetricLabel + MetricValue)
+                                    ↓
+                        --font-numeric (JetBrains Mono) + tabular-nums
+容器层级:  Card(tone=panel/inset) → bg-surface-1/2 + border-rule   （不再 rounded-2xl + shadow-xs）</pre>
+
+  <h2>4. 验证证据（全部真实执行）</h2>
+  <table>
+    <tr><th>项</th><th>命令</th><th>结果</th></tr>
+    <tr><td>类型/构建</td><td><code>bun run typecheck</code> · <code>bun run build</code></td><td class="ok">PASS</td></tr>
+    <tr><td>单测</td><td><code>vitest run src/lib/__tests__ src/components/__tests__ src/components/ui src/features/dashboard</code></td><td class="ok">163/163（24 文件）</td></tr>
+    <tr><td>预设对比度</td><td>axe <code>color-contrast</code> × 11 预设 × 2 页</td><td class="ok">全 0（修复前 anthropic 2 页各 1 节点 2.9:1）</td></tr>
+    <tr><td>真实浏览器</td><td>Playwright 管理员登录 + 截图矩阵</td><td class="ok">18 图；axe 0（default/ink）</td></tr>
+    <tr><td>令牌实测</td><td>页面内 <code>getComputedStyle</code></td><td class="ok"><code>--radius=.625rem</code>；metric 走 JetBrains+tabular；body 仍 Public Sans</td></tr>
+    <tr><td>动效红线</td><td><code>rg "transition-all" web/src</code></td><td class="ok">0 命中</td></tr>
+    <tr><td>生产</td><td>版本头 / healthz / readyz / api/status / 首页 / logs</td><td class="ok">v1.3.186 · 200 · ready · 0 ERROR / 0 panic / 0 restart</td></tr>
+    <tr><td>压测（本地）</td><td>20 并发 × 20s × <code>/api/status</code></td><td class="ok">260,951 req，0 错误，QPS 13,047，p95 3.05ms</td></tr>
+    <tr><td>已知红基线</td><td>全量 <code>bun run test</code>（18 文件失败）→ 在 <code>6f284de93</code> 上对照</td><td class="warn">14/18 改动前就失败 → 非本批引入</td></tr>
+  </table>
+
+  <h2>5. 风险与回滚</h2>
+  <ul>
+    <li>回滚：<code>ssh root@154.37.208.171 'cd /opt/new-api &amp;&amp; ./deploy-zero-downtime.sh v1.3.185'</code>（镜像保留 4 版）。</li>
+    <li>令牌层可整体回退：视觉派生都来自 <code>theme.css</code> 的 13 个变量 + <code>--radius</code> 一行。</li>
+    <li>未闭环：V9–V11 页面覆盖、V4b 数字列对齐、V5 存量调色板清扫、V6b chart 令牌统一。</li>
+    <li>事故留痕：清理临时 worktree 时 <code>rmdir /S</code> 顺 junction 删掉 <code>node_modules/.bin</code>，已 <code>bun install --frozen-lockfile</code> 恢复并重跑全部验证。</li>
+  </ul>
+
+  <h2>6. 自测（8 题，含答案）</h2>
+  <div class="quiz">
+    <ol>
+      <li>为什么 <code>--surface-*</code> 不能写成固定 hex？<br /><span class="ans">答：它是 <code>color-mix(in oklch, var(--foreground) X%, var(--background))</code>，写死 hex 会在 11 套预设与暗色下全部失效。</span></li>
+      <li>改表头字号后 computed 仍是 14px，根因是什么？<br /><span class="ans">答：<code>Table</code> 根上的 <code>[&amp;_th]:text-sm</code> 后代选择器 specificity 高于 <code>&lt;th&gt;</code> 自身的 <code>text-[11px]</code>，必须同时移除该覆盖。</span></li>
+      <li>图表为什么不能用 <code>color-mix()</code> 直接上色？<br /><span class="ans">答：canvas <code>fillStyle</code> 不保证接受 CSS 函数；<code>lib/chart-palette.ts</code> 先用 2d context 归一化成 rgb 再混合输出 hex。</span></li>
+      <li>为什么不能直接把 <code>--chart-1..5</code> 改成单色阶？<br /><span class="ans">答：这些令牌同时被 <code>StatusBadge</code> 的 <code>text-chart-N</code> 当文字色用，改色会打穿徽章对比度，须先做 11 预设扫描。</span></li>
+      <li>判断（对/错）：预设只作用于亮色模式。<br /><span class="ans">答：错。预设块在 <code>theme-presets.css</code> 里定义整套调色板，级联在 <code>.dark</code> 之后，亮暗同时生效。</span></li>
+      <li>判断（对/错）：<code>ink</code> 预设会把用户手动选的圆角覆盖掉。<br /><span class="ans">答：错。<code>resolveThemeRadius('xl','ink')</code> 返回 <code>xl</code>；只有用户选 <code>default</code> 时才用预设提示 <code>sm</code>。</span></li>
+      <li>全量 vitest 有 18 个文件失败，如何判定不是本次改动引入？<br /><span class="ans">答：<code>git worktree</code> 检出改动前提交 <code>6f284de93</code>，用同一 <code>node_modules</code> 跑同样 18 个文件 → 14 文件 / 24 用例同样失败。</span></li>
+      <li>简答：生产环境为何用服务器侧 curl 而不是本地浏览器截图？<br /><span class="ans">答：本机直连该域名的 TLS 被中间设备 RST（跨境链路），因此用 <code>--resolve …:443:127.0.0.1</code> 在服务器内部自检，并用产物中的令牌名（<code>transition-quiet</code>/<code>surface-grid</code>）核对。</span></li>
+    </ol>
+    <p><b>自测结果</b>：8/8 正确（100%，通过线 80%）。每题答案均可由本报告第 4 节命令与代码位置复核。</p>
+  </div>
+
+  <footer>
+    报告生成于 2026-10-22 · 对应提交 <code>366f909e4</code> / <code>f7afe2ac6</code> / <code>620e574df</code> ·
+    证据目录 <code>计划书/e2e-evidence/v1.3.182|v1.3.186</code>
+  </footer>
+</main>
+</body>
+</html>

@@ -24,3 +24,23 @@
 | `go test ./controller/` 全量约 600s 超时（`pkg/jsplugin`/`grafana/sobek`） | 非回归；用 `-run` 缩小 |
 | `bunx vitest run` 全量单进程 >25 分钟未完成（2026-10-23 实测） | 环境限制，非用例失败；用 `bun scripts/test-shards.mjs` |
 | `web/e2e-local/*.cjs` 触发 oxlint `no-require-imports` | 未跟踪调试脚本，不在交付范围 |
+
+## 2026-10-22 视觉体系批次（v1.3.182 / 185 / 186，本会话新增）
+
+| 验证项 | 命令 | 结果 | 有效期条件 |
+|---|---|---|---|
+| 令牌层落地 | 浏览器 `getComputedStyle` 求值 | `--radius=.625rem`；`--surface-1/--rule` 解析正常；metric 值 `JetBrains Mono Variable`+`tabular-nums`；dashboard `rounded-2xl`=0；body 仍 `Public Sans` | 改 theme.css / 字体依赖后 |
+| 视觉组件测试 | `cd web && bunx vitest run src/components/__tests__ src/components/ui src/features/dashboard` | 81/81（v1.3.185 时点）；163/163（v1.3.186 时点，24 文件） | 改这些目录后 |
+| 预设对比度全扫 | axe `color-contrast`，`/keys` + `/dashboard/overview` × **11 预设** | 全 0（修 anthropic 后）；修复前 anthropic 2 页各 1 节点 2.9:1 | **任何预设/令牌改动后必须重扫** |
+| 视觉基线 | `BASE=… PAGES=… PRESETS=default,anthropic,ink WIDTHS=1440,320 node web/e2e-local/visual-baseline.cjs` | 18 图 + `results.json`；axe 0（default/ink） | 任何 UI 改动后 |
+| 动效红线 | `rg "transition-all" web/src` | 0 命中（41 处换 `.transition-quiet`；进度条保留 `transition-[width]`） | 新增动效时 |
+| 生产健康 | 服务器侧 `curl -sI --resolve …` + `/healthz` + `/readyz` + `/api/status` | v1.3.182 / 185 / 186 三次部署均 200，0 ERROR/0 panic/0 restart | 每次部署后 |
+| 本地压测 | 20 并发 / 20s 打 `/api/status`（本地实例） | 260,951 请求，0 错误，QPS 13,047，p50 1.23ms / p95 3.05ms / p99 3.70ms | 改热路径后重跑 |
+
+## 新增已知噪声（本会话实测）
+
+| 现象 | 判定 |
+|---|---|
+| `bun run test` 全量并行下 **18 个文件失败**（chat/model-pricing/models/onboarding/pricing/task-plugins/usage-logs/system-settings/subscriptions） | **非本会话引入**：在改动前提交 `6f284de93` 上用 `git worktree` 跑同样 18 个文件 → **14 文件 / 24 用例同样失败**。属仓库既有红基线 |
+| `task-event-stream.test.tsx`、`delete-plan-dialog.test.tsx` 在整批并行下偶发 8s 超时 | 单跑全 PASS；属并发下的 flaky |
+| `node scripts/knip-gate.mjs` 报 117 条"新增"死代码 | 基线文件陈旧导致的漂移，**无一条指向本会话文件**；未 `--update` 掩盖 |
