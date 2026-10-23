@@ -2,6 +2,73 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.183] - 2026-10-23
+
+Gate hardening + policy centre + semantic response cache (参考的结果计划指南.md 批次 B-1/B-2/B-3/B-4/B-5/B-6).
+
+### Fixed
+- **i18n coverage gate was false-green** (`web/scripts/check-missing-i18n.cjs` only
+  checked "keys used in source exist in en.json"; it never compared locales against
+  en.json). fr/ja/ru/vi were **95 keys short** and zh-TW **66** — all of them on the
+  training-data export panel — so those users saw English via `fallbackLng: 'en'`.
+  Added `web/scripts/check-i18n-coverage.cjs` (per-locale coverage **and**
+  `{{placeholder}}` parity), filled the 446 missing translations, and wired both
+  i18n checks plus the new token-drift gate into `.github/workflows/ci.yml`.
+- **Interpolation placeholders lost in ja/vi**: `Failed to parse JSON file: {{name}}`,
+  `Model pull failed: {{msg}}`, `Parsed {{count}} service account file(s)` rendered a
+  literal `__ PH_0 __` to Japanese users, and the Vietnamese
+  `Minimum LinuxDO trust level required` invented a `{{LinuxDO}}` placeholder.
+
+### Added
+- **Design-token snapshot + drift gate** (`web/scripts/ds-tokens-{lib,export,check}.mjs`,
+  `web/.ai/ds/ds-tokens.json`): 34 blocks / 659 tokens extracted deterministically from
+  `theme.css` + `theme-presets.css`. `bun run ds:tokens` regenerates; `bun run
+  ds:tokens:check` exits 1 on drift, so the parallel visual work (V1–V13) can no longer
+  change a token without a reviewable snapshot diff.
+- **Built-in billing reachability guard** (`setting/billing_setting/builtin_billing_test.go`):
+  `InitRatioSettings()` seeds the *default* legacy tables into the same maps
+  `GetBillingMode` consults, so a model present in both tables is silently billed by the
+  legacy number and its built-in expression becomes dead code. The new test compiles
+  every built-in expression and fails if a model is shadowed by the legacy defaults.
+- **Per-model request budget** (`relay.policy_model_request_limits`): a request whose
+  estimated cost exceeds its model's limit is blocked with `403 policy_blocked`
+  (`rule=model_request_limit`) when the policy engine is in `enforce` mode. Pure
+  input-driven (no counters), so it is fully unit-tested and has zero state.
+- **Unified policy visibility**: sensitive-word blocks (which already existed and already
+  blocked) are now counted in `policy_decision_total{decision="guardrail:block"}`, closing
+  the gap where the policy centre could not see the guardrail that actually fires most.
+- **Semantic response cache** (`service/semantic_cache.go`, `SEMANTIC_RESPONSE_CACHE`):
+  when an exact cache miss occurs, a prompt close enough to a cached one reuses that
+  response instead of calling the upstream. Three hard boundaries: **off by default**,
+  **explicit model allowlist required**, **threshold 0.97 by default**. Per-user /
+  per-model / per-format buckets, bounded memory (64 per bucket, 2048 total), hit
+  counters exposed as `semantic_cache_{hits_total,misses_total,entries}` in `/metrics`.
+  The built-in embedder is a deterministic bag-of-words hash (robust to case, whitespace
+  and punctuation — **not** a semantic model); real embeddings would require an external
+  paid service, which this change deliberately does not call.
+- **Admin UI** (`request-limits/policy-center-section.tsx` + registry entry): the four
+  values an administrator must be able to change (prompt character limit, per-model
+  request budget, semantic allowlist, similarity threshold) are editable in
+  System settings → Request limits, with `model=quota` / one-model-per-line text editors,
+  inline validation and 8-language strings.
+
+### Changed
+- `PolicyInput` gained `ModelRequestLimit`; `evalBudget` reports `model_request_limit`
+  alongside the existing `insufficient_quota` rule.
+- `ResponseCacheServeHit` falls through to the semantic layer only after an exact miss, so
+  exact-match behaviour is unchanged when the new switch is off.
+
+### Verification
+- Real end-to-end run against the built binary + a mock OpenAI-compatible upstream
+  (15/15 cases): baseline 200 through the real relay chain, `403 policy_blocked` on the
+  per-model budget, recovery after clearing it, sensitive-word block + policy counter
+  increment, semantic cache off → 2 upstream calls, exact-cache baseline → 0 calls,
+  semantic hit → 0 calls, unrelated prompt → 1 call (no wrong match), switch off →
+  immediate rollback to upstream.
+- `go vet ./service ./setting/... ./controller ./common` clean; `go build ./...` clean;
+  `go test ./service ./setting/...` green; `bun run typecheck` clean;
+  `check-i18n-coverage` / `check-missing-i18n` / `ds-tokens-check` / `check-terminology` green.
+
 ## [v1.3.182] - 2026-10-22
 
 Visual identity batch 1 — "quiet instrument" token layer + dashboard pilot
