@@ -18,20 +18,25 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { lazy } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import z from 'zod'
 
 const Channels = lazy(() => import('@/features/channels').then((m) => ({ default: m.Channels })))
 import { ROLE } from '@/lib/roles'
+import {
+  defineSearchSchema,
+  numberParam,
+  textListParam,
+  textParam,
+} from '@/lib/search-schema'
 import { useAuthStore } from '@/stores/auth-store'
 
-const channelsSearchSchema = z.object({
-  page: z.number().optional().catch(1),
-  pageSize: z.number().optional().catch(undefined),
-  filter: z.string().optional().catch(''),
-  status: z.array(z.string()).optional().catch([]),
-  type: z.array(z.string()).optional().catch([]),
-  group: z.array(z.string()).optional().catch([]),
-  model: z.string().optional().catch(''),
+const channelsSearchSchema = defineSearchSchema({
+  page: numberParam(1),
+  pageSize: numberParam(undefined),
+  filter: textParam,
+  status: textListParam([]),
+  type: textListParam([]),
+  group: textListParam([]),
+  model: textParam,
 })
 
 export const Route = createFileRoute('/_authenticated/channels/')({

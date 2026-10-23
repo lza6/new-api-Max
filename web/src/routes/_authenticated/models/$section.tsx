@@ -17,7 +17,6 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import z from 'zod'
 
 import { Models } from '@/features/models'
 import {
@@ -25,27 +24,34 @@ import {
   MODELS_DEFAULT_SECTION,
 } from '@/features/models/section-registry'
 import { ROLE } from '@/lib/roles'
+import {
+  defineSearchSchema,
+  enumListParam,
+  numberParam,
+  textListParam,
+  textParam,
+} from '@/lib/search-schema'
 import { useAuthStore } from '@/stores/auth-store'
 
-const modelsSearchSchema = z.object({
-  vPage: z.number().optional().catch(1),
-  vPageSize: z.number().optional().catch(20),
-  vFilter: z.string().optional().catch(''),
-  vAssociation: z.array(z.string()).optional().catch([]),
-  page: z.number().optional().catch(1),
-  pageSize: z.number().optional().catch(10),
-  filter: z.string().optional().catch(''),
-  vendor: z.array(z.string()).optional().catch([]),
-  status: z.array(z.string()).optional().catch([]),
-  square_state: z
-    .array(z.enum(['visible', 'unavailable', 'hidden', 'partial']))
-    .optional()
-    .catch([]),
-  sync: z.array(z.string()).optional().catch([]),
-  dPage: z.number().optional().catch(1),
-  dPageSize: z.number().optional().catch(10),
-  dFilter: z.string().optional().catch(''),
-  dStatus: z.array(z.string()).optional().catch([]),
+const modelsSearchSchema = defineSearchSchema({
+  vPage: numberParam(1),
+  vPageSize: numberParam(20),
+  vFilter: textParam,
+  vAssociation: textListParam([]),
+  page: numberParam(1),
+  pageSize: numberParam(10),
+  filter: textParam,
+  vendor: textListParam([]),
+  status: textListParam([]),
+  square_state: enumListParam(
+    ['visible', 'unavailable', 'hidden', 'partial'],
+    []
+  ),
+  sync: textListParam([]),
+  dPage: numberParam(1),
+  dPageSize: numberParam(10),
+  dFilter: textParam,
+  dStatus: textListParam([]),
 })
 
 export const Route = createFileRoute('/_authenticated/models/$section')({

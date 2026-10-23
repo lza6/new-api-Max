@@ -17,17 +17,14 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import z from 'zod'
 
 import { Rankings } from '@/features/rankings'
 import { getModuleAccessForGuard } from '@/lib/nav-modules'
+import { defineSearchSchema, enumParam } from '@/lib/search-schema'
 import { useAuthStore } from '@/stores/auth-store'
 
-const rankingsSearchSchema = z.object({
-  period: z
-    .enum(['today', 'week', 'month', 'year'])
-    .optional()
-    .catch(undefined),
+const rankingsSearchSchema = defineSearchSchema({
+  period: enumParam(['today', 'week', 'month', 'year'], undefined),
 })
 
 export const Route = createFileRoute('/rankings/')({

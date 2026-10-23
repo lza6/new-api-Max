@@ -18,38 +18,40 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import { lazy } from 'react'
 import { createFileRoute, redirect } from '@tanstack/react-router'
-import z from 'zod'
 
 const UsageLogs = lazy(() => import('@/features/usage-logs').then((m) => ({ default: m.UsageLogs })))
 import {
   isUsageLogsSectionId,
   USAGE_LOGS_DEFAULT_SECTION,
 } from '@/features/usage-logs/section-registry'
+import {
+  defineSearchSchema,
+  enumListParam,
+  numberParam,
+  textParam,
+} from '@/lib/search-schema'
 
 const logTypeValues = ['0', '1', '2', '3', '4', '5', '6', '7'] as const
-const logTypeSearchSchema = z
-  .preprocess((value) => {
-    if (value == null || value === '') {return undefined}
-    return Array.isArray(value) ? value : [value]
-  }, z.array(z.enum(logTypeValues)).optional())
-  .catch([])
 
-const usageLogsSearchSchema = z.object({
-  page: z.number().optional().catch(1),
-  pageSize: z.number().optional().catch(undefined),
-  type: logTypeSearchSchema.optional(),
-  filter: z.string().optional().catch(''),
-  model: z.string().optional().catch(''),
-  token: z.string().optional().catch(''),
-  channel: z.string().optional().catch(''),
-  group: z.string().optional().catch(''),
-  username: z.string().optional().catch(''),
-  requestId: z.string().optional().catch(''),
-  upstreamRequestId: z.string().optional().catch(''),
+const usageLogsSearchSchema = defineSearchSchema({
+  page: numberParam(1),
+  pageSize: numberParam(undefined),
+  // `type` 单个值与重复键都归一成数组（原来的 z.preprocess 行为）。
+  // 显式取 string 作为元素类型：运行时仍按 logTypeValues 白名单过滤，
+  // 静态类型保持与调用方（传 string 的筛选条）兼容。
+  type: enumListParam<string>(logTypeValues, []),
+  filter: textParam,
+  model: textParam,
+  token: textParam,
+  channel: textParam,
+  group: textParam,
+  username: textParam,
+  requestId: textParam,
+  upstreamRequestId: textParam,
   // 首字/耗时筛选：min_use_time 秒，>0 时只列耗时 ≥ 该值的请求（如 20 → >20s）。
-  minUseTime: z.number().optional().catch(undefined),
-  startTime: z.number().optional(),
-  endTime: z.number().optional(),
+  minUseTime: numberParam(undefined),
+  startTime: numberParam(undefined),
+  endTime: numberParam(undefined),
 })
 
 export const Route = createFileRoute('/_authenticated/usage-logs/$section')({

@@ -195,7 +195,10 @@ export function useTableUrlState(
               : updater
           const value = trimGlobal ? next.trim() : next
           setGlobalFilter(value)
+          // 搜索框每次按键都会写 URL：用 replace 避免每敲一个字就压一条历史，
+          // 否则后退键要把整段输入逐字倒退才能退出该页面。
           navigate({
+            replace: true,
             search: (prev) => ({
               ...(prev as SearchRecord),
               [pageKey]: undefined,
@@ -228,7 +231,9 @@ export function useTableUrlState(
       }
     }
 
+    // 列筛选同样属于「同一页面的视图收窄」，不是页面跳转：replace 写 URL。
     navigate({
+      replace: true,
       search: (prev) => ({
         ...(prev as SearchRecord),
         [pageKey]: undefined,

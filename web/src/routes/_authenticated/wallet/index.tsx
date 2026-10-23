@@ -17,12 +17,12 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
-import { z } from 'zod'
 
 import { Wallet } from '@/features/wallet'
+import { booleanParam, defineSearchSchema } from '@/lib/search-schema'
 
-const walletSearchSchema = z.object({
-  show_history: z.boolean().optional(),
+const walletSearchSchema = defineSearchSchema({
+  show_history: booleanParam,
 })
 
 export const Route = createFileRoute('/_authenticated/wallet/')({

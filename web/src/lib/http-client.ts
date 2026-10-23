@@ -20,6 +20,10 @@ import axios, { type AxiosRequestConfig } from 'axios'
 import { t } from 'i18next'
 
 import {
+  languageFromPathPrefix,
+  pathWithLanguage,
+} from '@/i18n/languages'
+import {
   applyAuthRotation,
   clearAuthentication,
   getFreshAuthHeaders,
@@ -74,13 +78,34 @@ api.get = ((url: string, config: ApiRequestConfig = {}) => {
   return request
 }) as typeof api.get
 
+/**
+ * 会话过期时登录页的目标 URL；已位于登录页时返回 null（避免刷新循环）。
+ *
+ * 两个必须保留的语义：
+ * 1. **语言前缀**：`/en`、`/ja`、`/fr`… 用户掉线后必须回到同语言登录页，
+ *    否则 URL 语言与 canonical/hreflang 矛盾（默认语言 zhCN 无前缀）。
+ * 2. **returnTo**：带上掉线前的站内路径（`?redirect=`），登录成功后由
+ *    sign-in 路由的 `beforeLoad`（`sanitizeAuthRedirect`）校验后回跳。
+ */
+export function signInRedirectTarget(
+  pathname: string,
+  search = '',
+  hash = ''
+): string | null {
+  const signInPath = pathWithLanguage(
+    '/sign-in',
+    languageFromPathPrefix(pathname) ?? 'zhCN'
+  )
+  if (pathname === signInPath) {return null}
+  const returnTo = `${pathname}${search}${hash}`
+  return `${signInPath}?redirect=${encodeURIComponent(returnTo)}`
+}
+
 function redirectToSignIn(): void {
-  if (
-    typeof window !== 'undefined' &&
-    window.location.pathname !== '/sign-in'
-  ) {
-    window.location.replace('/sign-in')
-  }
+  if (typeof window === 'undefined' || !window.location) {return}
+  const { pathname, search, hash } = window.location
+  const target = signInRedirectTarget(pathname, search, hash)
+  if (target) {window.location.replace(target)}
 }
 
 api.interceptors.response.use(

@@ -17,20 +17,25 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 For commercial licensing, please contact support@quantumnous.com
 */
 import { createFileRoute } from '@tanstack/react-router'
-import z from 'zod'
 
 import { ApiKeys } from '@/features/keys'
 import { API_KEY_STATUS_OPTIONS } from '@/features/keys/constants'
+import {
+  defineSearchSchema,
+  enumListParam,
+  numberParam,
+  textParam,
+} from '@/lib/search-schema'
 
-const apiKeySearchSchema = z.object({
-  page: z.number().optional().catch(1),
-  pageSize: z.number().optional().catch(undefined),
-  status: z
-    .array(z.enum(API_KEY_STATUS_OPTIONS.map((s) => s.value as `${number}`)))
-    .optional()
-    .catch([]),
-  filter: z.string().optional().catch(''),
-  token: z.string().optional().catch(''),
+const apiKeySearchSchema = defineSearchSchema({
+  page: numberParam(1),
+  pageSize: numberParam(undefined),
+  status: enumListParam(
+    API_KEY_STATUS_OPTIONS.map((s) => s.value as `${number}`),
+    []
+  ),
+  filter: textParam,
+  token: textParam,
 })
 
 export const Route = createFileRoute('/_authenticated/keys/')({
