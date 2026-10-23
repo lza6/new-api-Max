@@ -1,0 +1,210 @@
+{
+  "task_id": "audit-ops",
+  "timestamp": "2026-10-23T18:10:00+08:00",
+  "scope": {
+    "target": "root@154.37.208.171 (Ubuntu 22.04 / 4C3925MB / 无 swap / 78G)",
+    "stack": "Caddy 2.11.7 -> 127.0.0.1:300x -> new-api:v1.3.187 (docker run 蓝绿) + postgres:15 + redis:latest",
+    "method": "SSH 只读取证：docker inspect / df -h / free -m / ss -tlnp / iptables+nft / systemctl / crontab / journalctl(caddy,docker,ssh) / pg_stat_* / curl 本机与公网 / 本地代码与 计划书/ops 对照。未执行任何写操作。",
+    "not_reported": "已在今日修复或已记录者：PG 1200MB+shared_buffers 256MB+jit off+random_page_cost 1.1+覆盖索引+VACUUM；new-api 1500MB/2400MB/2C/GOMEMLIMIT 1024MiB；Caddy 5s/5s/fails 3；compose image tag v1.3.88->v1.3.187；compose new-api 段无效遗留"
+  },
+  "findings": [
+    {
+      "id": "O-1",
+      "severity": "P0",
+      "title": "全站零备份、零 WAL 归档：数据库损坏即永久丢全部用户/额度/密钥",
+      "evidence": "crontab -l → 'no crontab for root'；/etc/cron.d 仅 e2scrub_all + new-api-disk-guard（无备份任务）；find / -maxdepth 3 -name '*.sql' -o '*dump*' → 仅 /tmp/q*.sql、/tmp/seed*.sql（本地 E2E 残留），无任何生产备份文件；postgres archive_mode=off、wal_level=replica → 无 PITR；数据仅存于单卷 new-api_pg_data（3.8G 磁盘 / DB 3673MB）；代码侧 GET /api/system/db/export 存在（controller/db_backup.go:30，RootAuth，纯 Go 流式，三库均支持）但只能人手点按钮，全站无任何自动化调用（无 cron、无 webhook）",
+      "impact": "卷损坏 / 误删表 / 误 upgrade / 勒索 = 用户表(1621)、tokens(1443)、额度、渠道 key、全部对账数据一次性不可恢复；与今日 PG OOM 事故叠加，同一台机上再出一次 fs 级损坏就没有任何恢复点",
+      "fix_suggestion": "①每日 04:30 pg_dump -Fc（含 logs 可选）到 /var/backups/newapi，gzip+age/gpg 加密（CHANNEL_KEY_ENCRYPTION=false，备份必须加密）；②每日 rclone/对象存储异地一份，保留 7 日 + 每周一份保留 4 周；③每月做一次『恢复到临时库并 count 关键表』演练并在 ledger 记证据；④PG 侧开 archive_mode=on + WAL 归档（wall 目录 65G 空闲足够）",
+      "rollback": "纯新增（cron + 脚本 + 备份目录），删除 cron 条目即回滚；archive_mode 需 restart postgres（约 10s 不可用），改回 off + 重启即可回滚",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-2",
+      "severity": "P0",
+      "title": "SSH 只允许 root 密码登录、无公钥、无 fail2ban、无防火墙，24h 内 16867 次撞库",
+      "evidence": "sshd -T → permitrootlogin yes / passwordauthentication yes / pubkeyauthentication no / maxauthtries 6；/root/.ssh/authorized_keys 不存在（wc -l = 0）；ufw status → inactive；iptables -S INPUT → -P INPUT ACCEPT；systemctl is-active fail2ban → inactive 且 /etc/fail2ban 不存在；journalctl -u ssh --since 24h | grep -ci 'failed password|invalid user' → 16867",
+      "impact": "唯一屏障是 10 位 root 密码；一旦被爆破或密码从聊天/脚本/日志泄露，攻击者直接拿到整机 root：.env(SESSION_SECRET/OneDrive client_secret)、DB 内全站渠道 key、可改 Caddy/可删库。16867 次/天说明它已在被持续扫描，且没有任何自动封禁",
+      "fix_suggestion": "①先装公钥并验证新会话可登录，再 PasswordAuthentication no + PermitRootLogin prohibit-password；②装 fail2ban（sshd jail, maxretry 3 / bantime 1h）；③ufw default deny incoming + allow 22/80/443 + 显式 allow 你当前出口 IP；④注意 Docker 会绕过 ufw 直写 DOCKER-USER 链（见 O-3），需同时处理；⑤改密码并轮换",
+      "rollback": "公钥先行、密码后关，全程保留一条已登录会话；ufw enable 前先 ufw allow 22 并用 `ufw --dry-run` 预演；误封可 `ufw disable` / `fail2ban-client unban --all`；密码登录可随时用 sed 改回 + systemctl reload ssh",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-3",
+      "severity": "P0",
+      "title": "3001 端口 0.0.0.0 直接暴露公网，明文 HTTP 绕过 Caddy 的 TLS/安全头/IP 传递",
+      "evidence": "ss -tlnp → LISTEN 0.0.0.0:3001 docker-proxy；iptables -t nat -S DOCKER → DNAT --dport 3001 到 172.18.0.4:3000；从服务器本机 `curl http://154.37.208.171:3001/api/status` → 200（公网可达）；3001 响应头无 HSTS/CSP/X-Frame-Options（对比 443 有全套，见 Caddyfile header 段）；Caddyfile 上游写的是 127.0.0.1:3001（依赖公网端口做内网回源）",
+      "impact": "任何扫描器/知道 IP 的人都能 http://IP:3001 明文访问同一套 API：①API key、session cookie、prompt/补全内容在链路上明文可嗅探；②绕过 Caddy 的 CSP/HSTS/Frame 等全部安全头；③绕过 Caddy 的 X-Real-IP 注入，应用看到的客户端 IP 变成 docker 网关 172.18.0.1 → 按 IP 的登录限流、滥用审计、私网信任判定全部失真；④为后续爆破提供无 TLS 的登录入口",
+      "fix_suggestion": "最小改动：部署脚本 `-p ${NEW_PORT}:3000` 改成 `-p 127.0.0.1:${NEW_PORT}:3000`（Caddy 回源仍走 127.0.0.1，蓝绿逻辑不变），下次发版即生效；同时 ufw 只放 22/80/443。若担心下次手动 docker run 又漏，可加 `iptables -I DOCKER-USER ! -i br-xxx -p tcp --dport 3001 -j DROP` 兜底",
+      "rollback": "改回 `-p 3001:3000` 重建容器即可；DOCKER-USER 规则可用 `iptables -D` 立即撤销；不影响 Caddy 上游（仍是 127.0.0.1:3001）",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-4",
+      "severity": "P1",
+      "title": "/metrics 公网可读：114 条运营指标未鉴权暴露在 https://freeapi.tingfengai.art/metrics",
+      "evidence": "`curl --resolve freeapi.tingfengai.art:443:127.0.0.1 https://freeapi.tingfengai.art/metrics` → 200，114 条指标（http_requests_total{route,status}、channel_health_score / success_rate / p95、training_capture_bytes_uploaded_today、process_memory_sys_bytes、db_open/in_use_connections、response_cache_*）；同一端点直连公网 3001 返回 401 {code:AUTH_UNAUTHORIZED} → 说明鉴权是『按来源 IP 放行』（Caddy 从 127.0.0.1 回源被信任），METRICS_ENABLED=true（.env）",
+      "impact": "竞品/爬虫可无成本抓取业务量、渠道健康与延迟、训练采集上传量、内存与 DB 连接数；为后续攻击（选时间点打爆内存、判断哪些渠道可用）提供侦察面；属信息泄露而非直接入侵",
+      "fix_suggestion": "Caddyfile 加在最前：`@metrics path /metrics` + `respond @metrics 404`（或只允许内网/固定 IP：`@metrics { path /metrics; not remote_ip 1.2.3.4 }` → 403）；或在应用侧引入 METRICS_TOKEN（当前 middleware/metrics_auth.go 仅按 IP 判定）",
+      "rollback": "删掉 Caddyfile 该段 + systemctl reload caddy（零中断）；应用侧 token 方案可关开关回退",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-5",
+      "severity": "P1",
+      "title": "宿主 0 swap，但容器配了 memory-swap 2400m —— swap 预算是幻觉，1500MB 一到直接 OOM kill",
+      "evidence": "free -m → Swap: 0/0/0；swapon --show 为空（swap_count=0）；docker inspect new-api → Memory=1572864000(1500m) / MemorySwap=2516582400(2400m)；cgroup2fs，容器 memory.max=1572864000、memory.swap.max=943718400(900m) —— 但宿主无 swap 设备，cgroup v2 的 swap 配额没有后端可用；当前 new-api 181.7MiB/1.465GiB、postgres 396MiB/1.172GiB、redis 11MiB/192MiB",
+      "impact": "①运营侧误以为有 900MB 缓冲，内存事故判断会失真（历史 2026-10-07、10-23 都是 memcg OOM）；②真正触顶时是 SIGKILL 直落，没有换页软着陆；③无 swap 也让内核更难回收 page cache 之外的匿名页，PG 大查询场景恢复力更差",
+      "fix_suggestion": "①加 2G swapfile（fallocate 2G → mkswap → swapon）+ /etc/fstab 持久化 + vm.swappiness=10，并设 vm.vfs_cache_pressure=50；或改用 zram（无盘 IO）；②若坚决不加 swap，就把 --memory-swap 设成与 --memory 相同的 1500m，避免账面上出现不存在的兜底；③在 SOP 资源矩阵里写明真实可用内存与各容器上限之和（2892MB / 3925MB）",
+      "rollback": "swapoff -a && rm -f /swapfile && 删 fstab 行（即时、无中断）；memory-swap 改动只需下次重建容器",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-6",
+      "severity": "P1",
+      "title": "『零停机』不成立：部署用 docker rm -f 强杀旧容器，每次发版都掐断在途流式请求（24h 内 53 个 502）",
+      "evidence": "deploy-zero-downtime.sh 切换上游后执行 `docker rm -f new-api`（SIGKILL，无 --stop-timeout）；journalctl -u caddy 24h 内 status=502 共 53 条，按小时：10-22 17:00(4)/18:00(5)、10-23 02:00(9)/04:00(12)/05:00(6)/07:00(2)/08:00(6)/09:00(7)；与 dockerd 日志里 8 次 new-api-new 创建时刻（02:41、04:07、04:31、04:50、05:01、05:44、08:26、09:53）逐一吻合；09:53:25 一批 `POST /v1/chat/completions`（Content-Length 1.7MB/1.1MB/542KB，duration 3-9s）返回 502，err=EOF / connection reset，指向 127.0.0.1:3000",
+      "impact": "每次发版都有一批正在生成的 LLM 流式响应被切断，用户看到断流/空补全；对账上产生『上游已计费、网关未记完』的灰色条目；今天发了 8 次版 = 8 次用户可见故障，且都被计入『正常发版』",
+      "fix_suggestion": "把 `docker rm -f new-api` 换成 `docker stop -t 90 new-api && docker rm new-api`（应用已实现优雅关闭：service/background_loop.go + main.go 的 SIGTERM 流程，会等待在途请求）；更彻底的做法是切换前先从 Caddy 摘掉旧上游并等待一个 drain 周期（如 10s + 最长流式时长）再 stop",
+      "rollback": "单行命令替换；若 stop 卡住可 `docker kill` 兜底；改回 rm -f 即回滚",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-7",
+      "severity": "P1",
+      "title": "logs 表无保留策略 + 19 个索引约 950MB，重演今日 OOM 的条件仍在",
+      "evidence": "DB 3673MB；logs 3553MB / 1,843,246 行，跨 2026-09-11 → 2026-10-23（42 天）；近 24h 新增 72,365 行（≈137MB/天，高于 42 天均值 44k/天）；pg_stat_user_indexes 中 logs 有 19 个索引合计 ≈950MB（idx_logs_type_created_stats 134MB、idx_log_type_created_id 105MB、idx_logs_request_id 100MB、idx_log_user_type_created 96MB、idx_log_type_created_finance 94MB、idx_logs_traffic 60MB…）；无任何 DELETE/分区/清理任务（无 cron）；磁盘剩余 65G",
+      "impact": "①磁盘层面还有约 1 年余量，但单日增速已翻倍；②30 天窗口仍占全表 ~70% 行，今天 OOM 的 SQL 形态（controller/log.go:220/387/453 全窗口聚合）没有结构性消除，只是靠索引+调参压下去；③19 个索引让 logs 写入放大、autovacuum 成本上升，突发流量时更容易顶到内存上限",
+      "fix_suggestion": "①按天预聚合 log_daily_stats（上轮已识别，仍未做）→ 三个报表查询退化为读 ≤N 行；②保留期策略（如 90 天）用分区表或每日批量 DELETE ... LIMIT 分批；③清冗余索引（idx_logs_request_id 100MB、idx_logs_traffic 60MB、idx_logs_user_id 14MB 系前缀冗余）——需授权，DROP INDEX CONCURRENTLY 可回滚",
+      "rollback": "索引可 CONCURRENTLY 重建；保留期策略先 dry-run（SELECT count 超期行）再执行，DELETE 不可逆故必须先有 O-1 的备份",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-8",
+      "severity": "P1",
+      "title": "内核 5.15.0-30（2022 年）仍在运行，reboot-required 自 10-06 挂了 17 天",
+      "evidence": "uname -r → 5.15.0-30-generic；dpkg -l → 已安装 linux-image-5.15.0-198-generic；ls /var/run/reboot-required 存在（10-06 06:09），pkgs 含 linux-image-5.15.0-194/198、systemd、libc6、dbus；uptime 18 天 20 小时（10-04 13:51 启动）；unattended-upgrades 已装但 Automatic-Reboot 未配置",
+      "impact": "4 年间的 kernel CVE（含容器逃逸/本地提权类）全部未生效；叠加 O-2（root 密码可登录、无防火墙、无 fail2ban），一旦攻击者取得 shell，提权门槛极低；也是今天 memcg OOM 行为异常时的潜在变量",
+      "fix_suggestion": "选低峰窗口（如凌晨 04:00-05:00）重启一次；重启前先落 O-1 的备份与 docker 快照，重启后按 SOP 验收（/readyz、20/20 外网探针、容器 healthy）；长期：unattended-upgrades 配 Automatic-Reboot=true + Automatic-Reboot-Time=04:00，或至少对 reboot-required 做告警",
+      "rollback": "重启不可逆；但业务侧无状态（容器 restart unless-stopped 自启），失败时按 SOP 手工 `docker start postgres redis new-api`；建议先确认服务商快照能力",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-9",
+      "severity": "P2",
+      "title": "Docker 日志无轮转上限（无 daemon.json、容器 LogOpts 为空），一次 panic/5xx 风暴可写满 /",
+      "evidence": "cat /etc/docker/daemon.json → No such file；docker info LoggingDriver=json-file；docker inspect new-api/postgres/redis → LogConfig.Type=json-file、LogConfig.Config=map[]（无 max-size/max-file）；/etc/logrotate.d/ 无 docker 项；当前 new-api json.log 仅 574KB（因频繁重建容器），postgres 2.3KB、redis 13K",
+      "impact": "一旦出现错误日志风暴（relay panic、连接池报错、重复 upstream error），单个 json.log 可涨到数十 GB 撑爆 /，直接导致 PG 写失败→全站 500；容器重启后旧日志还留在大目录里（containers 目录 720K，暂无问题）",
+      "fix_suggestion": "新建 /etc/docker/daemon.json：{\"log-driver\":\"json-file\",\"log-opts\":{\"max-size\":\"50m\",\"max-file\":\"3\"}}；重建容器后生效（或先在 compose 的 postgres/redis 段加 logging 配置）；同时给 disk-guard 的告警接上实际通知（见 O-12）",
+      "rollback": "删除 daemon.json + systemctl restart docker（会重启全部容器，约 10-30s 不可用，需窗口）；容器级 logging 配置随容器重建回滚",
+      "verified": "静态确认"
+    },
+    {
+      "id": "O-10",
+      "severity": "P2",
+      "title": "应用连接池默认 64 > PG max_connections 50：今天把 PG 上限从 100 降到 50 后新引入的失配",
+      "evidence": "model/main.go:212/259 → SetMaxOpenConns(GetEnvOrDefault(\"SQL_MAX_OPEN_CONNS\", 64))；运行容器 docker inspect 环境变量清单内无 SQL_MAX_OPEN_CONNS（deploy 脚本只传 SQL_DSN/REDIS/TZ/BATCH_UPDATE/LOG_FLUSH/MEMORY_CACHE/GOMEMLIMIT，.env 只有 SESSION_SECRET/LOG_FLUSH_ENABLED/CHANNEL_KEY_ENCRYPTION/METRICS_ENABLED/TRAINING_*）；compose 里写了 SQL_MAX_OPEN_CONNS=32 但 compose 不管理 new-api 容器；PG max_connections=50、superuser_reserved_connections=3（实际可用 47），当前 pg_stat_activity 9/50、应用侧 db_max_open_connections 64",
+      "impact": "突发并发时可同时开 64 条连接 > 47 可用 → `FATAL: sorry, too many clients already` → 新请求批量 500；今天之前 PG 是默认 100，所以是调参后新出现的隐患，且只在压力下暴露、日志里暂无痕迹（72h 内 grep 0 次）",
+      "fix_suggestion": "部署脚本加 `-e SQL_MAX_OPEN_CONNS=30 -e SQL_MAX_IDLE_CONNS=10 -e SQL_MAX_LIFETIME=300`（与 PG 50 上限留出余量给 psql/备份/监控）；把『应用池 ≤ PG max_connections − 预留』写进变更检查单",
+      "rollback": "去掉 -e 即回默认 64（下次重建容器生效），无数据影响",
+      "verified": "静态确认"
+    },
+    {
+      "id": "O-11",
+      "severity": "P2",
+      "title": "部署脚本内联明文 DB/Redis 密码且 755 全局可读，与 .env 双源维护",
+      "evidence": "ls -l /opt/new-api/deploy-zero-downtime.sh → -rwxr-xr-x（任何本地用户可读），脚本内含 `-e SQL_DSN=postgresql://newapi:****@postgres:5432/new-api` 与 `-e REDIS_CONN_STRING=redis://:****@redis:6379`；同机 .env 是 600 root:root 但脚本又抄了一份；仓库模板 deploy-zero-downtime.example.sh 已正确改成 ${SQL_DSN} 占位（说明模板比生产更安全）",
+      "impact": "密码以明文存在一个全局可读文件里，且与 .env/DB 实际密码三处不同步（改一处失效一处，容易在轮换时把自己锁在外面）；一旦主机被低权进程读取（或误 cat 进日志）就等于泄露 DB 全量与 Redis 全量",
+      "fix_suggestion": "chmod 700 脚本 + 删掉两行 -e，改为 `set -a; . /opt/new-api/.env.secrets; set +a` 或直接依赖 `--env-file`（SQL_DSN/REDIS_CONN_STRING 写进一个 600 的 secrets 文件）；顺带轮换一次 DB/Redis 密码（改 PG 用户密码 + redis requirepass + 两处引用需同窗口）",
+      "rollback": "chmod 改回即可；密码轮换需在同一维护窗口内改 DB/Redis/引用，失败按备份的两处旧值回滚",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-12",
+      "severity": "P2",
+      "title": "可观测性只能事后人工翻日志：Caddy 无访问日志、无任何告警通道（磁盘/内存/5xx/证书）",
+      "evidence": "Caddyfile 无 `log` 指令（错误 JSON 仅进 journald，24h 内 201 条 http.log.error、53 个 502、148 个 503）；disk-guard.sh 只在 df≥85% 时 `echo` 到 /var/log/new-api-disk-guard.log（无人订阅，近 9 天均 13-17% 从未触发）；无监控 agent、无 uptime 探测 cron、postfix 队列空且未配告警邮件；/metrics 有数据但没有任何抓取方（且公网裸奔，见 O-4）；journald 已被 disk-guard 收敛到 200M（现 168M）→ 事故窗口稍长就会滚掉证据",
+      "impact": "今天 148 个 503 + 53 个 502 全靠人工翻 journalctl 才被发现；磁盘、内存、证书（当前 notAfter 2027-01-02，Caddy 自续期）、PG 连接数异常都没有被动通知；MTTR 完全依赖用户投诉，而 200M journal 还限制了事后取证深度",
+      "fix_suggestion": "①Caddy 加 `log { output file /var/log/caddy/access.log { roll_size 100MiB; roll_keep 5 } }`；②最小告警闭环：cron 每 5min 跑一个脚本——curl /readyz、df 阈值、free 阈值、最近 5 分钟 5xx 计数 → 命中就 POST 到 TG/企业微信 webhook（现有 postfix 也可 mailing，但外发可靠性差）；③/metrics 收口后接 Prometheus/自托管 Uptime Kuma",
+      "rollback": "纯观测新增，停掉 cron / 删 Caddy log 段 + reload 即回滚，不影响请求路径",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-13",
+      "severity": "P2",
+      "title": "CHANNEL_KEY_ENCRYPTION=false：上游渠道 key 明文入库，与 O-1 的备份策略直接冲突",
+      "evidence": "/opt/new-api/.env 中 CHANNEL_KEY_ENCRYPTION=false（只读 key 名与开关值，未打印任何密钥）；DB 单卷 + 无备份 + 无静态加密；memory/new-api-prod-safety-batch-007.md 已记录『渠道 Key 明文列加密』为未做项",
+      "impact": "DB 泄露（卷被拷走、备份文件外泄、SQL 注入或导出接口滥用）= 全部上游 API key 明文可直接盗刷；一旦按 O-1 开始做备份，这个问题会从『风险』升级为『备份文件里就有全站 key』",
+      "fix_suggestion": "先做 O-1 但备份强制加密（age/gpg + 密钥离线）；再评估开启 CHANNEL_KEY_ENCRYPTION（需双写兼容期 + 存量明文迁移 + 主密钥放环境变量/KMS，不能落在同一台机）",
+      "rollback": "加密开关需保留旧明文读取路径一个版本；备份加密的密钥丢失等于备份不可用，必须双份离线保存",
+      "verified": "静态确认"
+    },
+    {
+      "id": "O-14",
+      "severity": "P2",
+      "title": "SOP / README / 部署模板与真实运行漂移 6 处，照文档操作会直接停机",
+      "evidence": "①计划书/ops/deploy-zero-downtime.example.sh 仍写 GOMEMLIMIT=512MiB、--memory 900m --memory-swap 900m（生产实为 1024MiB、1500m/2400m）；②SOP-运维手册.md:40/94/321 写 `--memory 900m`、GOMEMLIMIT=512MiB；③SOP-运维手册.md:241 写 `health_timeout 3s`（实际 Caddyfile 5s/5s）；④SOP-运维手册.md:37 声称主上游健康检查用 `/healthz`（实际用 /api/status）；⑤SOP-运维手册.md:35-42/SOP-回滚.md:115 多处 `curl 127.0.0.1:3000`（当前实际是 3001，且随发版在 3000/3001 交替）；⑥README.md:483-484 推荐 `docker compose up -d`，而 /opt/new-api/docker-compose.yml 顶部 7 行明确写『不要执行 docker compose up -d new-api』、且 README 说映射 3000:3000（实际 3001:3000）",
+      "impact": "新接手者照 README/SOP 操作 = ①用 compose 重建 new-api → 先停后起 5-15s 全站不可用（且历史上一度会把 v1.3.88 拉回来）；②按 900m 判断内存余量 → 误判 OOM 风险；③按 3000 端口排查 → healthz/readyz 全部超时，误判『服务挂了』；④按 /healthz 理解 Caddy 行为 → 对 503 的成因判断错误",
+      "fix_suggestion": "一次性对齐：把 example 脚本与 SOP 的内存/health 参数改成 1500m/2400m/1024MiB/5s-5s-/api/status；端口统一表述为『以 grep -oE \"127.0.0.1:300[0-9]\" /etc/caddy/Caddyfile 为准』；README 部署段改成指向 SOP-运维手册并显式警告不要用 compose 发 new-api；SOP 加一节『当前生产事实表』（版本/端口/内存/health/备份现状），发版时同 PR 更新",
+      "rollback": "纯文档，git revert 即可",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-15",
+      "severity": "P2",
+      "title": "回滚只回镜像：DB schema 无回滚路径、无版本兼容门禁、历史 rollback.sh 已不存在",
+      "evidence": "deploy-zero-downtime.sh KEEP_IMAGES=4 → 现存 new-api:v1.3.184/185/186/187（4 个回滚窗口，更早的已删）；GORM AutoMigrate 只加不删（旧代码可容忍新表/新列）；SOP-回滚.md:83-85 自述 `rollback.sh` 在 154.37.208.171 上不存在且不要当可用路径；发版脚本无『本版本是否含破坏性迁移』的检查点；今天单日发了 8 次版（02:41→09:53），每次都可能带迁移",
+      "impact": "若某版本写入破坏性数据（列单位/类型改变、表达式/计费写入语义变化），回旧镜像无法回数据；叠加上 O-1 无备份，等于『回滚路径在数据层断掉』。历史上已发生过计费口径改错（225 次多扣费）一类事故",
+      "fix_suggestion": "①发版前置门禁：迁移 diff 必须人工确认，含 DROP/类型收窄/单位变化的版本必须先有备份（O-1）再发；②把 KEEP_IMAGES 的分层写清：镜像 4 个保留，但『可安全回滚窗口』= 最近一次破坏性迁移之后的版本；③部署脚本在切换前自动 pg_dump 一次（成本 3.6G/天，磁盘够）",
+      "rollback": "N/A（流程改进）；若误删镜像可按 tag 从构建机重建（源码 tag 在 git）",
+      "verified": "静态确认"
+    },
+    {
+      "id": "O-16",
+      "severity": "P2",
+      "title": "全域单点：单宿主 + 单 new-api + 单 PG + 单 Redis，Caddy 只有一个上游，没有真正的故障转移目标",
+      "evidence": "docker ps → 3 个容器（new-api/postgres/redis）；Caddyfile 两个 reverse_proxy 都指向同一个 127.0.0.1:300x（无 backup 上游）；无第二台节点（memory/new-api-japi-second-site.md 记录副站已废弃且用户明确不再使用）；主机 uptime 18 天单机运行；PG archive_mode=off 且无异地副本",
+      "impact": "主机、磁盘、网络或 PG 任一失效 = 全站 100% 不可用，且恢复只能靠人工 SSH（而 SSH 是 root 密码、无防火墙）＋无备份（O-1）；Caddy 健康检查 15s 判定后没有第二个上游可切，行为是持续 503 直到恢复——今天 148 个 503 就是这个形态",
+      "fix_suggestion": "短期不建集群，做三件真兜底：①同机跑第二个实例（另一个端口）作为 Caddy backup 上游，可在『应用层坏但进程活』时切换（成本低，Docker 里只是多一个容器）；②异机每日备份（O-1）＝真正的灾备底线；③把『从零重建这台机』写成可执行脚本（compose + Caddyfile + 索引 DDL + 恢复备份），并演练一次计时",
+      "rollback": "增加的 backup 上游可随时从 Caddyfile 删除 + reload；重建脚本只在演练机执行",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-17",
+      "severity": "P2",
+      "title": "Caddy 健康检查打在 /api/status（纯内存）→ 只能发现进程死，DB 全挂 / relay 全 500 仍然 healthy",
+      "evidence": "Caddyfile 两处 health_uri /api/status；controller/misc.go:47 GetStatus 只读 console_setting/ common.OptionMap 内存值，不触碰 DB（对比 /readyz 才 ping DB，router/main.go:30）；实测 /readyz=200 /healthz=200；今天 09:00 时段 148 个 503 与 PG OOM 窗口重合，说明对『后端不可用』的判定实际取决于连接是否被拒（进程/端口），而不是业务可用性",
+      "impact": "健康检查给人虚假安全感：PG 挂掉或 relay 全 500 时，Caddy 仍把流量打进上游、监控上一切正常，故障只能靠用户报错发现；反过来，一旦进程活但端口不可达，也是 15s 才摘（单上游 = 摘了就是 503）",
+      "fix_suggestion": "把主上游 health_uri 改成 /readyz（DB 可达才 200），但要配套：/readyz 的超时必须短（wget/curl 内建超时），且保持现在的 5s/5s/fails 3 容忍窗口，避免 DB 抖动重演 503 风暴；更好的组合是『两个上游 + /api/status 判活 + /readyz 判就绪』",
+      "rollback": "改回 /api/status + systemctl reload caddy（零中断，历史备份 /etc/caddy/Caddyfile.bak-* 已在）",
+      "verified": "静态确认"
+    },
+    {
+      "id": "O-18",
+      "severity": "P3",
+      "title": "磁盘守卫的『告警』只是本地 echo，且清理范围遗漏 /root/build-*.log 与 /opt/new-api/logs 陈旧文件",
+      "evidence": "disk-guard.sh 中 WARN 分支仅 `echo WARNING...` 到 /var/log/new-api-disk-guard.log；/root 下 build-1xx.log 共数十个（每个 ~70-100KB，最后 10-18）；/opt/new-api/logs 46MB，最新文件仍是 10-05 的 oneapi-*.log（容器已不再写 --log-dir）；docker system df：Images 2.314GB（1.311GB 可回收）、Volumes 4.466GB（455.8MB 可回收）、Build Cache 0（清理策略有效）",
+      "impact": "单点垃圾量不大（<100MB），但『告警没人收』是系统性缺口（见 O-12）；陈旧 oneapi 日志会误导排障（以为日志还在写）",
+      "fix_suggestion": "告警改走 webhook；清理范围加 `/root/build-*.log`、`/opt/new-api/logs/*.log -mtime +30`；顺手确认 data 目录 426MB 中是否有可归档的产物",
+      "rollback": "日志类删除不可恢复但无业务价值；建议先 mv 到 /var/backups 观察一周",
+      "verified": "已验证"
+    },
+    {
+      "id": "O-19",
+      "severity": "P3",
+      "title": "postfix 监听 0.0.0.0:25、redis 以 root 运行且用 allkeys-lru，属攻击面与配置债",
+      "evidence": "ss -tlnp → 0.0.0.0:25 master(postfix)，systemctl is-enabled postfix = enabled，postconf mynetworks=127.0.0.0/8（非 open relay），mailq 空；docker inspect redis → Config.User 为空（容器内 root），Cmd=redis-server --requirepass **** --maxmemory 128mb --maxmemory-policy allkeys-lru --client-output-buffer-limit ...；redis INFO：used_memory 1.93M / maxmemory 128M、appendonly no、save 默认开启",
+      "impact": "25 端口暴露给全网的攻击面（被扫/被用来做反弹或退信轰炸），非 relay 故风险有限；redis 无 USER 意味着容器逃逸面略大（已有 cap-drop 未设置）；allkeys-lru 在有内存压力时会淘汰限流/缓存键且静默",
+      "fix_suggestion": "若不需要本地发信：`systemctl disable --now postfix` + ufw 不放 25；需要则 inet_interfaces=loopback-only。redis 加 `--user redis` 或在 compose 里指定 user，并考虑 volatile-lru 以保护计数类键",
+      "rollback": "systemctl enable --now postfix 即回滚；redis user 变更随容器重建回滚",
+      "verified": "已验证"
+    }
+  ],
+  "summary": {
+    "P0": 3,
+    "P1": 5,
+    "P2": 9,
+    "P3": 2,
+    "top3": ["O-1 无备份无 WAL 归档（数据不可恢复）", "O-2 root 密码 SSH 无防火墙无 fail2ban，24h 撞库 16867 次", "O-3 3001 公网明文暴露绕过 Caddy"],
+    "tonight": "只做一件：给 DB 加每日 pg_dump 加密 + 落异地（O-1）——它是 O-8 重启、O-7 清理、O-15 破坏性迁移回滚三件事的前置条件；顺手用 5 分钟把 3001 改成 -p 127.0.0.1:3001:3000（O-3）与 chmod 700 部署脚本（O-11），三项都零停机、可即刻回滚"
+  }
+}

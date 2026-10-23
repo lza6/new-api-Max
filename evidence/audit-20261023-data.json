@@ -1,0 +1,201 @@
+{
+  "task_id": "audit-data",
+  "timestamp": "2026-10-23T18:20:00+08:00",
+  "scope": {
+    "mode": "只读审计（未修改任何代码、配置、数据库；未执行 DDL/DML）",
+    "code": "new-api v1.3.187 工作区（model/ controller/ service/ common/），grep + 逐文件通读 + GORM v1.25.12 源码核对",
+    "prod_readonly": "SSH root@154.37.208.171 → docker exec postgres psql -X：pg_indexes / pg_stat_user_indexes / pg_stat_user_tables / pg_class / pg_stats / COUNT 聚合 / EXPLAIN（无 ANALYZE 于大表）",
+    "prod_logs": "docker logs new-api（09:53 启动至今）→ [SLOW SQL >= 200ms] 与 GIN 请求耗时",
+    "overstep_disclosed": "对 web_request_logs 执行了 1 次 `ANALYZE web_request_logs`（17.5 万行，仅更新规划器统计，无数据/schema 变更）。除此之外无任何写操作。",
+    "not_reported": "已在今日修复或已由 evidence/audit-20261023-ops.json 报告、此处不重复：PG 1200MB/shared_buffers 256MB/jit off/random_page_cost 1.1/idx_logs_type_created_stats/VACUUM 刷 VM；容器资源矩阵与 GOMEMLIMIT；Caddy 健康检查；零备份；SSH/防火墙；3001 明文暴露；/metrics 公开；logs 无保留策略（O-7 已报）。本文件只报 O-1..O-19 之外的数据层新问题。"
+  },
+  "summary": {
+    "P0": 1,
+    "P1": 4,
+    "P2": 9,
+    "P3": 4,
+    "headline": "今天 OOM 的同类查询仍有 2 条在生产可被触发，其中 GET /api/site/stats 匿名可达、实测 10.7–11.0 秒、EXPLAIN 为 Parallel Seq Scan cost 348,028（需回表 2.6GB heap）；上轮修复的 3 条查询覆盖面不足。"
+  },
+  "findings": [
+    {
+      "id": "D-1",
+      "severity": "P0",
+      "title": "公开未认证端点 GET /api/site/stats 仍在对 logs 做全表 Seq Scan，实测 10.7–11.0 秒（与今日 OOM 元凶同一机制，且未被上轮修复覆盖）",
+      "file": "controller/log.go:305-310（GetSiteOverview 的 .Scan(&agg)）；路由 router/api-router.go:38",
+      "evidence": "① 生产实时：[SLOW SQL >= 200ms] /build/controller/log.go:310 → [11014.515ms] [rows:1] SELECT COUNT(*) AS total_requests, COALESCE(SUM(request_bytes),0)+COALESCE(SUM(response_bytes),0) AS total_bytes, COALESCE(SUM(prompt_tokens),0)+COALESCE(SUM(completion_tokens),0) AS total_tokens, COALESCE(SUM(quota),0) AS total_quota FROM \"logs\" WHERE type = 2；同一 SQL 在 17:55:10 / 17:57:53 / 18:06:22 分别耗时 11014ms、10975ms、10728ms（GIN 记录 GET /api/site/stats latency=11.017670115s，来源 IP 61.135.210.171 / 76.9.111.14，均为匿名外网）。② EXPLAIN 同一 SQL → 'Finalize Aggregate → Gather → Parallel Seq Scan on logs (cost=0.00..348028.26 rows=696057 width=40) Filter: (type = 2)' —— 成本 34.8 万，与今日 OOM 元凶（cost 425,935 的 Parallel Seq Scan）同一量级。③ 为什么走不了索引：该 SELECT 需要 prompt_tokens/completion_tokens，而生产唯一的 (type,created_at) 覆盖索引是 'CREATE INDEX idx_logs_type_created_stats ON logs (type, created_at) INCLUDE (model_name, request_bytes, response_bytes)'，不含这两个 token 列；idx_log_type_created_finance 的 INCLUDE 侧只有 quota/cost_quota/cost_rule_id。必须回表 → 扫 2,644MB heap → 页缓存灌满 = 今天 09:03 OOM 的完全相同路径。④ 路由：apiRouter.GET(\"/site/stats\", controller.GetSiteOverview) 在未鉴权分组内（注释原文『不能用登录型限流…保持无认证』），同一 handler 还挂在管理端 logRoute.GET(\"/overview\")。",
+      "impact": "匿名爬虫/压测/正常首页访问都能以 11 秒级全表聚合压满 2 核 PG；shared_buffers 仅 256MB，串行 3~4 个并发即可把 page cache 顶到 1200MB 容器上限，等同重演今日 OOM（崩溃恢复 → 统计清零 → 全站 503）。上轮只修了 traffic/bandwidth 三条查询，这条是漏网的第四条，且是唯一公网匿名可达的。",
+      "fix_suggestion": "①立刻（无需改代码）：把该结果写进 Redis 并延长 TTL + 加 stale-while-revalidate（参考 service/site_visitor_tracker.go 的 siteVisitorCache），或直接在 Caddy 层对 /api/site/stats 做 30–60s 微缓存；②代码：GetSiteOverview 改为读预聚合（log_daily_stats 或 perf 计数表），彻底离开 1.85M 行扫描；③若短期仍要直查：新建覆盖索引 'CREATE INDEX CONCURRENTLY idx_logs_type_created_overview ON logs (type, created_at) INCLUDE (prompt_tokens, completion_tokens, quota, request_bytes, response_bytes)' 使其变为 index-only scan（成本可从 348k 降到 3 万量级），但 30 天以上窗口仍会退化，不能替代预聚合。",
+      "verified": "已验证"
+    },
+    {
+      "id": "D-2",
+      "severity": "P1",
+      "title": "migrateLogTrafficIndex 在单库部署（本生产形态）下永不被调用 → 声明已删除的 idx_logs_traffic(60MB) 仍在生产、每次写日志多维护一个死索引",
+      "file": "model/main.go:265-266（唯一调用点）、model/main.go:453-463、model/log.go:84-86（注释声明）",
+      "evidence": "① 代码：migrateLogTrafficIndex 只被 migrateLOGDB 调用，而 migrateLOGDB 只在 InitLogDB 的 `if os.Getenv(\"LOG_SQL_DSN\") == \"\" { LOG_DB = DB; ... return MigrateAuditLogs() }` 的 else 分支里执行（main.go:235-266）；LOG_SQL_DSN 为空时直接返回，只跑 MigrateAuditLogs。② 生产环境实测无 LOG_SQL_DSN（docker inspect new-api Env 只有 SQL_DSN=postgresql://newapi:***@postgres:5432/new-api 与 REDIS_CONN_STRING）。③ 生产 pg_indexes 仍有 idx_logs_traffic，pg_relation_size=60MB、idx_scan=0；容器日志自 09:53 启动仅有一行 'database migration started'，既无 'dropped obsolete index' 也无 'failed to drop obsolete index'（即函数根本没被调用，不是失败）。④ model/log.go:86 注释原文『存量索引由 migrateLogTrafficIndex 删除』对默认部署形态是假的。⑤ 单测 model/db_conformance_test.go:275 直接调用 migrateLogTrafficIndex(db)，所以测试是全绿的 —— 典型的『测试绿、生产不生效』契约假完成（对照记忆 new-api-declaration-vs-implementation-drift.md）。",
+      "impact": "60MB 死索引 + 每条 consume 日志 INSERT 多维护一棵 B-tree（该表 137MB/天写入量），在 1200MB/256MB shared_buffers 的容器里直接压缩可用缓存；同时证明『日志表 schema/索引的维护性迁移』在单库部署下全部失效——将来任何加在 migrateLOGDB 里的 logs 侧迁移都会静默不执行。",
+      "fix_suggestion": "把 migrateLogTrafficIndex(LOG_DB) 一并放进 InitLogDB 的 LOG_SQL_DSN 为空分支（在 MigrateAuditLogs 之后、且 LOG_DB.AutoMigrate(&Log{}) 已由 migrateDB 完成），或把 logs 的迁移统一收口到一个不依赖 DSN 分支的 ensureLogSchema()；补一条『单库形态』回归测试（LOG_SQL_DSN 为空 → 调用 InitLogDB 后索引应不存在），而不是直接调内部函数。生产侧可先手工 DROP INDEX CONCURRENTLY idx_logs_traffic 回收 60MB。",
+      "verified": "已验证"
+    },
+    {
+      "id": "D-3",
+      "severity": "P1",
+      "title": "用量/成本报表 /api/log/report（6 个维度）是全窗口 Parallel Seq Scan + HashAggregate + Sort，无任何缓存、start 参数无下限、并与 CSV 导出共用",
+      "file": "model/usage_report.go:117-135；controller/usage_report.go:41-49、98-108",
+      "evidence": "① EXPLAIN 实测（group_by=user，30 天窗口，bigint 参数）：'Sort → Finalize GroupAggregate → Gather Merge → Parallel Seq Scan on logs (cost=0.00..358202.56 rows=232019 width=72) Filter: ((type = 2) AND (created_at >= ...))'，总 cost 363,485。② 该查询对每条行计算 8 个聚合（COUNT、SUM(prompt_tokens)、SUM(completion_tokens)、两个派生 SUM、SUM(quota)、SUM(request_bytes)、SUM(response_bytes)），需要 prompt/completion/username/model_name/channel_id/token_name 等列，全部不在任何覆盖索引内 → 必然回表全扫 2,644MB。③ 无缓存：controller/usage_report.go:60-90 直接 model.GetUsageReport，没有任何 Redis/进程内缓存（对比同目录 log.go 的 traffic/bandwidth 都加了 60s 缓存）。④ start 只校验 >0（parseUsageReportParams），因此 start=1 即扫描全部 1.84M 行。⑤ ExportUsageReportCSV 同一查询，注释还写着『内存不随日志总量增长，可安全导出长窗口』—— 内存确实不涨，但 DB 成本无上限。",
+      "impact": "管理员打开报表页或点导出即触发一次 cost 36 万的 seq scan（与今日 425,935 的 OOM 元凶同量级，只差 JIT 已关）；并发两个管理员 = 两次并行全表扫描。这是今天事故后仍留在代码里的第二个同类入口。",
+      "fix_suggestion": "①先加 60s Redis 缓存 + 单飞（键含 group_by/start/end 的规范化桶，如按天对齐），成本立即下降一个数量级；②给 start 加下限（复用 LOG_STAT_MAX_DAYS=366 的同样兜底）；③中期做 log_daily_stats 日汇总表（group_by=day/model/channel 三维已足够覆盖 90% 用法），user/group/token 维度保留直查但必须带窗口下限；④把 8 个聚合裁剪为前端真正展示的列。",
+      "verified": "已验证"
+    },
+    {
+      "id": "D-4",
+      "severity": "P1",
+      "title": "日键计算 (created_at + 时区) / 86400 在 MySQL 是小数除法，扫描进 int64 会失败 → /api/log/traffic 与 /api/log/bandwidth/leaderboard 在 MySQL 部署下直接 500",
+      "file": "controller/log.go:220、controller/log.go:387（对照 model/usage_report.go:73-74 的明确禁令）",
+      "evidence": "① controller/log.go:220/387：Select(fmt.Sprintf(\"(created_at + %d) / 86400 AS day_key\", tzOffset))，扫描目标 struct 的 DayKey 是 int64。② 同项目 model/usage_report.go:73-74 原文：『刻意不用 `x / 86400`，因为 MySQL 的 `/` 是小数除法（返回 20729.5 而非 20729），跨库不可靠』，因此报表改用 `x - (x % 86400)`。同一仓库对同一算式给了两种相反写法。③ 语义：MySQL 的 `/` 恒返回 DECIMAL，go-sql-driver 把 DECIMAL 以 []byte(\"20729.5000\") 返回，database/sql 的 convertAssign 对 *int64 走 strconv.ParseInt → 解析失败 → Scan 返回错误 → 端点返回 500『failed to query traffic』。④ 而 controller/log.go:208-209 与 374-376 的注释恰恰声称『纯整数算术，SQLite/MySQL/PG 三库一致』。⑤ 三库验证为何没抓到：model/db_conformance_test.go:78-95 的 MySQL/PG 分支在 TEST_MYSQL_DSN/TEST_POSTGRES_DSN 未设置时 t.Skip()，默认 CI 只有 SQLite 在跑（AGENTS.md 要求的『必须真实跑三库』在默认流水线里并未发生）。",
+      "impact": "违反 AGENTS.md 的硬性三库兼容条款；任何 MySQL 部署（上游 new-api 的主流用法）打开管理端流量统计/带宽排行即 500，功能不可用且无降级。属于『声明与实际不一致』的又一处实例。",
+      "fix_suggestion": "把两处改写成报表已验证的写法：\"(created_at + %d) - ((created_at + %d) %% 86400) AS day_key\"（并用 SQL 别名之外的完整表达式写 GROUP BY/ORDER BY），或在 Go 侧用 strconv 接受小数再取整；补一条 conformance 测试覆盖 day_key 的整数性（SQLite+MySQL+PG 真库），并把 TEST_MYSQL_DSN/TEST_POSTGRES_DSN 纳入发版门禁，禁止用 Skip 当通过。",
+      "verified": "静态确认（MySQL 除法语义 + 驱动返回类型 + 项目自身禁令三重佐证；未在真实 MySQL 上复现，故此项为待真机验证的最高优先级）"
+    },
+    {
+      "id": "D-5",
+      "severity": "P1",
+      "title": "负页码使 OFFSET 为负 → PostgreSQL / MySQL 直接报错，/api/log/ 与 /api/log/self 返回 500",
+      "file": "common/page_info.go:50-58、13-15；model/log.go:137-139；controller/log.go:31、59",
+      "evidence": "① common/page_info.go:44-58：p=-1 先被写入 Page=-1，随后的『兼容』分支 `page,_ := strconv.Atoi(c.Query(\"p\")); if page != 0 { pageInfo.Page = page }` 把 -1 原样写回，没有任何下界钳制；GetStartIdx()=(Page-1)*PageSize=(-2)*100=-200。② model/log.go:138-139：startIdx<500 走浅分页，直接 .Offset(-200)。③ 生产 PG 实测：`select id from logs offset -200 limit 1;` → ERROR: OFFSET must not be negative（MySQL 的 LIMIT/OFFSET 亦不接受负数；只有 SQLite 静默当作 0）。④ GetAllLogs / GetUserLogs（controller/log.go:18-68）没有任何 Page 守卫；对照同项目 controller/access_token.go:68 就有 `if page.Page < 1 || page.PageSize < 1 ... return 400`，说明正确写法已有先例。",
+      "impact": "任何登录用户 GET /api/log/?p=-1 或 /api/log/self?p=-1 即稳定 500（DB 层报错被 GORM 记录为 SLOW/错误日志，形成噪声并可能触发告警）；三库行为分叉，属于典型的参数未在系统边界校验。",
+      "fix_suggestion": "在 GetPageQuery 里做钳制（Page<1→1，PageSize<1→ItemsPerPage，>100→100），或按 access_token.go 的既有做法在 log 两个 handler 入口校验并返回 400；补一条 p=-1 的回归测试。注意 GetPageQuery 同时被大量分页端点复用，改这里收益最大。",
+      "verified": "已验证（PG 侧负 OFFSET 报错已实测）+ 静态确认（调用链无守卫）"
+    },
+    {
+      "id": "D-6",
+      "severity": "P2",
+      "title": "GetOpsDailySeries 在 for 循环里逐日发 SQL：最多 90 次串行聚合查询，可用一次 GROUP BY 完成",
+      "file": "controller/ops_panel.go:556-575（循环体调 226-237 的 opsAggregateRange）",
+      "evidence": "`for i := days - 1; i >= 0; i-- { ... agg, err := opsAggregateRange(dayStart.Unix(), dayEnd.Unix()) ... }`，days 上限 opsMaxDailySeriesDays=90（ops_panel.go:66）；opsAggregateRange 每次都发一条 `SELECT COALESCE(SUM(quota),0), COALESCE(SUM(cost_quota),0), COUNT(*) FROM logs WHERE type=2 AND created_at>=? AND created_at<?`。缓存只有 Redis 5 分钟（opsOverviewCacheTTL），且无进程内兜底（GetOpsOverview 有 getLocalOpsOverview，这里没有）。",
+      "impact": "缓存冷启动时 = 90 次往返、90 次索引范围扫描；每次 miss 把请求线程占住数秒，且并发管理员各自重跑（无单飞）。与同文件 GetAllLogsTraffic 早已改为单次 GROUP BY 的写法自相矛盾。",
+      "fix_suggestion": "改成一条 SQL：Select(\"FLOOR((created_at+tz)/86400) 或 (created_at+tz)-((created_at+tz)%86400) AS day_start, SUM(quota), SUM(cost_quota), COUNT(*)\").Where(type=2 AND created_at>=start).Group(\"1\").Order(\"1\")，一次扫描出全部天；顺手补 getLocalOpsOverview 式的进程内兜底。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "D-7",
+      "severity": "P2",
+      "title": "logSearchCountLimit 形同虚设：GORM Count 不会剥离 LIMIT，用户日志计数仍全窗口；管理端 Count 更是完全无上限",
+      "file": "model/log.go:701（GetUserLogs）、model/log.go:666/607（GetAllLogs）",
+      "evidence": "① model/log.go:666 定义 `const logSearchCountLimit = 10000`，:701 写成 `tx.Model(&Log{}).Limit(logSearchCountLimit).Count(&total)`，看起来像『最多数 1 万条』。② GORM v1.25.12 finisher_api.go:442-490 的 Count 实现只替换 SELECT 子句、删除 ORDER BY，**不删除 LIMIT**，最终 SQL 是 `SELECT count(*) FROM logs WHERE ... LIMIT 10000` —— 对聚合结果只返回 1 行，LIMIT 10000 不产生任何截断效果，仍然全量扫描计数。③ GetAllLogs:607 的 `tx.Model(&Log{}).Count(&total)` 连这个装饰性的 Limit 都没有。",
+      "impact": "用户日志页/管理端日志页每次都做一次全窗口 COUNT。30 天窗口约 130 万行，走 index-only scan 约数百毫秒；配合 D-1/D-3 的全表扫描并发时进一步抢 shared_buffers。常量名与注释会让人误以为已设上限，属声明性防护失效。",
+      "fix_suggestion": "要么删除误导性的 Limit 并显式承认全量计数（改用『近似总数』或缓存 total），要么真正实现上限：total = min(count, 10000) 需要 `SELECT count(*) FROM (SELECT 1 FROM logs WHERE ... LIMIT 10000) t`；同时给 GetAllLogs 加上与 SumUsedQuota 一致的 LOG_STAT_MAX_DAYS 窗口兜底。",
+      "verified": "静态确认（GORM v1.25.12 源码 + 生成的 SQL 形态）"
+    },
+    {
+      "id": "D-8",
+      "severity": "P2",
+      "title": "公开聚合端点只有『设/取缓存』，没有单飞与 stale-while-revalidate：11 秒冷查询 + 60s TTL + 匿名可达 = 可被稳定击穿",
+      "file": "controller/log.go:184-204、243-248、272-324、352-371、433-441；对照 service/site_visitor_tracker.go:537-612（已加固）",
+      "evidence": "① GetSiteOverview / GetLogsTraffic / queryModelBandwidthLeaderboard / GetBandwidthLeaderboard 全部是 `if common.RedisEnabled { RedisGet(...) } ... 计算 ... RedisSet(ttl=1min)` 模式：没有 inflight 去重、没有『返回旧值 + 后台刷新』、没有进程内兜底（除 OpsOverview）。② 同项目 service/site_visitor_tracker.go:532-612 的 siteVisitorCache 专门实现了 refreshing/inflight 单飞 + 后台刷新，注释原文：『没有它时，压测里 16 个并发请求会在缓存为空时全部跑一遍 6 秒的聚合』——说明该问题在本项目已被认知并修过一次，只是没有推广到 log.go 的四个聚合端点。③ D-1 实测 /api/site/stats 单次 11 秒；Redis 未命中窗口内所有并发请求都会各自跑一遍 ⇒ 3 个并发即 3× 全表扫描并行。",
+      "impact": "缓存只降低了『稳定态』成本，没有降低『过期瞬间/冷启动』的并发成本，恰恰是 OOM 最容易发生的时刻；而该端点匿名可达、无速率限制（路由注释明确说不能加登录型限流）。",
+      "fix_suggestion": "把 siteVisitorCache 泛化成 common 层可复用的 SWR+单飞缓存，套到 GetSiteOverview/GetLogsTraffic/GetBandwidthLeaderboard/GetModelStats；TTL 提到 5–15 分钟并允许返回 stale；对 /api/site/stats 在 Caddy 或 middleware 加 IP 级轻量限流。",
+      "verified": "静态确认 + 已验证（11s 冷查询实测）"
+    },
+    {
+      "id": "D-9",
+      "severity": "P2",
+      "title": "web_request_logs 的 IP 聚合查询没有任何时间窗：全表 GROUP BY ip + 全表 COUNT(DISTINCT ip)，随流量线性增长",
+      "file": "model/web_request_log.go:55-88（AggregateWebRequestLogs）、:101-113（TodayWebRequestStats 有窗口，没问题）",
+      "evidence": "① AggregateWebRequestLogs 的 where 只可能是 `WHERE ip = ?`（用于单 IP 过滤），**永远不含 window_start 谓词**；随后两次全表扫描：`SELECT COUNT(DISTINCT ip) FROM web_request_logs` 与 `SELECT ip, SUM(request_count), MAX(rate_per_second), SUM(bytes_sent), MAX(window_start) FROM web_request_logs GROUP BY ip ORDER BY ... LIMIT ? OFFSET ?`。② 生产实测该表已有 175,622 行 / 60MB（仅 7 天保留期，min(window_start)=2026-10-16），EXPLAIN：`Parallel Seq Scan on web_request_logs (cost=0.00..6622.38 rows=72938)`、`Index Only Scan using idx_web_request_logs_ip (rows=175051)`。③ 行数结构是 (IP × path × 60s 窗口) 一行（service/web_protection_tracker.go:395-421 每路径一行），扫描型爬虫打随机路径可让单 IP 一分钟产生几十行。④ 调用方 controller/web_protection.go:181 是管理端页面，每次翻页/换排序都重跑。",
+      "impact": "当前 17.5 万行尚可（十毫秒级），但按 7 天窗口线性增长：日请求量翻 10 倍即 175 万行/次全扫，管理端防刷页会变成第二个慢查询源；且 COUNT(DISTINCT ip) 与 GROUP BY ip 让两遍扫描无法合并。",
+      "fix_suggestion": "①给查询加默认时间窗（如 window_start >= now-24h，前端提供 1h/24h/7d 选择）；②把『按 IP 聚合排行榜』改为写侧累加表（ip → 当日/当小时计数），与 site_daily_visitors 同思路；③临时缓解：建 (window_start, ip) 复合索引让窗口内聚合走范围扫描。",
+      "verified": "已验证（EXPLAIN + 生产行数与保留期实测）"
+    },
+    {
+      "id": "D-10",
+      "severity": "P2",
+      "title": "用户画像查询把该用户 30 天全部日志明细拉进 Go 内存（无 LIMIT、无聚合下推）",
+      "file": "service/user_profile/profile.go:214-231（queryConsumeRows）、:236-247（queryErrorRows）、:45-47",
+      "evidence": "queryConsumeRows 执行 `SELECT model_name, channel_id, quota, prompt_tokens, completion_tokens, created_at FROM logs WHERE type=2 AND user_id=? AND created_at>=? AND created_at<=?` 并 Scan 到 []consumeRow，**没有 Limit**；随后在 Go 侧 summarizeWindow 里做 count/sum/去重渠道（:249-283）。缓存是进程内 profileCache + Redis 60s（profileRedisTTL）。",
+      "impact": "内存占用与该用户 30 天请求数线性相关：重度用户（日 3 千请求）≈ 9 万行 × ~64B ≈ 6MB/次；并发多用户 + 60s TTL 到期时刻无单飞 ⇒ 叠加放大。相对 D-1 属可控量级，但形状与本项目反复强调的『别把明细拉进 Go』原则相反（对比 model/site_visitor.go 的 CountActiveUsers 用 COUNT(DISTINCT) 下推）。",
+      "fix_suggestion": "把这几个窗口（今日/7d/30d）改为一条条件聚合 SQL：SUM(CASE WHEN created_at>=? THEN ...)、COUNT(DISTINCT channel_id)，DB 只回 3 行；模型 top-N 用 GROUP BY model_name ORDER BY SUM(quota) DESC LIMIT 10 下推。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "D-11",
+      "severity": "P2",
+      "title": "quota_data 的去重键没有唯一约束，SaveQuotaDataCache 的『SELECT ... FOR UPDATE → 不存在则 INSERT』仍可并发双插；且每个 key 一个独立事务",
+      "file": "model/usedata.go:104-124（循环 + 每 key 一个 DB.Transaction）；:110-117（lockForUpdate）；model/usedata.go:11-24（QuotaData 模型无唯一索引）",
+      "evidence": "① 循环体：`for _, quotaData := range CacheQuotaData { err := DB.Transaction(func(tx *gorm.DB) error { ... lockForUpdate(tx.Table(\"quota_data\")).Where(<8 列等值>).First(&quotaDataDB) ... if quotaDataDB.Id > 0 { increase } else { tx.Create } }) }` —— 每次迭代申请一个事务，flush 有 N 个 key 就是 N 次事务提交。② 关键：当行不存在时 FOR UPDATE 不加任何锁（PG 对不存在的行无谓词锁；MySQL 只有在有可用的唯一/索引等值条件时才可能取到 gap 锁）—— 而 (user_id,username,model_name,created_at,use_group,token_id,channel_id,node_name) 上**没有唯一索引**（db_structure.md:682-690 的 quota_data 索引清单只有 8 个单列索引 + idx_qdt_model_user_name(model_name,username)），所以两个节点同时 miss → 同时 INSERT → 该组合出现两行，之后每次 upsert 只加其中一行，另一行永久成为『幽灵行』被后续 SUM 一起计入。③ 生产 quota_data 已 30,111 行。④ 注释原文声称『多实例防重复计数…事务外不再有 First→Create 竞态窗口』—— 只覆盖了『行已存在』的场景。",
+      "impact": "与记忆里 v1.3.63『add_keys 静默丢数据』完全同构的读-改-写竞态：一旦出现重复行，数据看板/流量排行（GetFlowQuotaData 按 token_id/use_group/model_name 分组合并）会出现同一逻辑键分成两行的错账，且无法自动收敛。当前单实例部署下风险低，但蓝绿部署期间新旧容器短暂并存即满足触发条件（今天 18:0x 的蓝绿切换正是这种窗口）。",
+      "fix_suggestion": "①加唯一索引（新建表或 CREATE UNIQUE INDEX CONCURRENTLY 前先去重）后在 8 列等值上做 ON CONFLICT DO UPDATE（与 site_daily_visitors 的既有双分支写法一致，MySQL 用 ON DUPLICATE KEY UPDATE），彻底消灭『先查后插』；②把 per-key 事务改为单事务批量（一批 100~200 个 key），把 N 次提交降到 1 次；③补一条两 goroutine 并发 miss 的回归测试。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "D-12",
+      "severity": "P2",
+      "title": "quota_data 上 idx_qdt_created_at 与 idx_qdt_created_at_2 是两条完全相同的 (created_at) 单列索引",
+      "file": "model/usedata.go:19（CreatedAt 的 gorm tag）；db_structure.md:689-691",
+      "evidence": "struct tag 原文：`CreatedAt int64 \\`json:\"created_at\" gorm:\"bigint;index:idx_qdt_created_at,priority:2;index:idx_qdt_created_at_2\"\\`` —— 两条索引都只有 created_at 一列（都没有 priority:1 的第二列），于是 GORM 生成了两条内容完全一致的 B-tree。db_structure.md 的生成快照同样列出 `idx_qdt_created_at` on (created_at) 与 `idx_qdt_created_at_2` on (created_at)。",
+      "impact": "纯写入放大：quota_data 每次 flush 的 INSERT/UPDATE 都要多维护一棵冗余 B-tree（该表已有 8 个单列索引，30,111 行），而没有任何查询能从中获益（同一列两条索引只会让规划器多一个候选）。属于 tag 书写历史遗留。",
+      "fix_suggestion": "删掉 tag 里的 `;index:idx_qdt_created_at_2`，并为存量库补一条与 migrateLogTrafficIndex 同风格的幂等 DropIndex（注意同时要把该函数挂到单库分支，否则又会重演 D-2）。",
+      "verified": "已验证（db_structure 快照）+ 静态确认（tag 语义）"
+    },
+    {
+      "id": "D-13",
+      "severity": "P2",
+      "title": "audit_logs 的 idx_audit_logs_created_at 是 idx_audit_created_event(created_at, event_id) 的前缀冗余；该表 9 个索引 / 17MB 仅 20,516 行",
+      "file": "model/audit_log.go:35-36",
+      "evidence": "CreatedAt 的 tag：`gorm:\"type:bigint;index:idx_audit_user_time,priority:2;index:idx_audit_token_time,priority:2;index;index:idx_audit_created_event,priority:1\"` —— 其中的裸 `index` 生成单列 idx_audit_logs_created_at，而 idx_audit_created_event 的第一列就是 created_at，任何按 created_at 的等值/范围/排序都能用后者。生产 pg_stat_user_indexes 实测 audit_logs 共 9 个索引：pkey 464kB、idx_audit_logs_event_id 1192kB（UNIQUE）、idx_audit_created_event 1368kB、idx_audit_token_time 1160kB、idx_audit_user_time 840kB、idx_audit_logs_created_at 440kB、idx_audit_logs_request_id 1192kB、idx_audit_logs_username 320kB、idx_audit_logs_category 200kB，合计 17MB / 20,516 行。",
+      "impact": "审计日志是全站写入最频繁的表之一（每次登录/管理操作一行，且永不清理），9 个索引意味着每行写 9 棵 B-tree；前缀冗余可无损去掉 1 个。idx_audit_logs_category（取值仅 4 种）与 idx_audit_logs_username 选择性极低，属长期观察项。",
+      "fix_suggestion": "删掉 CreatedAt 上的裸 `index`（保留两条复合 + idx_audit_created_event），存量库幂等 DropIndex idx_audit_logs_created_at；category 索引可改为 (category, created_at) 复合或直接删除（当前全部查询都带 created_at 排序）。",
+      "verified": "已验证（生产索引清单与体积）"
+    },
+    {
+      "id": "D-14",
+      "severity": "P2",
+      "title": "logs 现有 19 个索引 / 764MB 中，约 190MB 可无损清理；另有一个 partial index 机会（upstream_request_id 95.8% 为空串）。同时纠正记忆里一条已失效的结论",
+      "file": "model/log.go:62-95（索引 tag）；生产 pg_stat_user_indexes 实测",
+      "evidence": "生产实测（pg_stat_user_indexes / pg_indexes / 列值分布）：① 可无损删除的纯前缀冗余：idx_logs_user_id 14MB（⊂ idx_user_id_id(user_id,id)）、idx_logs_model_name 17MB（⊂ index_username_model_name(model_name,username)）；② 死索引：idx_logs_traffic 60MB（无排序首列、站点流量聚合无谓词，代码本意即删除，见 D-2）；③ 无任何查询使用的索引：idx_logs_ip 16MB —— GetAllLogs/GetUserLogs 的参数只有 type/时间/username/token_name/model_name/channel/group/request_id/upstream_request_id/min_use_time，grep 全仓确认没有任何 `logs` 表按 ip 过滤的 SQL（`ip = ?` 只出现在 web_request_logs 与 banned_ips）；④ partial index 机会：`SELECT count(*) FILTER (WHERE upstream_request_id=''), count(*) FILTER (WHERE ip=''), count(*) FILTER (WHERE request_id=''), count(*) FROM logs` → 1,766,811 / 1,458,801 / 3,279 / 1,843,776，即 upstream_request_id 有 95.8% 是空串，idx_logs_upstream_request_id 20MB 里绝大多数条目是同一个空值，改 `WHERE upstream_request_id <> ''` 可缩到 ~1MB；⑤ **纠正记忆**：new-api-pg-oom-and-sql-tuning-v13187.md 说 idx_logs_request_id『n_distinct=-0.667，众数为空串』—— 实测 request_id 空值仅 3,279 行(0.18%)，该索引现在是高选择性的有效索引（每次日志写入都由 ensureLogRequestId 生成），不应作为首要清理对象。另：idx_log_type_created_id(105MB) 不可与 idx_logs_type_created_stats 合并 —— 前者为 `created_at desc, id desc` 提供有序扫描（GetAllLogs 的 ORDER BY），INCLUDE 列不参与排序。",
+      "impact": "每个 consume 日志 INSERT 目前要维护 19 棵 B-tree（写放大 = 764MB 索引 / 2,644MB heap）；137MB/天写入量下，多余的 190MB 索引持续占用 shared_buffers(256MB) 与 page cache，直接缩短今天这种 OOM 的触发距离。",
+      "fix_suggestion": "按顺序执行（均可 CONCURRENTLY 回滚）：DROP INDEX CONCURRENTLY idx_logs_traffic（若 D-2 修好后由迁移自动做）；DROP INDEX CONCURRENTLY idx_logs_user_id；DROP INDEX CONCURRENTLY idx_logs_model_name；DROP INDEX CONCURRENTLY idx_logs_ip（需产品确认确实没有按 IP 查日志的需求）；重建 idx_logs_upstream_request_id 为 partial。预计回收 ~190MB 并减少 4 次/行的索引维护。注意：idx_scan 因崩溃恢复被清零，本结论完全基于『查询可达性』而非 idx_scan=0。",
+      "verified": "已验证（生产索引清单/体积/列值分布实测 + 全仓 grep 可达性分析）"
+    },
+    {
+      "id": "D-15",
+      "severity": "P3",
+      "title": "SumUsedToken 没有任何窗口上限，与已加固的 SumUsedQuota 不一致；当前仅被注释掉的调用点引用（死代码+潜在 11s 查询）",
+      "file": "model/log.go:798-817",
+      "evidence": "SumUsedQuota（:726-736）在开头有 `capDays := common.GetEnvOrDefault(\"LOG_STAT_MAX_DAYS\", 366)` 的窗口收敛，注释解释『管理端可传任意（含 0=全量）start_timestamp，导致对 logs 的无界 SUM 聚合』；而紧邻的 SumUsedToken 没有任何同类兜底，直接 `Select(\"COALESCE(sum(prompt_tokens),0)+COALESCE(sum(completion_tokens),0)\")`。调用点：controller/log.go:124 与 :154 均已被注释（`//tokenNum := model.SumUsedToken(...)`），全仓无其它调用者。",
+      "impact": "目前是死代码，风险为未来被误用即触发无界全表 SUM（prompt_tokens/completion_tokens 不在覆盖索引内 → 与 D-1 同样是回表全扫 11 秒级）。",
+      "fix_suggestion": "删除该函数（AGENTS.md 允许清理无调用者的死代码）；若需保留，则照 SumUsedQuota 复制 LOG_STAT_MAX_DAYS 兜底，把两处窗口收敛抽成一个共用 helper。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "D-16",
+      "severity": "P3",
+      "title": "pg_stat_user_tables.n_live_tup 对 4 张大表严重失真（226 vs 实际 175,622），据此判断容量/是否存在数据会得到完全相反的答案",
+      "file": "（运维取证方法问题，非代码缺陷）",
+      "evidence": "生产实测对比：web_request_logs n_live_tup=226 / 实际 COUNT(*)=175,622；audit_logs 12 / 20,516；perf_metrics 44 / 40,479；quota_data 33 / 30,111；logs 1,849,390 / 1,843,776（这张恰好准，因为 09:30 手工 VACUUM ANALYZE 过）。根因是 09:05 崩溃恢复后统计累计值被清空 + 这几张表从未被 autoanalyze 更新过（pg_stat_user_tables 里 last_vacuum/last_autovacuum/last_analyze 全为空）。注意：规划器仍用 pg_class.reltuples（准确），所以查询计划没被误导（已用 EXPLAIN 验证 web_request_logs 的 rows 估计 175,051 与实际一致）—— 只有『看 n_live_tup 做人工判断』会错。",
+      "impact": "今天事故复盘中若用 `n_live_tup` 判断『表已清空/很小』，会漏掉 17.5 万行与 40MB 级索引；后续容量告警脚本同样会误报。",
+      "fix_suggestion": "把容量口径写进 ledger：一律 `SELECT COUNT(*)`（大表用 pg_class.reltuples 估）而不是 n_live_tup；对 audit_logs / perf_metrics / quota_data / web_request_logs 各执行一次 ANALYZE 补齐统计（低风险，可择窗口执行）。",
+      "verified": "已验证"
+    },
+    {
+      "id": "D-17",
+      "severity": "P3",
+      "title": "客户端/缓存率采样每 TTL 拉 5000/2000 行 other TEXT 进 Go 内存解析",
+      "file": "service/client_stats.go:78-90；controller/log.go:648-653（modelSampledMetricsCached）",
+      "evidence": "aggregateClientStats：`Select(\"model_name\", \"other\", \"prompt_tokens\").Where(\"type = ?\", 2).Order(\"id DESC\").Limit(5000)`；modelSampledMetricsCached：同样的列 `Limit(2000)`，进程内缓存 5 分钟，另有 60s 客户端缓存。other 是 TEXT 列（生产单行 1–2KB，日志样本里可见含 explain/timeline_stages 的完整 JSON）。",
+      "impact": "每次刷新约 5–10MB 临时内存 + JSON 解析开销，量级可控（不构成 OOM 风险），但 ORDER BY id DESC 叠 `type=2` 过滤在主键反向扫描上要跳过 error/topup 行，属可优化的热点。",
+      "fix_suggestion": "把 other 里的 client / cache_tokens 在写入时提升为独立列（model/log.go:445-471 已有 request_bytes 的同类先例），采样即可改为 index-only 聚合；或至少把样本量降到 1000 并加 ORDER BY created_at DESC 走索引。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "D-18",
+      "severity": "P3",
+      "title": "日志列表接口 SELECT *，每行都带 content 与 other 两个 TEXT 列（页大小已限 100，风险有限）",
+      "file": "model/log.go:139/149（Find(out) 无 Select）",
+      "evidence": "findLogsPage 的两次查询（浅分页直接 Find、深分页 `Where(\"id IN ?\")` Find）都没有限定字段，Log 结构含 Content 与 Other 两个 TEXT；生产样本中单行 other 达 1.5–2KB（含 explain/timeline_stages），列表页实际只用 id/created_at/username/model_name/quota/token 等 10 来个字段。页大小已被 common/page_info.go:77-79 限到 100，故单次最坏 ~200KB，不构成风险。",
+      "impact": "纯带宽与解析浪费：列表首屏多传 ~200KB，且每次翻页都要把 other 全量解码再在 Go 侧按可见性裁剪（formatUserLogs/FormatAdminLogs）。",
+      "fix_suggestion": "列表查询显式 Select 必要列（保留 other，因为前端详情抽屉依赖它；或改为点击行时再按 id 取详情），可显著降低翻页开销。属长期优化，不建议在事故恢复期动。",
+      "verified": "静态确认"
+    }
+  ]
+}

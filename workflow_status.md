@@ -5,7 +5,8 @@
 | 项 | 值 | 校验命令 |
 |---|---|---|
 | 线上版本 | `v1.3.187` | `ssh ... 'docker ps --format "{{.Image}}"'` |
-| 部署时间 | 2026-10-23 17:5x（蓝绿，端口 3000） | — |
+| 部署时间 | 2026-10-23 17:53（蓝绿，Caddy 上游 **3001**） | `grep -oE "127.0.0.1:300[0-9]" /etc/caddy/Caddyfile \| head -1` |
+| 容器资源 | new-api 1500m/swap2400m/2core/GOMEMLIMIT=1024MiB；postgres 1200m/shared_buffers 256MB；redis 192m/maxmemory 128mb | `docker inspect new-api --format "{{.HostConfig.Memory}}"` |
 | 代码 SHA | `git rev-parse origin/main` | `git log origin/main -1` |
 | 回滚镜像 | `new-api:v1.3.186`（保留最近 4 个版本：184/185/186/187） | `docker images new-api` |
 | 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.186` | — |
@@ -428,3 +429,76 @@
 | 二进制自报版本 | `v1.3.187`（此前构建未注入 ldflags 时会报 `v0.0.0`，Dockerfile 已注入） |
 
 **未做的验证**：生产端**浏览器**点测（策略中心导航项、插件图标）未执行——本机对该域名的 TLS 被中间设备 RST（记忆 `tingfengai-domain-rst-20261010.md`），需隧道+管理员登录，本轮未取得。
+
+---
+
+# 2026-10-23 全量审计轮（进行中）
+
+## A. 线上加固（**已闭环，有实测**）
+
+触发：2026-10-23 09:03/09:05 UTC 生产 PG 两次 `oom_kill` → 崩溃恢复 → 全站 147 个 503（集中在 17:05–17:06 本地时间）。
+根因：`controller/log.go:220` GetLogsTraffic 的 30 天全窗口聚合对 2642MB heap 做 Parallel Seq Scan，撑爆 256MB 容器。
+
+| # | 变更 | 验证 |
+|---|---|---|
+| A1 | postgres 256m→**768m→1200m**、shared_buffers 32→**256MB**、work_mem 8MB、jit off、effective_cache_size 2GB、random_page_cost 1.1、effective_io_concurrency 100、**shm_size 256m** | `pg_settings` 实测 |
+| A2 | 新增覆盖索引 `idx_logs_type_created_stats (type,created_at) INCLUDE (model_name,request_bytes,response_bytes)` 134MB；删冗余 `idx_logs_type_created_bytes` | `indisvalid=t`；日流量 18134ms→**1824ms**，模型排行 9610ms→**1086ms** |
+| A3 | `VACUUM (ANALYZE, PARALLEL 0) logs` 刷 visibility map | `relallvisible` 78%→**99.98%**；Heap Fetches 286173→**81~372** |
+| A4 | new-api 900m→**1500m**/swap 2400m/2core/GOMEMLIMIT **1024MiB** | 蓝绿部署 14.7s 零停机，`docker inspect` 实测 |
+| A5 | Caddy 健康检查 2s/2s → **5s/5s**（容忍窗口 6s→15s，修 503 放大链） | `systemctl reload caddy`，外网 10/10=200 |
+| A6 | compose `image: new-api:v1.3.88` → **v1.3.187**（差一步降级生产）+ 顶部 7 行警告头 | `docker compose config --quiet` 通过 |
+| A7 | `deploy-zero-downtime.sh` 资源参数同步 1500m/2400m/1024MiB | `bash -n` 通过 |
+
+**验收**：外网 20/20=200、近 5 分钟 0 个 5xx、load 0.33、available 2166MB、Caddy 上游 3001、`x-new-api-version: v1.3.187`。
+
+## B. 计划文档闭环审计（`evidence/audit-20261023-docs.json`）
+
+规模：**57 份文档 / 121 个任务单元**；判定 保留 53 / 可删除 2 / 需用户决策 2。
+任务级：已闭环 61、部分 14、**伪闭环 9**、未闭环 75、待决策 9、过时 2。
+
+### B1. 已修复的伪闭环（5/6，均有实测）
+
+| # | 问题 | 修复 | 验证 |
+|---|---|---|---|
+| B1-1 | 指南 7 处写 `bun run test:shards`，但 `package.json` 未注册该 script（`Script not found`） | `web/package.json` 补 `"test:shards": "bun scripts/test-shards.mjs"` | `bun run test:shards --dry-run` → `201 test files -> 5 shards` |
+| B1-2 | `project_specs.md` 版本基线停在 v1.3.182/181（实际 187）；T-B1/T-B2 标 Todo、T-A8 标 Doing 但均已闭环 | 版本基线→v1.3.187；T-B1 复测直抛=0 → **Done**；T-B2 复测真实调用点=0（3 处为注释）→ **Done**；T-A8 三产物齐 → **Done** | `grep -c` 实跑 + `.agent/memory/` 6 文件 ls |
+| B1-3 | `计划书/README.md` 把两份 html 标为「仓库根」（实际在 `计划书/`）；ops 表漏登 2 份 | 路径改为「本目录」；补登 `DECISION-claude-billing.md`、`测试分片矩阵.md`（附待归档标注） | 文件 ls 实测 |
+| B1-4 | `audit/plan-docs-audit-20261023.md` 仍称指南「951 行/v1.3.166/T-xx」，且建议「重写」——该动作已完成 | 顶部加**勘误块**（保留原始观察，不改正文） | `wc -l` = 950、指南首行 = v1.3.181 |
+| B1-5 | 视觉指南 **V7 标 ✅ 但证据不成立**（验收要求三态各 2 页截图 + 单测） | 据实降级 **✅ → ◐**，写明：组件 3 文件在、单测仅 `empty-state` 一份、截图 0 张、CHANGELOG v1.3.184 未提及 | `ls` 组件三文件 + `find e2e-evidence -iname "*v7*"` 空 |
+
+**未处理（B1-6）**：`参考的结果计划指南.md` 同文件内 `PHASE_B_IN_PROGRESS` 与「B-1…B-6 全 DONE」自相矛盾 —— 该文件被 `.gitignore:65` 忽略（删除不可恢复）且属另一会话写保护，**留待用户裁决**。
+
+### B2. 删除候选（**未执行，等用户确认**）
+
+| 路径 | 理由 | 前提 |
+|---|---|---|
+| `前端改进计划.md` | §14–§18 全是 v1.3.166–170 已执行事项，零未闭环 | 建议归档而非硬删（git 已跟踪可恢复） |
+| `计划书/ops/测试分片矩阵.md` | 核心结论「本机无法单进程跑完全量」已被 T-A1 推翻 | 删前需改 `CHANGELOG.md:410` 与指南 §5.3 引用 |
+
+### B3. 必须保留（含未闭环任务）
+
+`下一步改进指南`（16 卡未闭环）/ `尼尔森指南`（N2/N6/N7/N10/N13/N14）/ `视觉指南`（V9/V10/V11 + V4b/V5/V6b + 本轮降级的 V7）/ `参考的结果计划指南`（.gitignore 保护）/ `ops/DECISION-claude-billing.md`（与指南 D-E 冲突待裁） / `audit/*.md` 中 22 项未核销项（保守判未闭环）。
+
+## B4. 计费与中继链路审计（完成，`evidence/audit-20261023-billing.json`）
+
+结果：**P0 0 / P1 2 / P2 3 / P3 4**。已修复 2 条 P1：
+
+| # | 缺陷 | 修复 | 验证 |
+|---|---|---|---|
+| B4-1 (P1) | `middleware/model-rate-limit.go` 两处（success 预占、total 检查）Redis 出错直接 `abortWithOpenAiMessage(500, "rate_limit_check_failed")`。IP/用户限流早已按 2026-09-29 事故改为降级，唯独模型限流没改 → 管理员一开 `ModelRequestRateLimitEnabled`，Redis 抖动即让全部 `/v1/*` 500，而 `/api/status` 仍 200 使探针继续导流 | 两处均改为 `memoryRateLimitHandler(...)(c)` 降级（内存实现已存在且 `Init` 幂等不重置状态） | 新增 2 用例：`TestRedisRateLimitHandlerFallsBackToMemoryWhenRedisDown`（不是 500、请求走到下游）、`TestRedisRateLimitHandlerFallbackStillEnforcesLimit`（降级后第 2 个请求仍 429，证明降级≠放行）。`go test ./middleware/` **全量 ok 9.3s** |
+| B4-2 (P1) | `pkg/billingexpr/settle.go` 的 `ComputeTieredQuotaWithRequest` 无 `cost<0` 守卫；保存期 `smokeTestExpr` 只跑 P/C/Len 向量（CR/CC/Img/AI 恒 0），覆盖不到「缓存折扣超过本金」的组合 → 表达式转负 → `SettleBilling` 走 `IncreaseUserQuota`，**每命中一次缓存反而给用户返额度** | 转换前钳 `cost` 到 0 并 `common.SysError` 留审计记录 | TDD：先写 `TestComputeTieredQuota_ClampsNegativeCost` 拿到 **RED（实际 -3000）**，修后 **GREEN**；`go test ./pkg/billingexpr/` 全量 ok；`./service ./setting/... ./relay/...` build exit 0 |
+
+**未修（留待排期）**：B-3 批量落库失败静默丢整窗额度增量（`model/utils.go:128-157`）；B-4 `BillingSession.Refund` 异步 goroutine 撞停机排空顺序致退款丢失（`billing_session.go:100-125` + `main.go:361-371`）；B-5 任务完成 `usageFacts` 覆盖冻结快照且无上界（`service/task_polling.go:738-752`）。这三条都需要 DB 故障注入环境才能真验证，已标 `待验证`。
+
+**已核对无问题（下轮免重复排查）**：`*Checked/*Strict` 覆盖全部计费换算、预扣饱和一律 400 不回绕、`max_tokens` 四格式均限、auto 分组每次选渠道重算 ratio、GPT 格式 `cr+cc>prompt` 已钳 0、客户端断开除在空流 failover 外、SSRF 有 dial 级 IP 校验。
+
+## C. 并行审计进行中
+
+| 代理 | 范围 | 状态 |
+|---|---|---|
+| audit-data | 慢查询/索引/N+1/事务/数据保留/三库兼容 | 进行中 |
+| audit-billing | 配额安全/并发幂等/限流降级/错误语义/密钥边界 | 进行中 |
+| audit-frontend | 首屏包体/不可见内容/i18n/尼尔森十项/前后端契约 | 进行中 |
+| audit-ops | 单点故障/磁盘/安全面/可观测性/回滚/文档与现实差距 | 进行中 |
+
+产出将写入 `evidence/audit-20261023-{data,billing,frontend,ops}.json`，汇总后按 P0→P1 修复并走独立审查循环（≤3 轮）。

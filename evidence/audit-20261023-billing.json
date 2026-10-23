@@ -1,0 +1,114 @@
+{
+  "task_id": "audit-billing",
+  "timestamp": "2026-10-23T23:40:00+08:00",
+  "scope": {
+    "target": "new-api v1.3.187 本地源码（只读）",
+    "read": [
+      "AGENTS.md（Billing safety invariants / Billing expression system）",
+      "pkg/billingexpr/expr.md, compile.go, run.go, settle.go, round.go",
+      "common/quota_math.go, common/rate-limit.go, common/ssrf_protection.go",
+      "service/quota.go, text_quota.go, tiered_settle.go, billing.go, billing_session.go, funding_source.go, task_billing.go, task_polling.go, violation_fee.go, billing_usage.go",
+      "relay/helper/price.go, valid_request.go, stream_scanner.go; relay/stream_downgrade.go; relay/relay_task.go; relay/constant",
+      "controller/relay.go; model/quota_reserve.go, utils.go, user.go, consume_log_flusher.go; middleware/*（限流、并发桶）; main.go 关停序列"
+    ],
+    "method": "纯静态阅读 + 交叉引用核对；未跑全量测试、未连生产、未发起任何付费 API 调用。",
+    "not_covered": "未做真实并发/故障注入（无 Redis/DB 故障注入环境）；未审前端 UI 计费渲染的逐页一致性（仅确认前端存在独立表达式解析器，见 B-9 备注）。"
+  },
+  "findings": [
+    {
+      "id": "B-1",
+      "severity": "P1",
+      "title": "模型请求限流在 Redis 故障时 fail-closed 返回 500（与已修复的 IP/用户限流口径相反）",
+      "file": "middleware/model-rate-limit.go:104-108,136-141（挂载点 router/relay-router.go:96）",
+      "evidence": "reserveRedisSuccessSlot 出错 → abortWithOpenAiMessage(c, http.StatusInternalServerError, \"rate_limit_check_failed\")；总请求令牌桶 tb.Allow 出错 → 同样 500。而 middleware/rate-limit.go:112-132 的 IP/用户限流在同样错误下注释写明「Redis 不可用时降级为本进程内存限流而非 fail-closed 500：fail-closed 会把一次缓存故障放大成全站 5xx——2026-09-29 生产事故中 Redis OOM 导致限流 EVAL 全部失败，246 次请求被直接转成 500」。model-rate-limit 未做同样降级，且 rg 'rate_limit_check_failed' 全仓无任何测试覆盖该分支。",
+      "failure_scenario": "管理员开启「模型请求限流」(setting.ModelRequestRateLimitEnabled=true，默认 false) → Redis OOM/主从切换/网络抖动 → 所有经 relayV1Router 的 /v1/chat/completions、/v1/responses、Gemini 原生路由在中间件层直接 500 rate_limit_check_failed；而 /api/status、/api/uptime/status 不受影响仍 200，Caddy 探针判定实例健康继续导流 → 全站 API 100% 5xx，与 2026-09-29 事故形态完全一致。",
+      "fix_suggestion": "按 rate-limit.go 的既有范式降级：Redis 报错时记录 LogError 并改用 memoryRateLimitHandler 同语义的进程内桶（成功槽 + 总请求桶），仅在内存桶也拒绝时返回 429；同时补一条「Redis 失败 → 200/429 而非 500」的回归测试（可复用 middleware/model_rate_limit_test.go 的 miniredis 夹具）。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-2",
+      "severity": "P1",
+      "title": "tiered 表达式结算没有「结果必须非负」的运行时守卫；保存期 smoke 测试也不覆盖缓存/图片/音频变量，负值可变成给用户的额度返还",
+      "file": "pkg/billingexpr/settle.go:37-50；setting/billing_setting/tiered_billing.go:215-232；service/text_quota.go:220-223；service/billing_session.go:49-53 + service/funding_source.go:57-65",
+      "evidence": "settle.go:37-50 ComputeTieredQuotaWithRequest 直接 quotaConversion(cost) → QuotaRoundChecked(quotaBeforeGroup*GroupRatio)，全程无 cost<0 判断；common/saturateQuota 只在 MinQuota(-2147483648) 处下钳，负值原样通过。smokeTestExpr 的向量只有 {P:0,1000,1e5,1e6, C 同, Len=P}（tiered_billing.go:215-220），billingExprSmokeRequests 只变 header/body，因此 CR/CC/CC1h/Img/ImgO/AI/AO 在整个 smoke 过程中恒为 0 —— 形如 `tier(\"base\", p * 3 + c * 15 - cr * 6)` 的「缓存折扣」式表达式能通过保存校验（p、c 全为正向，结果 >0）。对比：任务侧提交路径显式有 `if runErr != nil || cost < 0 { ... \"negative task expression result\" }`（relay/relay_task.go:291-296）、任务结算有 `if actualQuota < 0 { return }`（service/task_billing.go:301-303），文本侧两处都缺。",
+      "failure_scenario": "管理员配置 `tier(\"base\", p * 3 + c * 15 - cr * 6)`（意图：缓存命中给折扣）→ 真实请求命中缓存 cr>0 且 p 已被自动扣减（expr.md 的自动排除机制使 p 不含 cr）→ 结果转负（例：p=800,c=100,cr=1000 → 2400+1500-6000=-2100）→ summary.Quota=-2100 → SettleBilling delta<0 → IncreaseUserQuota(+2100)：每命中一次缓存就给用户返 2100 quota（≈$0.0042），可持续刷；同时 UpdateUserUsedQuotaAndRequestCount 被写入负值，用量报表失真。",
+      "fix_suggestion": "(1) smoke 向量补子类别非零组合（至少 cr/cc/img/ai 各一组，如 {P:1000,C:1000,Len:1000,CR:800,CC:200,Img:100}）；(2) settlement 侧加运行时守卫：cost<0 视为结算失败并保留预扣（与「结算求值失败保留预扣」的既有策略一致），或在 QuotaRoundChecked 之前 max(0, ...)，并沿用 noteQuotaClamp 记录到 admin_info；(3) 文本侧补 `summary.Quota < 0 → 0` 兜底，与 task 侧的 `< 0 return` 对齐。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-3",
+      "severity": "P2",
+      "title": "BATCH_UPDATE_ENABLED 下批量落库失败会静默丢弃整窗额度增量（非批量模式同一错误会回滚缓存）",
+      "file": "model/utils.go:128-139,155-157（配 model/quota_reserve.go:108-142,191-197）",
+      "evidence": "flushBatchUpdateStores 先把 batchUpdateStores[i] swap 成新 map（utils.go:117-122），再逐条落库；`increaseTokenQuota` 出错只 `common.SysLog(\"failed to batch update token quota: ...\")`（131-134），`updateUserQuotaUsedQuotaAndRequestCount` 返回值被忽略（156）。增量已从内存移除且未重排回队列，等价于丢失。对比直写路径 persistUserQuotaDelta/persistTokenQuotaDelta 会把错误回传给 TryReserveUserQuota/TryReserveTokenQuota，进而 cacheApply*QuotaDelta 补偿缓存（quota_reserve.go:191-197）。",
+      "failure_scenario": "BATCH_UPDATE_ENABLED=true（生产降延迟常用的开关）+ 一次 flush 窗口内 DB 抖动/连接池耗尽/PG 重启 → 5 秒窗口内所有预扣的用户 quota、token remain_quota/used_quota 增量在 DB 侧永久消失（Redis 侧已在 reserve 时扣过，但 Redis 会水合回 DB）→ 用户实际可用额度高于账实相符值，且无补偿记录、无对账线索，只有 SysLog 一行；多次抖动可累积成显著的营收漏损。",
+      "fix_suggestion": "flush 失败时把该 type 的 store 重新 merge 回 batchUpdateStores（或保留 failure 队列 + 有限次重试），并把失败计数暴露为指标（可复用 consume_log_flusher 的 Retries/Failures 范式）；至少让 StopBatchUpdater 的终末 flush 失败时打 SysError 并阻止进程正常退出码 0。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-4",
+      "severity": "P2",
+      "title": "BillingSession.Refund 是 fire-and-forget goroutine，优雅关闭的排空顺序会让停机瞬间的退款永久丢失",
+      "file": "service/billing_session.go:100-125；controller/relay.go:297-306；main.go:361-371",
+      "evidence": "Refund 在锁内置 refunded=true 后把退款工作包进 `gopool.Go(func(){ funding.Refund(); IncreaseTokenQuota(...) })`（billing_session.go:108-124）并立即返回，请求 handler 随即结束。main.go 的顺序是 srv.Shutdown(ctx)（等活跃请求返回）→ model.StopConsumeLogFlusher() → model.StopBatchUpdater()（cancel 后 FlushBatchUpdate 一次并置 Cancel=nil）。退款 goroutine 若在该 flush 之后才执行 model.IncreaseUserQuota/IncreaseTokenQuota，BATCH_UPDATE_ENABLED=true 时只写进 batchUpdateStores（model/user.go:1448-1455、quota_reserve.go:109-112），此后没有任何 flush，进程退出即丢。",
+      "failure_scenario": "滚动发布/重启时，某个上游在停机前返回 5xx → 准备走 deferred Refund（controller/relay.go:299-303）→ handler 返回，Shutdown 完成，StopBatchUpdater 已排空并停止 → 退款 goroutine 醒来执行 IncreaseUserQuota → 增量只进内存 map → 进程退出。结果：该用户预扣的 quota 与 token remain_quota 双双未退回（用户被多扣），DB 与 Redis 都不一致，且日志里只有一条「返还预扣费」的 LogInfo 假象。",
+      "fix_suggestion": "退款改为同步执行（或至少把 goroutine 纳入一个 shutdown 前 Wait 的 WaitGroup）；把 StopBatchUpdater 放到最后并在其之前等待所有在飞退款（可给 BillingSession 加进程级 pending 计数器）；或让 Refund 走 `db=true` 直写路径，绕开批量队列。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-5",
+      "severity": "P2",
+      "title": "任务结算用上游上报的 usageFacts 直接覆盖冻结快照且无上界校验，饱和后仍按 MaxQuota 实际扣费（可致单任务数千美元欠费）",
+      "file": "service/task_polling.go:738-752；pkg/billingexpr/settle.go:37-50；service/task_billing.go:322-330,425-428",
+      "evidence": "settleTaskBillingOnComplete 把 `taskResult.UsageFacts`（上游返回值）maps.Copy 覆盖到 `bc.TieredSnapshot.UsageFacts` 后重算；ComputeTieredQuotaWithRequest 无任何对 fact 的有限性/非负/上界校验（settle.go:28-50）。若饱和，`result.Clamp != nil` 只打一条 LogWarn（task_polling.go:746-748），随后仍以 `result.ActualQuotaAfterGroup`(=common.MaxQuota) 调 RecalculateTaskQuota，差额直接 DecreaseUserQuota（task_billing.go:108-116，无条件扣、允许负余额）。对比提交阶段：预扣走 QuotaRoundChecked 后若饱和会因余额不足 403（fail-safe），且 `cost < 0` 会被拒（relay/relay_task.go:291-296）。",
+      "failure_scenario": "kling/doubao 类任务插件遇到行为异常或恶意上游，把 `units`/`seconds`/`tokens` 上报成接近 int32 上限（或上游被中间人篡改）→ 表达式输出 * QuotaPerUnit * GroupRatio 远超 MaxQuota → 钳到 2147483647 → 单次任务向用户扣 2147483647 quota（按 QuotaPerUnit=500000 折算≈$4294），用户余额变为大额负数；系统只留一条 LogWarn，无人工确认闸门、无自动回滚。",
+      "fix_suggestion": "结算前对 usageFacts 做与 usageSchema 声明一致的边界校验（second ≤ 3600、count ≤ 128、token/credit ≤ 合理上限），越界即按「结算失败保留预扣」处理（现有 return true 分支即可复用）；或对比预扣额度设一个倍数上界（如 actual > preConsumed*10 时转人工待确认），而非静默按 MaxQuota 扣费。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-6",
+      "severity": "P3",
+      "title": "PublicReadRateLimit 注释声称 Redis 故障时 fail-closed 500，与实际降级实现相反（误导后续运维/开发者关掉正常限流）",
+      "file": "middleware/rate-limit.go:180-190",
+      "evidence": "注释：「注意该限流经 Redis 限流器（Redis 不可用时按既有全局模式 fail-closed 500）；如需无 Redis 依赖，置 false」。实际 rateLimitFactory → redisRateLimiter，err 非空时 logger.LogError 后降级 memoryRateLimiter（rate-limit.go:117-132），永不返回 500。仓库内已无任何 fail-closed 的 IP 限流路径。",
+      "failure_scenario": "下一轮运维/审计读到该注释 → 误以为 /v1/pricing 等公开只读端点在 Redis 故障时会 500 → 为了「可用性」把 PUBLIC_READ_RATE_LIMIT_ENABLE 设 false，反而失去唯一一道公开端点限流（注释导向了错误决策）。",
+      "fix_suggestion": "删掉「fail-closed 500」这句，改成「Redis 不可用时降级为进程内限流」，并补一句多实例下精度下降的说明。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-7",
+      "severity": "P3",
+      "title": "全局并发桶 acquire 重读配置，管理员热切换 Enabled 会造成 active 计数与真实持有量错位（可短暂超限）",
+      "file": "middleware/global-concurrency-limit.go:88-101,189-205",
+      "evidence": "GlobalConcurrencyLimit 先用一次 `relay_setting.GetGlobalConcurrencyGate()` 判断 Enabled/Limit 并决定是否 `defer release()`（192-204），随后 acquire 内部再读一次同一配置（91-95）：若两次之间管理员把开关关掉，acquire 走 `!cfg.Enabled` 分支直接返回 true 而**不** active++，但 handler 的 defer release() 仍会执行 `if g.active > 0 { g.active-- }`（176-181）→ 凭空减掉别人的槽位；反之 admin 打开开关时已在飞的请求没有占位。",
+      "failure_scenario": "并发压满（active==limit）时管理员在设置页关闭再打开全局并发开关 → 若干在进行中的请求在 release 时各多减一次 active → active 长期低于真实并发数 → 桶实际放行的并发数持续大于 limit（限流失效），直到进程重启才自愈；且 GetGlobalConcurrencyStats 会显示偏低的水位，掩盖问题。",
+      "fix_suggestion": "acquire 改为接收已解析的 cfg（与中间件同一次读取），或让 acquire 在 Disabled 分支返回一个 acquired=false、needRelease=false 的三态，中间件只在真正占位时才 defer release；release 里对 active 做 uint 下溢保护并计数告警。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-8",
+      "severity": "P3",
+      "title": "流式降级：读上游 body 失败时不还原 resp.Body，与其自身注释契约相反，会把半截 body 交给非流式解析",
+      "file": "relay/stream_downgrade.go:102-117",
+      "evidence": "注释明确写「读取失败：body 已被消费掉一部分，无法安全回退；如实报错而不是让上层把半截 body 当非流式解析（那会产生更迷惑的 bad response body）」，但代码只是 `logger.LogError(...); return false`——没有构造错误返回，也没有 restore（restore 闭包在 109-112 才定义，读取失败分支根本走不到）。调用方看到 false 后按原样走非流式路径继续读已被部分消费的 body。",
+      "failure_scenario": "上游在返回 200 + JSON 头后连接中断/body 被截断 → io.ReadAll 返回 err → 降级函数返回 false 且 body 半截 → 非流式解析失败 → 归入「bad response body / 解析失败」类别，渠道错误分类与重试判定基于错误原因，可能被判成不可重试的 500 而非上游断连（应为 502/可重试），用户看到误导性错误。",
+      "fix_suggestion": "读取失败时把已读前缀拼回 body（`resp.Body = io.NopCloser(io.MultiReader(bytes.NewReader(readPrefix), resp.Body))`，改用读取循环而非一次性 ReadAll），或返回一个 typed error 交由调用方按「上游响应中断」分类，而不是静默 false。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "B-9",
+      "severity": "P3",
+      "title": "任务消费/退款日志里的 matched_tier 写的是提交阶段的估算档位，与实际结算所用档位可能不同（计费口径与展示不一致）",
+      "file": "service/task_billing.go:61-68（LogTaskConsumption）、155-162（taskBillingOther）",
+      "evidence": "两处都是 `other.SetPublic(\"matched_tier\", snap.EstimatedTier)`。而任务的实际计费发生在完成时：task_polling.go:749-751 先用「提交 facts + 完成 facts 覆盖」重算，再把 `bc.TieredSnapshot.EstimatedTier = result.MatchedTier`（结算档位），随后 RecalculateTaskQuota 另写一条 type=consume/refund 的差额日志——那条差额日志通过 taskBillingOther 读的仍是 snapshot 的字段，但此时 snapshot 已被就地改写，两条日志语义不一致且无 label 区分「估算」/「结算」。",
+      "failure_scenario": "任务提交时 estimated facts 落在 std 档（提交日志写 matched_tier=std），完成后上游上报的 seconds 使表达式命中 pro 档并产生差额补扣 → 用户在「消耗日志」看到 std 档，在「任务计费日志」看到另一条补扣，但两条都只写 matched_tier 而不写 billing_unit/是否估算 → 用户/客服无法据此解释这次多扣的钱，只能人工翻代码（正是记忆 ui-label-authority-is-the-component.md 记录的口径事故形态）。",
+      "fix_suggestion": "提交阶段写 `estimated_tier`（明确估算法），结算阶段写 `matched_tier`（实际）+ `billing_unit`，并在前端用不同措辞渲染；差额日志里带上 pre_consumed/actual 与档位变化（`crossed_tier`）。",
+      "verified": "静态确认"
+    }
+  ],
+  "notes": [
+    "已核对为「无问题」的高风险点（避免下一轮重复排查）：common/quota_math.go 的 *Checked/*Strict 系列被 text/audio/wss/task/限流/钱包路径普遍使用，rg 'int(float64(...)*ratio)' 与 'IntPart()' 未发现裸转换进入计费（仅 controller/topup.go、utils.go 等金额展示/存储路径）；预扣估算全部走 QuotaFromFloatStrict / QuotaRoundStrict，饱和即 400，不会静默回绕（relay/helper/price.go:129,180,226,239,351）；max_tokens 族在 OpenAI/Claude/Gemini/Responses 四个格式均被 maxTokensLimit 限制（relay/helper/valid_request.go:148,340,371,424）；auto 分组/跨组重试时 group ratio 每次选渠道都会重算（controller/relay.go:793），tiered 另有 PrepareTieredBillingForSelectedGroup 补扣/建会话（service/tiered_settle.go:125-157）；BuildTieredTokenParams 对 GPT 格式的 cr+cc 超 prompt 做了 0 钳位（service/tiered_settle.go:74-81）；客户端断开被显式排除在空流 failover 之外（relay/helper/stream_scanner.go:466-469）；模型成功限流槽位已具备原子预占 + 失败/panic 退还（middleware/model-rate-limit.go:42-58,114-124）；SSRF 有 dial 级 IP 校验（service/protected_fetch_client.go）。",
+    "未验证/需环境项：B-1 是否能触发取决于生产是否存在 ModelRequestRateLimitEnabled=true（默认 false，本次禁止连生产库，未核实）；B-2/B-5 的最终金额换算依赖生产 QuotaPerUnit 与分组倍率，文中按 QuotaPerUnit=500000 折算仅作量级示意；B-3/B-4 依赖 BATCH_UPDATE_ENABLED=true（默认 false）与 DB 故障注入，未做实跑。",
+    "另记（P3 观察，未单列 finding）：前端存在与后端 billingexpr 平行的表达式解析/单价计算实现（web/src/features/pricing/lib/billing-expr.ts、dynamic-price.ts），当前只用于单价展示、不参与实际扣费，但属长期漂移风险，建议后续由后端输出解析后的价格结构供前端渲染，逐步收敛为单一权威源。"
+  ]
+}

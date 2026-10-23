@@ -50,3 +50,27 @@ func TestComputeTieredQuota_NoClampInRange(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, result.Clamp, "in-range settlement must not report a clamp")
 }
+
+// TestComputeTieredQuota_ClampsNegativeCost guards the "negative charge = credit"
+// invariant: an expression whose discount term exceeds the principal becomes
+// negative for large cache reads. The save-time smoke test only exercises
+// P/C/Len vectors (CR/CC/Img/AI are zero), so it cannot catch this combination —
+// the runtime path must clamp it, otherwise a cache hit pays the user.
+func TestComputeTieredQuota_ClampsNegativeCost(t *testing.T) {
+	// p=0, c=0, cr=1000 → 0*3 + 0*15 - 1000*6 = -6000
+	exprStr := `tier("base", p * 3 + c * 15 - cr * 6)`
+	snap := &billingexpr.BillingSnapshot{
+		BillingMode:  "tiered_expr",
+		ExprString:   exprStr,
+		ExprHash:     billingexpr.ExprHashString(exprStr),
+		GroupRatio:   1.0,
+		QuotaPerUnit: 500_000,
+	}
+
+	result, err := billingexpr.ComputeTieredQuota(snap, billingexpr.TokenParams{P: 0, C: 0, CR: 1000})
+	require.NoError(t, err)
+
+	assert.Equal(t, float64(0), result.ActualQuotaBeforeGroup, "negative cost must be clamped before conversion")
+	assert.Equal(t, 0, result.ActualQuotaAfterGroup, "a cache hit must never credit the user")
+	assert.GreaterOrEqual(t, result.ActualQuotaAfterGroup, 0, "settled quota must never be negative")
+}

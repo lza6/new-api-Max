@@ -200,3 +200,64 @@ func TestRedisRateLimitHandlerRefundsFailedRequest(t *testing.T) {
 	router.ServeHTTP(w3, httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil))
 	assert.Equal(t, http.StatusTooManyRequests, w3.Code)
 }
+
+// Redis 故障时必须降级到内存限流，而不是 fail-closed 500。
+// 这是 2026-09-29 事故的形态：Redis OOM → 限流命令全部失败 → 请求被直接转成 500，
+// 而 /api/status 仍返回 200，健康探针继续导流，把一次缓存故障放大成全站 5xx。
+// IP/用户限流已改为降级，模型限流此前遗漏（两处直接 abort 500），本测试锁死该契约。
+func TestRedisRateLimitHandlerFallsBackToMemoryWhenRedisDown(t *testing.T) {
+	server, client := newModelLimitRedis(t)
+	previous := common.RDB
+	common.RDB = client
+	t.Cleanup(func() { common.RDB = previous })
+
+	// 关掉 Redis：后续命令必然返回连接错误。
+	server.Close()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 9001)
+		c.Next()
+	})
+	reachedDownstream := false
+	router.GET("/v1/chat/completions", redisRateLimitHandler(60, 0, 5, "default"), func(c *gin.Context) {
+		reachedDownstream = true
+		c.Status(http.StatusOK)
+	})
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil))
+
+	assert.NotEqual(t, http.StatusInternalServerError, w.Code, "Redis 故障不得 fail-closed 500")
+	assert.True(t, reachedDownstream, "降级后请求必须继续走到下游 handler")
+	assert.Equal(t, http.StatusOK, w.Code)
+}
+
+// 降级不能等于放行：内存限流必须继续按同一参数生效。
+func TestRedisRateLimitHandlerFallbackStillEnforcesLimit(t *testing.T) {
+	server, client := newModelLimitRedis(t)
+	previous := common.RDB
+	common.RDB = client
+	t.Cleanup(func() { common.RDB = previous })
+
+	server.Close()
+
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) {
+		c.Set("id", 9002)
+		c.Next()
+	})
+	router.GET("/v1/chat/completions", redisRateLimitHandler(60, 0, 1, "default"), func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	first := httptest.NewRecorder()
+	router.ServeHTTP(first, httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil))
+	require.Equal(t, http.StatusOK, first.Code, "首个请求应放行")
+
+	second := httptest.NewRecorder()
+	router.ServeHTTP(second, httptest.NewRequest(http.MethodGet, "/v1/chat/completions", nil))
+	assert.Equal(t, http.StatusTooManyRequests, second.Code, "降级后第 2 个请求必须被内存限流拦住")
+}

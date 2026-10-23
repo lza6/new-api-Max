@@ -14,7 +14,7 @@
 > 本文件**只记状态机与证据指针**，不重复施工细节。改状态必须同时给出证据路径，否则状态无效。
 
 - 最后更新：2026-10-23
-- 仓库基线：`VERSION=v1.3.182`（未发版）／最新 tag `v1.3.181`／线上 `v1.3.181`
+- 仓库基线：`VERSION=v1.3.187`（已发版）／最新 tag `v1.3.187`／线上 `v1.3.187`（2026-10-23 17:53 蓝绿，Caddy 上游 3001）
 - 远端：`origin` = `lza6/new-api-Max`（**可推送**）；`upstream` = `QuantumNous/new-api`（**禁止推送**）
 
 ---
@@ -44,14 +44,14 @@
 | T-A3 | 三库 conformance 重跑 | P1 | **Todo** | 本机 MySQL/PG 服务 | — |
 | T-A4 | ClickHouse 真跑验证 | P0 | **Blocked** | Docker 或 CH 二进制 | 缺：本机无 `docker`（`docker: command not found`）。需用户提供运行环境或批准下载 CH 二进制 |
 | T-A7 | 工作区卫生清单（只列不删） | P2 | **Todo** | — | — |
-| T-A8 | 三份规格文件补全 | P1 | **Doing** | — | `db_structure.md` ✅（55 表/637 列，脚本生成）／`project_specs.md` ✅（本文件）／`.agent/memory/**` 进行中 |
+| T-A8 | 三份规格文件补全 | P1 | **Done** | — | `db_structure.md` ✅（55 表/637 列，脚本生成）／`project_specs.md` ✅（本文件）／`.agent/memory/**` ✅（6 文件全部落盘：audit-history/change-index/decisions/known-issues/optimization-log/verified-scope） |
 
 ### 轨道 B — 交互契约（N 系列残余）
 
 | ID | 目标 | 优先级 | 状态 | 证据 |
 |---|---|---|---|---|
-| T-B1 | 39 处 `ApiErrorMsg(...err.Error())` 改稳定码 | P1 | **Todo** | 基线清点：39 处 / 8 个 controller |
-| T-B2 | 清最后 2 处原生 `window.confirm` + 删死 hook | P1 | **Todo** | 基线：`waffo-pancake-settings-section.tsx:279`、`hooks/use-form-dirty-guard.ts:57` |
+| T-B1 | 39 处 `ApiErrorMsg(...err.Error())` 改稳定码 | P1 | **Done** | 基线清点：39 处 / 8 个 controller；2026-10-23 复测 `grep -rn "ApiErrorMsg(.*err\.Error()" controller/ middleware/` = **0** | `evidence/T-B1.json` |
+| T-B2 | 清最后 2 处原生 `window.confirm` + 删死 hook | P1 | **Done** | 2026-10-23 复测：`grep -rn "window\.confirm" web/src` = 3 处但**全为注释**（form-navigation-guard.tsx:35 / checkin-settings-section.tsx:124 / waffo-pancake-settings-section.tsx:83，均写明「改用 ConfirmDialog」），真实调用点 **0**；死 hook `use-form-dirty-guard.ts` 已删 | `evidence/T-B2.json` |
 | T-B3 | 12 处数据区空态带动作 | P1 | **Todo** | 基线：`grep "No data\|No results"` = 17，其中 12 处需动作 |
 | T-B4 | 错误 toast 带可点动作 | P1 | **Todo** | 基线：`handle-server-error.ts` 3 处 `toast.error` 无 action |
 | T-B5 | 长任务进度/可取消 | P1 | **Todo** | 基线：`toast.loading` 全仓 2 处 |

@@ -30,6 +30,7 @@
 | `go test ./controller/` 全量 | 约 600s 超时，栈在 `pkg/jsplugin` / `sobek` | 既有噪声；用 `-run` 缩小范围 |
 | `web/e2e-local/*.cjs` | `bun run lint` 报 `no-require-imports` | 未跟踪的临时脚本，不在交付范围 |
 | `controller/TestAuditDatabaseMatrix` 等 | 既有失败 | 与既有台账一致，非本轮引入 |
+| `go test ./service/` 全量（2026-10-23 复核） | `TestCapturedArtifactsAreReachableByCleanupLoop` FAIL：`清理 loop 必须认识 Persist 写入的目录（当前 err=<nil>）` | **既有失败**，非本轮引入：单独 `-run` 该测试 **PASS**，全量必 FAIL（测试间状态污染，确定性复现 3/3）；用 `git stash` 暂存本轮全部改动后复跑**仍 FAIL**。排除法与单独跑双向验证 |
 
 ## 未验证 / 缺口
 

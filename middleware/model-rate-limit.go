@@ -102,8 +102,12 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, g
 		successKey := fmt.Sprintf("rateLimit:%s:%s:%s:%s", ModelRequestRateLimitSuccessCountMark, modelSuccessLimitKeyVersion, group, userId)
 		member, allowed, err := reserveRedisSuccessSlot(ctx, rdb, successKey, successMaxCount, duration)
 		if err != nil {
-			logger.LogError(ctx, fmt.Sprintf("model rate limit: success reservation failed user=%s group=%s err=%v", userId, group, err))
-			abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
+			// 降级而非 fail-closed：Redis 故障（OOM/网络抖动）时若直接 500，而 /api/status
+			// 仍返回 200，健康探针会继续导流，把一次缓存故障放大成全站 5xx——与
+			// 2026-09-29 事故形态一致。IP/用户限流（redisRateLimiter）早已改为降级，
+			// 此处保持同一策略：切换为本进程内存限流，保留限流效果，仅跨实例精度下降。
+			logger.LogError(ctx, fmt.Sprintf("model rate limit: success reservation failed user=%s group=%s err=%v, falling back to in-memory limiter", userId, group, err))
+			memoryRateLimitHandler(duration, totalMaxCount, successMaxCount, group)(c)
 			return
 		}
 		if !allowed {
@@ -135,8 +139,11 @@ func redisRateLimitHandler(duration int64, totalMaxCount, successMaxCount int, g
 				limiter.WithRequested(duration),
 			)
 			if err != nil {
-				logger.LogError(ctx, fmt.Sprintf("model rate limit: total check failed user=%s group=%s err=%v", userId, group, err))
-				abortWithOpenAiMessage(c, http.StatusInternalServerError, "rate_limit_check_failed")
+				// 同上：总请求数检查失败也降级到内存限流，绝不 fail-closed。
+				// 此时 Redis 的 success 名额已预占，外面注册的 defer 会退还；
+				// 内存路径会重新占/退自己的名额，两条计数的差异只在降级窗口内。
+				logger.LogError(ctx, fmt.Sprintf("model rate limit: total check failed user=%s group=%s err=%v, falling back to in-memory limiter", userId, group, err))
+				memoryRateLimitHandler(duration, totalMaxCount, successMaxCount, group)(c)
 				return
 			}
 			if !allowed {

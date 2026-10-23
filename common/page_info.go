@@ -15,6 +15,11 @@ type PageInfo struct {
 }
 
 func (p *PageInfo) GetStartIdx() int {
+	// 负数页/页大小会让 OFFSET 变负，PostgreSQL 与 MySQL 直接报错
+	// （/api/log/、/api/log/self 返回 500）。这里兜底为 0。
+	if p.Page < 1 || p.PageSize < 1 {
+		return 0
+	}
 	return (p.Page - 1) * p.PageSize
 }
 
@@ -48,13 +53,10 @@ func GetPageQuery(c *gin.Context) *PageInfo {
 		pageInfo.PageSize = pageSize
 	}
 	if pageInfo.Page < 1 {
-		// 兼容
-		page, _ := strconv.Atoi(c.Query("p"))
-		if page != 0 {
-			pageInfo.Page = page
-		} else {
-			pageInfo.Page = 1
-		}
+		// page=0 与负数一律归到第 1 页。旧实现在这里重新读取 p 并原样赋值，
+		// 负数会被放行 → GetStartIdx() 得负数 → PostgreSQL/MySQL 报
+		// "OFFSET must not be negative" → 接口 500。
+		pageInfo.Page = 1
 	}
 
 	if pageInfo.PageSize == 0 {
@@ -74,6 +76,10 @@ func GetPageQuery(c *gin.Context) *PageInfo {
 		}
 	}
 
+	if pageInfo.PageSize < 1 {
+		// 负数页大小同上：LIMIT 为负在 PostgreSQL 直接报错。
+		pageInfo.PageSize = ItemsPerPage
+	}
 	if pageInfo.PageSize > 100 {
 		pageInfo.PageSize = 100
 	}

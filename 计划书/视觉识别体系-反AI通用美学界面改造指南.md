@@ -438,7 +438,7 @@ sans 走 `--font-sans: 'Public Sans'`（`styles/theme.css:22`）。后果：字�
 
 ## 7. 任务卡（V0–V13）
 
-> **状态速览（2026-10-22）**：V0 ✅ / V1 ✅ / V2 ✅ / V3 ◐（dashboard 已接，其余页面待接）/ V4 ◐（表头+表框已做，数字列右对齐待 V4b）/ V5 ◐（Alert 变体+2 热点，存量待清）/ V6 ◐（dashboard 单色阶，chart-N 令牌待 V6b）/ V7 ✅ / **V8 ✅（transition-all 清零 + .transition-quiet）** / **V12 ✅（visual-baseline.cjs 可重跑）** / **V13 ✅（ink 结构差异套）** / V9·V10·V11 ⏳
+> **状态速览（2026-10-23 17:5x 复核）**：V0 ✅ / V1 ✅ / V2 ✅ / V3 ◐（dashboard 已接，其余页面待接）/ V4 ◐（表头+表框已做，数字列右对齐待 V4b）/ V5 ◐（Alert 变体+2 热点，存量待清）/ V6 ◐（dashboard 单色阶，chart-N 令牌待 V6b）/ **V7 ◐（降级：组件已落，但 error/loading 无单测、三态截图 0 张）** / **V8 ✅（transition-all 清零 + .transition-quiet）** / **V12 ✅（visual-baseline.cjs 可重跑）** / **V13 ✅（ink 结构差异套）** / V9·V10·V11 ⏳
 > 已完成项的证据：`CHANGELOG.md [v1.3.182]`、`test_ledger.md`（2026-10-22 段）、
 > `计划书/e2e-evidence/v1.3.182/RESULTS.md`（10 张真实浏览器截图 + axe 0 违规）。
 
@@ -500,6 +500,12 @@ sans 走 `--font-sans: 'Public Sans'`（`styles/theme.css:22`）。后果：字�
 - **禁区**：不改 `emptyAction` 契约（Nielsen 强制动作）；不改错误文案三层结构。
 - **验收**：三态各 2 页截图；单测（动作存在、Request ID 可复制）。
 - **依赖**：V1。
+- **状态（2026-10-23 17:5x 复核，据实降级）**：**◐ 部分闭环**。实现已落盘
+  （`components/empty-state.tsx` 12:11、`loading-state.tsx` 11:21、`error-state.tsx` 11:21 三文件均存在）；
+  但**验收证据不成立**：单测仅 `components/__tests__/empty-state.test.tsx` 一份，
+  `error-state` / `loading-state` **无单测**；三态各 2 页截图 **0 张**
+  （`find 计划书/e2e-evidence -iname "*v7*"` 无结果）；`CHANGELOG.md` v1.3.184 通篇未提 V7。
+  → 原标 ✅ 属「实现真、验收假」，已降级。**补齐 error/loading 单测 + 6 张截图后可恢复 ✅**。
 
 ### V8　动效规范落地（4 时刻 + 红线）
 - **目标**：全局动效令牌化；替换 `transition-all`；抽屉/弹层/stagger/勾描四时刻统一；`prefers-reduced-motion` 全覆盖。
