@@ -73,6 +73,13 @@ type ResponseCacheSetting struct {
 	// DiskCleanupSeconds 磁盘清理 loop 的周期（秒）。
 	DiskCleanupSeconds int `json:"disk_cleanup_seconds"`
 
+	// SemanticAllowModels 语义缓存白名单（模型名）。空 = 不启用语义匹配（默认）。
+	// 必须显式列模型：语义命中返回的是「另一个问题的答案」，不能默认对所有模型放开。
+	SemanticAllowModels []string `json:"semantic_allow_models"`
+	// SemanticSimilarity 语义命中阈值（余弦相似度 0-1，默认 0.97）。
+	// 阈值越低越容易命中、也越容易答非所问；超出 (0,1] 时回退默认值。
+	SemanticSimilarity float64 `json:"semantic_similarity"`
+
 	// mu 保护上面的字段（热更新写入 vs 并发读取）。**不导出**，不参与
 	// `setting/config` 的反射序列化。
 	mu sync.RWMutex
@@ -83,18 +90,20 @@ type ResponseCacheSetting struct {
 // 单独定义一个类型而不是直接返回 `ResponseCacheSetting`：后者含 `sync.RWMutex`，
 // 拷贝/返回带锁的值会被 `go vet` 判定为 `copylocks`（真实隐患）。
 type responseCacheConfig struct {
-	TTLSeconds         int
-	MaxEntries         int
-	AllowModels        []string
-	DenyModels         []string
-	AllowCrossUser     bool
-	ChargeOnHit        bool
-	Backend            string
-	DiskDir            string
-	DiskMaxBytes       int64
-	DiskMaxEntryBytes  int64
-	MinFreeDiskBytes   int64
-	DiskCleanupSeconds int
+	TTLSeconds          int
+	MaxEntries          int
+	AllowModels         []string
+	DenyModels          []string
+	AllowCrossUser      bool
+	ChargeOnHit         bool
+	Backend             string
+	DiskDir             string
+	DiskMaxBytes        int64
+	DiskMaxEntryBytes   int64
+	MinFreeDiskBytes    int64
+	DiskCleanupSeconds  int
+	SemanticAllowModels []string
+	SemanticSimilarity  float64
 }
 
 var setting = ResponseCacheSetting{
@@ -130,19 +139,48 @@ func snapshot() responseCacheConfig {
 	setting.mu.RLock()
 	defer setting.mu.RUnlock()
 	return responseCacheConfig{
-		TTLSeconds:         setting.TTLSeconds,
-		MaxEntries:         setting.MaxEntries,
-		AllowModels:        append([]string(nil), setting.AllowModels...),
-		DenyModels:         append([]string(nil), setting.DenyModels...),
-		AllowCrossUser:     setting.AllowCrossUser,
-		ChargeOnHit:        setting.ChargeOnHit,
-		Backend:            setting.Backend,
-		DiskDir:            setting.DiskDir,
-		DiskMaxBytes:       setting.DiskMaxBytes,
-		DiskMaxEntryBytes:  setting.DiskMaxEntryBytes,
-		MinFreeDiskBytes:   setting.MinFreeDiskBytes,
-		DiskCleanupSeconds: setting.DiskCleanupSeconds,
+		TTLSeconds:          setting.TTLSeconds,
+		MaxEntries:          setting.MaxEntries,
+		AllowModels:         append([]string(nil), setting.AllowModels...),
+		DenyModels:          append([]string(nil), setting.DenyModels...),
+		AllowCrossUser:      setting.AllowCrossUser,
+		ChargeOnHit:         setting.ChargeOnHit,
+		Backend:             setting.Backend,
+		DiskDir:             setting.DiskDir,
+		DiskMaxBytes:        setting.DiskMaxBytes,
+		DiskMaxEntryBytes:   setting.DiskMaxEntryBytes,
+		MinFreeDiskBytes:    setting.MinFreeDiskBytes,
+		DiskCleanupSeconds:  setting.DiskCleanupSeconds,
+		SemanticAllowModels: append([]string(nil), setting.SemanticAllowModels...),
+		SemanticSimilarity:  setting.SemanticSimilarity,
 	}
+}
+
+// DefaultSemanticSimilarity 语义缓存默认阈值（保守：宁可少命中，不可答非所问）。
+const DefaultSemanticSimilarity = 0.97
+
+// SemanticCacheActive 报告语义缓存是否应生效：精确缓存总开关 + 语义开关都开，
+// 且白名单里至少有一个模型。任一条不满足即返回 false（默认全不满足）。
+func SemanticCacheActive() bool {
+	if !Enabled() {
+		return false
+	}
+	if !common.FeatureFlagValue(common.FlagSemanticResponseCache, false) {
+		return false
+	}
+	return len(snapshot().SemanticAllowModels) > 0
+}
+
+// SemanticModels 返回语义缓存白名单（副本）。
+func SemanticModels() []string { return snapshot().SemanticAllowModels }
+
+// SemanticThreshold 返回生效阈值；未配置或超出 (0,1] 时回退默认值。
+func SemanticThreshold() float64 {
+	v := snapshot().SemanticSimilarity
+	if v <= 0 || v > 1 {
+		return DefaultSemanticSimilarity
+	}
+	return v
 }
 
 // Enabled 报告响应缓存总开关是否生效（管理端「实验功能」页 > env，默认 false）。

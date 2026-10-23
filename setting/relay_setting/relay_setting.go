@@ -101,6 +101,12 @@ type RelaySetting struct {
 	// （service.PreConsumeBilling）与每用户限速中间件（middleware.UserRateLimit）
 	// 强制执行，策略引擎只读取它们的真实状态做统一观测，不重复实现。
 	PolicyMaxPromptChars int `json:"policy_max_prompt_chars"`
+
+	// PolicyModelRequestLimits 模型级单请求花费上限（quota，模型名 -> 上限）。
+	// 预估消耗超过该模型上限的请求被判为 block（rule=model_request_limit）。
+	// 空 = 不限制（默认）。它约束的是「单次请求」而非累计消耗，因此纯输入驱动、
+	// 无状态、可完整测试；累计型预算需要新的跨实例计数存储，不在本字段范围。
+	PolicyModelRequestLimits map[string]int64 `json:"policy_model_request_limits"`
 }
 
 // RateLimitTier 限速档位（并发 + RPM）。
@@ -309,6 +315,16 @@ func GetPolicyMaxPromptChars() int {
 		return s.PolicyMaxPromptChars
 	}
 	return 0
+}
+
+// GetPolicyModelRequestLimit 返回指定模型的单请求花费上限（quota）。
+// 0 = 不限制（默认）。
+func GetPolicyModelRequestLimit(model string) int64 {
+	s := GetRelaySetting()
+	if s == nil || len(s.PolicyModelRequestLimits) == 0 {
+		return 0
+	}
+	return s.PolicyModelRequestLimits[model]
 }
 
 // GetUserRateLimitTier 解析用户生效限速档位（并发/RPM）：

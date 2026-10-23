@@ -187,6 +187,9 @@ func Relay(c *gin.Context, relayFormat types.RelayFormat) {
 		contains, words := service.CheckSensitiveText(meta.CombineText)
 		if contains {
 			logger.LogWarn(c, fmt.Sprintf("user sensitive words detected: %s", strings.Join(words, ", ")))
+			// 统一观测：敏感词是内容护栏的一类命中，此前只出现在日志里，
+			// 策略中心的 guardrail 计数看不到它。只计数，不改变拦截行为。
+			service.RecordPolicyHit(service.PolicyKindGuardrail, service.PolicyBlock)
 			newAPIError = types.NewError(err, types.ErrorCodeSensitiveWordsDetected)
 			return
 		}
@@ -583,6 +586,7 @@ func evaluateRequestPolicy(c *gin.Context, relayInfo *relaycommon.RelayInfo, met
 		in.UserID = relayInfo.UserId
 		in.Group = relayInfo.UsingGroup
 		in.UserRemainingQuota = int64(relayInfo.UserQuota)
+		in.ModelRequestLimit = relay_setting.GetPolicyModelRequestLimit(in.Model)
 	}
 	if meta != nil {
 		in.PromptChars = utf8.RuneCountInString(meta.CombineText)

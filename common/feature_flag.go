@@ -41,6 +41,7 @@ const (
 	FlagErrorLogEnabled                   = "ERROR_LOG_ENABLED"
 	FlagGetMediaTokenNotStream            = "GET_MEDIA_TOKEN_NOT_STREAM"
 	FlagResponseCacheEnabled              = "RESPONSE_CACHE_ENABLED"
+	FlagSemanticResponseCache             = "SEMANTIC_RESPONSE_CACHE"
 	FlagMcpGatewayEnabled                 = "MCP_GATEWAY_ENABLED"
 	FlagSubscriptionFirstPurchaseDiscount = "SUBSCRIPTION_FIRST_PURCHASE_DISCOUNT"
 )
@@ -62,6 +63,7 @@ func FeatureFlagKeys() []string {
 		FlagErrorLogEnabled,
 		FlagGetMediaTokenNotStream,
 		FlagResponseCacheEnabled,
+		FlagSemanticResponseCache,
 		FlagMcpGatewayEnabled,
 		FlagSubscriptionFirstPurchaseDiscount,
 	}

@@ -58,6 +58,7 @@ type PolicyInput struct {
 	// 预算类
 	UserRemainingQuota int64 // 用户剩余额度（分/额度单位；<0 表示未知）
 	RequestEstimate    int64 // 本次预估消耗
+	ModelRequestLimit  int64 // 该模型的单请求花费上限；0 = 不限制
 	// 护栏类
 	PromptChars   int
 	MaxPromptChar int // 0=不限制
@@ -122,6 +123,14 @@ func recordPolicyHit(kind PolicyKind, action PolicyAction) {
 	policyCounters.Unlock()
 }
 
+// RecordPolicyHit 记录一次由**其它路径**执行的策略命中（例如 relay 早期的敏感词
+// 拦截），让统一策略中心看到全部护栏命中，而不是只看到自己判定的那部分。
+// 只计数、不做判定、不改变任何请求行为 —— 计数值按 kind:action 聚合，
+// 不带规则名，避免指标基数随规则数增长。
+func RecordPolicyHit(kind PolicyKind, action PolicyAction) {
+	recordPolicyHit(kind, action)
+}
+
 // PolicySnapshot 返回策略命中计数快照（观测/指标）。
 func PolicySnapshot() map[string]int64 {
 	policyCounters.Lock()
@@ -182,6 +191,11 @@ func Evaluate(in PolicyInput) PolicyDecision {
 }
 
 // evalGuardrail 内容护栏：prompt 超过配置上限 → block。
+//
+// 敏感词拦截不在这里重复实现：它由 setting.ShouldCheckPromptSensitive +
+// service.CheckSensitiveText 在 relay 早期完成（命中即返回
+// ErrorCodeSensitiveWordsDetected），策略中心只通过 RecordPolicyHitByRule
+// 把该结果记入统一观测口径，避免同一检查跑两遍。
 func evalGuardrail(in PolicyInput) PolicyDecision {
 	if in.MaxPromptChar > 0 && in.PromptChars > in.MaxPromptChar {
 		return PolicyDecision{
@@ -194,7 +208,7 @@ func evalGuardrail(in PolicyInput) PolicyDecision {
 	return PolicyDecision{Action: PolicyAllow}
 }
 
-// evalBudget 预算：单请求预估 > 用户剩余额度 → block。
+// evalBudget 预算：单请求预估 > 用户剩余额度，或 > 该模型单请求上限 → block。
 func evalBudget(in PolicyInput) PolicyDecision {
 	if in.UserRemainingQuota >= 0 && in.RequestEstimate > 0 && in.RequestEstimate > in.UserRemainingQuota {
 		return PolicyDecision{
@@ -202,6 +216,14 @@ func evalBudget(in PolicyInput) PolicyDecision {
 			Kind:   PolicyKindBudget,
 			Rule:   "insufficient_quota",
 			Reason: "estimated request cost exceeds remaining user quota",
+		}
+	}
+	if in.ModelRequestLimit > 0 && in.RequestEstimate > in.ModelRequestLimit {
+		return PolicyDecision{
+			Action: PolicyBlock,
+			Kind:   PolicyKindBudget,
+			Rule:   "model_request_limit",
+			Reason: "estimated request cost exceeds the per-request limit for this model",
 		}
 	}
 	return PolicyDecision{Action: PolicyAllow}

@@ -19,6 +19,11 @@ For commercial licensing, please contact support@quantumnous.com
 import { RateLimitSection } from '../request-limits/rate-limit-section'
 import { RequestCompressionSection } from '../request-limits/request-compression-section'
 import { SensitiveWordsSection } from '../request-limits/sensitive-words-section'
+import {
+  PolicyCenterSection,
+  toModelLimitsText,
+  toModelListText,
+} from '../request-limits/policy-center-section'
 import { SSRFSection } from '../request-limits/ssrf-section'
 import { TokenLimitSection } from '../request-limits/token-limit-section'
 import { GlobalConcurrencySection } from '../request-limits/global-concurrency-section'
@@ -105,6 +110,25 @@ const SECURITY_SECTIONS = [
           CheckSensitiveEnabled: settings.CheckSensitiveEnabled,
           CheckSensitiveOnPromptEnabled: settings.CheckSensitiveOnPromptEnabled,
           SensitiveWords: settings.SensitiveWords,
+        }}
+      />
+    ),
+  },
+  {
+    id: 'policy-center',
+    titleKey: 'Unified Policy Center',
+    build: (settings: SecuritySettings) => (
+      <PolicyCenterSection
+        defaultValues={{
+          maxPromptChars: settings['relay.policy_max_prompt_chars'] ?? 0,
+          modelLimits: toModelLimitsText(
+            settings['relay.policy_model_request_limits']
+          ),
+          semanticModels: toModelListText(
+            settings['response_cache.semantic_allow_models']
+          ),
+          semanticSimilarity:
+            settings['response_cache.semantic_similarity'] || 0.97,
         }}
       />
     ),

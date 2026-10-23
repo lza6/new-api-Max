@@ -414,6 +414,12 @@ export type SecuritySettings = {
   'relay.request_compression_threshold_kb': number
   'relay.request_compression_level': number
   'relay.request_compression_max_mb': number
+  // 统一策略中心（relay 设置块）：提示词长度上限 + 模型级单请求预算
+  'relay.policy_max_prompt_chars': number
+  'relay.policy_model_request_limits': string
+  // 语义响应缓存准入（response_cache 设置块）
+  'response_cache.semantic_allow_models': string
+  'response_cache.semantic_similarity': number
 }
 
 export type UpstreamChannel = {

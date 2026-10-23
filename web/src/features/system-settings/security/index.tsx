@@ -57,6 +57,10 @@ const defaultSecuritySettings: SecuritySettings = {
   'relay.request_compression_threshold_kb': 50,
   'relay.request_compression_max_mb': 20,
   'relay.request_compression_level': 6,
+  'relay.policy_max_prompt_chars': 0,
+  'relay.policy_model_request_limits': '{}',
+  'response_cache.semantic_allow_models': '[]',
+  'response_cache.semantic_similarity': 0.97,
 }
 
 export function SecuritySettings() {

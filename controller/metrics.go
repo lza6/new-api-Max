@@ -49,6 +49,12 @@ func RegisterMetricsGaugeProvider() {
 		for k, v := range ResponseCacheMetrics() {
 			common.MetricsSetGauge(k, nil, v)
 		}
+		// T-B6 语义缓存效果度量：命中率是唯一能判断「阈值设得太松/太紧」的信号，
+		// 因此必须出现在 /metrics 里，而不是只写在配置文件里。
+		semanticHits, semanticMisses := service.SemanticCacheMetrics()
+		common.MetricsSetGauge("semantic_cache_hits_total", nil, float64(semanticHits))
+		common.MetricsSetGauge("semantic_cache_misses_total", nil, float64(semanticMisses))
+		common.MetricsSetGauge("semantic_cache_entries", nil, float64(service.SemanticCacheLiveEntries()))
 		// G3 工具抽屉收益度量。
 		for k, v := range ToolDrawerMetrics() {
 			common.MetricsSetGauge(k, nil, v)

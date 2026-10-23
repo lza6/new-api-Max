@@ -212,6 +212,15 @@ var registry = []FeatureSwitch{
 		MetricKeys:   []string{"response_cache_hits_total", "response_cache_misses_total", "response_cache_live_entries"},
 		RollbackHint: "Turn off to bypass the cache entirely; upstream calls resume immediately.",
 	},
+	{
+		Key: common.FlagSemanticResponseCache, Kind: KindBool, Default: "false",
+		TitleKey:       "Semantic Response Cache",
+		DescriptionKey: "Extends the response cache with a similarity match: when an exact match misses, a new prompt that is close enough to a cached one is served from cache instead of calling the upstream. Requires the Response Cache switch, non-streaming requests, and an explicit model allowlist. A wrong match returns an answer to a different question, so start with a high threshold and watch the hit counters.",
+		Risk:           RiskMedium, AdminEditable: true,
+		DependsOn:    []string{common.FlagResponseCacheEnabled},
+		MetricKeys:   []string{"semantic_cache_hits_total", "semantic_cache_misses_total", "semantic_cache_entries"},
+		RollbackHint: "Turn off to fall back to exact-match caching only; nothing else changes.",
+	},
 }
 
 // featureSwitchConfig 是注册进 config 框架的持久化载体。

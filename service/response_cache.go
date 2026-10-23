@@ -337,6 +337,9 @@ func ResponseCacheStore(userID int, model, relayFormat string, rawBody, response
 		responseCacheStore.put(key, entry, response_cache_setting.MaxEntries(), time.Now(),
 			time.Duration(response_cache_setting.TTLSeconds())*time.Second)
 	}
+
+	// 语义层索引与精确缓存并行写入（默认关；白名单外模型直接返回）。
+	SemanticCacheStore(userID, model, relayFormat, rawBody, responseBody, totalTokens)
 }
 
 // ResponseCacheLiveEntries 返回当前后端的活跃条目数
@@ -437,10 +440,15 @@ func ResponseCacheServeHit(c *gin.Context, info *relaycommon.RelayInfo) ([]byte,
 		return nil, false
 	}
 	hit, ok := ResponseCacheLookup(info.UserId, info.OriginModelName, relayFormat, rawBody)
-	if !ok {
-		return nil, false
+	if ok {
+		return hit.Body, true
 	}
-	return hit.Body, true
+	// 精确未命中 → 语义补充层（默认关，需 SEMANTIC_RESPONSE_CACHE + 模型白名单）。
+	// 命中返回与精确缓存**同形**的字节，调用方无需区分两者。
+	if semanticHit, semanticOK := SemanticCacheLookup(info.UserId, info.OriginModelName, relayFormat, rawBody); semanticOK {
+		return semanticHit.Body, true
+	}
+	return nil, false
 }
 
 // MarkResponseCacheServed 标记本次请求已由缓存服务。

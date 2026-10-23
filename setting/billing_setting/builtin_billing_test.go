@@ -113,3 +113,57 @@ func TestGPT6AstraBuiltinBilling(t *testing.T) {
 		})
 	}
 }
+
+// TestBuiltinBillingExpressionsStayReachable guards the invariant that makes a
+// built-in billing expression take effect in production.
+//
+// GetBillingMode prefers an administrator-configured legacy ratio/price, and
+// InitRatioSettings seeds modelRatioMap/modelPriceMap with the *default* legacy
+// tables. A model present in both defaultModelRatio/defaultModelPrice and
+// builtinBillingExpr is therefore billed by the legacy number while the
+// built-in expression silently never runs — the "library green, production
+// silent" failure mode this repo has hit before.
+func TestBuiltinBillingExpressionsStayReachable(t *testing.T) {
+	settings := config.GlobalConfig.Get("billing_setting").(*billing_setting.BillingSetting)
+	saved := *settings
+	savedOptions := common.OptionMap
+	savedRatios, savedPrices := ratio_setting.ModelRatio2JSONString(), ratio_setting.ModelPrice2JSONString()
+	t.Cleanup(func() {
+		*settings, common.OptionMap = saved, savedOptions
+		billing_setting.PublishBillingSettingSnapshot()
+		require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(savedRatios))
+		require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(savedPrices))
+	})
+
+	common.OptionMap = map[string]string{"billing_setting.billing_mode": `{}`, "billing_setting.billing_expr": `{}`}
+	require.NoError(t, config.GlobalConfig.LoadFromDB(common.OptionMap))
+	require.NoError(t, ratio_setting.UpdateModelRatioByJSONString(`{}`))
+	require.NoError(t, ratio_setting.UpdateModelPriceByJSONString(`{}`))
+	// Reproduce the production startup state: default legacy tables are loaded
+	// into the same maps that GetBillingMode consults.
+	ratio_setting.InitRatioSettings()
+
+	builtins := billing_setting.GetBuiltinBillingExprCopy()
+	require.NotEmpty(t, builtins, "the built-in billing table must not be empty")
+
+	defaultRatios := ratio_setting.GetDefaultModelRatioMap()
+	defaultPrices := ratio_setting.GetDefaultModelPriceMap()
+
+	for model, expression := range builtins {
+		t.Run(model, func(t *testing.T) {
+			require.NotEmpty(t, expression, "built-in expression must not be empty")
+			_, err := billingexpr.CompileFromCache(expression)
+			require.NoError(t, err, "built-in expression must compile cleanly")
+
+			_, hasRatio := defaultRatios[model]
+			_, hasPrice := defaultPrices[model]
+			require.False(t, hasRatio || hasPrice,
+				"model %q also exists in the legacy default price tables, so the built-in expression would never be used; migrate the legacy entry away or remove the expression", model)
+
+			assert.Equal(t, billing_setting.BillingModeTieredExpr, billing_setting.GetBillingMode(model),
+				"built-in expression must still be the active mode after the default tables are loaded")
+			_, ok := billing_setting.GetBillingExpr(model)
+			assert.True(t, ok, "GetBillingExpr must resolve the built-in expression for %q", model)
+		})
+	}
+}
