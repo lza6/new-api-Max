@@ -196,7 +196,45 @@ func GetContextKeyType[T any](c *gin.Context, key constant.ContextKey) (T, bool)
 	return t, false
 }
 
+// internalErrorHints 命中任意一条即视为「实现细节」：数据库/驱动/运行时/序列化
+// 的原始错误。这类文案对终端用户没有意义（`sql: no rows in result set`），
+// 还会泄露表结构与内部类型，因此统一换成可追踪的通用文案。
+var internalErrorHints = []string{
+	"sql:", "record not found", "gorm:", "reflect:", "runtime error",
+	"invalid memory address", "nil pointer", "UNIQUE constraint",
+	"duplicate key", "duplicate entry", "pq:", "mysql:", "driver:", "json: cannot unmarshal",
+	"context deadline exceeded", "connection refused", "i/o timeout",
+	"database is locked", "no such table", "syntax error at or near",
+}
+
+// LooksInternalError 判断错误文案是否属于「不应直接外泄」的底层实现细节。
+func LooksInternalError(msg string) bool {
+	lower := strings.ToLower(msg)
+	for _, hint := range internalErrorHints {
+		if strings.Contains(lower, strings.ToLower(hint)) {
+			return true
+		}
+	}
+	return false
+}
+
 func ApiError(c *gin.Context, err error) {
+	if LooksInternalError(err.Error()) {
+		requestId := c.GetHeader(RequestIdKey)
+		if requestId == "" {
+			requestId = NewRequestId()
+			c.Header(RequestIdKey, requestId)
+		}
+		// 原始错误只进服务端日志，带同一个 request id 便于对照排查。
+		SysError(fmt.Sprintf("internal error [%s] %s %s: %v", requestId, c.Request.Method, c.FullPath(), err))
+		c.JSON(http.StatusOK, gin.H{
+			"success":    false,
+			"message":    "The request could not be completed. Please try again or contact the administrator with request ID: " + requestId,
+			"code":       "internal_error",
+			"request_id": requestId,
+		})
+		return
+	}
 	c.JSON(http.StatusOK, gin.H{
 		"success": false,
 		"message": err.Error(),

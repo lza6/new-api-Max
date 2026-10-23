@@ -7423,6 +7423,7 @@
     "Referral link": "Referral link",
     "Type {{text}} to confirm": "Type {{text}} to confirm",
     "Change pricing conversion?": "Change pricing conversion?",
-    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user."
+    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.",
+    "The request could not be completed. Please try again later.": "The request could not be completed. Please try again later."
   }
 }

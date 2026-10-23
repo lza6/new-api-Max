@@ -7423,6 +7423,7 @@
     "Referral link": "推荐链接",
     "Type {{text}} to confirm": "输入 {{text}} 以确认",
     "Change pricing conversion?": "修改价格换算？",
-    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "修改额度单位或汇率会立刻改变所有用户的余额与价格显示。"
+    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "修改额度单位或汇率会立刻改变所有用户的余额与价格显示。",
+    "The request could not be completed. Please try again later.": "请求未能完成，请稍后重试。"
   }
 }

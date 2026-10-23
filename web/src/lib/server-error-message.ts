@@ -33,6 +33,8 @@ const serverErrorMessageKeys = {
   TELEGRAM_LEGACY_AUTH_REMOVED:
     'Telegram login has changed. Reload the page and start Telegram OAuth again.',
   AUTH_INTERNAL_ERROR: 'Please try again later.',
+  // 后端 ApiError 兜底：底层错误不外泄，只给可重试的通用文案（含 request id 时另行展示）
+  internal_error: 'The request could not be completed. Please try again later.',
   SECURITY_VERIFICATION_FAILED: 'Verification failed. Please try again.',
   SECURITY_VERIFICATION_FLOW_REQUIRED:
     'This verification method requires its dedicated verification flow.',

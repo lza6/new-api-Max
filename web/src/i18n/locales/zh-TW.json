@@ -7357,6 +7357,7 @@
     "Referral link": "推薦連結",
     "Type {{text}} to confirm": "輸入 {{text}} 以確認",
     "Change pricing conversion?": "修改價格換算？",
-    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "修改額度單位或匯率會立刻改變所有使用者的餘額與價格顯示。"
+    "Changing the quota unit or exchange rate immediately changes how balances and prices are displayed for every user.": "修改額度單位或匯率會立刻改變所有使用者的餘額與價格顯示。",
+    "The request could not be completed. Please try again later.": "請求未能完成，請稍後重試。"
   }
 }
