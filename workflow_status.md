@@ -468,12 +468,14 @@
 
 **未处理（B1-6）**：`参考的结果计划指南.md` 同文件内 `PHASE_B_IN_PROGRESS` 与「B-1…B-6 全 DONE」自相矛盾 —— 该文件被 `.gitignore:65` 忽略（删除不可恢复）且属另一会话写保护，**留待用户裁决**。
 
-### B2. 删除候选（**未执行，等用户确认**）
+### B2. 删除候选（**已执行，2026-10-23 用户授权**）
 
-| 路径 | 理由 | 前提 |
+| 路径 | 理由 | 结果 |
 |---|---|---|
-| `前端改进计划.md` | §14–§18 全是 v1.3.166–170 已执行事项，零未闭环 | 建议归档而非硬删（git 已跟踪可恢复） |
-| `计划书/ops/测试分片矩阵.md` | 核心结论「本机无法单进程跑完全量」已被 T-A1 推翻 | 删前需改 `CHANGELOG.md:410` 与指南 §5.3 引用 |
+| `前端改进计划.md` | §14–§18 全是 v1.3.166–170 已执行事项，零未闭环 | **已归档 + `git rm`**：`docs/archive/plans/20261023/前端改进计划.md`（字节一致，见该目录 `archive-manifest.md`） |
+| `计划书/ops/测试分片矩阵.md` | 核心结论「本机无法单进程跑完全量」已被 T-A1 推翻 | **已归档 + `git rm`**：`docs/archive/plans/20261023/测试分片矩阵.md`；引用已改（`CHANGELOG.md`、指南 §3.1/§3.3/§5.3/§6 P2-3/§13.2、`计划书/README.md`、本文件） |
+
+回滚：`git checkout 664a8489b866607e896771bbccf3575c746740c0 -- "前端改进计划.md" "计划书/ops/测试分片矩阵.md"`（详见归档目录 `archive-manifest.md` §5）。
 
 ### B3. 必须保留（含未闭环任务）
 
@@ -517,6 +519,37 @@
 | D-6 | Caddy 健康检查 `2s/2s` → `5s/5s`（容忍窗口 6s→15s，修 503 放大链） | 同上 | reload 后外网 10/10=200 |
 | D-7 | 每日数据库备份：`/opt/new-api/backup.sh`（pg_dump -Fc + `pg_restore -l` 校验 + 保留 7 天），cron `0 3 * * *` | 生产主机 | 实测产出 182MB dump、耗时 44s、校验通过 |
 | D-8 | fail2ban：`/etc/fail2ban/jail.local`（sshd, systemd backend, maxretry 4, bantime 1h） | 生产主机 | `fail2ban-client status sshd` = active |
+
+## G. 日志日汇总预聚合（v1.3.189/190 —— 根治方案）
+
+### 为什么必须做
+覆盖索引只是**对症**：30 天窗口仍要扫 130 万索引项（实测 1.8s），且随天数线性恶化 ——
+一年后回到 4-5s。真正的根治是预聚合，让查询从「扫窗口内全部原始行」变成「读 ≤N 行」。
+
+### 实现
+| 组件 | 说明 |
+|---|---|
+| 表 `log_daily_stats` | `day_key + dim_type(total\|model) + dim_value` 唯一，含 requests/bytes/prompt_tokens/completion_tokens/quota |
+| `RefreshLogDailyStats(days)` | 事务内「删窗口 + 整批重插」，幂等；不用 UPSERT（GORM OnConflict 在 MySQL 曾渲染空子句） |
+| `StartLogDailyStatsRefresh()` | master 每 10 分钟重算最近 2 天；表空则回填历史（上限 400 天）；停机可 Stop |
+| 查询侧 | `DailyStatsCovers(fromDay)` 判断是否覆盖整个窗口；不覆盖则回退原扫表路径 |
+| 维度选择 | 只做 `total` 与 `by-model`（字符串维度），数字维度需 CAST 会引入方言分支；`/api/log/report` 六维保持原路径 |
+
+### 生产实测
+| 项 | 值 |
+|---|---|
+| 回填 42 天 | **1.24 秒**（`log daily stats refreshed (window days=400, took=1.244722589s)`） |
+| 汇总表规模 | total **43 行** / model **365 行**（43 天） |
+| **历史口径一致性** | 与原始聚合**逐位相等**：req `1,629,848` / bytes `1,708,786,385,745` / quota `1,141,459,216` |
+| `/api/site/stats` | 10.7s → **84-99ms** |
+
+### 🔴 踩到的坑（重要）
+`migrateLOGDB()` 在生产**没有真正创建** `log_daily_stats`：启动日志打印了
+`database migration started`，但表不存在，刷新任务首次 tick 报 `42P01 relation does not exist`。
+**同批的 `migrateLogTrafficIndex` 也没生效**（死索引 `idx_logs_traffic` 还在，是我手动 DROP 的）——
+两件事指向同一处：`migrateLOGDB()` 内的 schema 变更在这个部署形态下不落地。
+处置：把 `AutoMigrate(&LogDailyStat{})` 兜底到 `RefreshLogDailyStats` 开头（v1.3.190），
+建不出来直接报错而不是静默退化成全表扫描。**根因仍未查清**，已列为待办 E-9。
 
 ## E. 剩余待办（本轮未做，按优先级）
 

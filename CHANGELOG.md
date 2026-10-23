@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.190] - 2026-10-23
+
+### Fixed
+- **`log_daily_stats` was never created in production.** The startup log printed
+  `database migration started`, yet the table did not exist and the refresh task died on
+  its first tick with `42P01 relation does not exist`. The same deploy path also left the
+  obsolete `idx_logs_traffic` in place. `AutoMigrate(&LogDailyStat{})` now runs at the
+  point of use (`RefreshLogDailyStats`), so a missing table fails loudly instead of
+  silently degrading the stats endpoints back to full table scans. The root cause of
+  `migrateLOGDB()` not applying these schema changes in this deployment shape is still open.
+
 ## [v1.3.189] - 2026-10-23
 
 Daily log statistics are pre-aggregated, so the stats endpoints stop scanning the whole
