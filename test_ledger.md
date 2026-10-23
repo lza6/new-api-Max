@@ -483,3 +483,23 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 `POST /api/setup {username,password,confirmPassword}` 直接初始化管理员；后端
 `SQLITE_PATH=<tmp>/v182.db PORT=3000 ./new-api-e2e.exe`，前端
 `bunx rsbuild dev --port 5173`（proxy → 3000）。
+
+### v1.3.182 生产部署与线上验证（2026-10-22）
+
+| 验证 | 命令（服务器侧） | 结果 |
+|---|---|---|
+| 镜像构建 | `docker build -t new-api:v1.3.182 /opt/new-api-src-v182` | PASS（builder2 go build DONE） |
+| 蓝绿切换 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.182` | 3000→3001 切换；新容器 200；自检 200；旧镜像清理后磁盘 13G/78G（17%） |
+| 容器状态 | `docker ps` | `new-api:v1.3.182 Up (healthy)`，RestartCount=0 |
+| 版本头 | `curl -sI --resolve freeapi…:443:127.0.0.1 https://freeapi.tingfengai.art` | `HTTP/2 200` + `x-new-api-version: v1.3.182` |
+| 健康检查 | `/healthz`、`/readyz` | 200；`{"status":"ready","checks":{"database":"up","redis":"up"}}` |
+| 业务接口 | `/api/status` | 200 |
+| 首页 | `GET /` | 200，8666 字节，title 正常（`听风API — 一个接口调用多种 AI 模型`） |
+| 新令牌生效（产物核对） | 拉取 `/static/css/index.fe22e679b3.css` | 含 `JetBrains Mono Variable`、`--surface-2/3`、`--rule/--rule-strong`、`--grid-line/step`、`--radius:.625rem` |
+| 字体产物 | `GET /static/font/jetbrains-mono-latin-ext-*.woff2` | 200，15196 字节 |
+| 运行期错误 | `docker logs \| grep -c ERROR / panic` | 0 / 0（最近 500 行） |
+
+**回滚点**：`new-api:v1.3.181`（`./deploy-zero-downtime.sh v1.3.181` 一条命令回到上一版）；
+本轮未触发回滚。
+**未取得**：生产端**浏览器**截图（本机直连该域名的 TLS 被中间设备 RST，见
+`tingfengai-domain-rst-20261010.md`），线上验证以服务器侧 curl + 产物内容核对为准。
