@@ -16,7 +16,11 @@ along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 For commercial licensing, please contact support@quantumnous.com
 */
-import { CancelledError, QueryClientProvider } from '@tanstack/react-query'
+import {
+  CancelledError,
+  QueryClientProvider,
+  useQuery,
+} from '@tanstack/react-query'
 import { act, renderHook } from '@testing-library/react'
 import {
   AxiosError,
@@ -440,5 +444,65 @@ it('rejects an unsuccessful setting update so callers cannot proceed as if it sa
   ])
   expect(success).not.toHaveBeenCalled()
   unmount()
+  client.clear()
+})
+
+// 后台轮询偶发 500 不应把用户踢到 /500：用户可能正停在抽屉/表单里输入，
+// 一次跳转会直接丢掉未保存内容（PG OOM 那类时段会反复触发）。
+// 只有页面级查询（无 refetchInterval）返回 500 才跳错误页。
+it('does not navigate to /500 for a failing background polling query', async () => {
+  const onInternalServerError = vi.fn()
+  const client = createAppQueryClient(onInternalServerError)
+  vi.spyOn(toast, 'error').mockReturnValue('error')
+
+  const failWith500 = () =>
+    new AxiosError('HTTP 500', 'ERR_BAD_RESPONSE', undefined, undefined, {
+      data: {},
+      status: 500,
+      statusText: 'Error',
+      headers: {},
+      config: { headers: new AxiosHeaders() },
+    })
+
+  const wrapper = ({ children }: { children: ReactNode }) =>
+    createElement(QueryClientProvider, { client }, children)
+
+  // 后台轮询：带 refetchInterval
+  const polling = renderHook(
+    () =>
+      useQuery({
+        queryKey: ['polling-500'],
+        queryFn: async () => {
+          throw failWith500()
+        },
+        retry: false,
+        refetchInterval: 5000,
+      }),
+    { wrapper }
+  )
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 80))
+  })
+  expect(onInternalServerError).not.toHaveBeenCalled()
+  polling.unmount()
+
+  // 页面级查询：不带 refetchInterval，仍然要跳错误页
+  const page = renderHook(
+    () =>
+      useQuery({
+        queryKey: ['page-level-500'],
+        queryFn: async () => {
+          throw failWith500()
+        },
+        retry: false,
+      }),
+    { wrapper }
+  )
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 80))
+  })
+  expect(onInternalServerError).toHaveBeenCalledTimes(1)
+  page.unmount()
+
   client.clear()
 })

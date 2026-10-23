@@ -1,0 +1,169 @@
+{
+  "task_id": "audit-frontend",
+  "timestamp": "2026-10-23T19:10:00+08:00",
+  "scope": {
+    "mode": "只读审计（未修改任何源码；仅新建本 JSON 交付物）",
+    "code": "web/ 工作区（React 19 + Rsbuild 2 + TanStack + Base UI，未提交改动亦纳入）",
+    "executed": [
+      "bun run typecheck（tsgo -b）→ exit 0",
+      "bun run i18n:check → OK (0 missing)",
+      "bun run i18n:coverage → 12/12 locale complete",
+      "bun run i18n:terminology → PASS（quota 统一为「额度」）",
+      "ls/stat/gzip 实测 dist 产物体积；按模块切分 dist/static/js/31241*.js 统计 zod/toast 占比"
+    ],
+    "not_executed": [
+      "未跑全量 vitest（567s，按指令禁止）",
+      "未跑 bun run build（禁止全量构建），体积结论基于既有 dist 产物（Oct 23 16:11）",
+      "未访问生产、未做浏览器 E2E（无授权）→ 无任何「已验证（实跑浏览器）」级结论"
+    ],
+    "not_reported": "已由项目已知缺口清单（计划书/尼尔森十项…指南 §4.2 P1×10/P2×11/P3×10）覆盖的问题不重复报：quota 三译法、ApiErrorMsg 直抛、emptyAction 零使用、状态徽章两套、轮询无可见性门控、批量删渠道绕过 ConfirmDialog、错误页以大状态码为主体、设计令牌缺间距轴等。"
+  },
+  "findings": [
+    {
+      "id": "F-1",
+      "severity": "P1",
+      "title": "任意单条 query 返回 500 就把整个 SPA 导航到 /500，丢失当前页面与未保存输入",
+      "file": "web/src/lib/query-client.ts:71-76; web/src/main.tsx:46-48",
+      "evidence": "query-client.ts:\n  queryCache: new QueryCache({ onError: (error, query) => {\n    if (query.meta?.errorToast !== false) {handleServerError(error)}\n    if (getServerErrorStatus(error) === 500) {onInternalServerError?.()}\n  }})\nmain.tsx:\n  const queryClient = createAppQueryClient(() => { void router.navigate({ to: '/500' }) })\n→ 无任何门控（不看 queryKey、不看是否关键查询、不看是否首屏数据），后台轮询 query 失败同样触发。",
+      "impact": "后端任一端点偶发 500（本实例 2026-10-23 PG OOM 期间即为大面积 500）时，用户正在编辑的抽屉/表单会被整页替换为 /500 错误页；轮询 query（dashboard、ops-panel、live-requests 等）每秒级失败会反复触发跳转。落点 /500 又是已知 P2-2「以大状态码为主体、无 request id」的页面，恢复路径差（H9）。",
+      "fix_suggestion": "只让「路由级/首屏关键查询」触发整页错误页：给 Query 加 meta.critical 或用 queryKey 白名单；其余 500 走 ErrorState + onRetry。若保留全局跳转，至少加同一时刻只跳一次的去抖 + 保留 returnTo。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-2",
+      "severity": "P2",
+      "title": "会话过期跳转硬编码 '/sign-in'，丢弃语言前缀与来源页",
+      "file": "web/src/lib/http-client.ts:77-84",
+      "evidence": "function redirectToSignIn(): void {\n  if (typeof window !== 'undefined' && window.location.pathname !== '/sign-in') {\n    window.location.replace('/sign-in')\n  }\n}\n对比 web/src/i18n/languages.ts:84 已提供 pathWithLanguage()，i18n/config.ts:230-233 的语言跳转就用了它并保留 search/hash。",
+      "impact": "多语言站点里，在 /en/keys、/ja/usage-logs 等前缀路径下掉线，用户被扔到中文登录页（zh 无前缀），语言与 URL 前缀/canonical 立即不一致；同时丢失 returnTo，登录后回到首页而不是原页面。",
+      "fix_suggestion": "改用 pathWithLanguage(window.location.pathname, normalizeInterfaceLanguage(i18n.language)) 生成目标路径，并带 ?redirect=<当前 path+search>；登录成功后优先跳回 redirect。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-3",
+      "severity": "P2",
+      "title": "公开页 /tool-setup 与 /model-test 的代码片段/提示词硬编码中文，非中文用户看到中文",
+      "file": "web/src/features/tool-setup/tool-integration-section.tsx:44-138; web/src/features/pricing/lib/model-test-meta.ts:34-35",
+      "evidence": "tool-integration-section.tsx buildPresets() 里 config 字符串字面量：\n  '# Claude Code（Anthropic 原生协议）'\n  '# 推荐写入 ~/.claude/settings.json 的 env 或 shell profile：'\n  '# CC Switch 一键导入（推荐）'  '# 控制台 → API 密钥 → 行操作 → 「CC Switch」…'\n  '# 余额显示：CC Switch 会读取'  '# 若侧栏未显示余量，请确认这两个地址可直接访问。'\n渲染处 line 207-210：<pre>{preset.config(baseUrl, siteModel)}</pre>，同值还被 CopyButton 复制进用户本地配置。\nmodel-test-meta.ts:35 prompt: '创建一个HTML，内容是SVG绘制一个鹈鹕骑自行车的2D动画，你不需要任何测试。'\n两页均在 i18n/config.ts:194-204 的 PUBLIC_SEO_PATHS 列表内（面向全语种公开流量）。",
+      "impact": "en/fr/ja/ru/vi 访客在这两个公开页看到中文注释与中文测试提示词；且被一键复制到用户自己的配置文件里带走，属对外可见未本地化文案（违反 web/AGENTS.md 3.1「所有面向用户文案需 t()」）。",
+      "fix_suggestion": "config 片段改为按语言模板（或注释行抽成 i18n key 后插值拼装），至少把注释行做成 t() 变量；model-test 的 prompt 按语言给出或改为英文源串 + 翻译。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-4",
+      "severity": "P2",
+      "title": "首屏初始 chunk 里打进了整份 zod（约 68K raw / 20-22K gzip），落地页并不需要",
+      "file": "web/dist/static/js/31241.ab9377f1f2.js（index.html 内 <script defer> 同步加载）; 来源：约 30 个路由文件顶层 import z 做 validateSearch，如 web/src/routes/_authenticated/usage-logs/$section.tsx:22-56",
+      "evidence": "index.html: <script defer ...31241.ab9377f1f2.js></script>（初始 chunk 组，非 async/）。\n按模块切分该文件（252894 B）：\n  25732 → 45.9K，含 zod/Zod 标识 364 次\n  79991 → 6.0K(zod 28) / 99070 → 6.1K(61) / 74483 → 6.0K(7) / 82192 → 1.2K(12) / 70192 → 1.1K(5) / 62448 → 1.6K(4) / 56080 → 0.7K(6)\n  合计 zod ≈ 69K raw；同 chunk 另有 sonner/toast 32.7K、dayjs 6.8K、i18next 26.2K。\n初始 5 个 chunk 实测 gzip：vendor-ui-primitives 110K / 31241 76K / lib-react 58K / vendor-tanstack 50K / index 34K + CSS 66K ≈ 394K gzip；i18n-common 仅 8-14K（这部分已优化到位）。",
+      "impact": "营销落地页（无任何表单、无 search 校验）也要下载并解析 zod；zod 占初始 JS 约 20%，属可摘除的首屏成本（跨境弱网下尤其明显）。",
+      "fix_suggestion": "把 zod 加进独立 cacheGroup（chunks:'async'）不行——路由定义需要在 router 创建时可用；可行方向：①validateSearch 改用路由自带的轻量解析（不用 zod 的 .catch/z.preprocess）；②把重表单 schema 拆到 lazily 加载的模块；③至少确认 zod v4 的 tree-shaking（当前 364 处标识说明整包在）。",
+      "verified": "已验证"
+    },
+    {
+      "id": "F-5",
+      "severity": "P2",
+      "title": "13 处无障碍名称/占位符硬编码英文，未走 t()；其中 1 处是可见文案",
+      "file": "web/src/components/datetime-picker.tsx:158; web/src/components/config-drawer.tsx:152; web/src/components/ai-elements/conversation.tsx:119; web/src/components/json-editor.tsx:259; web/src/components/password-input.tsx:57; web/src/components/tag-input.tsx:90; web/src/features/channels/components/numeric-spinner-input.tsx:154,197; web/src/features/system-settings/models/tiered-pricing-editor.tsx:410; web/src/features/models/components/dialogs/update-config-dialog.tsx:346; web/src/components/ui/pagination.tsx:95,117; web/src/components/ui/sidebar.tsx:307; web/src/components/ui/spinner.tsx:37",
+      "evidence": "rg \"aria-label=['\\\"][A-Za-z]\" 命中并逐个确认为字面量（非 t()）：\n  aria-label='Clear'（datetime-picker） / 'Reset'（config-drawer） / 'Scroll to bottom' / 'Delete row' / 'Toggle password visibility' / 'Remove tag' / 'Decrement' / 'Increment' / 'remove'（tiered-pricing-editor） / 'Go to previous page' / 'Go to next page' / 'Toggle Sidebar' / 'Loading'\n可见文案：update-config-dialog.tsx:346 <Input placeholder='Optional' {...field} />\nlocale 核查：'Clear'、'Reset' 键在 en/zh 已存在（只是漏 t()）；'Scroll to bottom'、'Toggle password visibility'、'Remove tag'、'Delete row'、'Optional' 在两个 locale 中都不存在（0 命中）。",
+      "impact": "中文用户用读屏时听到英文按钮名（H4 一致性与 3.12 可访问性违约）；'Optional' 是直接可见的表单占位符。i18n:check 脚本只校验 t() 已用的 key，这类硬编码字面量它查不到，因此长期不会被 CI 拦住。",
+      "fix_suggestion": "逐个改为 t('...')；不存在的 7 个键补进 7 份 locale；'Clear'/'Reset' 直接改 t()。可给 scripts/check-missing-i18n.cjs 增加一条「aria-label/placeholder/title 字面量必须包 t()」的静态规则，防回归。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-6",
+      "severity": "P2",
+      "title": "表格搜索/筛选写 URL 用 push（未 replace），每敲一次搜索都把历史栈塞满",
+      "file": "web/src/hooks/use-table-url-state.ts:189-206（onGlobalFilterChange）、:208-238（onColumnFiltersChange）",
+      "evidence": "onGlobalFilterChange: navigate({ search: (prev) => ({...prev, pageKey: undefined, [globalFilterKey]: value || undefined }) })  ← 无 replace\nonColumnFiltersChange: 同样 navigate({ search: ... }) 无 replace\nensurePageInRange 反而写了 replace: true（:248），说明作者知道该参数。\n调用方均为裸 navigate：features/keys/components/api-keys-table.tsx:258 navigate: route.useNavigate()（另 9 处同形）。\n输入侧确有 500ms 防抖（components/data-table/toolbar/toolbar.tsx:182-212），因此是「每段停顿一条历史」而不是「每个字符一条」。",
+      "impact": "在 keys/users/channels/models/redemptions/usage-logs 等 10 张表里搜一次词后，点浏览器后退不是离开页面，而是逐条回放搜索词（H3 用户控制与自由）；深度筛选场景可累积十几条历史。",
+      "fix_suggestion": "globalFilter/columnFilters 的 navigate 传 replace: true（分页保留 push，符合「后退=上一页」直觉）。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-7",
+      "severity": "P3",
+      "title": "「No description provided」硬编码英文（中文界面出现英文）",
+      "file": "web/src/features/models/components/dialogs/prefill-group-management-dialog.tsx:215, 304",
+      "evidence": "<CardDescription className='text-muted-foreground italic'>\\n  No description provided\\n</CardDescription>（两处相同）",
+      "impact": "中文界面里模型预填组无描述时显示英文句子，与相邻已 t() 的文案混排。",
+      "fix_suggestion": "改为 {t('No description provided')} 并补 7 份 locale。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-8",
+      "severity": "P3",
+      "title": "「先读 response.data.code、顶层 code 仅非 ERR_ 前缀才采用」这份逻辑有两份独立实现",
+      "file": "web/src/lib/secure-verification.ts:93-103; web/src/features/keys/hooks/use-token-key-disclosure.ts:68-78",
+      "evidence": "两处 readServerCode(error) 函数体逐行等价（中文注释版 / 英文注释版各一份），都是先读 response.data.code、再判 !direct.startsWith('ERR_')。另有第三处简化版：features/auth/api.ts:108 直接 error.response?.data?.code。",
+      "impact": "这是项目栽过跟头的点（new-api-batch13 记忆：顺序写反会让 SECURITY_PROOF_* 永远读不到）。两份实现意味着下一次修改只会改一处，另一处静默退化，且没有任何测试锁住这条不变量。",
+      "fix_suggestion": "抽到 lib/server-error-message.ts（已有 getServerErrorStatus 等同类工具）导出 readServerCode，两处改为引用；补一条单测覆盖 {code:'ERR_BAD_REQUEST', response:{data:{code:'SECURITY_PROOF_REQUIRED'}}} 与 {code:'SOME_BUSINESS_CODE'} 两个形态。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-9",
+      "severity": "P3",
+      "title": "防抖窗口内改动其它筛选/翻页，会把正在输入但未提交的搜索词回滚",
+      "file": "web/src/components/data-table/hooks/use-debounced-column-filter.ts:48-60; web/src/hooks/use-table-url-state.ts:153-156",
+      "evidence": "use-table-url-state.ts: useEffect(() => { setColumnFilters(initialColumnFilters) }, [search])  ← 任何 URL 变化都整体重建 columnFilters\nuse-debounced-column-filter.ts: const value = columnFilters.find(id===columnId)?.value ?? ''; useEffect(() => { setInputValue(value); setPendingValue(value) }, [value])\n→ 输入未满 500ms 时若发生其它 navigate（点状态筛选、翻页、另一个列筛选），search 变化 → columnFilters 按 URL（旧值）重建 → value 变旧值 → pendingValue 被覆盖 → 已输入的字符被清掉。",
+      "impact": "快速操作场景（一边打字一边点筛选）输入内容丢失，用户需重打；触发需要「500ms 内同时做两件事」，概率中等。",
+      "fix_suggestion": "pendingValue 只在 URL 里的该列值真的变化时同步（记 prevValue ref 比较），或把本地输入态与 URL 同步改为单向（本地优先，URL 只作初值）。",
+      "verified": "合理推断"
+    },
+    {
+      "id": "F-10",
+      "severity": "P3",
+      "title": "Service Worker 对未带 hash 的静态资源也 cache-first，同版本重新部署会长期陈旧",
+      "file": "web/public/sw.js:28-49",
+      "evidence": "if (!/\\.(js|css|woff2?|png|svg|ico|webp|jpg|jpeg)$/.test(p)) return  → /logo.png、/favicon.ico、/pay-apple.png、/pay-card.png、/pay-google.png、/model-test.html 都命中\n缓存策略：const hit = await cache.match(request); if (hit) return hit  ← cache-first，永不 revalidate\n清理条件仅 caches.keys() filter(k !== VERSION)，VERSION 由 scripts/stamp-sw.mjs 用 package.json 版本 + 产物列表 hash 生成。",
+      "impact": "版本号不变的前提下替换 /logo.png 或 /pay-*.png，老用户会一直看到旧图（需等下一次发版改 VERSION 才清）。导航请求已正确绕过缓存（request.mode==='navigate' return），所以 index.html 不受影响，不会复现白屏。",
+      "fix_suggestion": "对未带内容 hash 的路径改用 stale-while-revalidate，或把这几类后缀排除在 SW 缓存之外（收益有限）；至少加注释说明「换图需发版」。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-11",
+      "severity": "P3",
+      "title": "GET 去重把「同 URL 不同 config」的并发请求合并，先到者的 skipErrorHandler 等选项覆盖后到者",
+      "file": "web/src/lib/http-client.ts:58-75",
+      "evidence": "const key = `${sessionSID}:${url}?${params}`（仅 session+url+params）\nconst existingRequest = inFlightGet.get(key); if (existingRequest) {return existingRequest}\n→ 并发时后调用方拿到的 Promise 来自先调用方的 config，其 skipErrorHandler / skipBusinessError / acceptAuthRotation 全部失效。",
+      "impact": "同一 URL 被「轮询 query（skipErrorHandler）」与「用户操作」同时请求时，后者可能吞掉错误或反之弹错；当前更依赖「同 URL 恰好并发」的时机，属边缘竞态。",
+      "fix_suggestion": "key 里带上会影响行为的选项（skipErrorHandler/skipBusinessError），或不合并带差异选项的请求。",
+      "verified": "合理推断"
+    },
+    {
+      "id": "F-12",
+      "severity": "P3",
+      "title": "React Query retry 在 DEV 恒为 false，本地无法复现生产的 4 次重试行为",
+      "file": "web/src/lib/query-client.ts:36-44",
+      "evidence": "retry: (failureCount, error) => {\n  if (import.meta.env.DEV || failureCount > 3) {return false}\n  return ![401, 403].includes(getServerErrorStatus(error) ?? 0)\n}",
+      "impact": "重试/退避相关缺陷（与 F-1 的「重复跳 500」叠加）在开发环境观察不到，只能在生产暴露；也意味着 dev 下任何 5xx 立即走到 onError。",
+      "fix_suggestion": "用显式开关（如 VITE_DISABLE_RETRY）代替 env 判断，默认保持与生产一致。",
+      "verified": "静态确认"
+    },
+    {
+      "id": "F-13",
+      "severity": "P3",
+      "title": "落地页首屏向第三方（ccswitch.io）取图，且失败靠手工改 DOM 兜底",
+      "file": "web/src/features/home/components/sections/hero.tsx:284-296",
+      "evidence": "<img src='https://ccswitch.io/favicon.png' alt='CC Switch' className='size-6 ...' onError={(e) => { e.currentTarget.style.display='none'; const fallback = e.currentTarget.nextSibling as HTMLElement; if (fallback) {fallback.style.display='flex'} }} />\n（无 loading/width/height；兜底依赖 nextSibling 的 DOM 顺序耦合）",
+      "impact": "公开落地页首屏发起一次跨域请求：向第三方暴露访客 IP、跨境弱网下多一次失败尝试；DOM 结构一改兜底就静默失效（只剩空位）。尺寸由 class 固定，无 CLS 风险。",
+      "fix_suggestion": "改为站内静态资源（或首屏后懒加载 / loading='lazy'）；兜底改为 state 驱动而不是改 style。",
+      "verified": "静态确认"
+    }
+  ],
+  "summary": {
+    "P0": 0,
+    "P1": 1,
+    "P2": 5,
+    "P3": 7,
+    "top3": [
+      "F-1 query-client.ts:71-76 + main.tsx:46-48 —— 任一 query 500 就整页跳 /500，后台轮询失败也会把用户从正在编辑的页面踢走并丢输入",
+      "F-2 http-client.ts:77-84 —— 会话过期硬编码 replace('/sign-in')，多语言前缀与来源页全丢，/en /ja 用户掉线后落到中文登录页",
+      "F-4 dist/static/js/31241*.js（源：约 30 个路由 validateSearch 顶层 import zod）—— 落地页初始 chunk 里带了整份 zod（≈69K raw / 20-22K gz，占初始 JS 约 20%）"
+    ],
+    "already_known_not_repeated": [
+      "入口 4.5MB 白屏（已优化到 ~394K gzip 初始组，i18n-common 仅 8-14K，本轮复核未回退）",
+      "whileInView + initial opacity:0 不可见（Reveal 已用 useReducedMotion 分支；AnimateInView 仍靠 IntersectionObserver，但仅用于首页装饰区块，未复现空白）",
+      "V7 三态降级、emptyAction 零使用、状态徽章两套、轮询无可见性门控、批量删渠道绕过 ConfirmDialog、错误页以大状态码为主体"
+    ]
+  }
+}

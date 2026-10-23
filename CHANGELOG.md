@@ -26,6 +26,11 @@ Production Postgres OOM chain closed; four audit P0/P1 defects fixed.
 - **Day key used `/ 86400`, which breaks on MySQL.** MySQL's `/` is decimal
   division, so the result failed to scan into int64. Switched to the integer form
   `x - (x % 86400)` already documented in `model/usage_report.go`.
+- **Any 500 navigated the user to `/500`, even from a background poller.**
+  `queryCache.onError` called `onInternalServerError()` unconditionally on 500, so a
+  transient failure of a dashboard/ops polling query kicked the user out of an open
+  drawer or form and discarded unsaved input. Polling queries (any observer with
+  `refetchInterval`) now only toast; page-level queries still navigate.
 
 ### Tooling
 - `web/package.json` gained `test:shards`. The planning guide referenced

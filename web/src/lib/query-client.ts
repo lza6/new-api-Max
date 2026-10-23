@@ -58,7 +58,18 @@ export function createAppQueryClient(
     queryCache: new QueryCache({
       onError: (error, query) => {
         if (query.meta?.errorToast !== false) {handleServerError(error)}
-        if (getServerErrorStatus(error) === 500) {onInternalServerError?.()}
+        // 后台轮询（带 refetchInterval）偶发 500 不应把用户踢到 /500：
+        // 它不代表当前页面不可用，而用户可能正停在抽屉/表单里输入，
+        // 一次跳转会直接丢掉未保存内容（PG OOM 那类时段会反复触发）。
+        // refetchInterval 只存在于 observer 选项上（QueryOptions 里没有），
+        // 所以必须遍历 observers 判断。
+        const isBackgroundPolling = query.observers.some((observer) => {
+          const interval = observer.options.refetchInterval
+          return interval !== undefined && interval !== false
+        })
+        if (!isBackgroundPolling && getServerErrorStatus(error) === 500) {
+          onInternalServerError?.()
+        }
       },
     }),
   })
