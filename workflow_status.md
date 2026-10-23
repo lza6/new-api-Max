@@ -4,12 +4,12 @@
 
 | 项 | 值 | 校验命令 |
 |---|---|---|
-| 线上版本 | `v1.3.186` | `ssh ... 'docker ps --format "{{.Image}}"'` |
-| 部署时间 | 2026-10-22（蓝绿，端口 3001） | — |
+| 线上版本 | `v1.3.187` | `ssh ... 'docker ps --format "{{.Image}}"'` |
+| 部署时间 | 2026-10-23 17:5x（蓝绿，端口 3000） | — |
 | 代码 SHA | `git rev-parse origin/main` | `git log origin/main -1` |
-| 回滚镜像 | `new-api:v1.3.185`（保留最近 4 个版本） | `docker images new-api` |
-| 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.185` | — |
-| VERSION 文件 | `v1.3.186` | `cat VERSION` |
+| 回滚镜像 | `new-api:v1.3.186`（保留最近 4 个版本：184/185/186/187） | `docker images new-api` |
+| 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.186` | — |
+| VERSION 文件 | `v1.3.187` | `cat VERSION` |
 
 `VERSION` / 最新 tag / `CHANGELOG` 首条 / 本表四者一致；若不一致，必须先修本文档。
 
@@ -403,3 +403,28 @@
 - **累计型预算**（当日/会话）未做：需要跨实例计数存储，属独立架构工作，不在本批。
 - **真实语义 embedding** 未接：内置 embedder 是词袋哈希；真语义需外部付费 embedding 服务（付费红线，未批准预算）。
 - 前端全量 `bun run test` 基线仍为红（既有 18 文件失败，见 `test_ledger.md`），本批不触碰。
+
+---
+
+## 15. 2026-10-23 v1.3.187 发版与生产部署（已验收）
+
+| 项 | 值 |
+|---|---|
+| 版本 | `v1.3.187` |
+| 提交 | `3d316a530`（fix(web): 前端套件转绿 1582/1582 + 插件图标 fail-closed + 策略中心进导航） |
+| 构建 | 服务器侧 `docker build`（Dockerfile 注入 `common.Version`），镜像 `new-api:v1.3.187` 275MB |
+| 部署 | 蓝绿：旧容器在 3001 → 新容器 3000 → Caddy 切上游 → 外网自检 200 |
+| 回滚点 | `new-api:v1.3.186`（`./deploy-zero-downtime.sh v1.3.186` 一条命令） |
+| 磁盘 | 13G/78G (17%)，已清理 v1.3.183 |
+
+**线上验收（服务器侧真实命令）**
+
+| 检查 | 结果 |
+|---|---|
+| 版本头 | `x-new-api-version: v1.3.187` |
+| 健康 | `/healthz` 200、`/readyz` 200、`/api/status` 200 |
+| 首页 | 200，8666 字节 |
+| 运行期错误 | 最近 400 行 `ERROR/panic` = 0 |
+| 二进制自报版本 | `v1.3.187`（此前构建未注入 ldflags 时会报 `v0.0.0`，Dockerfile 已注入） |
+
+**未做的验证**：生产端**浏览器**点测（策略中心导航项、插件图标）未执行——本机对该域名的 TLS 被中间设备 RST（记忆 `tingfengai-domain-rst-20261010.md`），需隧道+管理员登录，本轮未取得。
