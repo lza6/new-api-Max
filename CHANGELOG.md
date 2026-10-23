@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.184] - 2026-10-23
+
+### Fixed
+- Policy-centre textareas (, ) now
+  cap input at 20 000 characters before writing to options (review finding: an
+  oversized paste could bloat the stored option).
+
 ## [v1.3.183] - 2026-10-23
 
 Gate hardening + policy centre + semantic response cache (参考的结果计划指南.md 批次 B-1/B-2/B-3/B-4/B-5/B-6).
