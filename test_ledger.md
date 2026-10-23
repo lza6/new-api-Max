@@ -572,3 +572,42 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
   → 结论：这些失败**不是 v1.3.182 引入的**，是仓库既有状态；CI 的 `bun run test` 门禁目前不可能为绿。
 - 处置：本批**不动**这些测试（不属视觉范围，且禁止为变绿削弱断言）；列为独立待办，
   需专门一批「测试基线归零」处理。
+
+---
+
+## v1.3.183（门禁转正 / 策略中心 / 语义缓存）— 2026-10-23
+
+### 已 PASS 且不必重跑（除非对应文件变化）
+
+| 项目 | 命令 | 结果 |
+|---|---|---|
+| i18n 语言覆盖（新门禁） | `cd web && node scripts/check-i18n-coverage.cjs` | `OK (all locales translated)`；12 个 locale 文件全 complete（fr/ja/ru/vi 各 95 键、zh-TW 66 键、本轮新 UI 14 键已补，8 语种均 7439 键） |
+| i18n key 用法（旧门禁回归） | `node scripts/check-missing-i18n.cjs` | `OK (0 missing)` |
+| 术语门禁 | `node scripts/check-terminology.mjs` | `PASS: quota 相关文案已统一为「额度」` |
+| 设计令牌漂移 | `node scripts/ds-tokens-check.mjs` | `OK (659 tokens)`；负向：改 `--radius` → exit 1 并精确报 `:root :: --radius`，还原 → exit 0 |
+| 前置：令牌快照幂等 | `node scripts/ds-tokens-export.mjs` ×2 | 第二次 `no change`（34 blocks / 659 tokens） |
+| 内置计费可达性 | `go test ./setting/billing_setting/ -run TestBuiltinBillingExpressionsStayReachable` | PASS；负向：往 `defaultModelRatio` 插同名模型 → FAIL 并报「legacy default price tables 遮挡」 |
+| 策略引擎 / 语义缓存单测 | `go test ./service/ -run "Policy|Semantic|ResponseCache"` | ok |
+| 语义缓存配置回退 | `go test ./setting/response_cache_setting/` | ok（阈值越界回退 0.97、空白名单不生效） |
+| 前端策略中心解析 | `bunx vitest run src/features/system-settings/request-limits/__tests__/policy-center-section.test.ts` | 11/11 PASS |
+| 静态检查 | `go vet ./service ./setting/... ./controller ./common` / `go build ./...` / `bun run typecheck` | 全部 0 错 |
+| 真实 E2E（进程级） | `node .refscan/e2e-policy.mjs`（真实二进制 + mock 上游） | **15/15 PASS**（详见 workflow_status.md v1.3.183 节） |
+
+### 压测（本地，非生产）
+
+| 场景 | 并发 | qps | p50 | p95 | 上游调用 |
+|---|---|---|---|---|---|
+| 语义命中（200 次） | 20 | 35.2 | 142.9ms | 2312ms | +0（`semantic_cache_hits_total` 0→200） |
+| 精确命中（200 次，对照） | 20 | 33.6 | 151.3ms | 1913ms | +0 |
+| 精确命中（200 次） | 2 | 32.1 | 42.9ms | 159ms | +0 |
+| 直连上游（100 次，限流前） | 10 | 268 | 9.2ms | 82.3ms | — |
+
+**归因结论**：语义命中与精确命中延迟同量级（p50 143 vs 151ms），延迟随并发线性上升（2 并发时 42.9ms）→ 瓶颈是本机 CPU/内存（压测时本机内存 93%）与限流中间件，**不是语义层引入的开销**。真实吞吐需在有独立配额的机器上重测（`待验证`）。
+
+### 新增环境要点（下次本地 E2E 直接用）
+
+- 本机 `curl` HTTPS 全局不可用，探测用 `node -e fetch(...)`；推送 GitHub 需 `git -c http.proxy=http://127.0.0.1:10808 push`（否则 `TLS connect error: unexpected eof`）。
+- 本地起服务必须：`SSRF_GUARD_DISABLED=true`（否则内网 mock 上游被 `ValidateChannelURL` 拒为 `upstream address rejected`）、`METRICS_ENABLED=true`（否则 `/metrics` 不输出）、并把 `performance_setting.monitor_memory_threshold` 提到 99（本机内存常驻 93%，否则 503 `system_memory_overloaded`）。
+- 管理端 API 登录返回 JWT（`data.access_token`）+ refresh cookie；只带其一可能 401。Token 列表接口返回**掩码 key**，真 key 只能从创建响应 `data.key` 取。
+- 敏感词 option 是**换行分隔**文本（不是 JSON 数组）；`/api/option/` 用 **PUT**（POST 会落到 relay 报 `Invalid URL`）。
+- 生产 SSH：`py -3 .refscan/ssh.py "<cmd>"`；源码走服务器 `git clone`（SFTP 未开放，`cat >` 流式上传会 socket 关闭）。

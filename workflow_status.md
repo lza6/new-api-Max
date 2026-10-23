@@ -370,3 +370,36 @@
 | 生产部署 / 发版 | **未由本会话执行** | 并行会话已发布 v1.3.182 并留回滚点 v1.3.181（见 ledger 生产段）；本会话不重复部署，避免与其撞车 |
 
 **未闭环项（不掩饰）**：knip 死代码门禁当前 FAIL(1)；前端 13 条真实失败；ClickHouse 未验证；生产最终版本以并行会话的部署记录为准。
+
+---
+
+# v1.3.183 — 参考对标批次 B-1…B-6（2026-10-23）
+
+**结论：complete（B-1…B-6 全部落地，已提交 ef80dd8ae，已部署生产 v1.3.183，发行 tag v1.3.183 已推送）**
+
+## 交付内容
+
+| 批次 | 内容 | 关键文件 |
+|---|---|---|
+| B-1 | i18n 门禁从「假绿」转正：新增语言覆盖 + 占位符一致性检查，补 446 条翻译，修 ja/vi 占位符事故，CI 接入三步门禁 | `web/scripts/check-i18n-coverage.cjs`、`web/src/i18n/locales/*`、`.github/workflows/ci.yml` |
+| B-2 | 设计令牌快照 + 漂移门禁（34 blocks / 659 tokens） | `web/scripts/ds-tokens-*.mjs`、`web/.ai/ds/ds-tokens.json` |
+| B-3 | 内置计费表达式可达性守卫（防 legacy 默认表静默遮挡） | `setting/billing_setting/builtin_billing_test.go` |
+| B-4 | 护栏观测统一：敏感词拦截计入 `policy_decision_total{guardrail:block}`（不重复实现已有拦截） | `service/policy_engine.go`、`controller/relay.go` |
+| B-5 | 模型级单请求预算（`relay.policy_model_request_limits`，403 `model_request_limit`） | `setting/relay_setting/relay_setting.go`、`service/policy_engine.go` |
+| B-6 | 语义响应缓存（默认关 + 白名单 + 阈值 0.97 + 有界内存 + `/metrics` 三指标）与管理端配置分区 | `service/semantic_cache.go`、`setting/response_cache_setting/*`、`web/src/features/system-settings/request-limits/policy-center-section.tsx` |
+
+## 真实 E2E（本地二进制 + mock 上游，15/15）
+
+基线 200 → 预算 403 → 取消后恢复 200 → 敏感词拦截 + 计数 2→3 → 语义关 2 次上游 →
+精确缓存基线 0 次 → 语义命中 0 次（hits 0→200）→ 无关问题 1 次（不误命中）→ 关开关立即回滚。
+
+## 部署
+
+- 生产 `154.37.208.171`：镜像 `new-api:v1.3.183` 蓝绿部署到 3000 端口，旧容器已停；`/healthz` 200、`X-New-Api-Version: v1.3.183`、`/readyz` = database up / redis up；公网 `https://freeapi.tingfengai.arch/healthz` 200（服务器侧探测）；镜像内确认含 `semantic_cache_hits_total` / `policy_model_request_limits` / `Unified Policy Center` 符号。
+- 回滚：`bash /opt/new-api/deploy-zero-downtime.sh v1.3.182`（镜像仍在，前端/后端均无 schema 迁移）。
+
+## 未做（明确披露）
+
+- **累计型预算**（当日/会话）未做：需要跨实例计数存储，属独立架构工作，不在本批。
+- **真实语义 embedding** 未接：内置 embedder 是词袋哈希；真语义需外部付费 embedding 服务（付费红线，未批准预算）。
+- 前端全量 `bun run test` 基线仍为红（既有 18 文件失败，见 `test_ledger.md`），本批不触碰。
