@@ -395,7 +395,7 @@
 
 ## 部署
 
-- 生产 `154.37.208.171`：镜像 `new-api:v1.3.183` 蓝绿部署到 3000 端口，旧容器已停；`/healthz` 200、`X-New-Api-Version: v1.3.183`、`/readyz` = database up / redis up；公网 `https://freeapi.tingfengai.arch/healthz` 200（服务器侧探测）；镜像内确认含 `semantic_cache_hits_total` / `policy_model_request_limits` / `Unified Policy Center` 符号。
+- 生产 `154.37.208.171`：镜像 `new-api:v1.3.183` 蓝绿部署到 3000 端口，旧容器已停；`/healthz` 200、`X-New-Api-Version: v1.3.183`、`/readyz` = database up / redis up；公网 `https://freeapi.tingfengai.art/healthz` 200（服务器侧探测）；镜像内确认含 `semantic_cache_hits_total` / `policy_model_request_limits` / `Unified Policy Center` 符号。
 - 回滚：`bash /opt/new-api/deploy-zero-downtime.sh v1.3.182`（镜像仍在，前端/后端均无 schema 迁移）。
 
 ## 未做（明确披露）
