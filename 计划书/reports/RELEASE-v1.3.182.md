@@ -52,3 +52,18 @@ V8 动效规范 · V9–V11 页面覆盖 · V12 视觉基线脚本 · V13 `ink` 
 - **验证**：typecheck / oxlint / build PASS；定向 vitest 81/81 + chart-palette 4/4 + empty-state 6/6；
   浏览器实测 canvas 颜色管线（`--primary` → `#146fa8` → `ctx.fillStyle`）与表头 11px
 - **未完成**：V4b 数字列右对齐、V5 存量 `bg-*-50` 清扫、V6b `--chart-N` 令牌统一、V8–V13
+
+---
+
+# v1.3.186（视觉批次 3：V8 + V12 + V13）
+
+- **提交**：`620e574df`（tag `v1.3.186`）
+- **部署**：2026-10-22 蓝绿 3001，`x-new-api-version: v1.3.186`，healthy，0 ERROR / 0 panic / 0 restart
+- **回滚**：`./deploy-zero-downtime.sh v1.3.185`
+- **新增**：`.transition-quiet`（`transition-all` 41 处清零）、`ink` 石墨结构差异套预设
+  （半径/密度提示 + 用户显式选择优先）、`e2e-local/visual-baseline.cjs` 可重跑视觉基线
+- **修复**：`anthropic` 预设白字 on 陶土 `#e37756` 仅 **2.9:1** → primary 改 `oklch(0.57 0.128 38)`，
+  亮/暗 axe 复测 0 违规；11 预设 × 2 页 color-contrast 全 0
+- **验证**：typecheck / build PASS；vitest 163/163；基线 18 图；生产五项健康检查通过
+- **事故**：清理临时 worktree 时 `rmdir /S` 顺 junction 删掉 `node_modules/.bin`，已 `bun install`
+  恢复并重跑全部验证；GitHub HTTPS 推送短时中断 10 次后恢复

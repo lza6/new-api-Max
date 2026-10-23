@@ -665,3 +665,24 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 `bun: command not found: tsgo`）。处置：`bun install --frozen-lockfile` 恢复（240 包重装），随后
 typecheck / 163 条测试 / build 全部重新通过。教训：Windows 上删除含 junction 的目录必须
 `rmdir` 目录本身而不是 `/S` 递归，或先 `rm junction`。
+
+### v1.3.186 生产部署与线上验证（2026-10-22）
+
+| 验证 | 命令（服务器侧） | 结果 |
+|---|---|---|
+| 镜像构建 | `docker build -t new-api:v1.3.186 /opt/new-api-src-v186` | PASS（exporting manifest list / naming done） |
+| 蓝绿切换 | `./deploy-zero-downtime.sh v1.3.186` | 3000→3001；新容器 200；自检 200；清理后磁盘 13G/78G |
+| 版本头 | `curl -sI --resolve … https://freeapi.tingfengai.art` | `HTTP/2 200` + `x-new-api-version: v1.3.186` |
+| 健康 | `/healthz`、`/readyz` | 200；`{"status":"ready","checks":{"database":"up","redis":"up"}}` |
+| 业务/首页 | `/api/status`、`GET /` | 200 / 200，title 正常 |
+| 新产物 | 拉取 `index.dbcc6db346.css` | 含 `transition-quiet`、`surface-grid`、`data-theme-preset=ink` |
+| 运行期 | `docker logs \| grep -c ERROR / panic`；`RestartCount` | 0 / 0；0 restarts |
+
+**回滚点**：`new-api:v1.3.185`。
+**说明**：生产 CSS 由 lightningcss 降级输出（不含字面 `oklch(`），因此 anthropic 显式色值只在
+本地源码与本地 axe 复测中 `已验证`；生产侧为 `静态确认`（同一构建产物 + 预设块存在）。
+
+### 推送受阻与恢复（如实记录）
+
+`git push` 到 GitHub 在 13:33–13:36 连续 10 次失败（`TLS connect error … unexpected eof`），
+部署期间重试后恢复：`64a2ed8f2..620e574df` 与 tag `v1.3.186` 均已推送成功。
