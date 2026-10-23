@@ -67,6 +67,7 @@ function EmptyMedia({
     <div
       data-slot='empty-icon'
       data-variant={variant}
+      aria-hidden='true'
       className={cn(emptyMediaVariants({ variant, className }))}
       {...props}
     />

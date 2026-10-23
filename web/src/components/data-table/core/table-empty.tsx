@@ -72,7 +72,7 @@ export function TableEmpty({
   return (
     <TableRow>
       <TableCell colSpan={colSpan} className='h-[400px] p-0'>
-        <Empty>
+        <Empty className='surface-grid'>
           <EmptyHeader>
             <EmptyMedia variant='icon'>
               {icon || <Database className='size-6' />}

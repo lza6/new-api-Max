@@ -38,6 +38,11 @@ interface EmptyStateProps {
   action?: ReactNode
   className?: string
   bordered?: boolean
+  /**
+   * 工程网格底纹（视觉体系 §4.7）。默认开启，纯装饰（`::before` + mask），
+   * 不改变任何对比度或交互；密集表格内的空态可传 `false` 保持净面。
+   */
+  atmosphere?: boolean
 }
 
 export function EmptyState(props: EmptyStateProps) {
@@ -49,6 +54,7 @@ export function EmptyState(props: EmptyStateProps) {
       <Empty
         className={cn(
           'min-h-[300px]',
+          props.atmosphere !== false && 'surface-grid',
           props.bordered && 'border',
           props.className
         )}

@@ -279,6 +279,48 @@ For commercial licensing, please contact support@quantumnous.com
 
 /* Launch UI Animations and Effects - Matching Template Exactly */
 @layer utilities {
+  /* 视觉体系 §3.2：空态「工程图纸」底纹。
+   * 网格画在 ::before 上（不影响子元素的对比度与可读性），四周用 radial mask
+   * 渐隐，避免网格抢走标题与动作按钮的注意力。颜色/步进全部来自令牌，因此
+   * 11 套预设与亮/暗主题自动成立。 */
+  .surface-grid {
+    position: relative;
+  }
+
+  .surface-grid::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      repeating-linear-gradient(
+        to right,
+        var(--grid-line) 0 1px,
+        transparent 1px var(--grid-step)
+      ),
+      repeating-linear-gradient(
+        to bottom,
+        var(--grid-line) 0 1px,
+        transparent 1px var(--grid-step)
+      );
+    background-position: center center;
+    -webkit-mask-image: radial-gradient(
+      ellipse 72% 72% at 50% 50%,
+      #000 38%,
+      transparent 100%
+    );
+    mask-image: radial-gradient(
+      ellipse 72% 72% at 50% 50%,
+      #000 38%,
+      transparent 100%
+    );
+  }
+
+  .surface-grid > * {
+    position: relative;
+    z-index: 1;
+  }
+
   /* Gradient utilities */
   .bg-radial {
     background-image: radial-gradient(var(--tw-gradient-stops));

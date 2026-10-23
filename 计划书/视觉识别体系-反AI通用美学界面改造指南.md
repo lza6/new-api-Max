@@ -438,7 +438,7 @@ sans 走 `--font-sans: 'Public Sans'`（`styles/theme.css:22`）。后果：字�
 
 ## 7. 任务卡（V0–V13）
 
-> **状态速览（2026-10-22）**：V0 ✅ / V1 ✅ / V2 ✅ / V3 ◐（dashboard 三个消费点已接，keys·wallet·status·channels 待接）/ V4–V13 ⏳
+> **状态速览（2026-10-22）**：V0 ✅ / V1 ✅ / V2 ✅ / V3 ◐（dashboard 三个消费点已接，keys·wallet·status·channels 待接）/ **V7 ✅（空态工程网格，代码与浏览器已验证，待随下一版发版）** / V4·V5·V6·V8–V13 ⏳
 > 已完成项的证据：`CHANGELOG.md [v1.3.182]`、`test_ledger.md`（2026-10-22 段）、
 > `计划书/e2e-evidence/v1.3.182/RESULTS.md`（10 张真实浏览器截图 + axe 0 违规）。
 

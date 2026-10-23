@@ -177,7 +177,7 @@ export function DataTableCardGrid<TData>(props: DataTableCardGridProps<TData>) {
   if (!rows || rows.length === 0) {
     return (
       <div className='rounded-lg border p-6'>
-        <Empty className='border-none p-0'>
+        <Empty className='surface-grid border-none p-0'>
           <EmptyHeader>
             <EmptyMedia variant='icon'>
               {props.emptyIcon ?? <Database className='size-6' />}

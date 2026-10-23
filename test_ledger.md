@@ -503,3 +503,72 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 本轮未触发回滚。
 **未取得**：生产端**浏览器**截图（本机直连该域名的 TLS 被中间设备 RST，见
 `tingfengai-domain-rst-20261010.md`），线上验证以服务器侧 curl + 产物内容核对为准。
+
+---
+
+## 2026-10-23 12:00–12:30 门禁可信度审计（主控会话，真实执行）
+
+> 环境：Windows 本机，go1.26.1，node v25.8.1，bun 1.3.2，vitest 4.1.10，jsdom 29.1.1，**无 docker**。
+
+| 项 | 命令 | 真实结果 |
+|---|---|---|
+| Go 根模块构建 | `go build ./...` | PASS 54.7s（会话开始）；中途因并行会话在改 `setting/response_cache_setting`（11:56）短暂失败，对方改完后复跑 PASS |
+| 前端类型检查 | `cd web && bun run typecheck` | PASS 4.9s |
+| 版本口径门禁 | `node scripts/check-version-consistency.mjs` | 自测 9/9 PASS；对真仓库先报 README 过期，修正后 `RESULT: consistent` |
+| 术语门禁 | `node scripts/check-terminology.mjs` | **假绿已修**：原豁免正则 `/rate\|limit\|concurren/` 命中 `Unlimited` 里的 `limit`；改 `\b(...)\b` 后 RED 4 处 → 修文案后 GREEN 0 |
+| 漏译门禁 | `node scripts/check-missing-i18n.cjs` | 0 missing |
+| i18n 覆盖率门禁 | `node scripts/check-i18n-coverage.cjs` | OK（all locales translated） |
+| 设计令牌门禁 | `node scripts/ds-tokens-check.mjs` | OK（659 tokens，hash 未变） |
+| **knip 死代码门禁** | `node scripts/knip-gate.mjs` | **FAIL(1)**：5 个新死导出（FeatureSwitchKind / FeatureSwitchListData / FeatureSwitchRisk / RelayAuditFinding / IconComponent），来自并行会话在途改动；**未 --update 掩盖** |
+| 前端分片全量 | `cd web && node scripts/test-shards.mjs` | 199 文件→5 片；**948 通过 / 13 失败**（第 1–4 片），第 5 片因下述死循环长期不结束 |
+| 全量单进程 | `bunx vitest run` | **>25 分钟未完成**（P0-2 证据） |
+
+### 本轮定位的关键缺陷：`plan-comparison.test.tsx` 死循环
+
+- 现象：单跑 `src/features/subscriptions/__tests__/plan-comparison.test.tsx` **>6 分钟不结束**，`--testTimeout=30000` 也压不住（不是慢，是循环）。
+- 定位手法：分片 → 二分（40→20→10→5→1）→ 单文件隔离 → **只 import 不 render**（25s 通过，排除 import 死锁）→ 读组件 effect 依赖。
+- 根因：测试 mock `react-i18next` 时用内联箭头 `t: (key) => key`，每次渲染都是新引用；组件 `useCallback([isSignedIn, t])` → `useEffect([loadData])` → `setLoading` 触发重渲染 → **无限循环**。
+- 修复：mock 里的 `t` 提为模块级稳定引用。**>6 分钟 → 2.9 秒**。
+- 修好后暴露 2 个此前被永久遮蔽的真实失败（见下），未削弱断言。
+
+### 当前前端真实失败清单（13 条，均不在本会话改动范围）
+
+| 分片 | 文件 | 失败用例（摘要） |
+|---|---|---|
+| 1 | `features/models/__tests__/metadata-editing.test.tsx` | 价格草稿跨 tab 保留 |
+| 1 | `features/models/__tests__/model-listing.test.tsx` | 3 例：`text-warning` 类名 / 后端方块状态 / 未识别表达式 |
+| 1 | `features/system-settings/__tests__/section-metadata.test.ts` | registry 9 vs 10（新增分区未登记） |
+| 1 | `features/models/components/dialogs/__tests__/bulk-pricing-dialog.test.tsx` | 3 例：找不到 `Model ratio` / `Cache ratio` 标签、`Apply to all selected` 按钮 |
+| 2 | `features/model-pricing/__tests__/editor-layout.test.tsx` | 2 例：固定操作栏保存 |
+| 2 | `features/task-plugins/__tests__/marketplace-install-dialog.test.tsx` | 页脚在受限滚动体之外 |
+| 3 | `features/task-plugins/__tests__/plugin-icon-file.test.ts` | 图标 digest 一致/不一致行为 |
+| 3 | `features/usage-logs/audit/__tests__/viewer.test.tsx` | 每页行数切换后分页重置 |
+| 4 | （4 例，明细待补） | — |
+
+归因：这些文件均属并行会话正在改的模块（models 定价编辑、dashboard 状态卡、task-plugins、usage-logs a11y、system-settings 新区块），本会话只改了 `controller/*.go`、`common/gin.go`、waffo 设置分区、术语脚本、locale 2 个键、脚本与文档。
+
+### 已 PASS 且可引用
+
+- `go test ./common/ -run 'TestApiError|TestLooksInternalError' -v` → 5/5 PASS（含 2 条新增）
+- `go vet ./controller/` → clean；`go test ./controller/ -run 'XXX_NoSuchTest'` → 测试包可编译
+- `bunx vitest run src/i18n/locale-consistency.test.ts` → 2/2 PASS
+- `bunx vitest run src/i18n/__tests__/config-default-language.test.ts` → **4/4 PASS**（原 4 例全红：`vi.stubGlobal('window')` 在 jsdom 29 抛 "Cannot redefine property: window"，改为 spyOn(Storage.prototype) 后修复）
+
+## 2026-10-22 v1.3.182 之后：V7 空态工程网格（待发版）
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 类型 | `cd web && bun run typecheck` | PASS |
+| Lint | `bunx oxlint`（empty-state / ui/empty / table-empty / card-grid / 测试） | 0 error（测试内 `<button>` 缺 type 已修） |
+| 组件测试 | `vitest run src/components/__tests__/empty-state.test.tsx src/components/__tests__/metric.test.tsx` | 11/11 PASS |
+| 浏览器实测（`/keys` 空表） | Playwright evaluate | `[data-slot=empty]` 含 `surface-grid`；`::before` background = `repeating-linear-gradient(...)`（取自 `--grid-line`），mask = `radial-gradient(72% 72% …)`；标题/描述/动作均可见 |
+
+### 🔴 新发现（P1，既有问题，非本批引入）：前端测试基线本身是红的
+
+- 全量并行跑 `bun run test` 时有 **18 个测试文件**失败（chat / model-pricing / models / onboarding /
+  pricing / task-plugins / usage-logs / system-settings / subscriptions）。
+- **对照实验**：在改动前的提交 `6f284de93` 上（`git worktree` + `node_modules` junction）跑同样 18 个文件：
+  **14 个文件失败 / 24 条用例失败**。
+  → 结论：这些失败**不是 v1.3.182 引入的**，是仓库既有状态；CI 的 `bun run test` 门禁目前不可能为绿。
+- 处置：本批**不动**这些测试（不属视觉范围，且禁止为变绿削弱断言）；列为独立待办，
+  需专门一批「测试基线归零」处理。
