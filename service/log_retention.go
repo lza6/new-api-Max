@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/lza6/new-api-Max/common"
+	"github.com/lza6/new-api-Max/model"
 	"github.com/lza6/new-api-Max/setting"
 )
 
@@ -62,10 +63,19 @@ func runLogRetentionOnce() {
 	if days <= 0 {
 		return
 	}
-	target := time.Now().Add(-time.Duration(days) * 24 * time.Hour).Unix()
+	// 目标时间戳取「保留天数前的**本地零点**」，而不是精确的 now-days。
+	//
+	// 用 now-days 的后果（2026-10-24 生产实测）：StartLogRetentionTask 在启动时也会
+	// 立即跑一次，所以每次容器重启都会把边界往后推一点 —— 一晚重启 3 次就把本该保留
+	// 的那一天多删掉了几个小时的数据。改成按本地日期零点计算后，同一天内任意次重启
+	// 得到同一个 target，清理完全幂等。
+	cutoff := model.DayKeyFor(time.Now().AddDate(0, 0, -days).Unix())
+	_, tzOffsetSeconds := time.Now().Zone()
+	target := cutoff - int64(tzOffsetSeconds)
+
 	if _, err := StartLogCleanupTask(target); err != nil {
 		common.SysError("log retention: failed to enqueue cleanup task: " + err.Error())
 		return
 	}
-	common.SysLog("log retention: cleanup enqueued (retain " + strconv.Itoa(days) + " days)")
+	common.SysLog("log retention: cleanup enqueued (retain " + strconv.Itoa(days) + " days, cutoff=" + time.Unix(target, 0).Format("2006-01-02") + ")")
 }

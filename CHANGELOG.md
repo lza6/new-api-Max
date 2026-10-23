@@ -2,6 +2,17 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.195] - 2026-10-23
+
+### Fixed
+- **Log retention was not idempotent across restarts.** `StartLogRetentionTask` runs once
+  immediately at startup, and the cutoff was computed as `now − N days` — so every container
+  restart pushed the boundary forward and deleted a little more. Three restarts in one night
+  (while deploying) removed about two extra hours of the oldest retained day.
+  The cutoff is now the **local midnight N days ago**, so any number of restarts on the same
+  day yield the same target and the cleanup is genuinely idempotent.
+  Found the hard way on 2026-10-24 while validating the summary table.
+
 ## [v1.3.194] - 2026-10-23
 
 ### Fixed
