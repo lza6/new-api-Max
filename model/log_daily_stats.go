@@ -105,6 +105,13 @@ func RefreshLogDailyStats(days int) error {
 	if common.UsingLogDatabase(common.DatabaseTypeClickHouse) {
 		return nil
 	}
+	// 兜底建表：不能只依赖 migrateLOGDB 那条路径。2026-10-23 生产实测：启动日志
+	// 打印了 "database migration started"，但 log_daily_stats 并未被创建（同批的
+	// migrateLogTrafficIndex 也没生效，死索引还留在库里）。AutoMigrate 幂等、表很窄，
+	// 放在使用点最可靠——建不出来就直接报错，而不是让统计静默退回全表扫描。
+	if err := LOG_DB.AutoMigrate(&LogDailyStat{}); err != nil {
+		return fmt.Errorf("ensure log_daily_stats table: %w", err)
+	}
 	if days <= 0 {
 		days = 2
 	}
