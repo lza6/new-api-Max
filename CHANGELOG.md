@@ -2,6 +2,24 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.193] - 2026-10-23
+
+### Fixed
+- **Session-expiry redirect dropped the language prefix.** `http-client.ts` replaced the
+  location with a bare `/sign-in`, so `/en`、`/ja`、`/fr` users landed on the unprefixed
+  (Chinese) login page and lost `returnTo`. Extracted `signInRedirectTarget` and covered it
+  with 5 unit cases.
+- **zod still shipped in the entry bundle.** The earlier assumption ("30 routes import zod")
+  was wrong: TanStack Router's `autoCodeSplitting` keeps each route's `validateSearch` in
+  the entry sync graph, so zod rode along in a shared chunk (253 KB). Splitting it into its
+  own cacheGroup was measured to **not** help. The 13 route search schemas are now
+  zero-dependency validators (validation preserved; form-level zod untouched).
+  Initial JS 1,088,386 B → 1,015,589 B (gzip −20 KB).
+- **13 hardcoded English `aria-label` / `placeholder` values** are now `t()`-keyed, with 8
+  new keys across 7 locales (`breadcrumb` / `pagination` kept as WAI-ARIA landmark names).
+- **Table search/filter wrote one history entry per keystroke.** Now `replace: true`;
+  pagination keeps its original semantics.
+
 ## [v1.3.192] - 2026-10-23
 
 ### Added
