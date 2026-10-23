@@ -4,8 +4,8 @@
 
 | 项 | 值 | 校验命令 |
 |---|---|---|
-| 线上版本 | `v1.3.187`（`VERSION` 已升到 v1.3.188，**部署待执行**） | `ssh ... 'docker ps --format "{{.Image}}"'` |
-| 部署时间 | 2026-10-23 17:53（蓝绿，Caddy 上游 **3001**） | `grep -oE "127.0.0.1:300[0-9]" /etc/caddy/Caddyfile \| head -1` |
+| 线上版本 | `v1.3.188` | `ssh ... 'docker ps --format "{{.Image}}"'` |
+| 部署时间 | 2026-10-23 20:14（蓝绿，Caddy 上游 **3001**，耗时 26.6s 零停机） | `grep -oE "127.0.0.1:300[0-9]" /etc/caddy/Caddyfile \| head -1` |
 | 容器资源 | new-api 1500m/swap2400m/2core/GOMEMLIMIT=1024MiB；postgres 1200m/shared_buffers 256MB；redis 192m/maxmemory 128mb | `docker inspect new-api --format "{{.HostConfig.Memory}}"` |
 | 代码 SHA | `git rev-parse origin/main` | `git log origin/main -1` |
 | 回滚镜像 | `new-api:v1.3.186`（保留最近 4 个版本：184/185/186/187） | `docker images new-api` |
@@ -522,8 +522,8 @@
 
 | ID | 优先级 | 事项 | 阻塞原因 |
 |---|---|---|---|
-| E-1 | **P0** | 部署 v1.3.188（本轮全部代码修复尚未上线） | SSH 被 fail2ban 封禁（见 §F） |
-| E-2 | P0 | 生产删除死索引 `idx_logs_traffic`（60MB，`migrateLogTrafficIndex` 因 master 判定/时序未生效） | 同上 |
+| E-1 | ~~**P0** 部署 v1.3.188~~ | **已完成** 2026-10-23 20:14 蓝绿部署，端口 3001，26.6s 零停机 | 外网 20/20=200、版本头 v1.3.188、近 10min 0 个 5xx |
+| E-2 | ~~P0 删除死索引 `idx_logs_traffic`~~ | **已完成** `DROP INDEX CONCURRENTLY` 成功 | 索引列表已无该项 |
 | E-3 | P0 | SSH 改密钥登录 + 关密码登录（24h 16867 次撞库） | **需用户提供公钥**，否则锁死 |
 | E-4 | P1 | logs 保留策略（现 184 万行 / 42 天 / 3.5GB，`StartLogCleanupTask` 存在但无定时触发） | 删除数据属不可逆，**需用户定保留天数** |
 | E-5 | P1 | `/api/log/report` 六个维度的全窗口聚合（`model/usage_report.go`） | 分组列（channel/user/group/token）不在覆盖索引里，需评估是否再加索引 |
