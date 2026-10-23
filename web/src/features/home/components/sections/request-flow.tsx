@@ -179,7 +179,7 @@ function FlowDiagram(props: { demo: EndpointDemo }) {
               <div key={item.label} className='relative flex flex-col items-center gap-2.5 text-center'>
                 <span
                   className={cn(
-                    'flex size-10 items-center justify-center rounded-full border text-xs font-semibold tabular-nums transition-all duration-500',
+                    'flex size-10 items-center justify-center rounded-full border text-xs font-semibold tabular-nums transition-quiet duration-500',
                     reached
                       ? `${tone.activeRing} ${tone.activeText}`
                       : 'border-border/50 text-muted-foreground/50'

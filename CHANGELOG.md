@@ -2,6 +2,42 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.186] - 2026-10-22
+
+Visual identity batch 3 — motion rule, `ink` structural preset, visual baseline, preset contrast fix (视觉体系 V8/V12/V13).
+
+### Added
+- **`.transition-quiet`** utility + project-wide replacement of `transition-all` (41 sites, 25
+  files). The new class animates only paint/composite properties (color, background, border,
+  fill, stroke, opacity, box-shadow, transform, translate, scale) with `--motion-fast` and
+  `--ease-quiet`; layout properties can no longer be animated by accident. The progress bar
+  keeps an explicit `transition-[width]` because a smooth progress fill is intended behaviour.
+- **`ink` preset** (D4): graphite neutrals + a single signal colour, and the first *structural*
+  preset — `PRESET_DEFAULT_RADIUS` / `PRESET_DEFAULT_SCALE` tighten radius and density while
+  `resolveThemeRadius` / `resolveThemeScale` guarantee an explicit user choice always wins.
+- **`web/e2e-local/visual-baseline.cjs`** (V12): one command captures pages × breakpoints ×
+  presets × light/dark and writes `results.json` plus per-page axe results, so the visual layer
+  has a repeatable gate instead of ad-hoc screenshots.
+
+### Fixed
+- **`anthropic` preset failed WCAG AA**: white text on the original clay primary measured
+  **2.9:1**. The primary is now `oklch(0.57 0.128 38)` (same hue, darker) — 0 contrast
+  violations in light and dark, verified with axe on `/keys` and `/dashboard/overview`.
+
+### Verified
+- `bun run typecheck` PASS · `bun run build` PASS · `vitest` on lib/components/dashboard
+  **163/163 PASS** across 24 files (incl. new theme-customization resolver tests, 6 cases).
+- Preset contrast sweep (axe `color-contrast`, `/keys` + `/dashboard/overview` × 11 presets):
+  **all 0 violations** after the anthropic fix (before: anthropic 1 node on both pages).
+- Visual baseline run: 18 screenshots (2 pages × 3 presets × 2 widths + dark), axe 0 violations
+  on `default` and `ink`, 1 benign console 401 before login.
+
+### Not done (tracked in test_ledger.md)
+- V4b numeric column alignment, V5 remaining `bg-*-50` backlog, V6b `--chart-N` token unification,
+  V9–V11 page-by-page coverage.
+- The frontend suite still has the pre-existing red files documented in `test_ledger.md`
+  (proven to fail on `6f284de93` as well).
+
 ## [v1.3.185] - 2026-10-22
 
 Visual identity batch 2 — table micro-labels, tokenised status colours, single-hue chart ramp (视觉体系 V4/V5/V6).

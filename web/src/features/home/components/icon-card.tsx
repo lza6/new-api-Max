@@ -34,7 +34,7 @@ export function IconCard({ iconName, size = 32, className }: IconCardProps) {
       className={cn(
         'glass-morphism group/card border-border/50 dark:border-border/20',
         'relative overflow-hidden rounded-2xl border p-5',
-        'transition-all duration-500 hover:scale-105',
+        'transition-quiet duration-500 hover:scale-105',
         className
       )}
     >

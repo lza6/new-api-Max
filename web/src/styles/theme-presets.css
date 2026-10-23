@@ -505,7 +505,9 @@ For commercial licensing, please contact support@quantumnous.com
   --popover-foreground: oklch(0.205 0.005 60);
 
   /* Clay/coral — Anthropic's signature accent, used scarcely on CTAs. */
-  --primary: oklch(0.685 0.142 38); /* ≈ #d97757 */
+  /* 视觉体系：品牌陶土色在原始亮度（L .685）下与白字仅 2.9:1，达不到 WCAG AA。
+   * 压到 L .57（同色相同彩度附近）后白字 ≥4.5:1，观感仍是陶土。 */
+  --primary: oklch(0.57 0.128 38); /* 加深版陶土，白字达 AA */
   --primary-foreground: oklch(0.99 0.005 95);
 
   --secondary: oklch(0.925 0.008 92);
@@ -610,6 +612,64 @@ For commercial licensing, please contact support@quantumnous.com
 
   --skeleton-base: oklch(0.305 0.004 60);
   --skeleton-highlight: oklch(0.41 0.004 60);
+}
+
+/* ── Ink ─────────────────────────────────────────────────────────────── */
+/* 视觉体系 D4：石墨中性 + 单一信号色。这是唯一一套**结构差异套**预设：
+ * PRESET_DEFAULT_RADIUS / PRESET_DEFAULT_SCALE 会把圆角收到 sm、密度收到 sm，
+ * 但用户在外观抽屉里的显式选择永远覆盖它（见 resolveThemeRadius/Scale）。
+ * 颜色只做中性阶梯，强调色仅出现在可操作/当前/异常三处。 */
+[data-theme-preset='ink'] {
+  --background: oklch(0.985 0 0); /* paper */
+  --foreground: oklch(0.185 0 0); /* ink */
+  --card: oklch(0.972 0 0);
+  --card-foreground: oklch(0.185 0 0);
+  --popover: oklch(0.99 0 0);
+  --popover-foreground: oklch(0.185 0 0);
+
+  /* 单一信号色：石墨近黑，白字对比 12:1+ */
+  --primary: oklch(0.32 0.006 250);
+  --primary-foreground: oklch(0.985 0 0);
+
+  --secondary: oklch(0.94 0 0);
+  --secondary-foreground: oklch(0.28 0 0);
+  --muted: oklch(0.955 0 0);
+  --muted-foreground: oklch(0.5 0 0);
+  --accent: oklch(0.93 0 0);
+  --accent-foreground: oklch(0.185 0 0);
+
+  --destructive: oklch(0.55 0.19 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --success: oklch(0.56 0.13 160);
+  --success-text: oklch(0.45 0.11 160);
+  --success-foreground: oklch(0.985 0 0);
+  --warning: oklch(0.7 0.15 78);
+  --warning-text: oklch(0.5 0.12 78);
+  --warning-foreground: oklch(0.185 0 0);
+  --info: oklch(0.55 0.13 245);
+  --info-foreground: oklch(0.985 0 0);
+  --neutral: oklch(0.7 0 0);
+  --neutral-foreground: oklch(0.185 0 0);
+
+  --border: oklch(0.9 0 0);
+  --input: oklch(0.9 0 0);
+  --ring: oklch(0.45 0.02 250);
+
+  /* 图表序列：同色相石墨阶（文字用途时最深一档仍有足够对比） */
+  --chart-1: oklch(0.32 0.006 250);
+  --chart-2: oklch(0.42 0.006 250);
+  --chart-3: oklch(0.52 0.006 250);
+  --chart-4: oklch(0.62 0.006 250);
+  --chart-5: oklch(0.72 0.006 250);
+
+  --sidebar: oklch(0.975 0 0);
+  --sidebar-foreground: oklch(0.185 0 0);
+  --sidebar-primary: oklch(0.32 0.006 250);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.93 0 0);
+  --sidebar-accent-foreground: oklch(0.185 0 0);
+  --sidebar-border: oklch(0.9 0 0);
+  --sidebar-ring: oklch(0.45 0.02 250);
 }
 
 /* ── Font axis ────────────────────────────────────────────────────────────

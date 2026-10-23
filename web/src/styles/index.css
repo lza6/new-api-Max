@@ -321,6 +321,16 @@ For commercial licensing, please contact support@quantumnous.com
     z-index: 1;
   }
 
+  /* 视觉体系 §5.2 红线：禁止 transition-all（会连带 width/height/top/left 等布局属性）。
+   * 需要多属性过渡时用这个类：只含绘制与合成属性，时长/曲线走令牌。 */
+  .transition-quiet {
+    transition-property:
+      color, background-color, border-color, fill, stroke, opacity, box-shadow,
+      transform, translate, scale;
+    transition-duration: var(--motion-fast);
+    transition-timing-function: var(--ease-quiet);
+  }
+
   /* Gradient utilities */
   .bg-radial {
     background-image: radial-gradient(var(--tw-gradient-stops));

@@ -176,7 +176,7 @@ export function DataTableBulkActions<TData>({
         onKeyDown={handleKeyDown}
         className={cn(
           placement === 'floating'
-            ? 'fixed bottom-6 left-1/2 z-50 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl transition-all delay-100 duration-300 ease-out hover:scale-105'
+            ? 'fixed bottom-6 left-1/2 z-50 w-max max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl transition-quiet delay-100 duration-300 ease-out hover:scale-105'
             : 'shrink-0 rounded-xl',
           'focus-visible:ring-ring/50 focus-visible:ring-2 focus-visible:outline-none'
         )}

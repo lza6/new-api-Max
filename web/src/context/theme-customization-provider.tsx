@@ -31,6 +31,8 @@ import {
   type ContentLayout,
   DEFAULT_THEME_CUSTOMIZATION,
   resolveThemeFont,
+  resolveThemeRadius,
+  resolveThemeScale,
   THEME_COOKIE_KEYS,
   THEME_FONT_VALUES,
   THEME_PRESET_VALUES,
@@ -152,19 +154,15 @@ export function ThemeCustomizationProvider(props: {
     applyAttribute('data-theme-font', resolveThemeFont(font, preset))
   }, [font, preset])
 
+  // radius/scale also resolve against preset hints (visual blueprint D4): a
+  // `default` preference defers to the preset, an explicit pick always wins.
   useEffect(() => {
-    applyAttribute(
-      'data-theme-radius',
-      radius === DEFAULT_THEME_CUSTOMIZATION.radius ? null : radius
-    )
-  }, [radius])
+    applyAttribute('data-theme-radius', resolveThemeRadius(radius, preset))
+  }, [radius, preset])
 
   useEffect(() => {
-    applyAttribute(
-      'data-theme-scale',
-      scale === DEFAULT_THEME_CUSTOMIZATION.scale ? null : scale
-    )
-  }, [scale])
+    applyAttribute('data-theme-scale', resolveThemeScale(scale, preset))
+  }, [scale, preset])
 
   useEffect(() => {
     applyAttribute('data-theme-content-layout', contentLayout)

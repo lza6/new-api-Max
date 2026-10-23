@@ -438,7 +438,7 @@ sans 走 `--font-sans: 'Public Sans'`（`styles/theme.css:22`）。后果：字�
 
 ## 7. 任务卡（V0–V13）
 
-> **状态速览（2026-10-22）**：V0 ✅ / V1 ✅ / V2 ✅ / V3 ◐（dashboard 三个消费点已接，keys·wallet·status·channels 待接）/ **V7 ✅（空态工程网格）** / **V4 ◐（表头微标签+表框已做，数字列右对齐待 V4b）** / **V5 ◐（Alert 语义变体+2 处热点已令牌化，存量待清）** / **V6 ◐（dashboard 单色序列阶已接，chart 令牌与其余图表待 V6b）** / V8–V13 ⏳
+> **状态速览（2026-10-22）**：V0 ✅ / V1 ✅ / V2 ✅ / V3 ◐（dashboard 已接，其余页面待接）/ V4 ◐（表头+表框已做，数字列右对齐待 V4b）/ V5 ◐（Alert 变体+2 热点，存量待清）/ V6 ◐（dashboard 单色阶，chart-N 令牌待 V6b）/ V7 ✅ / **V8 ✅（transition-all 清零 + .transition-quiet）** / **V12 ✅（visual-baseline.cjs 可重跑）** / **V13 ✅（ink 结构差异套）** / V9·V10·V11 ⏳
 > 已完成项的证据：`CHANGELOG.md [v1.3.182]`、`test_ledger.md`（2026-10-22 段）、
 > `计划书/e2e-evidence/v1.3.182/RESULTS.md`（10 张真实浏览器截图 + axe 0 违规）。
 
@@ -669,3 +669,4 @@ sans 走 `--font-sans: 'Public Sans'`（`styles/theme.css:22`）。后果：字�
 | 2026-10-22 | 初版：基线 v1.3.181 / 提交 `83e67f270`；三方向取舍；令牌提案；V1–V12 任务卡；6 项待拍板 | 本轮只读审计命令见 §0.3 |
 | 2026-10-22 | **D1–D6 全部拍板并入册**：方向 A、圆角 0.625rem、引入 JetBrains Mono、`ink` 结构差异套、删除 `fonts.ts`、范围=控制台+落地页 token 对齐；新增 V0/V13 任务卡、R8 风险、§3.5 扩为 11 套预设矩阵、§8 拆出 v1.3.188/189 | 业主拍板（AskUserQuestion Q1–Q7） |
 | 2026-10-22 | **v1.3.182 交付（V0+V1+V2+V3◐）**：令牌层落地、`--radius` 收敛、`font-numeric` 等宽数字、`Card.tone`、`Metric` 组件、dashboard 试点（rounded-2xl 归零）；本地真实浏览器 E2E 10 图 + axe 0 违规 | `CHANGELOG.md [v1.3.182]`、`test_ledger.md`、`计划书/e2e-evidence/v1.3.182/` |
+| 2026-10-22 | **v1.3.186 交付（V8+V12+V13）**：`transition-all` 全库清零改 `.transition-quiet`；新增 `ink` 石墨结构差异套预设（半径/密度提示 + 用户显式选择优先）；`e2e-local/visual-baseline.cjs` 可重跑基线；修 `anthropic` 预设白字 on 陶土 2.9:1 的 AA 违规 | `CHANGELOG.md [v1.3.186]`、`test_ledger.md`、`计划书/e2e-evidence/v1.3.186/` |

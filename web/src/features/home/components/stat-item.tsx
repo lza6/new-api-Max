@@ -37,7 +37,7 @@ export function StatItem({ value, suffix, description }: StatItemProps) {
         <div
           className={cn(
             GRADIENT_TEXT,
-            'text-4xl drop-shadow-sm transition-all duration-300 sm:text-5xl md:text-6xl'
+            'text-4xl drop-shadow-sm transition-quiet duration-300 sm:text-5xl md:text-6xl'
           )}
         >
           {value}

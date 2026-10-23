@@ -38,6 +38,13 @@ export const THEME_PRESETS = [
     swatches: ['oklch(0.984 0.005 95)', 'oklch(0.685 0.142 38)'],
   },
   {
+    // 视觉体系 D4：石墨中性 + 单一信号色，并作为**结构差异套**（更紧的圆角与
+    // 密度，见 PRESET_DEFAULT_RADIUS / PRESET_DEFAULT_SCALE）。
+    value: 'ink',
+    name: 'Ink',
+    swatches: ['oklch(0.32 0.006 250)', 'oklch(0.985 0 0)'],
+  },
+  {
     value: 'simple-large',
     name: 'Simple Large-font',
     swatches: ['oklch(0.15 0 0)', 'oklch(0.99 0 0)'],
@@ -194,4 +201,44 @@ export function resolveThemeFont(
     return PRESET_DEFAULT_FONT[preset] ?? 'sans'
   }
   return font
+}
+
+/**
+ * Preset → default radius / density hints. Mirrors `PRESET_DEFAULT_FONT`:
+ * the user's `default` preference defers to the active preset, while an
+ * explicit choice always wins. Only deliberately structural presets (`ink`)
+ * set these; everything else keeps the project defaults.
+ */
+export const PRESET_DEFAULT_RADIUS: Partial<
+  Record<ThemePreset, Exclude<ThemeRadius, 'default'>>
+> = {
+  ink: 'sm',
+}
+
+export const PRESET_DEFAULT_SCALE: Partial<
+  Record<ThemePreset, Exclude<ThemeScale, 'default'>>
+> = {
+  ink: 'sm',
+}
+
+/** Resolve the radius attribute value for the active preset. */
+export function resolveThemeRadius(
+  radius: ThemeRadius,
+  preset: ThemePreset
+): ThemeRadius {
+  if (radius === 'default') {
+    return PRESET_DEFAULT_RADIUS[preset] ?? 'default'
+  }
+  return radius
+}
+
+/** Resolve the density attribute value for the active preset. */
+export function resolveThemeScale(
+  scale: ThemeScale,
+  preset: ThemePreset
+): ThemeScale {
+  if (scale === 'default') {
+    return PRESET_DEFAULT_SCALE[preset] ?? 'default'
+  }
+  return scale
 }

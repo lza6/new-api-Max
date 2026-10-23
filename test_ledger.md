@@ -646,3 +646,22 @@ React 接管后 `#root` 会短暂为空 → 冷启动时误报「白屏」。改
 **回滚点**：`new-api:v1.3.184`（`./deploy-zero-downtime.sh v1.3.184`）。本轮未触发回滚。
 **注**：本次部署的 HEAD 同时包含并行工作流的 v1.3.183/184（策略中心、语义缓存、i18n 门禁、
 策略中心文本域上限）；那部分后端行为不在本会话的验证范围内，线上仅确认健康检查/接口/日志无错。
+
+## 2026-10-22 v1.3.186 视觉批次 3（V8 动效 / V12 基线 / V13 ink 预设 / 预设对比度修复）
+
+| 验证 | 命令 | 结果 |
+|---|---|---|
+| 类型 | `cd web && bun run typecheck` | PASS |
+| 单测 | `vitest run src/lib/__tests__ src/components/__tests__ src/components/ui src/features/dashboard` | **163/163 PASS / 24 files** |
+| 构建 | `bun run build` | PASS（24574.3 kB） |
+| 动效红线 | 全库 `rg "transition-all"` | **0 命中**（41 处换 `.transition-quiet`；进度条保留显式 `transition-[width]`） |
+| 预设对比度扫描 | axe `color-contrast`，`/keys` + `/dashboard/overview` × 11 预设 | 修复前：anthropic 2 页各 1 节点（白字 on `#e37756` = **2.9:1**）；修复后：**全部 0** |
+| 视觉基线脚本 | `BASE=… PAGES=… PRESETS=default,anthropic,ink WIDTHS=1440,320 node e2e-local/visual-baseline.cjs` | 18 张截图 + `results.json`；axe 0（default/ink），1 条登录前 401 console |
+| ink 预设 | 浏览器实测 + 截图 | 石墨中性 + 黑色主按钮，圆角/密度收至 `sm`；`/keys`、概览均 0 违规 |
+| 解析契约 | `vitest src/lib/__tests__/theme-customization.test.ts` | 6/6 PASS（预设提示生效、用户显式选择永远赢） |
+
+**事故与修复（如实记录）**：清理临时 `git worktree` 时用 `cmd rmdir /S` 删掉了指向
+`web/node_modules` 的 junction，**连带删除了真实 node_modules 的 `.bin` 等文件**（typecheck 报
+`bun: command not found: tsgo`）。处置：`bun install --frozen-lockfile` 恢复（240 包重装），随后
+typecheck / 163 条测试 / build 全部重新通过。教训：Windows 上删除含 junction 的目录必须
+`rmdir` 目录本身而不是 `/S` 递归，或先 `rm junction`。

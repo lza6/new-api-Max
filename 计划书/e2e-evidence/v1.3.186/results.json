@@ -1,0 +1,185 @@
+{
+  "base": "http://127.0.0.1:5173",
+  "startedAt": "2026-10-23T05:21:28.933Z",
+  "presets": [
+    "default",
+    "anthropic",
+    "ink"
+  ],
+  "widths": [
+    1440,
+    320
+  ],
+  "shots": [
+    {
+      "page": "dashboard-overview",
+      "preset": "default",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-1440-default-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "default",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-320-default-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "default",
+      "width": 1440,
+      "theme": "dark",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-1440-default-dark.png"
+    },
+    {
+      "page": "keys",
+      "preset": "default",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-1440-default-light.png"
+    },
+    {
+      "page": "keys",
+      "preset": "default",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-320-default-light.png"
+    },
+    {
+      "page": "keys",
+      "preset": "default",
+      "width": 1440,
+      "theme": "dark",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-1440-default-dark.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "anthropic",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-1440-anthropic-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "anthropic",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-320-anthropic-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "anthropic",
+      "width": 1440,
+      "theme": "dark",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-1440-anthropic-dark.png"
+    },
+    {
+      "page": "keys",
+      "preset": "anthropic",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-1440-anthropic-light.png"
+    },
+    {
+      "page": "keys",
+      "preset": "anthropic",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-320-anthropic-light.png"
+    },
+    {
+      "page": "keys",
+      "preset": "anthropic",
+      "width": 1440,
+      "theme": "dark",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-1440-anthropic-dark.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "ink",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-1440-ink-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "ink",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-320-ink-light.png"
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "ink",
+      "width": 1440,
+      "theme": "dark",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\dashboard-overview-1440-ink-dark.png"
+    },
+    {
+      "page": "keys",
+      "preset": "ink",
+      "width": 1440,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-1440-ink-light.png"
+    },
+    {
+      "page": "keys",
+      "preset": "ink",
+      "width": 320,
+      "theme": "light",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-320-ink-light.png"
+    },
+    {
+      "page": "keys",
+      "preset": "ink",
+      "width": 1440,
+      "theme": "dark",
+      "file": "C:\\Users\\Administrator.DESKTOP-EGNE9ND\\Desktop\\公益服务网关\\new-api\\web\\e2e-local\\visual-baseline\\keys-1440-ink-dark.png"
+    }
+  ],
+  "axe": [
+    {
+      "page": "dashboard-overview",
+      "preset": "default",
+      "violations": []
+    },
+    {
+      "page": "keys",
+      "preset": "default",
+      "violations": []
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "anthropic",
+      "violations": []
+    },
+    {
+      "page": "keys",
+      "preset": "anthropic",
+      "violations": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "nodes": 9
+        }
+      ]
+    },
+    {
+      "page": "dashboard-overview",
+      "preset": "ink",
+      "violations": []
+    },
+    {
+      "page": "keys",
+      "preset": "ink",
+      "violations": []
+    }
+  ],
+  "afterLoginUrl": "http://127.0.0.1:5173/dashboard/overview",
+  "finishedAt": "2026-10-23T05:22:42.103Z",
+  "consoleErrors": [
+    "Failed to load resource: the server responded with a status of 401 (Unauthorized)"
+  ],
+  "axeViolationTotal": 1
+}

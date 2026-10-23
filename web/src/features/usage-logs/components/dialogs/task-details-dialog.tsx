@@ -104,7 +104,7 @@ export function TaskStructuredProgressRow(props: {
         aria-valuenow={percent}
       >
         <div
-          className='bg-primary h-full transition-all'
+          className='bg-primary h-full transition-quiet'
           style={{ width: `${percent}%` }}
         />
       </div>
