@@ -4,8 +4,8 @@
 
 | 项 | 值 | 校验命令 |
 |---|---|---|
-| 线上版本 | 镜像 `v1.3.190`（自报 `v1.3.189`——打 tag 时漏改 VERSION，下次构建修正） | `ssh ... 'docker ps --format "{{.Image}}"'` |
-| 部署时间 | 2026-10-23 21:36（蓝绿，Caddy 上游 **3001**，零停机） | `grep -oE "127.0.0.1:300[0-9]" /etc/caddy/Caddyfile \| head -1` |
+| 线上版本 | `v1.3.192` | `ssh ... 'docker ps --format "{{.Image}}"'` |
+| 部署时间 | 2026-10-23 23:52（蓝绿，Caddy 上游 **3001**，零停机） | `grep -oE "127.0.0.1:300[0-9]" /etc/caddy/Caddyfile \| head -1` |
 | 容器资源 | new-api 1500m/swap2400m/2core/GOMEMLIMIT=1024MiB；postgres 1200m/shared_buffers 256MB；redis 192m/maxmemory 128mb | `docker inspect new-api --format "{{.HostConfig.Memory}}"` |
 | 代码 SHA | `git rev-parse origin/main` | `git log origin/main -1` |
 | 回滚镜像 | `new-api:v1.3.186`（保留最近 4 个版本：184/185/186/187） | `docker images new-api` |

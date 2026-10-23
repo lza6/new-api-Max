@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>变更报告 · 2026-10-23 · 日志统计根治与事故闭环</title>
+<style>
+  :root{
+    --bg:#0f1115; --surface:#171a21; --surface2:#1e222b; --line:#2a2f3a;
+    --fg:#e6e8ee; --muted:#9aa3b2; --accent:#6ea8fe; --ok:#4ade80; --warn:#fbbf24; --bad:#f87171;
+    --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.7 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif}
+  .wrap{max-width:960px;margin:0 auto;padding:48px 24px 96px}
+  h1{font-size:30px;line-height:1.25;margin:0 0 8px;letter-spacing:-.02em}
+  .sub{color:var(--muted);margin:0 0 40px;font-size:14px}
+  h2{font-size:19px;margin:44px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+  h3{font-size:15px;margin:24px 0 8px;color:var(--accent)}
+  p{margin:10px 0}
+  code{font-family:var(--mono);font-size:.88em;background:var(--surface2);padding:2px 6px;border-radius:4px;color:#c8d3f5}
+  pre{font-family:var(--mono);font-size:12.5px;background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:14px 16px;overflow-x:auto;line-height:1.6}
+  pre code{background:none;padding:0}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:13.5px}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted);font-weight:600;font-size:12.5px;text-transform:uppercase;letter-spacing:.04em}
+  tr:last-child td{border-bottom:none}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px 20px;margin:16px 0}
+  .pill{display:inline-block;font-size:11.5px;padding:2px 9px;border-radius:999px;font-weight:600;letter-spacing:.02em}
+  .p0{background:#4a1d21;color:#ff9ba1} .p1{background:#4a3a1d;color:#ffd68a}
+  .p2{background:#1d3a4a;color:#8ed0ff} .ok{background:#1d3a26;color:#8ef0b0}
+  .flow{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0;font-size:13px}
+  .node{background:var(--surface2);border:1px solid var(--line);border-radius:8px;padding:9px 14px}
+  .arrow{color:var(--muted)}
+  .quiz{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:20px;margin:14px 0}
+  .quiz label{display:block;padding:7px 10px;margin:4px 0;border-radius:6px;cursor:pointer;border:1px solid transparent}
+  .quiz label:hover{background:var(--surface2)}
+  .quiz label.sel{border-color:var(--accent)}
+  .qres{font-size:13px;margin-top:10px}
+  button{background:var(--accent);color:#0b1020;border:0;border-radius:7px;padding:9px 18px;font-weight:700;cursor:pointer;font-size:13.5px}
+  button:hover{filter:brightness(1.1)}
+  .score{font-size:16px;font-weight:700;margin-top:14px}
+  details{margin:10px 0}
+  summary{cursor:pointer;color:var(--accent);font-size:13.5px}
+  .muted{color:var(--muted)}
+  hr{border:0;border-top:1px solid var(--line);margin:36px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>变更报告 · 2026-10-23</h1>
+<p class="sub">日志统计从「对症」走到「根治」，以及一次生产 OOM 事故的完整闭环 · v1.3.187 → v1.3.192</p>
+
+<h2>1. 上下文：为什么会做这一批</h2>
+<p>2026-10-23 09:03 / 09:05 UTC，生产 PostgreSQL 两次被 OOM killer 杀掉后端进程，触发崩溃恢复，<strong>统计信息被清空</strong>。09:05–09:06（本地 17:05–17:06）产生 <strong>147 个 503</strong>，用户反馈「服务器炸了、用不了」。</p>
+<p>元凶是一条从 Postgres 日志里捞出来的 SQL：</p>
+<pre><code>SELECT (created_at + 28800) / 86400 AS day_key, COUNT(*) AS requests,
+       COALESCE(SUM(request_bytes),0) + COALESCE(SUM(response_bytes),0) AS bytes
+FROM "logs" WHERE type='2' AND created_at >= '&lt;30天前&gt;'
+GROUP BY day_key ORDER BY day_key ASC</code></pre>
+<p>执行计划是 <code>Parallel Seq Scan on logs</code>，扫描 2642MB 堆表，实测 <strong>18.1 秒</strong>。容器只有 256MB 内存，page cache 被灌满后撞 cgroup 上限 → OOM。</p>
+
+<h2>2. 直觉与关键取舍</h2>
+<div class="card">
+<h3>取舍一：先止血，还是先根治？</h3>
+<p>止血（加内存、关 JIT、改成本模型）能让今天的故障不再复现；根治（预聚合）才能让它明年也不复现。但根治要改数据链路，风险高。决定：<strong>先止血并验证，再在稳定的基础上做根治</strong>——因为如果在内存仍然吃紧的库上做 DDL 和回填，等于在漏水的船上换发动机。</p>
+</div>
+<div class="card">
+<h3>取舍二：预聚合为什么只做 <code>total</code> 和 <code>by-model</code>？</h3>
+<p>维度值必须是<strong>字符串</strong>。数字维度（channel/user）要 <code>CAST</code>，而 PG 是 <code>::text</code>、MySQL 是 <code>CAST AS CHAR</code>、SQLite 是 <code>CAST AS TEXT</code>——一旦引入方言分支，三库兼容就成了长期负担。所以只做字符串维度，牺牲六维报表的覆盖，换取「一套 SQL 三库通吃」。</p>
+</div>
+<div class="card">
+<h3>取舍三：为什么「删窗口 + 重插」而不是 UPSERT？</h3>
+<p>GORM 的 <code>OnConflict</code> 在 MySQL 上曾渲染出空子句（<code>ON DUPLICATE KEY UPDATE</code> 后面什么都没有，直接 1064）。删+插在三库行为一致、容易推理，且窗口很小（2 天 × 2 维）。</p>
+</div>
+
+<h2>3. 做了什么</h2>
+
+<h3>3.1 代码修复（5 个真实缺陷，均有 RED→GREEN 或定向测试）</h3>
+<table>
+<tr><th>级别</th><th>缺陷</th><th>后果</th><th>证据</th></tr>
+<tr><td><span class="pill p1">P1</span></td><td>模型限流 Redis 出错直接 <code>abort 500</code></td><td>管理员一开 <code>ModelRequestRateLimitEnabled</code>，Redis 抖动即让全部 <code>/v1/*</code> 500，而 <code>/api/status</code> 仍 200 → 探针继续导流，复刻 2026-09-29 全站事故</td><td><code>go test ./middleware/</code> ok 9.3s，新增 2 用例</td></tr>
+<tr><td><span class="pill p1">P1</span></td><td>tiered 结算无 <code>cost&lt;0</code> 守卫</td><td>缓存折扣项超过本金时表达式转负，经 <code>SettleBilling</code> 走 <code>IncreaseUserQuota</code>——<strong>每命中一次缓存反而给用户返额度</strong></td><td>RED 实测 <code>-3000</code> → GREEN <code>0</code></td></tr>
+<tr><td><span class="pill p1">P1</span></td><td>负数页码 → 负 OFFSET</td><td><code>GetPageQuery</code> 把负数原样放行，PG/MySQL 报 <code>OFFSET must not be negative</code>，<code>/api/log/</code> 500</td><td>新增 2 用例，<code>common</code> 全量绿</td></tr>
+<tr><td><span class="pill p1">P1</span></td><td>日键用 <code>x / 86400</code></td><td>MySQL 的 <code>/</code> 是小数除法，结果扫不进 int64；日流量/带宽排行在 MySQL 上挂</td><td>线上逐行验证新旧写法 <code>same=t</code></td></tr>
+<tr><td><span class="pill p1">P1</span></td><td>任意 500 就 <code>navigate('/500')</code></td><td>后台轮询偶发 500 把用户从抽屉/表单里踢出，未保存输入丢失</td><td>新增用例，该文件 22/22</td></tr>
+</table>
+
+<h3>3.2 生产加固</h3>
+<table>
+<tr><th>项</th><th>之前</th><th>之后</th></tr>
+<tr><td>Postgres 容器</td><td>256MB，<code>shared_buffers</code> 32MB，JIT on，cost 模型是机械盘</td><td>1200MB，<code>shared_buffers</code> 256MB，JIT off，<code>random_page_cost</code> 1.1，<code>shm_size</code> 256m</td></tr>
+<tr><td>new-api 容器</td><td>900MB / GOMEMLIMIT 512MiB</td><td>1500MB / GOMEMLIMIT 1024MiB / 2 core</td></tr>
+<tr><td>Caddy 健康检查</td><td>2s / 2s / fails 3（6 秒抖动就判死）</td><td>5s / 5s / fails 3（15 秒容忍）</td></tr>
+<tr><td>端口暴露</td><td><code>0.0.0.0:3001</code> 明文绕过 TLS</td><td><code>127.0.0.1:3001</code></td></tr>
+<tr><td><code>/metrics</code></td><td>公网 200，泄 114 条运营指标</td><td>外网 404，本机 200</td></tr>
+<tr><td>备份</td><td><strong>零</strong></td><td>每日 pg_dump + <code>pg_restore -l</code> 校验，保留 7 天</td></tr>
+<tr><td>宿主 swap</td><td>0（容器的 2400m swap 是幻觉）</td><td>2GB swapfile + swappiness 10</td></tr>
+<tr><td>日志保留</td><td><strong>无任何自动清理</strong>（186 万行 / 3.5GB / 42 天）</td><td><code>LogRetentionDays</code>=7，每 6 小时分批删除</td></tr>
+</table>
+
+<h3>3.3 根治：日志日汇总预聚合</h3>
+<p>新增 <code>log_daily_stats</code> 表，按 <code>(day_key, dim_type, dim_value)</code> 唯一，存 requests/bytes/tokens/quota。查询侧先判断 <code>DailyStatsCovers(fromDay)</code>，覆盖则读汇总表，否则回退原来的扫表路径。</p>
+<div class="flow">
+  <div class="node">/api/log/traffic<br>带宽排行 · site/stats</div>
+  <span class="arrow">→</span>
+  <div class="node">DailyStatsCovers?</div>
+  <span class="arrow">→</span>
+  <div class="node" style="border-color:var(--ok)">是：读 log_daily_stats<br>≤ 天数×2 行</div>
+  <span class="arrow">|</span>
+  <div class="node" style="border-color:var(--warn)">否：回退扫 logs</div>
+</div>
+<p>刷新由 <code>StartLogRetentionTask</code> 的兄弟 <code>StartLogDailyStatsRefresh</code> 承担：master 每 10 分钟重算最近 2 天，表空时回填（上限 400 天）。</p>
+
+<h2>4. 验证证据（全部实际执行）</h2>
+<table>
+<tr><th>项</th><th>结果</th></tr>
+<tr><td>日流量聚合（30 天）</td><td>18,134ms → <strong>1,824ms</strong></td></tr>
+<tr><td>模型带宽排行（7 天）</td><td>9,610ms → <strong>1,086ms</strong></td></tr>
+<tr><td><code>/api/site/stats</code>（公开端点）</td><td>10,734ms → <strong>65–99ms</strong></td></tr>
+<tr><td>汇总表回填 42 天</td><td><strong>1.24 秒</strong></td></tr>
+<tr><td><strong>历史口径一致性</strong></td><td>与原始聚合<strong>逐位相等</strong>：req 1,629,848 / bytes 1,708,786,385,745 / quota 1,141,459,216</td></tr>
+<tr><td>日志保留生效</td><td>1,861,886 → <strong>639,962</strong> 行；最老 09-11 → <strong>10-16</strong>；<code>log_cleanup</code> = succeeded</td></tr>
+<tr><td>线上可用性</td><td>外网 20/20 = 200，近 10 分钟 0 个 5xx</td></tr>
+<tr><td>版本一致性</td><td><code>check-version-consistency --require-tag</code> → consistent</td></tr>
+</table>
+
+<h2>5. 风险与回滚</h2>
+<table>
+<tr><th>变更</th><th>回滚方式</th></tr>
+<tr><td>代码（v1.3.192）</td><td><code>cd /opt/new-api &amp;&amp; ./deploy-zero-downtime.sh v1.3.191</code>（保留最近 4 个镜像）</td></tr>
+<tr><td>预聚合表</td><td>删表即可，查询自动回退到扫 logs（<code>DailyStatsCovers</code> 返回 false）</td></tr>
+<tr><td>日志删除（不可逆）</td><td>删除前已备份 <code>/opt/backup/new-api/newapi-20261023-143842.dump</code>（184MB，含 186 万行）</td></tr>
+<tr><td>compose / Caddy / fail2ban</td><td>均有 <code>.bak-*</code> 备份文件</td></tr>
+</table>
+
+<h2>6. 已知限制（诚实交代）</h2>
+<ul>
+<li><strong><code>migrateLOGDB()</code> 在生产不落 schema 变更</strong>：启动日志打印了 <code>database migration started</code>，但 <code>log_daily_stats</code> 没被创建，同批的 <code>migrateLogTrafficIndex</code> 也没生效。已把 <code>AutoMigrate</code> 兜底到使用点，<strong>根因仍未查清</strong>。</li>
+<li><strong>三库只实测了 SQLite + PostgreSQL</strong>：MySQL 未跑（本机无实例）。日键已按项目既有约定改成整数取模，但未在 MySQL 上实跑。</li>
+<li><strong>六维报表未预聚合</strong>：<code>channel/user/group/token</code> 仍是全窗口扫表，靠 60s Redis 缓存兜底。</li>
+<li><strong>SSH 仍允许密码登录</strong>：24h 内 16867 次撞库，已装 fail2ban，但改密钥需用户提供公钥（否则锁死）。</li>
+<li><strong>内核 5.15.0-30 已 reboot-required 17 天</strong>，需维护窗口。</li>
+</ul>
+
+<hr>
+<h2>7. 自测（8 题，答案在最后）</h2>
+<div id="quiz"></div>
+<button onclick="grade()">提交并评分</button>
+<div class="score" id="score"></div>
+<details><summary>查看答案与解析</summary>
+<ol>
+<li><b>B</b>。负的 OFFSET 在 PG 报错、MySQL 语法错误。修复点在 <code>GetPageQuery</code> 与 <code>GetStartIdx</code> 双保险。</li>
+<li><b>对</b>。只判断「表非空」会在历史未回填时静默漏算——数字变小比变慢更危险。</li>
+<li><b>C</b>。<code>random_page_cost=4</code> 是机械盘默认值，把 8 万页随机读算得太贵，规划器宁可全表扫。</li>
+<li><b>B</b>。MySQL 的 <code>/</code> 是小数除法，扫描进 int64 失败。</li>
+<li><b>B（不会）</b>。删原始日志后 <code>log_daily_stats</code> 仍保留 43 天聚合，历史报表不受影响。</li>
+<li><b>A</b>。<code>docker rm -f</code> 是 SIGKILL，会掐断在途流式请求；改用 <code>docker stop -t 30</code>。</li>
+<li><b>对</b>。<code>migrateLOGDB</code> 在该部署形态下没创建表，已把 AutoMigrate 兜底到 <code>RefreshLogDailyStats</code>。</li>
+<li><b>C</b>。删+插在三库行为一致，规避 GORM OnConflict 在 MySQL 上的渲染缺陷。</li>
+</ol>
+</details>
+
+</div>
+<script>
+const QS = [
+  {q:'负数页码 p=-5 会在 PostgreSQL 上导致什么？',
+   a:['返回空列表','OFFSET 为负，SQL 报错，接口 500','自动纠正为第 1 页'],c:1},
+  {q:'判断「汇总表可用」时只看「表非空」就够了吗？',
+   a:['够，读到的就是全部','不够，历史未回填会静默漏算','无所谓，反正会回退'],c:1,type:'tf',tf:['对','不对']},
+  {q:'覆盖索引建好后规划器仍走全表扫描，最可能的原因是？',
+   a:['索引损坏','统计信息过期','random_page_cost 是机械盘默认值，随机读被算得太贵'],c:2},
+  {q:'为什么日键不能用 x / 86400？',
+   a:['性能差','MySQL 的 / 是小数除法，结果扫不进 int64','可读性差'],c:1},
+  {q:'删掉 7 天前的原始日志，会让历史 43 天的统计报表少数据吗？',
+   a:['会，报表直接读 logs','不会，log_daily_stats 保留了历史聚合','取决于缓存'],c:1,type:'tf',tf:['会','不会']},
+  {q:'蓝绿部署里旧容器应该怎么停？',
+   a:['docker rm -f','docker stop -t 30 再 rm','直接 pull 新镜像覆盖'],c:1},
+  {q:'生产曾出现「启动日志说 migration started，但表不存在」，当前处置是？',
+   a:['忽略，等下次重启','把 AutoMigrate 兜底到使用点，建不出来直接报错','删掉迁移代码'],c:1},
+  {q:'预聚合刷新为什么用「删窗口 + 重插」而不是 UPSERT？',
+   a:['性能更好','省代码','规避 GORM OnConflict 在 MySQL 上渲染出空子句'],c:2},
+];
+const ANS=[1,1,2,1,1,1,1,2];
+const box=document.getElementById('quiz');
+QS.forEach((item,i)=>{
+  const d=document.createElement('div'); d.className='quiz';
+  const h=document.createElement('p'); h.innerHTML='<b>'+(i+1)+'.</b> '+item.q; d.appendChild(h);
+  item.a.forEach((opt,j)=>{
+    const l=document.createElement('label');
+    l.innerHTML='<input type="radio" name="q'+i+'" value="'+j+'"> '+opt;
+    l.onclick=()=>{[...d.querySelectorAll('label')].forEach(x=>x.classList.remove('sel'));l.classList.add('sel');};
+    d.appendChild(l);
+  });
+  box.appendChild(d);
+});
+function grade(){
+  let ok=0; const wrong=[];
+  QS.forEach((item,i)=>{
+    const sel=document.querySelector('input[name=q'+i+']:checked');
+    if(sel && Number(sel.value)===ANS[i]) ok++; else if(sel) wrong.push(i+1);
+  });
+  const pct=Math.round(ok/QS.length*100);
+  document.getElementById('score').innerHTML =
+    '得分 '+ok+'/'+QS.length+'（'+pct+'%）'+
+    (pct>=80?' <span style="color:var(--ok)">通过</span>':' <span style="color:var(--bad)">未通过</span>')+
+    (wrong.length?' · 错题：'+wrong.join(', '):'');
+}
+</script>
+</body>
+</html>
