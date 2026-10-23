@@ -1,0 +1,141 @@
+{
+  "task_id": "fix-frontend-p2",
+  "status": "passed",
+  "timestamp": "2026-10-23T21:35:00+08:00",
+  "files_changed": [
+    "web/src/lib/http-client.ts",
+    "web/src/lib/search-schema.ts",
+    "web/src/lib/__tests__/sign-in-redirect.test.ts",
+    "web/src/lib/__tests__/search-schema.test.ts",
+    "web/src/hooks/use-table-url-state.ts",
+    "web/src/hooks/__tests__/use-table-url-state.test.ts",
+    "web/src/components/config-drawer.tsx",
+    "web/src/components/ai-elements/conversation.tsx",
+    "web/src/components/password-input.tsx",
+    "web/src/components/tag-input.tsx",
+    "web/src/components/datetime-picker.tsx",
+    "web/src/components/json-editor.tsx",
+    "web/src/components/ui/spinner.tsx",
+    "web/src/components/ui/sidebar.tsx",
+    "web/src/components/ui/pagination.tsx",
+    "web/src/features/channels/components/numeric-spinner-input.tsx",
+    "web/src/features/system-settings/models/tiered-pricing-editor.tsx",
+    "web/src/features/models/components/dialogs/update-config-dialog.tsx",
+    "web/src/routes/(auth)/sign-in.tsx",
+    "web/src/routes/rankings/index.tsx",
+    "web/src/routes/pricing/index.tsx",
+    "web/src/routes/pricing/$modelId/index.tsx",
+    "web/src/routes/_authenticated/channels/index.tsx",
+    "web/src/routes/_authenticated/keys/index.tsx",
+    "web/src/routes/_authenticated/models/$section.tsx",
+    "web/src/routes/_authenticated/playground/index.tsx",
+    "web/src/routes/_authenticated/redemption-codes/index.tsx",
+    "web/src/routes/_authenticated/usage-logs/$section.tsx",
+    "web/src/routes/_authenticated/users/index.tsx",
+    "web/src/routes/_authenticated/wallet/index.tsx",
+    "web/src/routes/_authenticated/web-protection/index.tsx",
+    "web/src/i18n/locales/en.json",
+    "web/src/i18n/locales/zh.json",
+    "web/src/i18n/locales/zh-TW.json",
+    "web/src/i18n/locales/fr.json",
+    "web/src/i18n/locales/ru.json",
+    "web/src/i18n/locales/ja.json",
+    "web/src/i18n/locales/vi.json",
+    "web/src/i18n/common-keys.json",
+    "web/src/i18n/locales/en.common.json",
+    "web/src/i18n/locales/zh.common.json",
+    "web/src/i18n/locales/zh-TW.common.json",
+    "web/src/i18n/locales/fr.common.json",
+    "web/src/i18n/locales/ru.common.json",
+    "web/src/i18n/locales/ja.common.json",
+    "web/src/i18n/locales/vi.common.json"
+  ],
+  "commands_executed": [
+    {
+      "cmd": "bun run typecheck (tsgo -b)",
+      "exit_code": 0,
+      "raw_output_tail": "$ tsgo -b (no diagnostics)"
+    },
+    {
+      "cmd": "bunx oxlint -c .oxlintrc.json src",
+      "exit_code": 0,
+      "raw_output_tail": "remaining diagnostics are pre-existing: 1 error in src/i18n/__tests__/config-default-language.test.ts (no-non-null-assertion); import/first warnings on route files that already use `const X = lazy(...)` between imports (dashboard/$section.tsx, webhook/index.tsx untouched)"
+    },
+    {
+      "cmd": "bun run i18n:check",
+      "exit_code": 0,
+      "raw_output_tail": "i18n missing-key check: OK (0 missing)"
+    },
+    {
+      "cmd": "bun run i18n:coverage",
+      "exit_code": 0,
+      "raw_output_tail": "i18n coverage check: OK (all locales translated)"
+    },
+    {
+      "cmd": "bun run i18n:terminology",
+      "exit_code": 0,
+      "raw_output_tail": "[terminology] PASS: quota 相关文案已统一为「额度」"
+    },
+    {
+      "cmd": "bun run i18n:common (scan-i18n-common --merge + build-i18n-common)",
+      "exit_code": 0,
+      "raw_output_tail": "[scan-i18n-common] 500 keys -> src/i18n/common-keys.json; en 500 keys, 8.0KB gzip"
+    },
+    {
+      "cmd": "bun run build (before fix, baseline)",
+      "exit_code": 0,
+      "raw_output_tail": "dist/static/js/31241.ab9377f1f2.js 253.2 kB (gzip 78.5 kB) — initial chunk containing zod; initial JS raw 1,088,386 B"
+    },
+    {
+      "cmd": "bun run build (probe: zod forced into its own cacheGroups entry)",
+      "exit_code": 0,
+      "raw_output_tail": "vendor-zod-probe.c1c347e029.js 73.4 kB (gzip 20.0 kB) — still listed in dist/index.html => zod is in the sync graph, split alone does not help (probe config reverted)"
+    },
+    {
+      "cmd": "bun run build (after fix)",
+      "exit_code": 0,
+      "raw_output_tail": "initial JS raw 1,015,589 B gzip 319,774 B; zod markers (invalid_type) in initial chunks: 0; zod now only in dist/static/js/async/* route chunks"
+    },
+    {
+      "cmd": "bunx vitest run src/lib/__tests__/search-schema.test.ts src/lib/__tests__/sign-in-redirect.test.ts src/hooks/__tests__/use-table-url-state.test.ts src/i18n/locale-consistency.test.ts",
+      "exit_code": 0,
+      "raw_output_tail": "Test Files 4 passed (4) / Tests 20 passed (20)"
+    },
+    {
+      "cmd": "bunx vitest run src/lib/__tests__/bundle-budget.test.ts",
+      "exit_code": 0,
+      "raw_output_tail": "Test Files 1 passed (1) / Tests 6 passed (6) — first-paint sync chain below the 740 KB gzip budget"
+    },
+    {
+      "cmd": "bunx vitest run src/lib/__tests__/http-cache.test.ts src/lib/__tests__/server-error-notifications.test.ts src/i18n/__tests__/route-locale.test.ts",
+      "exit_code": 0,
+      "raw_output_tail": "Test Files 3 passed (3) / Tests 29 passed (29)"
+    },
+    {
+      "cmd": "node scripts/format-with-protected-headers.mjs --check",
+      "exit_code": 0,
+      "raw_output_tail": "(no output — all changed files already formatted)"
+    },
+    {
+      "cmd": "bun run copyright:check",
+      "exit_code": 1,
+      "raw_output_tail": "40 pre-existing files missing/outdated headers (scripts/*.mjs, src/features/*, src/lib/__tests__/bundle-budget.test.ts …); none of this task's files are flagged"
+    },
+    {
+      "cmd": "bunx rsbuild preview --port 4319 + playwright smoke (6 URLs, temp script deleted afterwards)",
+      "exit_code": 0,
+      "raw_output_tail": "/ /pricing?view=table&tokenUnit=M /pricing?view=BOGUS&tokenUnit=ZZZ /en/pricing?sort=price /rankings?period=nope /en/usage-logs/common?page=2&type=1 — all HTTP 200, zero pageerror, zero error boundary; the guarded route redirects to /en/sign-in?redirect=… (language prefix kept)"
+    }
+  ],
+  "findings_fixed": ["F-1", "F-2", "F-3", "F-4"],
+  "findings_not_reproduced": [],
+  "limitations": [
+    "F-2 root cause corrected: it is not only 30 route files importing zod — TanStack Router autoCodeSplitting keeps every route's options (validateSearch) in the entry sync graph, so zod rode in a shared sync chunk (31241, 253 KB, gzip 78.5 KB). Splitting zod into its own cacheGroups entry was measured to NOT help (73.4 KB chunk still loaded from index.html). Fixed by replacing the 13 route search schemas with zero-dependency validators (validation logic preserved, no zod removal from forms).",
+    "F-2: 首屏 zod 已清零（0 markers），web/src 内表单类 zod 用法保留；但由于原状态共享 chunk 的重组，initial JS 由 1,088,386 B/≈339.8 KB gzip 降到 1,015,589 B/319,774 B gzip（-72.8 KB raw / -20.0 KB gzip）。数据来自本轮同一机器同配置构建，baseline 为修复前那次 build，非 CI 历史数据。",
+    "F-1: http-client 的 401 → redirectToSignIn 路径需要真实失效会话才能触发，未做浏览器端到端验证；新增纯函数 signInRedirectTarget 单测 5 例（前缀/returnTo/search+hash/已在登录页返回 null）。",
+    "F-3: 13 处 aria-label 硬编码英文已全部 t() 化 + 'Optional' 可见 placeholder，新增 8 个 key 写入 7 份 locale（纯文本行插入，未重序列化整份文件）。仍保留 2 处 landmark aria-label 原文：'breadcrumb' / 'pagination'（WAI-ARIA 导航地标惯用名，翻译价值低）。",
+    "F-3 遗留（非本次引入）：src/components/ui/spinner.tsx、ui/sidebar.tsx、ui/pagination.tsx 的 4 个 key（Loading / Toggle Sidebar / Go to previous page / Go to next page）未进入首屏 common 子集 —— 原因是 scripts/scan-i18n-common.mjs 的 walk() 递归时把绝对路径又 join 了一次 root，导致子目录从未被扫描（既有工具缺陷，未在本次修复）。这些文案在整包语言包加载前仍显示英文原文，与修改前可见文案完全一致，无回归。",
+    "F-4: 只改 2 处筛选写 URL 为 replace；分页（onPaginationChange）与 ensurePageInRange 维持原语义（前者保留历史，后者本就是 replace）。未做浏览器后退键 E2E。",
+    "未运行全量 vitest（567s）与 Go 侧测试：本次改动仅限 web/src 前端，无后端/接口契约变化。"
+  ]
+}

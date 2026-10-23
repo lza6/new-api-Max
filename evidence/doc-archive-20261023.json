@@ -1,0 +1,206 @@
+{
+  "task_id": "doc-archive",
+  "status": "passed",
+  "timestamp": "2026-10-23T21:05:00+08:00",
+  "scope": "仅处理审计判定为「可删除」的 2 份计划文档（用户已明确授权删除）",
+  "authorization": "用户 2026-10-23 会话：明确授权归档并删除这 2 份已完全闭环的计划文档，仅限这 2 份",
+  "pre_delete_commit": "664a8489b866607e896771bbccf3575c746740c0",
+  "review_notes": {
+    "前端改进计划.md": {
+      "verdict": "零未闭环，可删除",
+      "own_recheck": "§14–§18 全部为 v1.3.166–170 已执行事项且带验证记录；§17「T-B4 留待单独一轮」已由 §18 闭环（v1.3.170）；§15.5 记录的既有缺陷（导航以中文原文当 key）在当前代码已改为 `t('Home')` 等英文 key（web/src/hooks/use-top-nav-links.ts:67-101），属已过时非未闭环。",
+      "code_spot_checks": [
+        "web/src/features/system-settings/components/settings-page-context.tsx:104 → 统一渲染 <FormNavigationGuard when={anyDirty} />",
+        "web/src/styles/theme.css:127 / :265 → --theme-color 亮/暗令牌存在",
+        "web/src/test-setup.ts:135 → 已补 ReadableStream polyfill",
+        "web/src/features/dashboard/components/overview/uptime-panel.tsx:50-59 → StatusDot 带 role='img' + aria-label/title",
+        "web/rsbuild.config.ts → 已无 vendor-react 死配置"
+      ]
+    },
+    "计划书/ops/测试分片矩阵.md": {
+      "verdict": "零未闭环，且核心结论已被推翻，可删除",
+      "own_recheck": "7 行分片均为已执行实测记录，无任务残留；其「本机无法单进程跑完全量 vitest」结论被 T-A1 取代（web/scripts/test-shards.mjs）。",
+      "code_spot_checks": [
+        "web/package.json:19 → \"test:shards\": \"bun scripts/test-shards.mjs\"",
+        "test_ledger.md:697 → 1582/1582 通过 / 5 片 / 566.9s / RESULT: PASS",
+        "CHANGELOG.md v1.3.187 条目记录同一结果"
+      ]
+    }
+  },
+  "archived": [
+    {
+      "original_path": "前端改进计划.md",
+      "archive_path": "docs/archive/plans/20261023/前端改进计划.md",
+      "tasks_total": 5,
+      "closed": 5,
+      "obsolete": 0,
+      "not_applicable": 0,
+      "need_decision": 0,
+      "sha256": "278cb332a442b00093199ccc7a09e08d54da19a7994eaa702cdd983f1eeead83",
+      "byte_identical_verified": true
+    },
+    {
+      "original_path": "计划书/ops/测试分片矩阵.md",
+      "archive_path": "docs/archive/plans/20261023/测试分片矩阵.md",
+      "tasks_total": 7,
+      "closed": 7,
+      "obsolete": 1,
+      "not_applicable": 0,
+      "need_decision": 0,
+      "sha256": "a410de31e86343921d8a3f5b97e7efdf9cac991ea400ee046352d3e30c2d2b23",
+      "byte_identical_verified": true
+    }
+  ],
+  "manifest": "docs/archive/plans/20261023/archive-manifest.md",
+  "deleted": [
+    "前端改进计划.md",
+    "计划书/ops/测试分片矩阵.md"
+  ],
+  "references_fixed": [
+    {
+      "file": "CHANGELOG.md",
+      "where": "v1.3.169「Decisions recorded」段（原第 440-445 行，审计引用为 :410）",
+      "before": "`计划书/ops/测试分片矩阵.md` — CI is the authoritative full test gate; the local shard matrix (≈880 cases measured) is the local equivalent.",
+      "after": "Test gate: CI is the authoritative full test gate. …superseded by `cd web && bun run test:shards` (T-A1), and the matrix itself is archived under `docs/archive/plans/20261023/`.",
+      "reason": "去掉指向已删文件的路径，改指向现行命令与归档位置"
+    },
+    {
+      "file": "计划书/下一步改进指南.md",
+      "where": "§1.2 结论有效期表（原 107 行，652 通过基线行）",
+      "after": "改为「已固化为 `cd web && bun run test:shards`，5 片 / 1582 通过 / 567s，证据 test_ledger.md:697 + CHANGELOG v1.3.187」",
+      "reason": "该结论原出自被删文档，且「未固化」已不成立"
+    },
+    {
+      "file": "计划书/下一步改进指南.md",
+      "where": "§3.1 顶层布局目录树（原 165 行）",
+      "after": "删除 `├── 前端改进计划.md` 一行",
+      "reason": "根目录已无该文件，保留会误导为现存文件"
+    },
+    {
+      "file": "计划书/下一步改进指南.md",
+      "where": "§3.3 具体漂移表（原 195 行）",
+      "after": "现状改为「已于 2026-10-23 归档到 docs/archive/plans/20261023/；根目录已无该文件」",
+      "reason": "消除指向已删文件的现存性描述"
+    },
+    {
+      "file": "计划书/下一步改进指南.md",
+      "where": "§5.3 工程可靠性遗留首行（原 279 行）",
+      "after": "改为「已闭环（T-A1）：bun run test:shards 一条命令跑完全量…；早期手工分片矩阵已归档到 docs/archive/plans/20261023/测试分片矩阵.md，仅作历史」",
+      "reason": "该行原引用被删文档的 5 批数字并称未固化，事实已变"
+    },
+    {
+      "file": "计划书/下一步改进指南.md",
+      "where": "§6 P2-3（原 322 行）",
+      "after": "标 strikethrough + 已闭环（归档到 docs/archive/plans/20261023/）",
+      "reason": "问题已实际解决，避免误判为待做"
+    },
+    {
+      "file": "计划书/下一步改进指南.md",
+      "where": "§13.2 清理清单第 6 项（原 658 行）",
+      "after": "标 strikethrough + 已执行（归档 + git rm + 索引更新）",
+      "reason": "清理项已执行完毕"
+    },
+    {
+      "file": "计划书/下一步改进指南.md",
+      "where": "附录 B 假设清单第 5 条（原 905 行）",
+      "after": "标 strikethrough + 已由 T-A1 取代（1582 通过 / 5 片 / 566.9s），旧的 652 数字出自已归档手工矩阵",
+      "reason": "假设依赖被删文档的数字口径"
+    },
+    {
+      "file": "计划书/README.md",
+      "where": "`ops/` 表最后一行",
+      "after": "整行删除（不再列出 测试分片矩阵.md）",
+      "reason": "索引不得登记已删文件"
+    },
+    {
+      "file": "计划书/README.md",
+      "where": "`archive/` 行 + audit 报告描述行",
+      "after": "archive 行补登 plans/20261023/；审计报告描述补「该文件已于同日归档」",
+      "reason": "指针改向现存归档目录，不留悬空指向"
+    },
+    {
+      "file": "workflow_status.md",
+      "where": "B2「删除候选」段",
+      "after": "标题改为「已执行，2026-10-23 用户授权」，两行改为已归档 + git rm 的实际结果，并写回滚命令",
+      "reason": "状态与事实对齐"
+    },
+    {
+      "file": "计划书/尼尔森十项可用性原则-界面设计规范与整改指南.md",
+      "where": "§0.2 文档边界表 + H8.4 证据行",
+      "after": "路径改为 docs/archive/plans/20261023/前端改进计划.md（附「原根目录文件，2026-10-23 已归档」）",
+      "reason": "避免死链，保留溯源"
+    },
+    {
+      "file": "计划书/audit/plan-docs-audit-20261023.md",
+      "where": "顶部「⚠️ 勘误」块追加第 4 条",
+      "after": "记录裁决已下并已执行（归档目录 + 回滚 sha），正文原样保留作历史",
+      "reason": "沿用该文件既有「加勘误不改正文」约定，消除「仍待拍板」的误导"
+    }
+  ],
+  "references_left_intact_on_purpose": [
+    "evidence/audit-20261023-docs.json — 带时间戳的审计证据，不改写",
+    "计划书/tasks/weekly.md、计划书/tasks/riper5_20261021_161731.md — 历史任务快照",
+    "计划书/audit/plan-docs-audit-20261023.md 正文 — 历史审计原文（仅加勘误块）",
+    "docs/archive/plans/20261023/* — 归档件与 manifest 自身"
+  ],
+  "rollback": "git checkout 664a8489b866607e896771bbccf3575c746740c0 -- \"前端改进计划.md\" \"计划书/ops/测试分片矩阵.md\"",
+  "rollback_alt": "cp -a docs/archive/plans/20261023/前端改进计划.md ./前端改进计划.md && cp -a docs/archive/plans/20261023/测试分片矩阵.md ./计划书/ops/测试分片矩阵.md",
+  "commands_executed": [
+    {
+      "cmd": "git rev-parse HEAD",
+      "exit_code": 0,
+      "raw_output_tail": "664a8489b866607e896771bbccf3575c746740c0"
+    },
+    {
+      "cmd": "git ls-files --error-unmatch \"前端改进计划.md\" \"计划书/ops/测试分片矩阵.md\" && git status --porcelain -- <both>",
+      "exit_code": 0,
+      "raw_output_tail": "\"\\345\\211\\215\\347\\253\\257\\346\\224\\271\\350\\277\\233\\350\\256\\241\\345\\210\\222.md\"\n\"\\350\\256\\241\\345\\210\\222\\344\\271\\246/ops/\\346\\265\\213\\350\\257\\225\\345\\210\\206\\347\\211\\207\\347\\237\\251\\351\\230\\265.md\"\n(no porcelain output = both tracked & clean)"
+    },
+    {
+      "cmd": "mkdir -p docs/archive/plans/20261023 && cp -a \"前端改进计划.md\" \"计划书/ops/测试分片矩阵.md\" docs/archive/plans/20261023/",
+      "exit_code": 0,
+      "raw_output_tail": "-rw-r--r-- 6942 Oct 21 21:54 前端改进计划.md\n-rw-r--r-- 2150 Oct 21 23:17 测试分片矩阵.md"
+    },
+    {
+      "cmd": "diff 原件 归档件 (×2) && sha256sum (×4)",
+      "exit_code": 0,
+      "raw_output_tail": "DIFF1_IDENTICAL\nDIFF2_IDENTICAL\n278cb332a442b00093199ccc7a09e08d54da19a7994eaa702cdd983f1eeead83 前端改进计划.md\n278cb332a442b00093199ccc7a09e08d54da19a7994eaa702cdd983f1eeead83 docs/archive/plans/20261023/前端改进计划.md\na410de31e86343921d8a3f5b97e7efdf9cac991ea400ee046352d3e30c2d2b23 计划书/ops/测试分片矩阵.md\na410de31e86343921d8a3f5b97e7efdf9cac991ea400ee046352d3e30c2d2b23 docs/archive/plans/20261023/测试分片矩阵.md"
+    },
+    {
+      "cmd": "git rm \"前端改进计划.md\" \"计划书/ops/测试分片矩阵.md\"",
+      "exit_code": 0,
+      "raw_output_tail": "rm '前端改进计划.md'\nrm '计划书/ops/测试分片矩阵.md'"
+    },
+    {
+      "cmd": "test ! -e \"前端改进计划.md\" && test ! -e \"计划书/ops/测试分片矩阵.md\"",
+      "exit_code": 0,
+      "raw_output_tail": "OK: 前端改进计划.md absent\nOK: 计划书/ops/测试分片矩阵.md absent"
+    },
+    {
+      "cmd": "rg -n \"测试分片矩阵|前端改进计划\" . -g '!node_modules' -g '!.git'",
+      "exit_code": 0,
+      "raw_output_tail": "剩余命中仅三类：① 已改为指向 docs/archive/plans/20261023/ 的引用；② 标记为「已闭环/已过时」的历史行；③ 带时间戳的历史记录（evidence/audit-20261023-docs.json、计划书/tasks/*、计划书/audit/*正文）；无一指向已不存在的路径且未标注归档。"
+    },
+    {
+      "cmd": "cd web && bun run test:shards --dry-run",
+      "exit_code": 0,
+      "raw_output_tail": "201 test files -> 5 shards (dry run, nothing executed)"
+    },
+    {
+      "cmd": "git diff --stat -- CHANGELOG.md workflow_status.md 计划书/README.md 计划书/下一步改进指南.md",
+      "exit_code": 0,
+      "raw_output_tail": "CHANGELOG.md | 6 ++++--\nworkflow_status.md | 10 ++++++----\n计划书/README.md | 5 ++---\n计划书/下一步改进指南.md | 13 ++++++-------\n4 files changed, 18 insertions(+), 16 deletions(-)"
+    }
+  ],
+  "must_keep_untouched_verified": [
+    "计划书/下一步改进指南.md 仍保留未闭环 16 卡（T-B3..B9b、T-C9、T-D1a/D1b/D2/D4、T-A2/A3/A4/A7）",
+    "计划书/尼尔森...指南.md 仍保留 N2/N6/N7/N10/N13/N14 + N16 部分",
+    "计划书/视觉识别体系...指南.md、参考的结果计划指南.md、计划书/ops/DECISION-claude-billing.md、计划书/audit/*、计划书/audit-ledger.md 均未删除",
+    "除这 2 份外未删除任何文件；项目根 README.md 未改动"
+  ],
+  "remaining_risks": [
+    "docs/archive/plans/20261023/ 为 AGENTS.md「不得在 docs/ 下新增文件」的授权例外，已用 archive-manifest.md 留痕；若架构上不接受 docs/ 内归档，需整体迁到 计划书/archive/（仅移动目录，不影响 git rm 结果）。",
+    "归档目录与引用改动尚未提交（工作区状态）；如需落库请显式指示提交。",
+    "CHANGELOG 属历史发布记录，本轮只改其 v1.3.169「Decisions recorded」一处的死路径，未改任何发布事实。"
+  ]
+}
