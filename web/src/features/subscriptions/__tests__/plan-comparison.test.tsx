@@ -201,11 +201,11 @@ describe('PlanComparison', () => {
         'Sign in to view subscription plans, check your balances and renew with one click.'
       )
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Sign in' })).toHaveAttribute(
       'href',
       '/sign-in'
     )
-    expect(screen.getByRole('link', { name: 'Back to Pricing' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Back to Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     )
@@ -271,7 +271,7 @@ describe('PlanComparison', () => {
     expect(
       await screen.findByText('No subscription plans are currently available.')
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Back to Pricing' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: 'Back to Pricing' })).toHaveAttribute(
       'href',
       '/pricing'
     )

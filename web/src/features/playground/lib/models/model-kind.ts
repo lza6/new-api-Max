@@ -56,7 +56,7 @@ export const MODEL_KIND_ORDER: ModelKind[] = [
  * i18n 键。与选择器的 `{{category}} Models` 模板衔接：
  * `t(MODEL_KIND_LABEL_KEY[kind])` 得到分组标题。
  */
-export const MODEL_KIND_LABEL_KEY: Record<ModelKind, string> = {
+const MODEL_KIND_LABEL_KEY: Record<ModelKind, string> = {
   text: 'Text',
   image: 'Image',
   video: 'Video',

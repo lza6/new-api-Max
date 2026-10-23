@@ -55,7 +55,16 @@ export default defineConfig({
     // exceeds vitest-pool-runner's startup budget. `vmThreads` is the pool
     // verified to start here (threads and forks both time out), and a single
     // worker keeps the suite deterministic.
-    pool: 'vmThreads',
+    // 用 threads 而不是 vmThreads：vmThreads 下同 worker 共享一个 VM 上下文，
+    // 一个文件的 vi.mock('sonner') 会被另一个文件复用，断言于是打在自己新建的
+    // vi.fn 上（典型症状「单跑绿、合跑红」，本轮在 delete-plan-dialog / confirm-dialog /
+    // model-cards / transparency-panel 上各踩一次）。threads + maxWorkers:1 实测
+    // 既有真隔离又不慢（5 文件 40 用例 9.5s）。
+    pool: 'threads',
+    // 每个测试文件一个独立 VM 上下文：vmThreads 默认会把已加载模块（含 vi.mock
+    // 的替身）在同 worker 内共享，导致 A 文件的 mock 被 B 文件复用、B 的断言打在
+    // 自己新建的 vi.fn 上（表现为「单跑绿、合跑红」）。
+    isolate: true,
     maxWorkers: 1,
     fileParallelism: false,
   },

@@ -89,7 +89,7 @@ const PROOF_REQUIRED_CODES = new Set([
  * code must be read from `response.data.code` first; the top-level `code` is
  * only trusted when it is not an `ERR_*` transport prefix.
  */
-export function readServerCode(error: unknown): string | null {
+function readServerCode(error: unknown): string | null {
   if (!error || typeof error !== 'object') {return null}
   const record = error as Record<string, unknown>
   const response = record.response as Record<string, unknown> | undefined

@@ -55,7 +55,7 @@ export interface SiteStatsResponse {
 }
 
 /** Visitor counts (deduplicated per IP per day, bots excluded). */
-export interface VisitorCounts {
+interface VisitorCounts {
   today: number
   last_7d: number
   last_30d: number

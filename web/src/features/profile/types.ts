@@ -127,10 +127,6 @@ export interface AgentPreset {
 export const MAX_USER_SKILLS = 20
 export const MAX_SKILL_NAME_RUNES = 64
 export const MAX_SKILL_PROMPT_RUNES = 2000
-export const MAX_AGENT_PRESETS = 20
-export const MAX_PRESET_NAME_RUNES = 64
-export const MAX_PRESET_SYSTEM_RUNES = 8000
-export const MAX_PRESET_MAX_TOKENS = 32000
 
 /**
  * Parsed user settings

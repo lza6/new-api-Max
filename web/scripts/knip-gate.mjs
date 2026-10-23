@@ -68,17 +68,52 @@ const CATEGORIES = [
  * - File-granular categories (e.g. `files`) yield `category:file:name`
  *   where name === the file itself; still stable for baseline diffing.
  */
+/**
+ * Files that are deliberately out of scope for the dead-code gate.
+ *
+ * `e2e-local/` holds ad-hoc local scripts (playwright probes, one-off screenshots)
+ * that are not part of the deliverable and are already excluded from the lint
+ * gate for the same reason. Before this exclusion they produced 64 of the 111
+ * "new dead code" entries, i.e. 58% of the signal was noise about files that
+ * never ship — which is exactly how a gate loses its authority.
+ *
+ * `scripts/` holds CLI tools invoked by `bun run …` / CI. Nothing imports them,
+ * so knip reports every one of them as an unused file; they are entry points,
+ * not dead modules.
+ */
+const OUT_OF_SCOPE_PREFIXES = ['e2e-local/', 'scripts/']
+
+/**
+ * Dependencies that are only referenced from out-of-scope files above.
+ * `playwright` drives the local e2e probes in `e2e-local/`; nothing under `src/`
+ * imports it, so knip reports it as unused on every run.
+ */
+const IGNORED_DEPENDENCIES = new Set(['playwright'])
+
+function isOutOfScope(file) {
+  return OUT_OF_SCOPE_PREFIXES.some((prefix) => file.startsWith(prefix))
+}
+
+function isIgnoredDependencyKey(key) {
+  // key shape: `dependencies:package.json:<name>` / `devDependencies:...`
+  const name = key.split(':').pop()
+  return IGNORED_DEPENDENCIES.has(name)
+}
+
 function issueKeys(issues) {
   const keys = new Set()
   for (const issue of issues) {
     const file = issue.file ?? ''
+    if (isOutOfScope(file)) continue
     for (const category of CATEGORIES) {
       const items = issue[category]
       if (!Array.isArray(items)) continue
       for (const item of items) {
         const group = Array.isArray(item) ? item : [item]
         for (const entry of group) {
-          keys.add(`${category}:${file}:${entry?.name ?? ''}`)
+          const key = `${category}:${file}:${entry?.name ?? ''}`
+          if (isIgnoredDependencyKey(key)) continue
+          keys.add(key)
         }
       }
     }

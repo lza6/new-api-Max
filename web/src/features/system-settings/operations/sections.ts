@@ -27,7 +27,7 @@ import type { TFunction } from 'i18next'
  * chunk. __tests__/section-metadata.test.ts keeps this list and the registry in
  * sync.
  */
-export const OPERATIONS_SECTIONS = [
+const OPERATIONS_SECTIONS = [
   { id: 'channel-health', titleKey: 'Channel Health' },
   { id: 'behavior', titleKey: 'System Behavior' },
   { id: 'alerts', titleKey: 'Monitoring & Alerts' },

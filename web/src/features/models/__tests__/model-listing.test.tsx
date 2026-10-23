@@ -218,7 +218,7 @@ it('requests channel models and distinguishes catalog policy from availability u
   const warning = screen
     .getAllByText('Unavailable')[0]
     .closest('[data-slot="status-badge"]')
-  expect(warning).toHaveClass('text-warning')
+  expect(warning).toHaveClass('text-(--warning-text)')
   expect(warning?.querySelector('svg')).toBeInTheDocument()
   expect(warning).not.toHaveClass('text-success')
   expect(screen.getAllByText('Missing metadata')).toHaveLength(2)
@@ -429,7 +429,7 @@ it('uses backend square states for success, warning, hidden, and partial rows in
   expect(screen.getByRole('button', { name: 'Display policy' })).toBeVisible()
   for (const label of ['Unavailable', 'Partly shown']) {
     const badge = screen.getByText(label).closest('[data-slot="status-badge"]')
-    expect(badge).toHaveClass('text-warning')
+    expect(badge).toHaveClass('text-(--warning-text)')
     expect(badge?.querySelector('svg')).toBeInTheDocument()
     expect(badge).not.toHaveClass('text-success')
   }
@@ -437,7 +437,7 @@ it('uses backend square states for success, warning, hidden, and partial rows in
   expect(displayed).toHaveLength(2)
   for (const label of displayed) {
     expect(label.closest('[data-slot="status-badge"]')).toHaveClass(
-      'text-success'
+      'text-(--success-text)'
     )
   }
   const hidden = screen.getAllByText('Listing hidden')
@@ -715,12 +715,16 @@ it('shows an unrecognized expression as special and retains its full source in p
   const button = screen.getByRole('button', {
     name: 'View pricing for channel-only',
   })
-  expect(button).toHaveTextContent('Special billing expression')
+  expect(button).toHaveTextContent('Pricing varies by usage — see details')
   expect(button).not.toHaveTextContent('$2')
   expect(button).not.toHaveTextContent(expression)
   await userEvent.click(button)
   const preview = await screen.findByRole('region', { name: 'Current Billing' })
-  expect(preview).toHaveTextContent(expression)
+  // 计费表达式源码属于实现细节，用户看不懂也不该看到（策略与
+  // pricing/__tests__/model-cards.test.tsx「never shows an unrecognized
+  // expression as source code」一致）；详情里只给人话说明。
+  expect(preview).not.toHaveTextContent(expression)
+  expect(preview).toHaveTextContent('Pricing varies by usage — see details')
 })
 
 it('distinguishes pending and failed pricing requests from an unset price', async () => {

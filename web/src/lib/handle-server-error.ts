@@ -25,7 +25,16 @@ import {
   isServerErrorCancelled,
 } from './server-error-message'
 
-const reportedErrors = new WeakSet<object>()
+// 「同一个错误只提示一次」的去重表。生产环境里它会随会话存活，这是刻意的；
+// 但 vitest 用 `vmThreads` 池，同一 worker 内的测试文件共享模块实例，
+// 于是前一个用例弹过的错误会把后一个用例的同文案错误吞掉（表现为跨文件
+// 顺序依赖的假失败）。测试侧通过 resetServerErrorDedupe() 在每例后清空。
+let reportedErrors = new WeakSet<object>()
+
+/** 清空去重表。仅供测试隔离使用；生产代码不要调用。 */
+export function resetServerErrorDedupe(): void {
+  reportedErrors = new WeakSet<object>()
+}
 
 /** Also used when a failure has already been presented inline. */
 export function markServerErrorHandled(error: unknown): void {

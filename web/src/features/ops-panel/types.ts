@@ -80,14 +80,6 @@ export interface ModelCostRule {
   created_at: string
 }
 
-export interface OpsDaySeriesItem {
-  date: string
-  revenue_quota: number
-  cost_quota: number
-  profit_quota: number
-  requests: number
-}
-
 export interface OpsRankingItem {
   user_id: number
   /** 当前用户名；用户已被删除时为空字符串。 */

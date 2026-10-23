@@ -20,6 +20,8 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { resetServerErrorDedupe } from '@/lib/handle-server-error'
+
 import { DeletePlanDialog } from '../components/dialogs/delete-plan-dialog'
 import type { PlanRecord } from '../types'
 
@@ -80,6 +82,9 @@ function planRecord(id: number, title: string): PlanRecord {
 describe('DeletePlanDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // handleServerError 对「同一错误」有全局去重表；本文件断言错误必须真的弹提示，
+    // 所以显式清空它，避免依赖执行顺序。
+    resetServerErrorDedupe()
     mocks.open = 'delete-plan'
     mocks.currentRow = planRecord(7, 'Starter')
   })

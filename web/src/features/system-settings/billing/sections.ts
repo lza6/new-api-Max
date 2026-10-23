@@ -27,7 +27,7 @@ import type { TFunction } from 'i18next'
  * chunk. __tests__/section-metadata.test.ts keeps this list and the registry in
  * sync.
  */
-export const BILLING_SECTIONS = [
+const BILLING_SECTIONS = [
   { id: 'quota', titleKey: 'Quota Settings' },
   { id: 'currency', titleKey: 'Currency & Display' },
   { id: 'model-pricing', titleKey: 'Model Pricing' },

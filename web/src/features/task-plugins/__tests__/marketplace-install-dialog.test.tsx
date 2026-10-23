@@ -120,7 +120,7 @@ test('loading keeps installation disabled and footer outside the bounded scroll 
   const dialog = screen.getByRole('dialog')
   expect(dialog).toHaveClass(
     'sm:max-w-3xl',
-    'max-h-[calc(100vh-2rem)]',
+    'max-h-[calc(100dvh-2rem)]',
     'overflow-hidden'
   )
   const footer = dialog.querySelector('[data-slot=dialog-footer]')

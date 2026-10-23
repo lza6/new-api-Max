@@ -18,5 +18,4 @@ For commercial licensing, please contact support@quantumnous.com
 */
 export { StatusBackgroundCard } from './status-background'
 export { StatusDependenciesCard } from './status-dependencies'
-export { StatusStateBadge } from './status-state-badge'
 export { StatusTrafficCard } from './status-traffic'

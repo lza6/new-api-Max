@@ -1,7 +1,7 @@
 import { api } from '@/lib/api'
 import { requireServerSuccess } from '@/lib/server-error-message'
 
-export type ActionApprovalStatus =
+type ActionApprovalStatus =
   | 'pending'
   | 'approved'
   | 'denied'

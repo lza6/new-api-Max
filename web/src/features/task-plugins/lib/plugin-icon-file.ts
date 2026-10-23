@@ -110,7 +110,10 @@ export async function fetchPluginIconDataUri(
   const expected = options.sha256?.trim().toLowerCase()
   if (expected) {
     const actual = await sha256Hex(bytes)
-    if (actual !== null && actual !== expected) {return null}
+    // 摘要无法计算时也必须拒绝（fail-closed）：调用方 pin 了 sha256 就是要求完整性校验，
+    // 静默跳过等于把供应链校验关掉。非安全上下文（http 内网）没有 crypto.subtle，
+    // 这时宁可不出图标，也不能展示一个可能被掉包的文件。
+    if (actual === null || actual !== expected) {return null}
   }
   return `data:${mediaType};base64,${bytesToBase64(bytes)}`
 }

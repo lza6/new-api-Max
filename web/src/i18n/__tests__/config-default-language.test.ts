@@ -31,21 +31,23 @@ import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest'
 function setupLocalStorage(initial: Record<string, string> = {}) {
   const store = new Map(Object.entries(initial))
   // jsdom 29 里 `window` 是不可重定义属性，`vi.stubGlobal('window', ...)` 会抛
-  // "Cannot redefine property: window"。被测代码读的是 `window.localStorage`，
-  // 而它与全局 `localStorage` 是同一个 Storage 实例，所以直接替换 Storage 方法
-  // 即可覆盖真实行为（afterEach 里 restoreAllMocks 复原）。
-  vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key: string) =>
+  // "Cannot redefine property: window"。被测代码读的是 `window.localStorage`。
+  // 打桩要打在**实例**上而不是 `Storage.prototype`：threads 池下每个测试文件有独立
+  // realm，全局 `Storage` 与 `window.localStorage` 的类原型不是同一个，打原型会
+  // 失效（表现为「换个 pool 就红」）。
+  const storage = window.localStorage
+  vi.spyOn(storage, 'getItem').mockImplementation((key: string) =>
     store.has(key) ? store.get(key)! : null
   )
-  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(
+  vi.spyOn(storage, 'setItem').mockImplementation(
     (key: string, value: string) => {
       store.set(key, value)
     }
   )
-  vi.spyOn(Storage.prototype, 'removeItem').mockImplementation((key: string) => {
+  vi.spyOn(storage, 'removeItem').mockImplementation((key: string) => {
     store.delete(key)
   })
-  vi.spyOn(Storage.prototype, 'clear').mockImplementation(() => {
+  vi.spyOn(storage, 'clear').mockImplementation(() => {
     store.clear()
   })
   return store

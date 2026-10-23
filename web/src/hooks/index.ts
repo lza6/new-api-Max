@@ -32,4 +32,3 @@ export { useDebounce } from './use-debounce'
 export { useMediaQuery } from './use-media-query'
 
 // Visibility
-export { useDocumentVisible } from './use-document-visible'

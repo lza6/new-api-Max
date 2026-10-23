@@ -34,7 +34,7 @@ const FEATURE_SWITCH_SECTIONS = [
   },
 ] as const
 
-export type FeatureSwitchSectionId =
+type FeatureSwitchSectionId =
   (typeof FEATURE_SWITCH_SECTIONS)[number]['id']
 
 const featureSwitchRegistry = createSectionRegistry<

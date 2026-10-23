@@ -23,9 +23,9 @@ For commercial licensing, please contact support@quantumnous.com
  * `title_key` / `description_key` / `rollback_hint` 是 i18n 键（英文源串），
  * 由一个开关的元数据携带，因此**新增开关不需要改前端**。
  */
-export type FeatureSwitchRisk = 'low' | 'medium' | 'high'
+type FeatureSwitchRisk = 'low' | 'medium' | 'high'
 
-export type FeatureSwitchKind = 'bool' | 'enum'
+type FeatureSwitchKind = 'bool' | 'enum'
 
 export interface FeatureSwitchSnapshot {
   /** 开关的 env 名（稳定契约）。 */
@@ -59,7 +59,7 @@ export interface FeatureSwitchSnapshot {
   rollback_hint: string
 }
 
-export interface FeatureSwitchListData {
+interface FeatureSwitchListData {
   switches: FeatureSwitchSnapshot[]
   /** 与 /metrics 同名指标同源的进程内读数。 */
   metrics: Record<string, number>

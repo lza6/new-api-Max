@@ -27,7 +27,7 @@ import type { TFunction } from 'i18next'
  * chunk. __tests__/section-metadata.test.ts keeps this list and the registry in
  * sync.
  */
-export const AUTH_SECTIONS = [
+const AUTH_SECTIONS = [
   { id: 'basic-auth', titleKey: 'Basic Authentication' },
   { id: 'oauth', titleKey: 'OAuth Integrations' },
   { id: 'passkey', titleKey: 'Passkey Authentication' },

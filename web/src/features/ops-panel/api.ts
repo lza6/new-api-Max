@@ -21,7 +21,6 @@ import { requireServerSuccess } from '@/lib/server-error-message'
 
 import type {
   ModelCostRule,
-  OpsDaySeriesItem,
   OpsOverview,
   OpsRankingResult,
 } from './types'
@@ -52,17 +51,6 @@ export async function grantUserQuota(payload: {
 }): Promise<void> {
   const res = await api.post('/api/admin/ops/grant-quota', payload)
   requireServerSuccess(res.data)
-}
-
-/** GET /api/admin/ops/daily —— 逐日营收/成本/利润（本地时区）。 */
-export async function getOpsDailySeries(
-  days = 30
-): Promise<{ days: number; items: OpsDaySeriesItem[] }> {
-  const res = await api.get('/api/admin/ops/daily', { params: { days } })
-  return requireServerSuccess(res.data)?.data as {
-    days: number
-    items: OpsDaySeriesItem[]
-  }
 }
 
 /** GET /api/admin/ops/model-costs —— 成本配置历史（append-only）。 */

@@ -27,7 +27,7 @@ import type { TFunction } from 'i18next'
  * chunk. __tests__/section-metadata.test.ts keeps this list and the registry in
  * sync.
  */
-export const FEATURE_SWITCH_SECTIONS = [
+const FEATURE_SWITCH_SECTIONS = [
   { id: 'switches', titleKey: 'Feature Switches' },
 ] as const
 

@@ -34,6 +34,13 @@ import { ModelPricingEditorPanel } from '@/features/system-settings/models/model
 import { ModelRatioForm } from '@/features/system-settings/models/model-ratio-form'
 import { api } from '@/lib/api'
 
+// FormNavigationGuard（未保存保护）依赖 TanStack Router 的 useBlocker；
+// 本用例没有路由上下文，按同目录其它设置页测试的既有做法注入 no-op blocker。
+vi.mock('@tanstack/react-router', () => ({
+  useBlocker: () => ({ status: 'idle', proceed: () => undefined, reset: () => undefined }),
+}))
+
+
 const clients: QueryClient[] = []
 const originalColumnVisibility = localStorage.getItem(
   'model-ratio-column-visibility'

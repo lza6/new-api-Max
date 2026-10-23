@@ -27,7 +27,7 @@ import type { TFunction } from 'i18next'
  * chunk. __tests__/section-metadata.test.ts keeps this list and the registry in
  * sync.
  */
-export const SITE_SECTIONS = [
+const SITE_SECTIONS = [
   { id: 'system-info', titleKey: 'System Information' },
   { id: 'notice', titleKey: 'System Notice' },
   { id: 'header-navigation', titleKey: 'Header navigation' },

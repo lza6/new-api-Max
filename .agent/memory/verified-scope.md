@@ -44,3 +44,15 @@
 | `bun run test` 全量并行下 **18 个文件失败**（chat/model-pricing/models/onboarding/pricing/task-plugins/usage-logs/system-settings/subscriptions） | **非本会话引入**：在改动前提交 `6f284de93` 上用 `git worktree` 跑同样 18 个文件 → **14 文件 / 24 用例同样失败**。属仓库既有红基线 |
 | `task-event-stream.test.tsx`、`delete-plan-dialog.test.tsx` 在整批并行下偶发 8s 超时 | 单跑全 PASS；属并发下的 flaky |
 | `node scripts/knip-gate.mjs` 报 117 条"新增"死代码 | 基线文件陈旧导致的漂移，**无一条指向本会话文件**；未 `--update` 掩盖 |
+
+## 2026-10-23 17:30 更新（前端套件全绿）
+
+| 验证项 | 命令 | 结果 |
+|---|---|---|
+| 前端全量 | `cd web && node scripts/test-shards.mjs` | **1582/1582 通过，0 失败，5 片，567s，PASS** |
+| 前端构建 | `cd web && bun run build` | clean，18.5s，产物 24.6MB（gzip 7.76MB） |
+| 死代码门禁 | `cd web && node scripts/knip-gate.mjs` | 绿（586 存量 / 0 新增） |
+| 令牌快照 | `cd web && node scripts/ds-tokens-check.mjs` | 绿（743 tokens） |
+| 后端 | `go build ./...`、`go vet ./controller ./common` | clean |
+
+测试池口径：**必须用 `threads`**（`vmThreads` 会同 worker 共享模块上下文导致 mock 串台）。

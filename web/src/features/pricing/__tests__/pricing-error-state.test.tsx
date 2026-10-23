@@ -28,6 +28,30 @@ const mocks = vi.hoisted(() => ({
   refetch: vi.fn(),
 }))
 
+// 价格页的过滤器把筛选状态放在 URL 上（useFilters → useSearch），
+// 单测没有路由上下文，useSearch 会读到 null router 并抛
+// "Cannot read properties of null (reading 'stores')"。这里给它一份空 search。
+vi.mock('@tanstack/react-router', () => ({
+  useSearch: () => ({}),
+  Link: ({
+    to,
+    children,
+    ...rest
+  }: {
+    to: string
+    children?: React.ReactNode
+  }) => (
+    <a href={to} {...rest}>
+      {children}
+    </a>
+  ),
+}))
+
+// 价格页经 PriceDetails 拉入 vchart；单元测试不需要真实图表，按
+// task-price-display.test.tsx 的既有做法替身掉（vchart 的 ESM 无扩展名导入
+// 在 node 解析下会直接抛 "Cannot find module"，导致整个测试文件加载失败）。
+vi.mock('@visactor/react-vchart', () => ({ VChart: () => null }))
+
 vi.mock('@/features/pricing/hooks/use-pricing-data', () => ({
   usePricingData: () => ({
     models: [],

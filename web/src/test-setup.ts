@@ -18,6 +18,7 @@ For commercial licensing, please contact support@quantumnous.com
 */
 import '@testing-library/jest-dom/vitest'
 import { ReadableStream as NodeReadableStream } from 'node:stream/web'
+import { webcrypto as NodeWebcrypto } from 'node:crypto'
 import { cleanup, configure } from '@testing-library/react'
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
@@ -136,5 +137,17 @@ if (typeof globalThis.ReadableStream === 'undefined') {
     configurable: true,
     writable: true,
     value: NodeReadableStream,
+  })
+}
+
+// jsdom 的 crypto 只有 getRandomValues，没有 subtle，于是依赖真实摘要的用例
+// （插件图标的 sha256 完整性校验）会走「无法计算摘要」分支。这里注入 Node 的
+// WebCrypto，让校验逻辑在测试里真的被执行，而不是被环境差异悄悄绕过。
+if (typeof globalThis.crypto?.subtle === 'undefined') {
+  Object.defineProperty(globalThis, 'crypto', {
+    configurable: true,
+    enumerable: true,
+    writable: true,
+    value: NodeWebcrypto,
   })
 }

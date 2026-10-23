@@ -686,3 +686,34 @@ typecheck / 163 条测试 / build 全部重新通过。教训：Windows 上删�
 
 `git push` 到 GitHub 在 13:33–13:36 连续 10 次失败（`TLS connect error … unexpected eof`），
 部署期间重试后恢复：`64a2ed8f2..620e574df` 与 tag `v1.3.186` 均已推送成功。
+
+---
+
+## 2026-10-23 14:30–17:30 前端套件转绿（主控会话，真实执行）
+
+| 项 | 命令 | 真实结果 |
+|---|---|---|
+| 全量前端测试 | `cd web && node scripts/test-shards.mjs` | **1582/1582 通过，0 失败，5 片，566.9s，RESULT: PASS**（本轮之前：1581 用例中 20 红 → 14 → 13 → 4 → 3 → 1 → 0） |
+| 类型 | `bun run typecheck` | clean |
+| 构建 | `bun run build` | clean，18.5s，产物 24.6MB / gzip 7.76MB |
+| 死代码门禁 | `node scripts/knip-gate.mjs` | **绿**：586 项存量，0 新增（基线 626 键） |
+| 设计令牌门禁 | `node scripts/ds-tokens-check.mjs` | 重生成快照后绿（36 blocks / 743 tokens；117 条漂移=ink 预设，已核对） |
+| i18n 三门禁 | 术语 / 漏译 / 覆盖率 | 全绿 |
+| 后端 | `go build ./...`、`go vet ./controller ./common` | clean |
+
+### 本轮修掉的真实缺陷（不是"让测试变绿"）
+
+1. **插件图标完整性校验 fail-open**：`plugin-icon-file.ts` 原先在 `crypto.subtle` 缺失时**跳过**摘要比对，凡 pin 了 sha256 的图标都可能未经校验就展示。改为 fail-closed（无摘要 → 不显示）。
+2. **统一策略中心不在导航里**：`security/section-registry.tsx` 有 `policy-center` 分区，但轻量元数据 `security/sections.ts` 漏登记 → 用户找不到刚上线的功能。
+3. **测试隔离失效**：`vitest` 的 `vmThreads` 池让同 worker 共享 VM 上下文，一个文件的 `vi.mock('sonner')` 被下一个文件复用 → 断言打错 `vi.fn`。切到 `threads` + `maxWorkers:1` 后 4 处「单跑绿/合跑红」全部消失。
+4. **`@visactor/vchart` ESM 无扩展名导入**让 `pricing-error-state.test.tsx` 整个文件加载失败（用例 0 失败但退出码 1 = 门禁假红）；按既有做法 mock 掉图表。
+5. **计费详情隐藏表达式是既定策略**（`model-cards.test.tsx` 有专门用例守护），`model-listing` 的旧断言要求显示源码 → 对齐策略，并断言「不再显示源码、只给人话」。
+6. **`config-default-language.test.ts`** 在 jsdom 29 下 `vi.stubGlobal('window')` 抛错、且 `Storage.prototype` 打桩跨 realm 失效 → 改为打桩 `window.localStorage` 实例。
+
+### 死代码清理（行为等价）
+
+删 40 个「仅本文件使用」的多余 export、`OpsDaySeriesItem` + `getOpsDailySeries`（未使用的 API 封装）、`site-subscription-stats-card.tsx`（无人 import）、`i18next-browser-languagedetector` 依赖（默认语言改 zhCN 后无引用）。
+
+### 门禁口径修正
+
+`knip-gate.mjs` 不再把 `e2e-local/`（本地探针）与 `scripts/`（CLI 工具）算作死代码，并忽略仅这些探针使用的 `playwright`。理由是它们本就不是可导入模块；修正前 111 条「新增死代码」里 64 条是这类噪声。

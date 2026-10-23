@@ -27,13 +27,16 @@ import type { TFunction } from 'i18next'
  * chunk. __tests__/section-metadata.test.ts keeps this list and the registry in
  * sync.
  */
-export const SECURITY_SECTIONS = [
+const SECURITY_SECTIONS = [
   { id: 'rate-limit', titleKey: 'Rate Limiting' },
   { id: 'global-concurrency', titleKey: 'Global Concurrency Bucket' },
   { id: 'request-compression', titleKey: 'Request Body Compression' },
   { id: 'user-rate-limit', titleKey: 'User Base Rate Limit' },
   { id: 'rate-limit-overrides', titleKey: 'Rate Limit Overrides' },
   { id: 'sensitive-words', titleKey: 'Sensitive Words' },
+  // 统一策略中心：section-registry.tsx 里已有该分区，但元数据漏登记，
+  // 导致它不出现在导航项里（用户找不到刚上线的策略中心）。顺序与 registry 一致。
+  { id: 'policy-center', titleKey: 'Unified Policy Center' },
   { id: 'ssrf', titleKey: 'SSRF Protection' },
   { id: 'login-session-limit', titleKey: 'Login Session Limit' },
   { id: 'token-limits', titleKey: 'Token Limits' },

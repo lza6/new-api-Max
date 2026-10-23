@@ -52,7 +52,7 @@ export interface PublicStatusTraffic {
   error_logging_enabled: boolean
 }
 
-export interface PublicStatusLoop {
+interface PublicStatusLoop {
   name: string
   /** Unix seconds of the loop's last completed tick. */
   last_run_at: number

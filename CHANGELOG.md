@@ -2,6 +2,53 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.187] - 2026-10-23
+
+Frontend suite goes fully green (1582/1582) and the dead-code gate is honest again.
+
+### Fixed
+- **Plugin icon integrity was fail-open.** `fetchPluginIconDataUri` only compared the
+  digest when `crypto.subtle` existed (`actual !== null && actual !== expected`), so in a
+  non-secure context (http intranet, older browser) a **pinned** icon was shown without
+  verifying it. A pinned `sha256` now fails closed: no hash → no icon.
+- **Policy Centre was invisible in the settings nav.** `security/section-registry.tsx`
+  renders `policy-center`, but the lightweight metadata list in
+  `security/sections.ts` never registered it, so it produced no nav item.
+  `section-metadata.test.ts` caught the drift.
+- **Two navigation CTAs lost their test contract**: the tests asserted
+  `role="link"` while Base UI renders `<a role="button">` for
+  `<Button render={<Link/>}>`. Assertions now describe the real contract.
+
+### Changed
+- **Test isolation: `vmThreads` → `threads`.** `vmThreads` shares one VM context per
+  worker, so one file's `vi.mock('sonner')` was reused by the next file and assertions
+  landed on the wrong `vi.fn` (`单跑绿、合跑红`). Reproduced on `delete-plan-dialog`,
+  `confirm-dialog`, `model-cards` and `transparency-panel`; `threads` + `maxWorkers: 1`
+  gives real per-file isolation at the same speed.
+- **`test-setup` now provides WebCrypto**, so digest-dependent tests execute the real
+  hashing path instead of silently taking the "cannot hash" branch.
+- **`handleServerError` exposes `resetServerErrorDedupe()`** and `delete-plan-dialog`
+  clears it per test: the "report each error once" table is module-level state and made
+  that test order-dependent.
+- **`config-default-language.test.ts` spies the `localStorage` instance** instead of
+  `Storage.prototype`, which is not shared across realms under the `threads` pool.
+
+### Removed (dead code, no behaviour change)
+- 40 exports that were only ever used inside their own file (constants, section tables,
+  barrel re-exports), `OpsDaySeriesItem` + `getOpsDailySeries` (unused API wrapper),
+  `site-subscription-stats-card.tsx` (never imported), and the
+  `i18next-browser-languagedetector` dependency (nothing imports it since the default
+  language became zhCN).
+
+### Gates
+- `web/scripts/knip-gate.mjs` no longer counts `e2e-local/` and `scripts/` (local probes
+  and CLI tools are entry points, not dead modules) and ignores `playwright`, which only
+  those probes use. Gate is green: 586 legacy issues, **0 new**.
+- Design-token snapshot regenerated for the `ink` preset (117 drift entries accepted —
+  the change is the V13 preset, nothing else).
+- Full suite: **1582/1582 passed, 0 failed** (5 shards, 567s). `typecheck` clean,
+  `bun run build` clean, `go build ./...` + `go vet ./controller ./common` clean.
+
 ## [v1.3.186] - 2026-10-22
 
 Visual identity batch 3 — motion rule, `ink` structural preset, visual baseline, preset contrast fix (视觉体系 V8/V12/V13).

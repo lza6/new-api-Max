@@ -19,8 +19,8 @@
 > `ops/` 中若引用了已删除的 `计划书/workflow_status.md` 行号，那是历史证据出处；
 > 需要原文时用 `git log --all -- 计划书/workflow_status.md` 找回。
 >
-> 最后核对：**2026-10-23 12:30**（`VERSION` = `v1.3.183`〔**未发版**〕，最新 tag = `v1.3.182`，
-> `CHANGELOG` 首条 = `## [v1.3.183]`，`workflow_status.md` §0 线上版本 = `v1.3.182`）。
+> 最后核对：**2026-10-23 17:30**（`VERSION` = `v1.3.187`〔**未发版**〕，最新 tag = `v1.3.186`，
+> `CHANGELOG` 首条 = `## [v1.3.187]`，`workflow_status.md` §0 线上版本 = `v1.3.186`）。
 > **口径状态由脚本判定，不靠人眼**：`node scripts/check-version-consistency.mjs`
 > （自测 9/9；发版时加 `--require-tag` 强制 tag 一致）。
 > 上一段落（2026-10-22）写的「三处口径不一致 / tag = v1.3.180」已作废。

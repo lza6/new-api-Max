@@ -67,7 +67,7 @@ interface StatusStateBadgeProps {
   size?: 'sm' | 'md' | 'lg'
 }
 
-export function StatusStateBadge(props: StatusStateBadgeProps) {
+function StatusStateBadge(props: StatusStateBadgeProps) {
   const { t } = useTranslation()
   return (
     <StatusBadge

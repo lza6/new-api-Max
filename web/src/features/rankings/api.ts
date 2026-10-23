@@ -66,7 +66,7 @@ export async function getCompressionStats(
 }
 
 /** T1 反事实节省基准：单模型行。 */
-export interface SavingsBaselineModel {
+interface SavingsBaselineModel {
   model_name: string
   count: number
   original_bytes: number
@@ -108,12 +108,12 @@ export async function getSavingsBaseline(
   return res.data
 }
 
-export interface ClientUsage {
+interface ClientUsage {
   client: string
   count: number
   share: number
 }
-export interface ModelClientBreakdown {
+interface ModelClientBreakdown {
   model: string
   total: number
   clients: ClientUsage[]

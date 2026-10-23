@@ -32,3 +32,19 @@
 ## 他会话遗留、仅换行级改动（不得代提交）
 
 `controller/webhook.go`、`model/shadow_price.go`、`controller/site_stats_test.go`、`model/{channel_constraint_test,shadow_price_test,subscription_plan_delete_test}.go` —— 已由 `workflow_status.md` §13 登记为「其它会话未提交文件」。
+
+## 2026-10-23 17:30（前端套件转绿批次）
+
+| 文件 | 变更与原因 |
+|---|---|
+| `web/vitest.config.ts` | 池 `vmThreads` → `threads`：前者同 worker 共享 VM 上下文，`vi.mock` 串台导致「单跑绿、合跑红」 |
+| `web/src/test-setup.ts` | 注入 Node WebCrypto（jsdom 无 `crypto.subtle`，摘要校验用例会走不到真实分支） |
+| `web/src/lib/handle-server-error.ts` | 新增 `resetServerErrorDedupe()`：去重表是模块级状态，测试需按例清空 |
+| `web/src/features/task-plugins/lib/plugin-icon-file.ts` | 摘要校验 fail-open → **fail-closed**（pin 了 sha256 就必须校验通过） |
+| `web/src/features/system-settings/security/sections.ts` | 补登记 `policy-center`：分区已存在但导航元数据缺失 |
+| 25 个前端文件 | 去掉 40 个「仅本文件使用」的多余 export（行为等价） |
+| `web/src/features/ops-panel/{api,types}.ts`、`pricing/components/site-subscription-stats-card.tsx` | 删除未使用的 API 封装 / 类型 / 组件 |
+| `web/package.json` + `bun.lock` | 移除死依赖 `i18next-browser-languagedetector` |
+| `web/scripts/knip-gate.mjs` | 不再把 `e2e-local/`、`scripts/` 算死代码，忽略仅探针使用的 `playwright` |
+| `web/.ai/ds/ds-tokens.json` | 重生成：117 条漂移对应 ink 预设（V13） |
+| 8 个测试文件 | 断言对齐真实契约（Base UI 的 `<a role=button>`、`100dvh`、具名 combobox、表达式不外显策略） |

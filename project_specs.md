@@ -37,7 +37,7 @@
 
 | ID | 目标 | 优先级 | 状态 | 依赖 | 证据 |
 |---|---|---|---|---|---|
-| T-A1 | 前端全量测试一条命令跑完（分片脚本） | P0 | **Doing** | — | `web/scripts/test-shards.mjs`；`--dry-run` 实测 197 文件→5 片；全量运行结果见 `evidence/T-A1.json` |
+| T-A1 | 前端全量测试一条命令跑完（分片脚本） | P0 | **Done** | — | `web/scripts/test-shards.mjs`；**1582/1582 通过、0 失败、5 片、567s**（2026-10-23 17:2x） |
 | T-A5 | 版本四口径机器校验 | P0 | **Done** | — | `scripts/check-version-consistency.mjs`；自测 9/9 PASS；真实仓库 `RESULT: consistent`；已进 CI |
 | T-A6 | CI 补门禁 | P0 | **Done** | T-A5 | `.github/workflows/ci.yml` 新增 `i18n terminology gate` + `Version consistency gate`；`Bun.YAML.parse` 校验通过（frontend 12 steps / 3 jobs）；terminology 门禁本地 RED→GREEN 见 T-B9a |
 | T-A2 | controller 全量 `-shuffle` 顺序依赖回归 | P1 | **Todo** | — | — |

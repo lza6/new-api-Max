@@ -27,7 +27,7 @@ import type { TFunction } from 'i18next'
  * chunk. __tests__/section-metadata.test.ts keeps this list and the registry in
  * sync.
  */
-export const MODELS_SECTIONS = [
+const MODELS_SECTIONS = [
   { id: 'global', titleKey: 'Global Model Configuration' },
   { id: 'routing-reliability', titleKey: 'Routing Reliability' },
   { id: 'gemini', titleKey: 'Gemini' },

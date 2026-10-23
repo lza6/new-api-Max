@@ -104,13 +104,13 @@ function loadBundle(
 }
 
 /** 首屏子集（阻塞首帧）。 */
-export function ensureCommonLanguageLoaded(code: string): Promise<void> {
+function ensureCommonLanguageLoaded(code: string): Promise<void> {
   const lang = code || DEFAULT_LANGUAGE
   return loadBundle(lang, commonLocaleLoaders[lang], loadedCommon, commonLoadPromises)
 }
 
 /** 整包语言包（后台补齐；显式切换语言时也用它）。 */
-export function ensureFullLanguageLoaded(code: string): Promise<void> {
+function ensureFullLanguageLoaded(code: string): Promise<void> {
   const lang = code || DEFAULT_LANGUAGE
   return loadBundle(lang, localeLoaders[lang], loadedFull, fullLoadPromises)
 }
@@ -119,7 +119,7 @@ export function ensureFullLanguageLoaded(code: string): Promise<void> {
  * 确保指定语言**完整**可用。切换语言前调用；失败时静默降级（保留 fallback en），
  * 不阻塞 UI。
  */
-export async function ensureLanguageLoaded(code: string): Promise<void> {
+async function ensureLanguageLoaded(code: string): Promise<void> {
   const lang = code || DEFAULT_LANGUAGE
   await ensureCommonLanguageLoaded(lang)
   await ensureFullLanguageLoaded(lang)
@@ -152,7 +152,7 @@ function readPathLanguage(): string | null {
 }
 
 /** 写入用户显式选择的语言到 localStorage。 */
-export function persistLanguage(code: string): void {
+function persistLanguage(code: string): void {
   if (typeof window === 'undefined') {
     return
   }

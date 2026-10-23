@@ -426,7 +426,7 @@ export interface TaskLog {
  * T7 中继一致性自检的一条发现（对应后端 service.RelayAuditFinding）。
  * 仅管理员可见（落在日志 other.admin_info.relay_audit）。
  */
-export interface RelayAuditFinding {
+interface RelayAuditFinding {
   /** 检查项：sse_whitelist | usage_monotonic | error_leak | model_fingerprint */
   check: string
   /** 严重级别：warn | error */

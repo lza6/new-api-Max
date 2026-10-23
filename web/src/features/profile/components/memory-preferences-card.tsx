@@ -33,7 +33,7 @@ import { parseUserSettings } from '../lib'
 import type { UserProfile } from '../types'
 
 /** 与服务端 relaykit/dto.MaxMemoryInjectionRunes 保持一致。 */
-export const MAX_MEMORY_INJECTION_RUNES = 2000
+const MAX_MEMORY_INJECTION_RUNES = 2000
 
 type MemoryPreferencesCardProps = {
   profile: UserProfile | null

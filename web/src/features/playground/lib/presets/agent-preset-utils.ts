@@ -28,8 +28,8 @@ export const MAX_AGENT_PRESETS = 20
 export const MAX_PRESET_NAME_RUNES = 64
 export const MAX_PRESET_SYSTEM_RUNES = 8000
 export const MAX_PRESET_MAX_TOKENS = 32000
-export const MIN_TEMPERATURE = 0
-export const MAX_TEMPERATURE = 2
+const MIN_TEMPERATURE = 0
+const MAX_TEMPERATURE = 2
 
 /** 按 Unicode 码点计数（与后端 utf8.RuneCountInString 同口径）。 */
 export function runeLength(value: string): number {

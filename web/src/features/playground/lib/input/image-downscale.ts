@@ -38,10 +38,10 @@ For commercial licensing, please contact support@quantumnous.com
 export const IMAGE_MAX_DIMENSION = 1568
 
 /** 压缩后目标字节上限（1MB）。 */
-export const IMAGE_MAX_BYTES = 1024 * 1024
+const IMAGE_MAX_BYTES = 1024 * 1024
 
 /** JPEG 质量阶梯：从高到低逐档尝试，直到压进目标体积。 */
-export const IMAGE_QUALITY_STEPS = [0.92, 0.85, 0.75, 0.65, 0.55]
+const IMAGE_QUALITY_STEPS = [0.92, 0.85, 0.75, 0.65, 0.55]
 
 /**
  * 计算降采样后的尺寸（纯函数）。

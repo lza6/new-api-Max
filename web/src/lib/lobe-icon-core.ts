@@ -27,7 +27,7 @@ import { IconSub2api } from '@/assets/custom/icon-sub2api'
 import { LOBE_ICON_META } from '@/lib/lobe-icon-meta'
 
 type IconProps = Record<string, unknown>
-export type IconComponent = React.ComponentType<IconProps>
+type IconComponent = React.ComponentType<IconProps>
 
 export type ResolvedIcon = {
   Comp: IconComponent
@@ -36,7 +36,7 @@ export type ResolvedIcon = {
 
 export const FALLBACK_SIZE = 20
 
-export const CUSTOM_ICONS: Record<string, IconComponent> = {
+const CUSTOM_ICONS: Record<string, IconComponent> = {
   Sub2API: IconSub2api as unknown as IconComponent,
 }
 

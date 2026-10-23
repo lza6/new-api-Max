@@ -119,7 +119,7 @@ export type LiveRequestEntry = {
   finished_at?: number
 }
 
-export type LiveConcurrencyStats = {
+type LiveConcurrencyStats = {
   enabled: boolean
   active: number
   waiting: number

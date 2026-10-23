@@ -86,9 +86,11 @@ describe('UploadDialog layout', () => {
     renderDialog()
 
     const content = document.querySelector('[data-slot=dialog-content]')
-    const body = content?.querySelector(':scope > div:nth-child(2)')
-    expect(content).toHaveClass('max-h-[calc(100vh-2rem)]')
-    expect(body).toHaveClass('overflow-y-auto')
+    const body = content?.querySelector(':scope > div:nth-child(2) > div')
+    expect(content).toHaveClass('max-h-[calc(100dvh-2rem)]')
+    // 滚动容器是共享 Dialog 的外层（min-h-0 + overflow-y-auto + max-h），
+    // 内层只负责内边距与间距；断言打在真正承载滚动的那一层。
+    expect(body?.parentElement).toHaveClass('overflow-y-auto')
   })
 
   test('does not steal focus into the mid-dialog source editor on open', () => {

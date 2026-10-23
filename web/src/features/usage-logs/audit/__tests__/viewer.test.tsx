@@ -519,7 +519,7 @@ it('changing rows per page resets pagination and sends the selected page size', 
       params: expect.objectContaining({ p: 2 }),
     })
   )
-  await user.click(screen.getByRole('combobox', { name: '' }))
+  await user.click(screen.getByRole('combobox', { name: 'Rows per page' }))
   await user.click(await screen.findByRole('option', { name: '50' }))
   await waitFor(() =>
     expect(get).toHaveBeenLastCalledWith('/api/audit/self', {
