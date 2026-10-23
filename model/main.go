@@ -233,7 +233,14 @@ func InitLogDB() (err error) {
 		common.SetLogDatabaseType(common.MainDatabaseType())
 		InitCol()
 		if common.IsMasterNode {
-			return MigrateAuditLogs()
+			// 单库形态（未配置 LOG_SQL_DSN）下日志库就是主库，**同样必须跑日志侧迁移**。
+			//
+			// 旧实现这里只 `return MigrateAuditLogs()` 就结束了，导致 migrateLOGDB()
+			// 在单库部署上从来不被调用——2026-10-23 生产实测代价：
+			//   1. 新增的 log_daily_stats 表没被创建（刷新任务首 tick 报 42P01）；
+			//   2. 废弃的 idx_logs_traffic 没被删除（每次写日志白维护一个 60MB 死索引）。
+			// migrateLOGDB 内部先调 MigrateAuditLogs，所以不会漏掉审计表，且全程幂等。
+			return migrateLOGDB()
 		}
 		return
 	}

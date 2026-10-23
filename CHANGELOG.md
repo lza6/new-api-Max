@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented here.
 
+## [v1.3.194] - 2026-10-23
+
+### Fixed
+- **`migrateLOGDB()` was never called on single-database deployments** — the root cause
+  behind `log_daily_stats` never being created and the obsolete `idx_logs_traffic` never
+  being dropped. `InitLogDB()` had two branches; the one taken when `LOG_SQL_DSN` is unset
+  (i.e. the common production shape) did `return MigrateAuditLogs()` and stopped, while
+  `migrateLOGDB()` — which owns `AutoMigrate(&Log{}, &LogDailyStat{})` and
+  `migrateLogTrafficIndex` — was only reachable from the *separate log database* branch.
+  That branch now also calls `migrateLOGDB()`, which begins with `MigrateAuditLogs()` so
+  nothing is skipped, and the whole path is idempotent.
+  The previously added `AutoMigrate` fallback inside `RefreshLogDailyStats` stays as
+  defence in depth.
+
 ## [v1.3.193] - 2026-10-23
 
 ### Fixed
