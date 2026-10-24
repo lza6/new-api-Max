@@ -48,3 +48,19 @@
 |---|---|---|
 | `anthropic` 预设白字 on 陶土 `#e37756` 仅 **2.9:1**（WCAG AA 违规） | `--primary` 由 `oklch(0.685 0.142 38)` 改 `oklch(0.57 0.128 38)` | axe 亮/暗各 0 违规；11 预设 × 2 页全 0 |
 | `Table` 根 `[&_th]:text-sm` 压掉表头微标签字号（computed 14px） | 移除该后代覆盖 | 浏览器实测 `th` = 11px / tracking 0.275px |
+
+## 2026-10-24 新增（改进指南 v1.3.195 重写批次）
+
+| # | 问题 | 级别 | 证据 | 缺什么才能修 |
+|---|---|---|---|---|
+| 1 | **CI 门禁在本仓库的工作流下从不运行**：`ci.yml` 仅 `on: pull_request`，而 37 个提交/14 个 tag 全部直接 push main | P0 | 读 6 个 workflow 触发条件；`release.yml`/`docker-build.yml` 只构建不测 | 无（改 `ci.yml` 加 `push: branches: [main]`，T-A9） |
+| 2 | `ci.yml` 的 `Test` 步骤跑不完：`bun run test` = `vitest run`，而 `vitest.config.ts` 强制 `maxWorkers:1` + `fileParallelism:false`，job timeout 10min，本地实测单进程 >25min、分片 707s | P0 | `web/package.json`、`web/vitest.config.ts:63-69`、`ci.yml:144-146` | 改成分片脚本 + 放宽 timeout（T-A9） |
+| 3 | 版本口径门禁当前 **RED**（`计划书/README.md` 停 v1.3.192，实际 v1.3.195），已存活 ≥2 个版本 | P0 | 实跑 `check-version-consistency.mjs` | 改两处声明（T-A10） |
+| 4 | **生产零备份**：仓库内 `rg 'pg_dump\|数据库备份\|backup' 计划书/ops scripts deploy` **零命中** | P0 | 本轮实跑 | SSH 凭据或业主本地执行（T-E1，已授权待落地） |
+| 5 | **47KB 尼尔森指南此前未纳入版本控制**（只存在于工作区） | P1 | `git ls-files 计划书` 查不到 | **已于本批次提交修复** |
+| 6 | 前端全量测试当前 1599/1601（2 条失败，`model-listing.test.tsx:771 square_state`），归因并行会话在途改动 | P2 | 本轮实跑 + 单跑复现 | 待 HEAD 隔离复现 |
+
+## 2026-10-24 环境事实补充
+
+- 本工作区**同时有 7 个会话 busy**（`ListAgents` 观察），跑测试会读到别人的半成品状态。
+- 每次跑前端全量前先 `git status` 快照，否则会把别人的 bug 记成自己的回归。

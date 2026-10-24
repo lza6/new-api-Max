@@ -1,5 +1,42 @@
 # 周报
 
+## 2026-10-24（第 44 周）
+
+**本轮（仅文档交付，未改代码）**
+
+- 把 `计划书/下一步改进指南.md` 从基线 v1.3.181 **整篇重写为 v1.3.195**（37 提交 / 14 版本推进）。
+  旧版已归档 `计划书/archive/plans/20261024/`（sha256 `56bbcb0b…d79fb9`）+ manifest。
+- **本轮最重要的新发现**：`ci.yml` 仅 `on: pull_request`，而本仓库 37 个提交、14 个 tag **全部直接 push main** →
+  **6 条门禁 + 三库 conformance job 一次都没跑过**；且 `Test` 步骤用的 `bun run test`（`maxWorkers:1`）
+  与 `timeout-minutes:10` 天然不相容（本地实测单进程 >25min，分片 707s）。→ 定为 P0-3。
+  实证：版本口径门禁当前 **RED**（`计划书/README.md` 停 v1.3.192）却已存活 ≥2 个版本。
+- 完成度据实盘点：B 轨道 10 卡**只完成 3 张**（B1/B2/B9a），`refetchInterval` 22 处/17 文件仅 5 文件门控、
+  `mode:'onChange'` 涨到 12 处、`toast.loading` 仍 2 处、空态 18 处；C 轨道 V0–V13 **Done**。
+- 问题清单：P0 3 → **5 条**（新增「生产零备份」——仓库内 `rg pg_dump` 零命中；与「暴露面」）；
+  P1 重排为 **7 条**（新增「三库证据随 v1.3.189–195 改 model 而失效」）；P2 10 条 / P3 6 条。
+- 新增 **轨道 E 运维（6 卡）/ F 数据层性能（6 卡）/ G 计费正确性（3 卡）**，任务卡 32 → **34 张**。
+- 新增 §7「最强自我反驳与盲点扫描」（7 条，其中 R4 主动回退「轮询恶化」的口径结论）。
+- 用户 3 项拍板（2026-10-24）：D-1 备份**已授权**（缺落地方式）/ D-2 **不砍项、全部落地** / D-3 卫生**授权我决策**。
+  据此我做了 7 条具体处置：提交 47KB 尼尔森指南、`logger/zz_dryrun_test.go` 保留并提交、e2e-local 73 个脚本**不删只归档**、
+  他会话 12 处源码**不动不代提交**、`*.exe`（106MB）待勾选、e2e-evidence 被覆盖的 7 文件不还原。
+- 路线重排 **v1.3.196 → v1.3.209**，新增「砍版规则」防估时失真（上一版 13 个版本只兑现 3 张卡）。
+
+**本轮实跑的 6 条命令（真实输出）**
+
+| 命令 | 结果 |
+|---|---|
+| `node scripts/check-version-consistency.mjs` | **inconsistent**（2 处：`计划书/README` 声明 v1.3.192） |
+| `cd web && node scripts/check-terminology.mjs` | PASS |
+| `cd web && node scripts/check-missing-i18n.cjs` | OK（0 missing） |
+| `cd web && node scripts/ds-tokens-check.mjs` | OK（743 tokens） |
+| `go build ./...` | PASS 10.2s |
+| `cd web && node scripts/test-shards.mjs` | **1599/1601，2 failed，707.4s**（失败归因并行会话在途改动；单跑复现 `model-listing.test.tsx:771` 的 `square_state` 断言） |
+
+**下轮建议**：T-A9（CI 加 `push: main`）+ T-A10（修 3 处红项）+ T-A13/A14（卫生与台账）。
+零外部依赖、零产品风险，且是后续所有 PASS 可信的前提。
+
+---
+
 ## 2026-10-23（第 43 周续）
 
 **本轮（仅文档交付，未改代码）**

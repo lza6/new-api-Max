@@ -56,3 +56,18 @@
 | 后端 | `go build ./...`、`go vet ./controller ./common` | clean |
 
 测试池口径：**必须用 `threads`**（`vmThreads` 会同 worker 共享模块上下文导致 mock 串台）。
+
+## 2026-10-24 改进指南重写批次（本会话新增）
+
+| 验证项 | 命令 | 结果 | 有效期条件 |
+|---|---|---|---|
+| 版本口径 | `node scripts/check-version-consistency.mjs` | **inconsistent**（`计划书/README.md` 声明 v1.3.192 vs 实际 v1.3.195） | 每次改 VERSION / 该 README |
+| 术语门禁 | `cd web && node scripts/check-terminology.mjs` | PASS | 改 locale |
+| 漏译门禁 | `cd web && node scripts/check-missing-i18n.cjs` | OK（0 missing） | 改 locale |
+| 令牌门禁 | `cd web && node scripts/ds-tokens-check.mjs` | OK（743 tokens，源哈希未变） | 改 theme.css / theme-presets.css |
+| Go 构建 | `go build ./...` | PASS **10.2s**（缓存热，含他会话 12 处未提交改动） | 任何 `.go` 变更后 |
+| 前端全量 | `cd web && node scripts/test-shards.mjs` | **1599/1601，2 failed，707.4s**（shard1 2 失败，其余全绿） | 任何 ts/tsx 变更后 |
+| 失败定位 | `bunx vitest run src/features/models/__tests__/model-listing.test.tsx` | 单跑 **1 failed / 24 passed**（`square_state` 断言，实际 `["partial"]`） | 同上 |
+| CI 触发条件 | 读 6 个 `.github/workflows/*.yml` | **`ci.yml` 仅 pull_request**；release/docker 只构建 | 改任何 workflow |
+
+**测试规模变化**：1582 → **1601** 条（+19，有会话在加测试）。**已知噪声新增**：`model-listing.test.tsx` 的 `square_state` 用例在并行会话在途改动下失败，非 HEAD 缺陷（`合理推断`，未做 HEAD 隔离复现）。

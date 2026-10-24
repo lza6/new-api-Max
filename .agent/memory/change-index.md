@@ -48,3 +48,19 @@
 | `web/scripts/knip-gate.mjs` | 不再把 `e2e-local/`、`scripts/` 算死代码，忽略仅探针使用的 `playwright` |
 | `web/.ai/ds/ds-tokens.json` | 重生成：117 条漂移对应 ink 预设（V13） |
 | 8 个测试文件 | 断言对齐真实契约（Base UI 的 `<a role=button>`、`100dvh`、具名 combobox、表达式不外显策略） |
+
+## 2026-10-24（改进指南 v1.3.195 重写批次，**仅文档**）
+
+| 文件 | 类型 | 变更与原因 |
+|---|---|---|
+| `计划书/下一步改进指南.md` | **整篇重写** | 基线 v1.3.181 → v1.3.195；新增 §1.3「CI 门禁真相」、§7「自我反驳与盲点」、轨道 E/F/G；P0 3→5、任务卡 32→34、路线 v1.3.196–209 + 砍版规则 |
+| `计划书/archive/plans/20261024/下一步改进指南-v1.3.181基线.md` | 新增（归档） | 旧版留档，sha256 `56bbcb0b…d79fb9`，80646 B |
+| `计划书/archive/plans/20261024/archive-manifest.md` | 新增 | 归档 manifest（含恢复命令） |
+| `project_specs.md` | 重写 | 对齐 v1.3.195；7 轨道 / 34 卡状态表；据实修 T-A2/A3/A4/A7 与 B 轨残余数量 |
+| `计划书/tasks/riper5_20261024_184000.md` | 新增 | 本轮 RIPER-5 记录 |
+| `计划书/tasks/weekly.md` | 追加 | 第 44 周本轮摘要 |
+| `计划书/尼尔森十项可用性原则-界面设计规范与整改指南.md` | **首次纳入 git** | 此前未跟踪（P1-5），47.1KB 唯一可用性施工蓝图 |
+| `logger/zz_dryrun_test.go` | **首次纳入 git** | 未跟踪但参与 `go test ./logger/` 编译；有效手工 dry-run 工具 |
+| `.agent/memory/{known-issues,verified-scope,change-index,decisions,audit-history}.md` | 追加 | 本轮事实与决策 |
+
+**未改动（明确）**：无任何 `.go` / `.ts` / `.tsx` / `.yml` / 测试 / 脚本变更；他会话 12 处源码改动未动。
