@@ -14,7 +14,7 @@
 > 本文件**只记状态机与证据指针**，不重复施工细节。改状态必须同时给出证据路径，否则状态无效。
 
 - 最后更新：**2026-10-24**（对齐 `计划书/下一步改进指南.md` 基线 v1.3.195）
-- 仓库基线：`VERSION=v1.3.195`（已发版）／最新 tag `v1.3.195`／**线上 `v1.3.192`（落后 3 个版本：193/194/195 未上线）**
+- 仓库基线：`VERSION=v1.3.195`（已发版）／最新 tag `v1.3.195`／**线上 `v1.3.195`（2026-10-24 生产实测，与仓库零落后）**
 - 远端：`origin` = `lza6/new-api-Max`（**可推送**）；`upstream` = `QuantumNous/new-api`（**禁止推送**）
 - 上一版本记录：`v1.3.187` 基线（见 git 历史）
 
@@ -47,7 +47,7 @@
 | **T-A11** | 三库 conformance 重跑（v1.3.189–195 改过 `model/` 后必做） | **P1** | **Todo** | 本机 MySQL/PG 临时实例 | 最后证据是 `evidence/three-db-conformance-20261018.json`（v1.3.16x 期） |
 | **T-A12** | `controller -shuffle` 顺序依赖回归 | P1 | **Todo** | — | — |
 | **T-A13** | 工作区卫生落地（提交未纳管文档、e2e-local 归档分类） | P1 | **Doing** | — | 2026-10-24：尼尔森指南已提交；`web/e2e-local/` 73 个未跟踪脚本待迁 `archive/` |
-| **T-A14** | 台账对齐（本文件 + `workflow_status` §0 + `计划书/README`） | P1 | **Doing** | T-A10 | 本文件已对齐 v1.3.195；其余两处待改 |
+| **T-A14** | 台账对齐（本文件 + `workflow_status` §0 + `计划书/README`） | P1 | **Done（2026-10-24）** | T-A10 | 三处均已对齐 v1.3.195；`workflow_status` §0 已按生产实测把「线上 192→195」纠正，并补了主机暴露面/备份两行 |
 | **T-A15** | `relaykit` 独立构建复验（`GOWORK=off`） | P2 | **Todo** | — | — |
 | T-A4 | ClickHouse 真跑验证 | P0 | **Blocked** | Docker 或 CH 二进制 | 缺：本机无 `docker`；从未执行 |
 | T-A7 | 工作区卫生清单（只列不删） | P2 | **Dropped** | — | 已被 T-A13 取代（本轮直接给了处置决策） |
@@ -92,8 +92,8 @@
 
 | ID | 目标 | 优先级 | 状态 | 前置 / 证据 |
 |---|---|---|---|---|
-| T-E1 | 每日 `pg_dump` + 7 天轮转 + **restore 演练** | **P0** | **Todo（已授权，缺落地方式）** | 用户 2026-10-24 授权备份；缺 SSH 凭据或你本地执行 + 备份落点决策 |
-| T-E2 | 主机加固（关 3001 公网 / SSH 密钥 + 禁 root 密码 / fail2ban） | **P0** | **Todo（待授权）** | 改生产网络配置，需 Q-2 确认 |
+| T-E1 | 每日 `pg_dump` + 7 天轮转 + **restore 演练** | **P0** | **Done（2026-10-24）** | 脚本加固 + 恢复演练通过（pg_restore exit 0 / 1m31s / 表 62=62 / users 1625=1625 / tokens 1452=1452 / daily 415=415）+ 异地副本 sha256 一致 → `evidence/T-E1.json`、`计划书/ops/SOP-备份与恢复.md` |
+| T-E2 | 主机加固（SSH 密钥化 / 关密码登录 / 关公网端口 / ufw） | **P0** | **Done（2026-10-24）** | 密钥登录+关密码（实测 `Permission denied (publickey)`）、MaxAuthTries 3、ufw 仅 22/80/443、postfix 只听 loopback、compose 端口锁 loopback；外网仅 22/80/443 可达，站点 200 → `evidence/T-E2.json`、`计划书/ops/SOP-主机加固.md` |
 | T-E3 | Docker 日志轮转上限 | P1 | **Todo** | `docker-compose.yml` 无 `logging:` 段（示例文件；生产以 `LogConfig` 为准） |
 | T-E4 | 连接池 `SQL_MAX_OPEN_CONNS` 64 → ≤ PG `max_connections` | P1 | **Todo** | `model/main.go:212,266` 默认 64；审计称生产 PG 上限 50 |
 | T-E5 | Caddy 健康检查 `/api/status` → `/readyz` | P1 | **Todo** | 需真实演练：停 PG 后 `/readyz` 必须非 200 |

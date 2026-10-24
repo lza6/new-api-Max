@@ -64,3 +64,21 @@
 | `.agent/memory/{known-issues,verified-scope,change-index,decisions,audit-history}.md` | 追加 | 本轮事实与决策 |
 
 **未改动（明确）**：无任何 `.go` / `.ts` / `.tsx` / `.yml` / 测试 / 脚本变更；他会话 12 处源码改动未动。
+
+## 2026-10-24（生产加固执行轮）
+
+| 文件/对象 | 类型 | 变更与原因 |
+|---|---|---|
+| `evidence/T-E1.json` / `evidence/T-E2.json` | 新增 | 备份闭环与主机加固的真实命令 + 输出 + 限制 |
+| `计划书/ops/SOP-备份与恢复.md` | 更新 | 状态改"已在生产执行并通过恢复演练"，补实测数字、纠正"零备份"前提、新增 5 条剩余边界 |
+| `计划书/ops/SOP-主机加固.md` | 新增 | 加固前后对照、审计结论纠正表、验证输出、**VNC 应急恢复命令**、5 条残余风险 |
+| `计划书/下一步改进指南.md` | 更新 | P0-1/P0-2 标已闭环；§1.4 改生产实测（v1.3.195 / 62 表 / 61G）；T-E1/T-E2 标 Done；D-4 拍板；变更记录追加执行轮 |
+| `workflow_status.md` §0 | 更新 | 线上 `v1.3.192` → **`v1.3.195`**（生产实测纠正）；补端口/暴露面/备份/DB 规模四行 |
+| `project_specs.md` | 更新 | T-E1/T-E2/T-A14 → Done；线上版本改 v1.3.195 |
+| **生产机** `/opt/new-api/backup.sh` | 加固 | umask 077 / 目录 700 / 剩余空间守卫 / 配置快照 / 只轮转自身命名；原件 `.bak-20261024-113344` |
+| **生产机** `/etc/ssh/sshd_config` | 加固 | 密钥认证开、密码认证关、root 禁密码、MaxAuthTries 3；原件 `.bak-20261024-*` |
+| **生产机** `/etc/postfix/main.cf` | 加固 | `inet_interfaces = loopback-only`；原件 `.bak-20261024-*` |
+| **生产机** `ufw` | 启用 | default deny incoming，放行 22/80/443 |
+| **生产机** `/opt/new-api/docker-compose.yml` | 加固 | `3001:3000` → `127.0.0.1:3001:3000`；原件 `.bak-20261024-*` |
+| 本机 `~/.ssh/config` + `newapi_prod_ed25519` | 新增 | `ssh newapi-prod` 别名；密钥登录 |
+| 本机 `~/newapi-prod-backups/` | 新增 | 一次性异地副本（dump 83MB + config tar，sha256 双端一致） |

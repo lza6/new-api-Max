@@ -35,3 +35,11 @@
 - **头号发现**：`ci.yml` 仅 `on: pull_request`，而实际发版是直接 push main + tag → **6 条门禁 + 三库 job 从未运行**，且 `Test` 步骤本身跑不完。这是"所有假完成/口径漂移"的根因层。
 - **证据出处**：`计划书/下一步改进指南.md` §1.3 / §1.6；`计划书/tasks/riper5_20261024_184000.md`。
 - **未闭环**：生产侧取值（P0-2/P1-7/P2-1）未连线；`计划书/ops/DECISION-claude-billing.md` 未读；`db_structure.md` 是否含 `log_daily_stats` 未验证；三库/`-shuffle`/relaykit 未跑。
+
+## 第 14 轮（2026-10-24，生产加固执行轮）
+
+- **范围**：生产机 `154.37.208.171` 的暴露面与备份实际状态（连线取证）。
+- **结论**：**两条既有审计结论被证伪** —— ①「3001 端口暴露公网」实测早已 `127.0.0.1:3000`；②「无 fail2ban」实测已装且 sshd jail 生效（Total banned 70）。**一条被纠正** —— 「零备份」实为「仓库里搜不到」，生产 `crontab` 早有每日备份。
+- **真实缺口并已修**：SSH 密码登录开着（`pubkeyauthentication no`）、ufw inactive、postfix 公网 25、备份从未演练/未含配置/权限过宽/无异地。
+- **证据**：`evidence/T-E1.json`、`evidence/T-E2.json`、`计划书/ops/SOP-主机加固.md`、`计划书/ops/SOP-备份与恢复.md`。
+- **未闭环**：DOCKER-USER 绕过 ufw、异地备份自动化、WAL 归档（PITR）、内核重启、控制台密码轮换、`db_structure.md` 过期（55 vs 62 表）。

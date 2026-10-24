@@ -1,0 +1,83 @@
+{
+  "task_id": "T-E1",
+  "title": "生产数据库备份闭环：脚本加固 + 恢复演练 + 异地副本",
+  "status": "passed",
+  "timestamp": "2026-10-24T11:34:00Z..11:41:00Z（服务器 UTC）/ 19:34..19:41 Asia/Shanghai",
+  "target": "root@154.37.208.171（生产主站 freeapi.tingfengai.art）",
+  "prior_state_correction": {
+    "claimed_by_audit_20261023": "全站零备份、零 WAL 归档",
+    "actual_state_20261024": "备份已存在（crontab 0 3 * * * /opt/new-api/backup.sh，脚本 2026-10-23 10:55 落地，目录 /opt/backup/new-api 同日创建）。审计结论在 10-24 已不成立。",
+    "real_gaps_found": [
+      "从未做过 restore 演练（只有 pg_restore -l 结构校验，不等于能恢复）",
+      ".env / Caddyfile 不在备份内 —— CRYPTO_SECRET 丢了数据库恢复了用户也登不上",
+      "dump 文件权限 644 + 目录 755（含明文渠道 Key，world-readable）",
+      "备份与数据库同机，无异地副本",
+      "脚本无剩余空间守卫，磁盘满会连带打挂服务"
+    ]
+  },
+  "commands_executed": [
+    {
+      "cmd": "crontab -l",
+      "exit_code": 0,
+      "raw_output_tail": "0 3 * * * /opt/new-api/backup.sh >> /var/log/newapi-backup.log 2>&1"
+    },
+    {
+      "cmd": "cp -a /opt/new-api/backup.sh /opt/new-api/backup.sh.bak-20261024-113344 && chmod 700 /opt/backup/new-api && chmod 600 /opt/backup/new-api/*.dump",
+      "exit_code": 0,
+      "raw_output_tail": "drwx------ 2 root root 4096 Oct 24 03:00 .\n-rw------- 1 root root 190079899 Oct 23 10:56 newapi-20261023-105558.dump\n-rw------- 1 root root 191957301 Oct 23 14:39 newapi-20261023-143842.dump\n-rw------- 1 root root  83102949 Oct 24 03:00 newapi-20261024-030001.dump"
+    },
+    {
+      "cmd": "bash -n /opt/new-api/backup.sh",
+      "exit_code": 0,
+      "raw_output_tail": "bash -n OK"
+    },
+    {
+      "cmd": "time /opt/new-api/backup.sh",
+      "exit_code": 0,
+      "raw_output_tail": "[backup] 2026-10-24T11:34:26+00:00 ok db=83M cfg=4.0K tables=62\nreal\t0m22.940s"
+    },
+    {
+      "cmd": "tar -tzf /opt/backup/new-api/config-20261024-113403.tar.gz",
+      "exit_code": 0,
+      "raw_output_tail": "opt/new-api/.env\nopt/new-api/docker-compose.yml\netc/caddy/Caddyfile"
+    },
+    {
+      "cmd": "docker exec postgres createdb -U newapi restore_drill && time docker exec -i postgres pg_restore -U newapi -d restore_drill --no-owner --no-privileges < <最新 dump>",
+      "exit_code": 0,
+      "raw_output_tail": "createdb OK\nreal\t1m31.150s\npg_restore 退出码=0"
+    },
+    {
+      "cmd": "psql 行数对比（生产 vs 恢复后的 restore_drill）",
+      "exit_code": 0,
+      "raw_output_tail": "生产基线: users=1625 tokens=1452 channels=7 logs=716963 daily=415 tables=62\n恢复后:   users=1625 tokens=1452 channels=7 logs=716924 daily=415 tables=62"
+    },
+    {
+      "cmd": "docker exec postgres dropdb -U newapi restore_drill",
+      "exit_code": 0,
+      "raw_output_tail": "dropdb OK\n/dev/vda1 78G 18G 61G 23% /"
+    },
+    {
+      "cmd": "scp 最新 dump + config tar 到本机 ~/newapi-prod-backups/ ；双端 sha256sum 比对",
+      "exit_code": 0,
+      "raw_output_tail": "本地=476577d5107e45e7c9b915b01a95ce6c136dfaa531d7ea38ca7edbb0116d4032\n远端=476577d5107e45e7c9b915b01a95ce6c136dfaa531d7ea38ca7edbb0116d4032\nSHA256 一致 → 异地副本完整"
+    }
+  ],
+  "tests": [
+    {"name": "备份脚本语法", "type": "lint", "status": "passed", "evidence": "bash -n OK"},
+    {"name": "备份产出非空且 pg_restore 可解析", "type": "integration", "status": "passed", "evidence": "db=83M tables=62"},
+    {"name": "配置快照含 .env/compose/Caddyfile", "type": "integration", "status": "passed", "evidence": "tar -tzf 输出 3 个条目"},
+    {"name": "全量恢复演练（临时库）", "type": "e2e", "status": "passed", "evidence": "pg_restore exit 0, 1m31s, 表数 62/62, users/tokens/channels/daily 逐项相等"},
+    {"name": "异地副本完整性", "type": "integration", "status": "passed", "evidence": "双端 sha256 一致"}
+  ],
+  "coverage_summary": {"lines": null, "branches": null, "functions": null, "statements": null},
+  "seams_touched": ["docker(postgres) ↔ 宿主机 /opt/backup", "宿主机 ↔ 本机异地副本"],
+  "mock_scenarios_covered": [],
+  "browser_validation": {"performed": false, "paths": [], "screenshots": []},
+  "limitations": [
+    "恢复演练在 2026-10-24 11:34 的快照上完成；演练期间生产仍在写入，logs 相差 39 条属正常（快照后新增）。",
+    "仍不是 PITR：RPO 最长约 24 小时（每日 03:00 一次）。要分钟级需开 WAL 归档，未做。",
+    "异地副本目前是『拉到本机 ~/newapi-prod-backups/』的一次性副本，不是自动异地同步 —— 自动化待决策（对象存储/另一台机 rsync）。",
+    "本机副本为明文（含渠道 Key），Windows 侧未加密；建议后续加密或改传对象存储。",
+    "从未在真实故障（库损坏）场景下执行过生产恢复；只有临时库演练证据。"
+  ]
+}

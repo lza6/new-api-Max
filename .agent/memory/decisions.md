@@ -75,3 +75,21 @@
   5. 根目录 `*.exe`（106MB+123MB）**只列清单待业主勾选**（属删除真实数据边界）；
   6. `计划书/e2e-evidence/v1.3.162-ui/` 被覆盖的 7 文件 **不还原**（工作区版本可能更准），登记为 P2-6。
 - **代价**：e2e-local 目录继续膨胀（117 文件），需下一轮执行模式真正落地归档动作。
+
+## D-2026-10-24-04｜SSH 改为仅密钥登录（带死手开关）
+
+- **背景**：`passwordauthentication yes` + `pubkeyauthentication no`，root 密码可登；该密码已明文出现在本机记忆与临时 askpass 中。fail2ban 已在压制暴力破解（Total banned 70），但这挡不住"密码一旦泄露"。
+- **决策**：生成 `~/.ssh/newapi_prod_ed25519` → 写 `authorized_keys` → **先只开 `PubkeyAuthentication yes` 验证密钥能登** → 再关密码 + `PermitRootLogin prohibit-password` + `MaxAuthTries 3`；全程挂 600s 死手开关（未取消则自动恢复密码登录）。
+- **代价**：用户换机/丢私钥就登不上，必须走服务商 VNC 控制台执行 `SOP-主机加固.md` §4.1 的命令。已把私钥路径与应急命令写进 SOP §1。
+
+## D-2026-10-24-05｜ufw 只放行 22/80/443，且用 300s 死手开关
+
+- **背景**：ufw inactive，等于没有主机防火墙；但直接 enable 有小概率把自己锁在外面。
+- **决策**：`default deny incoming` + allow 22/80/443 → enable；enable 前挂 300s 自动 `ufw disable` 的后台任务，验证新 SSH 连接成功后再 `touch` 取消。
+- **代价**：将来任何新服务（如加监控端口）必须先 `ufw allow`，否则表现是"服务起了但外面连不上"。
+
+## D-2026-10-24-06｜备份加固而不重写，异地副本先做一次性
+
+- **背景**：生产已有 `/opt/new-api/backup.sh`（10-23 落地）且带"非空 + pg_restore -l"校验；真实缺口是**从未演练**、配置未纳入、权限过宽、无异地。
+- **决策**：**在原脚本上加固**（保留其余逻辑：`pg_dump -Fc` + 7 天轮转），新增 umask 077 / 目录 700 / 剩余空间守卫 / `.env`+compose+`Caddyfile` 快照；**不换实现**。异地副本本轮用 `scp` 手工拉一份到本机 `~/newapi-prod-backups/` 并核对 sha256。
+- **代价**：异地副本会随本机关机而"过期"，**必须尽快定自动化方案**（rsync 第二台 / 对象存储）。

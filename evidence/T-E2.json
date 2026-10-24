@@ -1,0 +1,101 @@
+{
+  "task_id": "T-E2",
+  "title": "生产主机暴露面收口：SSH 密钥化 + 关密码登录 + 关 3001/25 公网 + ufw",
+  "status": "passed",
+  "timestamp": "2026-10-24T11:33:00Z..11:45:00Z（服务器 UTC）/ 19:33..19:45 Asia/Shanghai",
+  "target": "root@154.37.208.171（生产主站 freeapi.tingfengai.art）",
+  "prior_state_correction": {
+    "claimed_by_audit_20261023": [
+      "SSH 只允许 root 密码登录、无公钥、无 fail2ban、无防火墙，24h 内 16867 次撞库",
+      "3001 端口 0.0.0.0 直接暴露公网，明文 HTTP 绕过 Caddy"
+    ],
+    "actual_state_20261024": {
+      "3001": "已不暴露。实跑容器由 deploy-zero-downtime.sh 管理，绑定 127.0.0.1:3000->3000（docker ps 证据），Caddy 反代 127.0.0.1:3000。外网探测 3001 = ECONNREFUSED。",
+      "fail2ban": "已安装并启用 sshd jail（Status: Number of jail: 1, Jail list: sshd）",
+      "ufw": "inactive（真实缺口）",
+      "sshd": "permitrootlogin yes + passwordauthentication yes + pubkeyauthentication NO（真实缺口）",
+      "port25": "postfix inet_interfaces=all，监听 0.0.0.0:25（真实缺口，外网从本机网络测为 timeout，但监听面存在）"
+    }
+  },
+  "commands_executed": [
+    {
+      "cmd": "sshd -T | grep -E '^(permitrootlogin|passwordauthentication|pubkeyauthentication|maxauthtries)' # 加固前",
+      "exit_code": 0,
+      "raw_output_tail": "maxauthtries 6\npermitrootlogin yes\npubkeyauthentication no\npasswordauthentication yes"
+    },
+    {
+      "cmd": "ssh-keygen -t ed25519 -f ~/.ssh/newapi_prod_ed25519 -N '' # 本机生成专用密钥，公钥写入 /root/.ssh/authorized_keys",
+      "exit_code": 0,
+      "raw_output_tail": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKjKdiNK4mz8I2ip24To/S1Hgw3U6fbmjaSLXs7jQu6w newapi-prod-20261024\n(root) wc -l /root/.ssh/authorized_keys -> 1"
+    },
+    {
+      "cmd": "Phase1: sed PubkeyAuthentication no->yes; sshd -t; systemctl reload ssh; ssh -i key ... 'echo KEY LOGIN OK'",
+      "exit_code": 0,
+      "raw_output_tail": "sshd -t OK\nreload OK\nKEY LOGIN OK\nroot"
+    },
+    {
+      "cmd": "Phase2（死手开关 600s 自动回退）: sed PasswordAuthentication yes->no; PermitRootLogin yes->prohibit-password; MaxAuthTries 3; sshd -t; reload",
+      "exit_code": 0,
+      "raw_output_tail": "sshd -t OK\nreload OK\nmaxauthtries 3\npermitrootlogin without-password\npubkeyauthentication yes\npasswordauthentication no"
+    },
+    {
+      "cmd": "ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no root@154.37.208.171 'echo SHOULD_NOT_APPEAR'",
+      "exit_code": 255,
+      "raw_output_tail": "root@154.37.208.171: Permission denied (publickey)."
+    },
+    {
+      "cmd": "ssh -i ~/.ssh/newapi_prod_ed25519 ... 'echo KEY OK; systemctl is-active ssh'",
+      "exit_code": 0,
+      "raw_output_tail": "KEY OK, deadman cancelled\nactive"
+    },
+    {
+      "cmd": "postconf -e 'inet_interfaces = loopback-only' && systemctl restart postfix && ss -lntp | grep ':25'",
+      "exit_code": 0,
+      "raw_output_tail": "active\nLISTEN 0 100 127.0.0.1:25 0.0.0.0:* users:((\"master\",pid=2784134,fd=12))"
+    },
+    {
+      "cmd": "sed -i 's/- \"3001:3000\"/- \"127.0.0.1:3001:3000\"/' /opt/new-api/docker-compose.yml",
+      "exit_code": 0,
+      "raw_output_tail": "22:    ports:\n23-      - \"127.0.0.1:3001:3000\""
+    },
+    {
+      "cmd": "ufw default deny incoming; ufw allow 22,80,443; ufw --force enable（死手开关 300s 自动 disable）",
+      "exit_code": 0,
+      "raw_output_tail": "Firewall is active and enabled on system startup\nStatus: active\nDefault: deny (incoming), allow (outgoing), deny (routed)\n22/tcp ALLOW IN Anywhere\n80/tcp ALLOW IN Anywhere\n443/tcp ALLOW IN Anywhere"
+    },
+    {
+      "cmd": "加固后 sshd -T / ufw status / fail2ban-client status sshd / ss -lntp",
+      "exit_code": 0,
+      "raw_output_tail": "maxauthtries 3\npermitrootlogin without-password\npubkeyauthentication yes\npasswordauthentication no\n---\nfail2ban: Currently failed 21, Total failed 2310, Currently banned 2, Total banned 70\n---\n对外监听: 0.0.0.0:22, *:80, *:443（仅此三项）"
+    },
+    {
+      "cmd": "外网探测（本机 node net.connect 154.37.208.171:22/25/80/443/3000/3001）",
+      "exit_code": 0,
+      "raw_output_tail": "port 22: OPEN\nport 25: timeout\nport 80: OPEN\nport 443: OPEN\nport 3000: timeout\nport 3001: timeout"
+    },
+    {
+      "cmd": "站点自检（服务器侧 + 本机）",
+      "exit_code": 0,
+      "raw_output_tail": "https=200 readyz=200\nhttps status=200 / healthz=200 / readyz=200"
+    }
+  ],
+  "tests": [
+    {"name": "sshd 配置合法性", "type": "lint", "status": "passed", "evidence": "sshd -t OK（两阶段各一次）"},
+    {"name": "密钥登录可用", "type": "smoke", "status": "passed", "evidence": "KEY LOGIN OK / root"},
+    {"name": "密码登录被拒", "type": "security", "status": "passed", "evidence": "Permission denied (publickey). exit=255"},
+    {"name": "对外端口面收敛", "type": "security", "status": "passed", "evidence": "外网仅 22/80/443 OPEN；3000/3001/25 不可达"},
+    {"name": "服务可用性回归", "type": "smoke", "status": "passed", "evidence": "https 200 / healthz 200 / readyz 200"},
+    {"name": "fail2ban 生效", "type": "security", "status": "passed", "evidence": "Total failed 2310 / Total banned 70 / Currently banned 2"}
+  ],
+  "coverage_summary": {"lines": null, "branches": null, "functions": null, "statements": null},
+  "seams_touched": ["外部网络 ↔ ufw ↔ sshd", "Caddy ↔ 127.0.0.1:3000(docker)", "postfix 监听面"],
+  "mock_scenarios_covered": [],
+  "browser_validation": {"performed": false, "paths": [], "screenshots": []},
+  "limitations": [
+    "只从本机一条网络路径做了外网探测；不排除特定出口网络对 25/3001 的探测结果不同（监听面与 ufw 规则已客观收敛，此限制影响很小）。",
+    "root 密码 bvspEQw9Dm 曾以明文出现在本机记忆文件与临时 askpass 中；现在密码认证已关闭，该密码对 SSH 已无授权作用，但建议仍视作已泄露并轮换（改 /etc/shadow 会牵动控制台救援密码，未擅自执行）。",
+    "未安装入侵检测（如 auditd/rkhunter）、未做内核升级（reboot-required 自 10-06 未重启，需停机窗口）。",
+    "3000 端口在 ufw 前已是 loopback 绑定；ufw 只是兜底。若将来有人用 docker run -p 3000:3000 发布到 0.0.0.0，docker 的 DOCKER-USER 链会绕过 ufw 默认规则 —— 本条未加防护（需在 DOCKER-USER 链显式拒绝），列为剩余风险。",
+    "本机 ~/.ssh/newapi_prod_ed25519 为无口令私钥，便于自动化；若本机被入侵则该密钥即生产 root 权限。"
+  ]
+}

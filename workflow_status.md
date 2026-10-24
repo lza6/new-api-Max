@@ -1,18 +1,21 @@
 ## 0. 线上版本声明（唯一真相源）
 
-> 更新于 2026-10-22。其他地方若与本表冲突，以本表为准。
+> 更新于 2026-10-24。其他地方若与本表冲突，以本表为准。
 
 | 项 | 值 | 校验命令 |
 |---|---|---|
-| 线上版本 | `v1.3.192` | `ssh ... 'docker ps --format "{{.Image}}"'` |
-| 部署时间 | 2026-10-23 23:52（蓝绿，Caddy 上游 **3001**，零停机） | `grep -oE "127.0.0.1:300[0-9]" /etc/caddy/Caddyfile \| head -1` |
-| 容器资源 | new-api 1500m/swap2400m/2core/GOMEMLIMIT=1024MiB；postgres 1200m/shared_buffers 256MB；redis 192m/maxmemory 128mb | `docker inspect new-api --format "{{.HostConfig.Memory}}"` |
+| 线上版本 | `v1.3.195`（2026-10-24 19:33 生产实测 `docker ps`：`new-api:v1.3.195 Up 17 hours (healthy)`） | `ssh newapi-prod 'docker ps --format "{{.Image}}"'` |
+| 容器端口 | `127.0.0.1:3000->3000`（**不是 3001**；由 `deploy-zero-downtime.sh` 管理，compose 段不用于生产） | `ssh newapi-prod 'docker ps --format "{{.Ports}}"'` |
+| 主机暴露面 | 外网仅 **22/80/443**；ufw active（default deny incoming）；SSH **仅密钥**（密码登录已关闭）；postfix 只听 loopback | 见 `evidence/T-E2.json` |
+| 备份 | `/opt/backup/new-api`（700，dump 600），cron `0 3 * * *`；**恢复演练已通过**（表 62/62、users/tokens/daily 逐项相等） | 见 `evidence/T-E1.json` |
+| 数据库 | PostgreSQL 15，库 `new-api`，3707MB，**62 张表** | `psql -c "select count(*) from information_schema.tables where table_schema='public'"` |
 | 代码 SHA | `git rev-parse origin/main` | `git log origin/main -1` |
-| 回滚镜像 | `new-api:v1.3.186`（保留最近 4 个版本：184/185/186/187） | `docker images new-api` |
-| 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh v1.3.186` | — |
-| VERSION 文件 | `v1.3.187` | `cat VERSION` |
+| 回滚命令 | `cd /opt/new-api && ./deploy-zero-downtime.sh <上一版>` | `docker images new-api` 核对实际可用镜像 |
+| VERSION 文件 | `v1.3.195` | `cat VERSION` |
 
-`VERSION` / 最新 tag / `CHANGELOG` 首条 / 本表四者一致；若不一致，必须先修本文档。
+`VERSION` / 最新 tag / `CHANGELOG` 首条 三者一致（`node scripts/check-version-consistency.mjs` = consistent，2026-10-24 19:45 实测）。
+**本表上一版曾写「线上 v1.3.192」，经 2026-10-24 生产实测纠正为 v1.3.195**（193/194/195 其实都已上线，只是台账没跟上）。
+若本表再次与 `docker ps` 冲突，以 `docker ps` 为准并立即修本表。
 
 ---
 

@@ -71,3 +71,26 @@
 | CI 触发条件 | 读 6 个 `.github/workflows/*.yml` | **`ci.yml` 仅 pull_request**；release/docker 只构建 | 改任何 workflow |
 
 **测试规模变化**：1582 → **1601** 条（+19，有会话在加测试）。**已知噪声新增**：`model-listing.test.tsx` 的 `square_state` 用例在并行会话在途改动下失败，非 HEAD 缺陷（`合理推断`，未做 HEAD 隔离复现）。
+
+## 2026-10-24 生产加固执行轮（**已在生产实测，勿重复跑**）
+
+| 验证项 | 命令（服务器侧） | 结果 | 有效期条件 |
+|---|---|---|---|
+| 线上版本 | `docker ps --format '{{.Image}}'` | **`new-api:v1.3.195`**，Up healthy | 每次部署后 |
+| 容器端口 | `docker ps --format '{{.Ports}}'` | `127.0.0.1:3000->3000/tcp` | 重启/换镜像后 |
+| 数据库规模 | `psql -c "select pg_database_size(...)"` / 表数 | 3707MB / **62 张表** | — |
+| 磁盘 | `df -h /` | 78G，用 18G，**可用 61G（23%）** | 磁盘告警 |
+| 备份脚本 | `bash -n /opt/new-api/backup.sh` + 手动执行 | `ok db=83M cfg=4.0K tables=62`，**22.9s** | 改脚本后 |
+| **恢复演练** | `createdb restore_drill` + `pg_restore --no-owner` + 行数对比 + `dropdb` | **PASS**：exit 0、**1m31s**、表 62/62、users 1625=1625、tokens 1452=1452、channels 7=7、daily 415=415、logs 716924（生产 716963，演练期间增量） | 每次改 schema 后重练 |
+| 异地副本 | `scp` 到本机 + 双端 `sha256sum` | 一致 `476577d5…6d4032`，83MB | 每次拉取后 |
+| SSH 生效配置 | `sshd -T` | `pubkeyauthentication yes` / `passwordauthentication no` / `permitrootlogin without-password` / `maxauthtries 3` | 改 sshd 后 |
+| 密码登录被拒 | `ssh -o PreferredAuthentications=password -o PubkeyAuthentication=no` | **`Permission denied (publickey)`**（exit 255） | 改 sshd 后 |
+| 密钥登录 | `ssh newapi-prod` | OK | — |
+| ufw | `ufw status verbose` | **active**，default deny incoming，仅放行 22/80/443 | 改防火墙后 |
+| 对外端口面 | 本机 `node net.connect` 打 22/25/80/443/3000/3001 | **仅 22/80/443 OPEN**；25/3000/3001 均不可达 | 每次改动网络面后 |
+| postfix | `ss -lntp \| grep :25` | 只监听 `127.0.0.1:25` | 改 postfix 后 |
+| fail2ban | `fail2ban-client status sshd` | sshd jail 生效：Total failed 2310 / Total banned 70 / Currently banned 2 | — |
+| 站点可用性 | 服务器侧 `curl` | https 200 / `/healthz` 200 / `/readyz` 200 | 每次变更后 |
+
+**SSH 登录方式已变**：`ssh newapi-prod`（别名在 `~/.ssh/config`，私钥 `~/.ssh/newapi_prod_ed25519`）。
+密码 `bvspEQw9Dm` **对 SSH 已失效**（密码认证关闭）。
