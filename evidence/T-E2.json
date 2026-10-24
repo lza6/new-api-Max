@@ -93,7 +93,7 @@
   "browser_validation": {"performed": false, "paths": [], "screenshots": []},
   "limitations": [
     "只从本机一条网络路径做了外网探测；不排除特定出口网络对 25/3001 的探测结果不同（监听面与 ufw 规则已客观收敛，此限制影响很小）。",
-    "root 密码 bvspEQw9Dm 曾以明文出现在本机记忆文件与临时 askpass 中；现在密码认证已关闭，该密码对 SSH 已无授权作用，但建议仍视作已泄露并轮换（改 /etc/shadow 会牵动控制台救援密码，未擅自执行）。",
+    "root 密码 **（旧密码，已失效）** 曾以明文出现在本机记忆文件与临时 askpass 中；现在密码认证已关闭，该密码对 SSH 已无授权作用，但建议仍视作已泄露并轮换（改 /etc/shadow 会牵动控制台救援密码，未擅自执行）。",
     "未安装入侵检测（如 auditd/rkhunter）、未做内核升级（reboot-required 自 10-06 未重启，需停机窗口）。",
     "3000 端口在 ufw 前已是 loopback 绑定；ufw 只是兜底。若将来有人用 docker run -p 3000:3000 发布到 0.0.0.0，docker 的 DOCKER-USER 链会绕过 ufw 默认规则 —— 本条未加防护（需在 DOCKER-USER 链显式拒绝），列为剩余风险。",
     "本机 ~/.ssh/newapi_prod_ed25519 为无口令私钥，便于自动化；若本机被入侵则该密钥即生产 root 权限。"

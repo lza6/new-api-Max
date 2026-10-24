@@ -21,6 +21,20 @@
    判断线上可达性**不要用本机 curl**，用服务器侧自检或 `node -e`。详见 §5.1。
 3. **「用户说进不去」不等于站点挂了。** 先取「真实业务流量」这条最硬证据，再下结论。详见 §5.1。
 
+### 0.1 服务器怎么登（2026-10-24 起变了）
+
+```bash
+ssh newapi-prod          # 仅密钥登录：~/.ssh/newapi_prod_ed25519，别名写在 ~/.ssh/config
+```
+
+- **密码登录已关闭**（`passwordauthentication no` + `permitrootlogin prohibit-password`），
+  旧的 root 密码 + `SSH_ASKPASS` 方式会直接 `Permission denied (publickey)`。
+- 换机 / 私钥丢失 / 被锁 → 服务商控制台 VNC，按 `计划书/ops/SOP-主机加固.md` §4.1 恢复密码登录。
+- 生产对外只开 **22 / 80 / 443**（ufw active，默认拒绝入站）；25 只监听 loopback。
+- ⚠️ **禁止 `docker compose up -d new-api`**：实跑容器由 `deploy-zero-downtime.sh` 管理，
+  compose 里的 new-api 段是历史残留（2026-10-23 曾因它差点把生产降到 v1.3.88）。详见 §2。
+- 改 sshd / ufw / postfix 必须先挂**死手开关**（`SOP-主机加固.md` §5），否则可能把自己锁在外面。
+
 ---
 
 ## 1. 速查表：常用一条命令
